@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Modules Traitement V1</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 40px 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+            font-size: 28px;
+        }
+
+        .modules-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+
+        .module-card {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .module-card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+        }
+
+        .module-icon {
+            font-size: 40px;
+            margin-bottom: 15px;
+        }
+
+        .module-title {
+            font-size: 20px;
+            font-weight: 700;
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+
+        .module-description {
+            font-size: 14px;
+            color: #7f8c8d;
+            margin-bottom: 20px;
+            line-height: 1.6;
+        }
+
+        .module-features {
+            font-size: 12px;
+            color: #95a5a6;
+            margin-bottom: 20px;
+            border-left: 3px solid #667eea;
+            padding-left: 12px;
+        }
+
+        .module-features li {
+            list-style: none;
+            margin: 5px 0;
+        }
+
+        .module-features li:before {
+            content: "✓ ";
+            color: #27ae60;
+            font-weight: bold;
+        }
+
+        .module-btn {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 14px;
+        }
+
+        .module-btn:hover {
+            transform: scale(1.02);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .back-section {
+            text-align: center;
+            margin-top: 40px;
+        }
+
+        .back-btn {
+            padding: 12px 24px;
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 2px solid white;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 14px;
+        }
+
+        .back-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .info-section {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 20px;
+            color: white;
+            margin-bottom: 30px;
+            border-left: 4px solid white;
+        }
+
+        .info-section h3 {
+            margin-bottom: 10px;
+        }
+
+        .info-section p {
+            font-size: 14px;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📦 Modules Traitement V1</h1>
+
+        <div class="info-section">
+            <h3>ℹ️ À propos</h3>
+            <p>Bienvenue dans la section Traitement V1. Ici vous trouverez tous les modules spécialisés pour la gestion avancée des données et des fichiers.</p>
+        </div>
+
+        <div class="modules-grid">
+            <!-- Module Upload Dossier -->
+            <div class="module-card">
+                <div class="module-icon">📂</div>
+                <div class="module-title">Upload de Dossier</div>
+                <div class="module-description">
+                    Uploader des dossiers complets avec support des sous-dossiers et jusqu'à 100 fichiers
+                </div>
+                <ul class="module-features">
+                    <li>Arborescence complète</li>
+                    <li>Jusqu'à 100 fichiers</li>
+                    <li>Sous-dossiers illimités</li>
+                    <li>Sauvegarde persistante</li>
+                </ul>
+                <button class="module-btn" onclick="window.location.href='folderUpload.html'">
+                    Accéder →
+                </button>
+            </div>
+
+            <!-- Autres modules à venir -->
+            <div class="module-card" style="opacity: 0.7;">
+                <div class="module-icon">🔄</div>
+                <div class="module-title">Synchronisation</div>
+                <div class="module-description">
+                    Module de synchronisation des données (à venir)
+                </div>
+                <ul class="module-features">
+                    <li>En développement</li>
+                    <li>Bientôt disponible</li>
+                </ul>
+                <button class="module-btn" disabled style="cursor: not-allowed; opacity: 0.6;">
+                    Bientôt →
+                </button>
+            </div>
+
+            <div class="module-card" style="opacity: 0.7;">
+                <div class="module-icon">📊</div>
+                <div class="module-title">Rapport Avancé</div>
+                <div class="module-description">
+                    Génération de rapports personnalisés (à venir)
+                </div>
+                <ul class="module-features">
+                    <li>En développement</li>
+                    <li>Bientôt disponible</li>
+                </ul>
+                <button class="module-btn" disabled style="cursor: not-allowed; opacity: 0.6;">
+                    Bientôt →
+                </button>
+            </div>
+        </div>
+
+        <div class="back-section">
+            <button class="back-btn" onclick="window.location.href='../home.html'">
+                ← Retour au tableau de bord
+            </button>
+        </div>
+    </div>
+</body>
+</html>

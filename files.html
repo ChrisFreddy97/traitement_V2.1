@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestion des Fichiers</title>
+    <link rel="stylesheet" href="files.css">
+</head>
+<body>
+    <div class="container">
+        <header class="management-header">
+            <div class="header-content">
+                <h1>📊 Gestion des Relèves V2</h1>
+                <button id="back-to-home-btn" class="btn btn-secondary">
+                    ← Retour à l'accueil
+                </button>
+            </div>
+        </header>
+
+        <main class="management-main">
+            <!-- Barre de recherche -->
+            <div class="search-section">
+                <input type="text" id="folder-search" placeholder="🔍 Rechercher un dossier par nom NR..." class="search-input">
+            </div>
+
+            <!-- Bouton pour ouvrir le modal d'ajout -->
+            <div class="add-folder-section">
+                <button id="open-add-modal-btn" class="btn btn-primary btn-large">
+                    ➕ Ajouter un nouveau relève
+                </button>
+            </div>
+
+            <!-- Section Liste des Dossiers -->
+            <div id="folders-list-section" class="folders-section">
+                <h2>📁 Dossiers Relèves Créés</h2>
+                <div id="folders-list" class="folders-grid">
+                    <!-- Les dossiers seront ajoutés dynamiquement ici -->
+                </div>
+                <div id="no-folders-message" class="no-data">
+                    <p>Aucun dossier créé pour le moment</p>
+                    <p>Cliquez sur "Ajouter un nouveau dossier" pour commencer</p>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modal d'ajout de dossier -->
+    <div id="add-folder-modal" class="modal hidden">
+        <div class="modal-content large">
+            <div class="modal-header">
+                <h2>📁 Ajouter un nouveau dossier</h2>
+                <span class="close">&times;</span>
+            </div>
+            <div class="modal-body">
+                <!-- Section Sélection de dossier -->
+                <div class="upload-section">
+                    <div class="upload-card">
+                        <button id="select-folder-btn" class="btn btn-primary btn-large">
+                            📁 Sélectionner un dossier
+                        </button>
+                        <div id="selected-folder" class="folder-info"></div>
+                    </div>
+                </div>
+
+                <!-- Section Analyse des Fichiers -->
+                <div id="files-section" class="files-section hidden">
+                    <h3>Fichiers détectés</h3>
+                    <div id="files-list" class="files-list"></div>
+                    
+                    <div class="nr-section">
+                        <label for="nr-input">Numéro NR (unique):</label>
+                        <input type="text" id="nr-input" placeholder="Entrez le numéro NR">
+                    </div>
+
+                    <div id="clients-section" class="clients-section hidden">
+                        <h4>Configuration des clients</h4>
+                        <div id="clients-list"></div>
+                    </div>
+
+                    <div class="validation-section">
+                        <button id="validate-btn" class="btn btn-success btn-large" disabled>
+                            ✅ Valider et créer le dossier
+                        </button>
+                        <div id="validation-hint" class="validation-hint">
+                            Le bouton sera activé lorsque tous les critères seront remplis
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="cancel-modal-btn" class="btn btn-secondary">Annuler</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="files.js"></script>
+</body>
+</html>

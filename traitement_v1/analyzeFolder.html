@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analyse du Dossier</title>
+    <link rel="stylesheet" href="analyzeFolder.css">
+    <!-- SUPPRIMER la ligne ci-dessous -->
+    <!-- <script src="../chart.js"></script> -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header class="analyze-header">
+            <div class="header-content">
+                <div class="header-info">
+                    <h1 id="folder-title">📂 Analyse du Dossier</h1>
+                    <p id="folder-info-subtitle"></p>
+                </div>
+                <button id="back-btn" class="btn btn-secondary">
+                    ← Retour
+                </button>
+            </div>
+        </header>
+
+        <main class="analyze-main">
+            <!-- Système d'onglets -->
+            <div class="tabs-container">
+                <div class="tabs-header">
+                    <div id="tabs-list" class="tabs-list">
+                        <!-- Les onglets seront créés dynamiquement ici -->
+                    </div>
+                </div>
+
+                <!-- Contenu des onglets -->
+                <div id="tabs-content" class="tabs-content">
+                    <!-- Le contenu de chaque onglet s'affichera ici -->
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="analyzeFolder.js"></script>
+</body>
+</html>

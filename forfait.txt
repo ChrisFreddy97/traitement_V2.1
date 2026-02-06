@@ -1,0 +1,12 @@
+const FORFAITS = {
+  ECO: { max: 50, maxMarge: 57.5, heures: 5 },
+  ECLAIRAGE: { max: 90, maxMarge: 103.5, heures: 5 },
+  "ECLAIRAGE +": { max: 150, maxMarge: 172.5, heures: 5 },
+  MULTIMEDIA: { max: 210, maxMarge: 241.5, heures: 5 },
+  "MULTIMEDIA +": { max: 210, maxMarge: 241.5, heures: 5 },
+  "ECLAIRAGE PUBLIC": { max: 150, maxMarge: 172.5, heures: 11 },
+  CONGEL: { max: 1250, maxMarge: 1437.5, heures: 24 },
+  "FREEZER 1": { max: 2160, maxMarge: 2484, heures: 24 }, 90W x 24h et marge=+15%
+  "FREEZER 3": { max: 2160, maxMarge: 2484, heures: 24 }, 90W x 24h et marge=+15%
+  PRENIUM: { max: 500, maxMarge: 575, heures: 24 }
+};

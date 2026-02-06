@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Upload Dossier</title>
+    <link rel="stylesheet" href="folderUpload.css">
+</head>
+<body>
+    <div class="container">
+        <header class="upload-header">
+            <div class="header-content">
+                <h1>📊 Gestion des Relèves V1</h1>
+                <button id="back-to-home-btn" class="btn btn-secondary">
+                    ← Retour
+                </button>
+            </div>
+        </header>
+
+        <main class="upload-main">
+            <!-- Zone de statistiques -->
+            <section class="stats-section">
+                <div class="stat-card">
+                    <div class="stat-number" id="total-folders-count">0</div>
+                    <div class="stat-label">Dossiers sauvegardés</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="total-files-count">0</div>
+                    <div class="stat-label">Fichiers au total</div>
+                </div>
+            </section>
+
+            <!-- Barre de recherche -->
+            <div class="search-section">
+                <input type="text" id="folder-search" placeholder="🔍 Rechercher un dossier par nom..." class="search-input">
+            </div>
+
+            <!-- Boutons pour ouvrir les différents modes d'upload -->
+            <div class="add-folder-section">
+                <div class="upload-mode-buttons">
+                    <button id="open-upload-modal-btn" class="btn btn-primary btn-large">
+                        ➕ Relève Copie carte SD
+                    </button>
+                    <button id="open-arduino-page-btn" class="btn btn-info btn-large">
+                        🔧 Relève Arduino IDE
+                    </button>
+                </div>
+            </div>
+
+            <!-- Section Liste des Dossiers uploadés -->
+            <div id="folders-list-section" class="folders-section">
+                <h2>📁 Dossiers Relèves Créés</h2>
+                <div id="folders-list" class="folders-grid">
+                    <!-- Les dossiers seront ajoutés dynamiquement ici -->
+                </div>
+                <div id="no-folders-message" class="no-data">
+                    <p>Aucun dossier uploadé pour le moment</p>
+                    <p>Cliquez sur un bouton ci-dessus pour commencer</p>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modal d'upload de dossier -->
+    <div id="upload-folder-modal" class="modal hidden">
+        <div class="modal-content large">
+            <div class="modal-header">
+                <h2>📂 Uploader un Dossier</h2>
+                <span class="close">&times;</span>
+            </div>
+            <div class="modal-body">
+                <!-- Section Sélection de dossier -->
+                <div class="upload-section">
+                    <div class="upload-card">
+                        <button id="select-folder-btn" class="btn btn-primary btn-large">
+                            📁 Sélectionner un dossier
+                        </button>
+                        <div id="selected-folder-info" class="folder-info"></div>
+                    </div>
+                </div>
+
+                <!-- Section Analyse du dossier -->
+                <div id="folder-analysis-section" class="analysis-section hidden">
+                    <h3>Aperçu du dossier</h3>
+                    
+                    <div style="background: #e8f4f8; border-left: 4px solid #3498db; padding: 12px; margin-bottom: 15px; border-radius: 4px;">
+                        <p style="color: #2c3e50; font-size: 13px; margin: 0;">
+                            <strong>ℹ️ Info :</strong> Le dossier principal doit être nommé "NR" suivi du numéro (ex: NR3125). Le N°NR sera extrait automatiquement.
+                        </p>
+                    </div>
+                    
+                    <div class="folder-stats">
+                        <div class="stat-item">
+                            <span class="stat-icon">📁</span>
+                            <span class="stat-text"><strong id="subfolder-count">0</strong> sous-dossier(s)</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-icon">📄</span>
+                            <span class="stat-text"><strong id="file-count">0</strong> fichier(s) .txt</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-icon">✅</span>
+                            <span class="stat-text"><strong id="selected-files-count">0</strong> fichier(s) sélectionné(s)</span>
+                        </div>
+                    </div>
+
+                    <!-- Boutons de sélection globale -->
+                    <div class="selection-actions">
+                        <button id="select-all-files-btn" class="btn btn-small btn-primary">
+                            ✅ Sélectionner tous les fichiers
+                        </button>
+                        <button id="deselect-all-files-btn" class="btn btn-small btn-secondary">
+                            ❌ Désélectionner tous
+                        </button>
+                        <button id="select-last-three-btn" class="btn btn-small btn-info">
+                            ⏱️ Sélectionner les 3 derniers fichiers par dossier
+                        </button>
+                    </div>
+
+                    <!-- Arborescence des fichiers avec cases à cocher -->
+                    <div class="tree-section">
+                        <h4>🌳 Structure du dossier - Sélectionnez les fichiers .txt à uploader</h4>
+                        <div id="folder-tree" class="folder-tree"></div>
+                    </div>
+
+                    <!-- Informations de dossier (SIMPLIFIÉ - PAS DE DESCRIPTION) -->
+                    <div class="folder-info-section">
+                        <div class="nr-extraction-info" id="nr-extraction-info" style="display: none;">
+                            <div style="background: #e8f4f8; padding: 10px; border-radius: 6px; margin-bottom: 10px;">
+                                <p style="margin: 0; font-size: 13px; color: #2c3e50;">
+                                    <strong>NR détecté :</strong> <span id="detected-nr">NR0000</span> 
+                                    <button id="use-detected-nr-btn" class="btn btn-small btn-success" style="margin-left: 10px;">
+                                        Utiliser ce NR
+                                    </button>
+                                </p>
+                            </div>
+                        </div>
+                        
+                        <label for="folder-name-input">N° NR:</label>
+                        <input type="text" id="folder-name-input" placeholder="Ex: NR3125" autocomplete="off">
+                    </div>
+
+                    <!-- Bouton de validation -->
+                    <div class="validation-section">
+                        <button id="validate-upload-btn" class="btn btn-success btn-large" disabled>
+                            ✅ Valider et uploader
+                        </button>
+                        <div id="upload-validation-hint" class="validation-hint">
+                            Sélectionnez au moins un fichier et remplissez le N°NR
+                        </div>
+                    </div>
+
+                    <!-- Barre de progression -->
+                    <div id="progress-container" class="progress-container hidden">
+                        <div class="progress-bar">
+                            <div id="progress-fill" class="progress-fill"></div>
+                        </div>
+                        <div class="progress-text" id="progress-text">Upload en cours...</div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="cancel-upload-modal-btn" class="btn btn-secondary">Annuler</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de confirmation NR -->
+    <div id="nr-confirmation-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>🔍 Confirmation du N°NR</h2>
+            </div>
+            <div class="modal-body">
+                <p>Le N°NR détecté est : <strong id="confirmation-nr-number">0000</strong></p>
+                <p><strong>Est-ce bien le N°NR de ce dossier ?</strong></p>
+                <p class="confirmation-hint">Si ce n'est pas le bon numéro, vous pouvez le modifier dans le champ N°NR.</p>
+            </div>
+            <div class="modal-footer">
+                <button id="confirm-nr-yes" class="btn btn-success">Oui, c'est le bon</button>
+                <button id="confirm-nr-no" class="btn btn-secondary">Non, modifier</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de détails du dossier -->
+    <div id="folder-details-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="details-folder-name">Détails du Dossier</h2>
+                <span class="close close-details">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="details-content">
+                    <p><strong>Créé le:</strong> <span id="details-date"></span></p>
+                    <p><strong>Fichiers:</strong> <span id="details-file-count"></span></p>
+                    <p><strong>Taille:</strong> <span id="details-size"></span></p>
+                    
+                    <div class="file-list-section">
+                        <h4>📋 Liste des fichiers</h4>
+                        <div id="details-file-list" class="details-file-list"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-danger" id="delete-folder-btn">🗑️ Supprimer ce dossier</button>
+                <button class="btn btn-secondary close-details-btn">Fermer</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="folderUpload.js"></script>
+</body>
+</html>

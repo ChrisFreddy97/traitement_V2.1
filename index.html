@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestionnaire de Fichiers - Accueil</title>
+
+    <style>
+        /* ----------- BACKGROUND ANIMÉ ----------- */
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: "Segoe UI", Roboto, sans-serif;
+            height: 100vh;
+            background: linear-gradient(135deg, #667eea, #764ba2, #5b89f5);
+            background-size: 400% 400%;
+            animation: gradientMove 18s ease infinite;
+            color: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            overflow: hidden;
+        }
+
+        @keyframes gradientMove {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        /* ----------- HEADER ----------- */
+        .hero-header {
+            text-align: center;
+            padding: 40px 20px 10px;
+            animation: headerFade 1.8s ease forwards;
+        }
+
+        @keyframes headerFade {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Logo */
+        .logo-image {
+            width: 95px;
+            height: 95px;
+            object-fit: contain;
+            margin-bottom: 15px;
+            filter: drop-shadow(0 0 8px rgba(255,255,255,0.4));
+        }
+
+        /* Animation flottante */
+        .float {
+            animation: float 4s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0% { transform: translateY(0); }
+            50% { transform: translateY(-8px); }
+            100% { transform: translateY(0); }
+        }
+
+        /* Animation typing du sous-titre */
+        .subtitle {
+            font-size: 1.2rem;
+            margin-top: 8px;
+            opacity: 0;
+            animation: typing 3s steps(40) forwards 1s;
+            white-space: nowrap;
+            overflow: hidden;
+            border-right: 2px solid rgba(255,255,255,0.8);
+            width: 0;
+        }
+
+        @keyframes typing {
+            from { width: 0; opacity: 1; }
+            to { width: 100%; opacity: 1; }
+        }
+
+        /* ----------- CARD CENTRÉE ----------- */
+        .content-wrapper {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            margin-bottom: 10px;
+        }
+
+        .center-card {
+            background: rgba(255, 255, 255, 0.18);
+            backdrop-filter: blur(10px);
+            border-radius: 18px;
+            padding: 45px 55px;
+            text-align: center;
+            border: 2px solid rgba(255, 255, 255, 0.28);
+            box-shadow: 0 12px 30px rgba(0,0,0,0.25);
+            max-width: 480px;
+            animation: cardEntrance 1.5s ease forwards;
+            opacity: 0;
+        }
+
+        @keyframes cardEntrance {
+            from { transform: translateY(40px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        .center-card h3 {
+            font-size: 2.1rem;
+            margin-top: 0;
+        }
+
+        .center-card p {
+            font-size: 1.15rem;
+            opacity: 0.95;
+        }
+
+        /* ----------- BOUTON ----------- */
+        .btn {
+            margin-top: 25px;
+            background: #ffcc33;
+            color: #2d2d38;
+            padding: 15px 32px;
+            border: none;
+            border-radius: 12px;
+            font-size: 1.3rem;
+            cursor: pointer;
+            font-weight: bold;
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.25s, box-shadow 0.3s;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            animation: pulse 3s infinite ease-in-out;
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 8px rgba(255, 204, 51, 0.4); }
+            50% { box-shadow: 0 0 18px rgba(255, 204, 51, 0.8); }
+            100% { box-shadow: 0 0 8px rgba(255, 204, 51, 0.4); }
+        }
+
+        /* effet glow + light sweep */
+        .btn::after {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 120%;
+            height: 100%;
+            background: linear-gradient(
+                120deg,
+                transparent,
+                rgba(255,255,255,0.6),
+                transparent
+            );
+            transform: skewX(-20deg);
+            transition: left 0.6s ease;
+        }
+
+        .btn:hover::after {
+            left: 100%;
+        }
+
+        .btn:hover {
+            transform: scale(1.06);
+        }
+
+    </style>
+</head>
+
+<body>
+
+    <!-- HEADER -->
+    <header class="hero-header">
+
+        <!-- Logo -->
+        <img src="img/logo.jpg" alt="Logo" class="logo-image float">
+
+        <h1>📁 Gestionnaire des Fichiers relève V2 </h1>
+
+        <p class="subtitle">
+            Visualisez, analysez et gérez facilement les résultats de vos fichiers de relèves V2 et CPF
+        </p>
+    </header>
+
+    <!-- CARD CENTRE -->
+    <div class="content-wrapper">
+        <div class="center-card">
+            <h3>Prêt à commencer ?</h3>
+            <p>Accédez dès maintenant à l’interface de gestion des relèves.</p>
+
+            <button id="start-management-btn" class="btn">
+                🚀 Démarrer la Gestion
+            </button>
+        </div>
+    </div>
+
+
+    <script>
+    document.getElementById('start-management-btn').addEventListener('click', () => {
+        // Forcer le rechargement avec files.html
+        window.location.href = 'home.html';
+    });
+    </script>
+    
+
+</body>
+</html>

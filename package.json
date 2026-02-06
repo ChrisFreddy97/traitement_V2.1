@@ -1,0 +1,48 @@
+{
+    "name": "traitement-releves-v2",
+    "version": "1.0.0",
+    "description": "Traitement Releves V2",
+    "main": "main.js",
+    "author": "Nanoé <christianofreddy.nanoe@gmail.com>",
+    "scripts": {
+        "start": "electron .",
+        "build": "electron-builder --win",
+        "build-win": "electron-builder --win",
+        "build-win-installer": "electron-builder --win --x64",
+        "build-win-no-icon": "node create-simple-icon.js && electron-builder --win --x64",
+        "create-icon": "node create-simple-icon.js"
+    },
+    "devDependencies": {
+        "electron": "^26.6.10",
+        "electron-builder": "^24.0.0",
+        "tailwindcss": "^4.1.17",
+        "canvas": "^2.11.2"
+    },
+    "build": {
+        "appId": "com.nanoe.traitementrelevesV2",
+        "productName": "Traitement Releves V2",
+        "directories": {
+            "output": "dist"
+        },
+        "files": [
+            "**/*"
+        ],
+        "win": {
+            "target": [
+                {
+                    "target": "nsis",
+                    "arch": ["x64"]
+                }
+            ],
+            "icon": "img/logo.jpg"
+        },
+        "nsis": {
+            "oneClick": false,
+            "allowToChangeInstallationDirectory": true,
+            "allowElevation": true,
+            "createDesktopShortcut": true,
+            "createStartMenuShortcut": true,
+            "shortcutName": "Traitement Releves V2"
+        }
+    }
+}

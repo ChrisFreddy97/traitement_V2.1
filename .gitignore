@@ -1,0 +1,15 @@
+# Visual Studio
+.vs/
+bin/
+obj/
+
+# Node / Electron
+node_modules/
+dist/
+win-unpacked/
+
+# Executables
+*.exe
+
+# Logs
+*.log

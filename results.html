@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Résultats d'Analyse</title>
+    
+    <!-- Styles -->
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="./analyzer/energyAnalyzer.css">
+    
+    <!-- Bibliothèques externes -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    
+    <!-- Font Awesome pour les icônes -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+</head>
+<body>
+    <div class="container">
+        <header class="results-header">
+            <div class="header-content">
+                <h1><i class="fas fa-chart-bar"></i> Résultats d'Analyse</h1>
+                <button id="back-to-management-btn" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left"></i> Retour à la gestion
+                </button>
+            </div>
+        </header>
+
+        <main class="results-main">
+            <!-- Informations du dossier -->
+            <div class="results-info">
+                <div class="nr-info">
+                    <h2>Dossier NR-<span id="nr-display">-</span></h2>
+                    <p class="date-info"><i class="far fa-calendar"></i> Date d'ajout: <span id="date-display">-</span></p>
+                </div>
+            </div>
+
+            <!-- Conteneur pour le résumé global -->
+            <div id="global-summary-container"></div>
+
+            <!-- Tableau combiné sera inséré ici dynamiquement -->
+
+            <!-- Message de chargement -->
+            <div id="loading-message" class="loading-message">
+                <div class="loading-spinner"></div>
+                <p>Chargement des données d'analyse...</p>
+            </div>
+
+            <!-- Conteneur principal des onglets -->
+            <div id="tabs-container" class="tabs-container hidden">
+                <!-- En-tête des onglets principaux -->
+                <div class="tabs-header">
+                    <button class="tab-btn active" data-tab="energy">
+                        <i class="fas fa-bolt"></i> Énergie
+                    </button>
+                    <button class="tab-btn" data-tab="credit">
+                        <i class="fas fa-credit-card"></i> Crédit
+                    </button>
+                    <button class="tab-btn" data-tab="tension">
+                        <i class="fas fa-charging-station"></i> Tension
+                    </button>
+                    <button class="tab-btn" data-tab="enr">
+                        <i class="fas fa-sun"></i> ENR
+                    </button>
+                    <button class="tab-btn" data-tab="ec">
+                        <i class="fas fa-car-battery"></i> EC
+                    </button>
+                    <button class="tab-btn" data-tab="recharge">
+                        <i class="fas fa-plug"></i> Recharge
+                    </button>
+                </div>
+
+                <!-- Contenu des onglets -->
+                <div class="tabs-content">
+                    <!-- Onglet Énergie -->
+                    <div id="tab-energy" class="tab-pane active">
+                        <div class="tab-header">
+                            <h3><i class="fas fa-bolt"></i> Analyse des Fichiers Énergie</h3>
+                        </div>
+                        <div class="sub-tabs-container">
+                            <div class="sub-tabs-header" id="energy-sub-tabs"></div>
+                            <div class="sub-tabs-content" id="energy-sub-content"></div>
+                        </div>
+                    </div>
+
+                    <!-- Onglet Crédit -->
+                    <div id="tab-credit" class="tab-pane">
+                        <div class="tab-header">
+                            <h3><i class="fas fa-credit-card"></i> Analyse des Fichiers Crédit</h3>
+                        </div>
+                        <div class="sub-tabs-container">
+                            <div class="sub-tabs-header" id="credit-sub-tabs"></div>
+                            <div class="sub-tabs-content" id="credit-sub-content"></div>
+                        </div>
+                    </div>
+
+                    <!-- Onglet Tension -->
+                    <div id="tab-tension" class="tab-pane">
+                        <div class="tab-header">
+                            <h3><i class="fas fa-charging-station"></i> Analyse des Fichiers Tension</h3>
+                        </div>
+                        <div id="tension-content" class="file-content"></div>
+                    </div>
+
+                    <!-- Onglet ENR -->
+                    <div id="tab-enr" class="tab-pane">
+                        <div class="tab-header">
+                            <h3><i class="fas fa-sun"></i> Analyse des Fichiers ENR</h3>
+                        </div>
+                        <div id="enr-content" class="file-content"></div>
+                    </div>
+
+                    <!-- Onglet EC -->
+                    <div id="tab-ec" class="tab-pane">
+                        <div class="tab-header">
+                            <h3><i class="fas fa-car-battery"></i> Analyse des Fichiers EC</h3>
+                        </div>
+                        <div id="ec-content" class="file-content"></div>
+                    </div>
+
+                    <!-- Onglet Recharge -->
+                    <div id="tab-recharge" class="tab-pane">
+                        <div class="tab-header">
+                            <h3><i class="fas fa-plug"></i> Analyse des Fichiers Recharge</h3>
+                        </div>
+                        <div id="recharge-content" class="file-content"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Messages d'erreur -->
+            <div id="error-container"></div>
+        </main>
+    </div>
+
+    <!-- Script principal -->
+    <script type="module" src="results.js"></script>
+</body>
+</html>

@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tableau Horaire - Analyse Énergie</title>
+    <link rel="stylesheet" href="tableau-horaire.css">
+<body>
+    <div class="container">
+        <div class="header">
+            <h1 id="folder-title">📊 Tableau Horaire</h1>
+            <div class="header-info">
+
+            </div>
+        </div>
+        
+        <!-- Loader -->
+        <div id="loader" class="loader">
+            <div class="loading-spinner"></div>
+            <p>Chargement des données...</p>
+        </div>
+        
+        <!-- Error Container -->
+        <div id="error-container" class="error-container hidden"></div>
+        
+        <!-- Onglets Clients -->
+        <div id="tabs-section" class="hidden">
+            <div id="clients-tabs"></div>
+            <div id="clients-tabs-content"></div>
+        </div>
+        
+        <!-- Contrôles -->
+        <div id="controls-container" class="hidden"></div>
+    </div>
+    
+    <script>
+        // Loading spinner CSS
+        const style = document.createElement('style');
+        style.textContent = `
+            .loading-spinner {
+                display: inline-block;
+                width: 50px;
+                height: 50px;
+                border: 5px solid #f3f3f3;
+                border-top: 5px solid #3498db;
+                border-radius: 50%;
+                animation: spin 1s linear infinite;
+                margin-bottom: 15px;
+            }
+            
+            @keyframes spin {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
+            }
+        `;
+        document.head.appendChild(style);
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
+    <script src="chart.js"></script>
+    <script src="tableau-horaire.js"></script>
+</body>
+</html>
