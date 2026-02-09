@@ -4146,9 +4146,6 @@ function renderEventCurrentPage() {
             if (eventValue.toLowerCase().includes('surcharge')) {
                 eventColor = '#dc2626'; // Rouge plus foncé
                 eventBackground = (i % 2 === 0) ? '#fee2e2' : '#fecaca';
-            } else if (eventValue.toLowerCase().includes('panne')) {
-                eventColor = '#b45309'; // Orange ambré
-                eventBackground = (i % 2 === 0) ? '#fef3c7' : '#fde68a';
             } else if (eventValue.toLowerCase().includes('démarrage')) {
                 eventColor = '#059669'; // Vert émeraude
                 eventBackground = (i % 2 === 0) ? '#d1fae5' : '#a7f3d0';
@@ -5369,7 +5366,6 @@ function analyzeEventsByDay() {
         else if (event.includes('Surcharge')) eventType = 'Surcharge';
         else if (event.includes('DelestagePartiel')) eventType = 'DelestagePartiel';
         else if (event.includes('DelestageTotal')) eventType = 'DelestageTotal';
-        else if (event.includes('Panne')) eventType = 'Panne';
         else if (event.includes('Démarrage')) eventType = 'Démarrage';
         else if (event.includes('Arrêt')) eventType = 'Arrêt';
         else if (event.includes('Normal')) eventType = 'Normal';
@@ -5711,7 +5707,6 @@ function createEventSummaryCard() {
     cardContent.appendChild(createStatItem('⚡', 'Surcharge', totals.Surcharge, '#dc2626', '#fef2f2'));
     cardContent.appendChild(createStatItem('🔌', 'Delestage Partiel', totals.DelestagePartiel, '#ea580c', '#fff7ed'));
     cardContent.appendChild(createStatItem('🔋', 'Delestage Total', totals.DelestageTotal, '#991b1b', '#fef2f2'));
-    cardContent.appendChild(createStatItem('⚠️', 'Panne', totals.Panne || 0, '#b45309', '#fef3c7'));
     cardContent.appendChild(createStatItem('▶️', 'Démarrage', totals.Démarrage || 0, '#059669', '#d1fae5'));
     cardContent.appendChild(createStatItem('📊', 'Total Événements', totals.Total, '#16a34a', '#f0fdf4'));
     
@@ -5746,20 +5741,9 @@ function displayDailyEventsTableInEventTab(eventGrid) {
     const statsSection = addEventStatisticsSummary(dailyEvents);
     eventGrid.appendChild(statsSection);
     
-    // 2. Ajouter les indicateurs de gravité
-    const severitySection = addSeverityIndicators(dailyEvents);
-    eventGrid.appendChild(severitySection);
-    
     // 3. Ajouter le résumé par type
     const typeSummarySection = addEventTypeSummary(dailyEvents);
     eventGrid.appendChild(typeSummarySection);
-    
-    // 4. Ajouter les filtres
-    const filterSection = addClientFilter(dailyEvents, (filters) => {
-        // Fonction de filtrage à implémenter
-        console.log('Filtres appliqués:', filters);
-    });
-    eventGrid.appendChild(filterSection);
     
     // 5. Ajouter le tableau principal
     const tableContainer = document.createElement('div');
@@ -6135,117 +6119,7 @@ function addEventStatisticsSummary(dailyEvents) {
     
     return statsDiv;
 }
-function addClientFilter(dailyEvents, onFilterChange) {
-    const filterDiv = document.createElement('div');
-    filterDiv.style.cssText = `
-        background: white;
-        border-radius: 12px;
-        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-        margin-bottom: 20px;
-        padding: 20px;
-    `;
-    
-    // Extraire tous les clients uniques
-    const clients = Array.from(new Set(
-        dailyEvents
-            .filter(d => d.client !== 'Système' && d.client !== 'N/A')
-            .map(d => d.client)
-    )).sort((a, b) => parseInt(a) - parseInt(b));
-    
-    filterDiv.innerHTML = `
-        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 15px;">
-            <span style="font-size: 18px; background: #3b82f6; color: white; width: 32px; height: 32px; border-radius: 6px; display: flex; align-items: center; justify-content: center;">🔍</span>
-            <div>
-                <h3 style="margin: 0; color: #1e293b; font-size: 14px;">Filtres d'affichage</h3>
-                <p style="margin: 5px 0 0 0; color: #64748b; font-size: 11px;">Filtrer par client ou type d'événement</p>
-            </div>
-        </div>
-        
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px;">
-            <div>
-                <label style="display: block; margin-bottom: 8px; font-size: 12px; font-weight: 600; color: #475569;">
-                    <span style="margin-right: 5px;">👤</span>Filtrer par client
-                </label>
-                <select id="client-filter-select" style="width: 100%; padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 12px; background: white;">
-                    <option value="all">Tous les clients (${clients.length})</option>
-                    ${clients.map(client => `<option value="${client}">Client ${client}</option>`).join('')}
-                </select>
-            </div>
-            
-            <div>
-                <label style="display: block; margin-bottom: 8px; font-size: 12px; font-weight: 600; color: #475569;">
-                    <span style="margin-right: 5px;">⚡</span>Filtrer par type d'événement
-                </label>
-                <select id="event-type-filter-select" style="width: 100%; padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 12px; background: white;">
-                    <option value="all">Tous les types d'événements</option>
-                    <option value="SuspendP">SuspendP (Suspension Puissance)</option>
-                    <option value="SuspendE">SuspendE (Suspension Énergétique)</option>
-                    <option value="Surcharge">Surcharge</option>
-                    <option value="DelestagePartiel">Délestage Partiel</option>
-                    <option value="DelestageTotal">Délestage Total</option>
-                </select>
-            </div>
-            
-            <div>
-                <label style="display: block; margin-bottom: 8px; font-size: 12px; font-weight: 600; color: #475569;">
-                    <span style="margin-right: 5px;">📅</span>Filtrer par date
-                </label>
-                <div style="display: flex; gap: 10px;">
-                    <input type="date" id="start-date-filter" placeholder="Début" 
-                           style="flex: 1; padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 12px;">
-                    <input type="date" id="end-date-filter" placeholder="Fin" 
-                           style="flex: 1; padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 12px;">
-                </div>
-            </div>
-        </div>
-        
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 20px; padding-top: 15px; border-top: 1px solid #e2e8f0;">
-            <button id="apply-filters-btn" style="padding: 10px 20px; background: #3b82f6; color: white; border: none; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer;">
-                🔍 Appliquer les filtres
-            </button>
-            <button id="reset-filters-btn" style="padding: 10px 20px; background: #94a3b8; color: white; border: none; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer;">
-                🔄 Réinitialiser
-            </button>
-        </div>
-    `;
-    
-    // Événements des filtres
-    setTimeout(() => {
-        document.getElementById('apply-filters-btn').addEventListener('click', () => {
-            const clientFilter = document.getElementById('client-filter-select').value;
-            const eventTypeFilter = document.getElementById('event-type-filter-select').value;
-            const startDate = document.getElementById('start-date-filter').value;
-            const endDate = document.getElementById('end-date-filter').value;
-            
-            if (onFilterChange) {
-                onFilterChange({
-                    client: clientFilter,
-                    eventType: eventTypeFilter,
-                    startDate: startDate,
-                    endDate: endDate
-                });
-            }
-        });
-        
-        document.getElementById('reset-filters-btn').addEventListener('click', () => {
-            document.getElementById('client-filter-select').value = 'all';
-            document.getElementById('event-type-filter-select').value = 'all';
-            document.getElementById('start-date-filter').value = '';
-            document.getElementById('end-date-filter').value = '';
-            
-            if (onFilterChange) {
-                onFilterChange({
-                    client: 'all',
-                    eventType: 'all',
-                    startDate: '',
-                    endDate: ''
-                });
-            }
-        });
-    }, 100);
-    
-    return filterDiv;
-}
+
 function addEventTypeSummary(dailyEvents) {
     const summaryDiv = document.createElement('div');
     summaryDiv.style.cssText = `
@@ -6440,55 +6314,6 @@ function addSeverityIndicators(dailyEvents) {
     `;
     
     const totalDays = dailyEvents.length;
-    
-    severityDiv.innerHTML = `
-        <div style="margin-bottom: 15px; display: flex; align-items: center; gap: 10px;">
-            <span style="font-size: 20px; background: #ef4444; color: white; width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center;">⚠️</span>
-            <div>
-                <h3 style="margin: 0; color: #1e293b; font-size: 16px;">Indicateurs de Gravité</h3>
-                <p style="margin: 5px 0 0 0; color: #64748b; font-size: 12px;">Évaluation des risques par journée</p>
-            </div>
-        </div>
-        
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-bottom: 20px;">
-            <div style="text-align: center; padding: 15px; background: #fef2f2; border-radius: 8px; border: 2px solid #dc2626;">
-                <div style="font-size: 24px; font-weight: 700; color: #dc2626; margin-bottom: 5px;">${severityAnalysis.critical}</div>
-                <div style="font-size: 11px; color: #991b1b; font-weight: 600;">CRITIQUE</div>
-                <div style="font-size: 10px; color: #ef4444; margin-top: 3px;">${totalDays > 0 ? Math.round((severityAnalysis.critical/totalDays)*100) : 0}% des jours</div>
-            </div>
-            
-            <div style="text-align: center; padding: 15px; background: #fef3c7; border-radius: 8px; border: 2px solid #f59e0b;">
-                <div style="font-size: 24px; font-weight: 700; color: #d97706; margin-bottom: 5px;">${severityAnalysis.warning}</div>
-                <div style="font-size: 11px; color: #92400e; font-weight: 600;">ALERTE</div>
-                <div style="font-size: 10px; color: #f59e0b; margin-top: 3px;">${totalDays > 0 ? Math.round((severityAnalysis.warning/totalDays)*100) : 0}% des jours</div>
-            </div>
-            
-            <div style="text-align: center; padding: 15px; background: #d1fae5; border-radius: 8px; border: 2px solid #10b981;">
-                <div style="font-size: 24px; font-weight: 700; color: #059669; margin-bottom: 5px;">${severityAnalysis.info}</div>
-                <div style="font-size: 11px; color: #065f46; font-weight: 600;">INFORMATION</div>
-                <div style="font-size: 10px; color: #10b981; margin-top: 3px;">${totalDays > 0 ? Math.round((severityAnalysis.info/totalDays)*100) : 0}% des jours</div>
-            </div>
-            
-            <div style="text-align: center; padding: 15px; background: #f1f5f9; border-radius: 8px; border: 2px solid #94a3b8;">
-                <div style="font-size: 24px; font-weight: 700; color: #475569; margin-bottom: 5px;">${severityAnalysis.none}</div>
-                <div style="font-size: 11px; color: #334155; font-weight: 600;">NORMAL</div>
-                <div style="font-size: 10px; color: #64748b; margin-top: 3px;">${totalDays > 0 ? Math.round((severityAnalysis.none/totalDays)*100) : 0}% des jours</div>
-            </div>
-        </div>
-        
-        <div style="padding: 12px; background: #f8fafc; border-radius: 6px;">
-            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
-                <span style="font-size: 14px;">📋</span>
-                <span style="font-size: 12px; font-weight: 600; color: #1e293b;">Critères d'évaluation</span>
-            </div>
-            <div style="font-size: 11px; color: #475569; line-height: 1.4;">
-                <strong>Critique:</strong> Délestage total ou surcharges multiples<br>
-                <strong>Alerte:</strong> Délestage partiel ou suspensions multiples<br>
-                <strong>Information:</strong> Événements isolés sans impact majeur<br>
-                <strong>Normal:</strong> Aucun événement détecté
-            </div>
-        </div>
-    `;
     
     return severityDiv;
 }

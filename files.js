@@ -455,7 +455,7 @@ function askNRConfirmation(nr) {
         confirmModal.innerHTML = `
             <div class="modal confirm-modal">
                 <div class="modal-header">
-                    <h3>⚠️ Confirmation du numéro NR</h3>
+                    <h3>Confirmation du numéro NR</h3>
                 </div>
                 <div class="modal-body">
                     <div class="confirm-content">
@@ -468,10 +468,10 @@ function askNRConfirmation(nr) {
                 </div>
                 <div class="modal-footer">
                     <button id="confirm-nr-yes" class="btn btn-success">
-                        ✅ Oui, c'est le bon numéro
+                        Oui, c'est le bon numéro
                     </button>
                     <button id="confirm-nr-no" class="btn btn-danger">
-                        ❌ Non, annuler
+                        Non, annuler
                     </button>
                 </div>
             </div>
@@ -1078,7 +1078,7 @@ function askFinalConfirmation(nr) {
         confirmModal.innerHTML = `
             <div class="modal confirm-modal final-confirm">
                 <div class="modal-header">
-                    <h3>⚠️ Confirmation finale</h3>
+                    <h3>Confirmation finale</h3>
                 </div>
                 <div class="modal-body">
                     <div class="confirm-content">
