@@ -3,31 +3,46 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Arduino IDE - Ajout de fichier</title>
+    <title>Analyseur de Données - NANORESEAU</title>
     <link rel="stylesheet" href="arduino.css">
-    <link rel="stylesheet" href="folderUpload.css">
 </head>
 <body>
     <div class="container">
-        <header class="upload-header">
-            <div class="header-content">
-                <h1>🔧 Arduino IDE - Ajout de fichier</h1>
-                <button id="back-to-upload-btn" class="btn btn-secondary">
-                    ← Retour
-                </button>
-            </div>
-        </header>
+        <div class="header">
+            <h1>📊 Analyseur de Données NANORESEAU</h1>
+            <p>Importez votre fichier txt pour extraire et visualiser les données multiples</p>
+        </div>
 
-        <main class="arduino-main">
-            <!-- Section d'ajout de fichier -->
-            <section class="add-file-section">
-                <div class="add-file-card">
-                    
+        <div class="content">
+            <div class="upload-section" id="uploadSection">
+                <div class="file-input-wrapper">
+                    <input type="file" id="fileInput" accept=".txt">
+                    <label for="fileInput" class="file-label">
+                        📁 Choisir un fichier
+                    </label>
                 </div>
-            </section>
-        </main>
+                <div class="file-name" id="fileName">Aucun fichier sélectionné</div>
+            </div>
+
+            <div class="error-message" id="errorMessage"></div>
+
+            <div class="info-section" id="infoSection">
+                <h3>🔍 Informations extraites</h3>
+                <div>Numéro NANORESEAU :</div>
+                <div class="nanoreseau-value" id="nanoreseauValue">-</div>
+                
+                <div class="summary-section" id="summarySection" style="margin-top: 20px;">
+                    <div class="summary-title">📈 Résumé des données</div>
+                    <div class="summary-grid" id="summaryGrid"></div>
+                </div>
+
+                <div class="type-legend" id="typeLegend"></div>
+            </div>
+
+            <div class="tables-container" id="tablesContainer"></div>
+        </div>
     </div>
 
-    <script src="arduino.js"></script>
+    <script type="module" src="./arduino.js" defer></script>
 </body>
 </html>
