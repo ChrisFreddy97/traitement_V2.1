@@ -442,6 +442,10 @@ body {
     border: 1px solid rgba(255, 255, 255, 0.6);
     position: relative;
     overflow: hidden;
+    min-height: 700px;  /* Augmentez cette valeur */
+    height: auto;
+    display: flex;
+    flex-direction: column;
 }
 
 .all-clients-chart-section::before {
@@ -486,6 +490,8 @@ body {
     height: 500px;
     margin-bottom: 20px;
     z-index: 1;
+    flex: 1;  /* Prend tout l'espace disponible */
+    min-height: 550px;  /* Hauteur minimale garantie */
 }
 
 .all-clients-bar-chart-container {

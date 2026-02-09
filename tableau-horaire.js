@@ -1840,11 +1840,11 @@ function displayDailySummaryTable(clientId, dailySummary) {
             const systemType = detectSystemTypeFromTensionValue(avgTension);
 
             if (systemType === '24V') {
-                if (tensionMin < 21.4 || tensionMax > 31.5) return '#e53e3e';
+                if (tensionMin < 22 || tensionMax > 31) return '#e53e3e';
                 if (tensionMin < 24 || tensionMax > 29) return '#d69e2e';
                 return '#38a169';
             } else {
-                if (tensionMin < 10.7 || tensionMax > 15.6) return '#e53e3e';
+                if (tensionMin < 11 || tensionMax > 15) return '#e53e3e';
                 if (tensionMin < 12 || tensionMax > 14.5) return '#d69e2e';
                 return '#38a169';
             }
@@ -2044,8 +2044,8 @@ function detectSystemType(tensionResults) {
 function getSystemLimits(systemType) {
     if (systemType === '24V') {
         return {
-            min: 21.4,
-            max: 31.5,
+            min: 22,
+            max: 31,
             ideal: { min: 24, max: 29 },
             normal: 28,
             maxVariation: 5,
@@ -2053,8 +2053,8 @@ function getSystemLimits(systemType) {
         };
     } else {
         return {
-            min: 10.7,
-            max: 15.6,
+            min: 11,
+            max: 15,
             ideal: { min: 12, max: 14.5 },
             normal: 14,
             maxVariation: 2.5,
@@ -2137,23 +2137,23 @@ function getConclusionMessage(stabilityPercentage, stable, unstable, outOfLimits
     let message = '';
     
     if (stabilityPercentage >= 90) {
-        message = `La tension du système ${systemType} est <strong>excellente</strong> avec ${stablePercent}% de jours stables. 
+        message = `La tension du système ${systemType} est <strong>excellente</strong> avec ${stablePercent}% de jours Conforme. 
                   La variation moyenne de ${averageVariation} V/h est bien en dessous du seuil d'alerte. 
                   L'installation électrique fonctionne de manière optimale.`;
     } 
     else if (stabilityPercentage >= 80) {
-        message = `La tension est <strong>globalement stable</strong> (${stablePercent}% de jours stables) mais présente 
+        message = `La tension est <strong>globalement acceptable</strong> (${stablePercent}% de jours Conforme) mais présente 
                   ${unstablePercent}% de jours avec des variations importantes. 
                   Surveillez la variation moyenne de ${averageVariation} V/h.`;
     }
     else if (stabilityPercentage >= 60) {
-        message = `La tension est <strong>préoccupante</strong> avec seulement ${stablePercent}% de jours stables. 
+        message = `La tension est <strong>préoccupante</strong> avec seulement ${stablePercent}% de jours Conforme. 
                   ${outOfLimits > 0 ? `${outOfLimits} jour${outOfLimits !== 1 ? 's' : ''} hors limites. ` : ''}
                   La variation moyenne de ${averageVariation} V/h approche du seuil critique. 
                   Une vérification technique est recommandée.`;
     }
     else {
-        message = `⚠️ <strong>ALERTE STABILITÉ</strong> ⚠️ La tension est <strong>critiquement instable</strong> (${stablePercent}% de jours stables seulement). 
+        message = `⚠️ <strong>ALERTE</strong> ⚠️ La tension est <strong>critiquement mauvaise</strong> (${stablePercent}% de jours Conforme seulement). 
                   ${outOfLimits > 0 ? `${outOfLimits} jour${outOfLimits !== 1 ? 's' : ''} présentent des tensions hors limites. ` : ''}
                   La variation moyenne de ${averageVariation} V/h dépasse les normes acceptables. 
                   <strong>Intervention technique urgente requise.</strong>`;
@@ -2170,6 +2170,9 @@ function createStabilityChart(containerId, stabilityData, tensionResults) {
 
     const { stable, unstable, outOfLimits, stabilityPercentage, systemType, averageVariation, days } = stabilityData;
     const totalDays = stable + unstable + outOfLimits;
+
+    // CALCULER LES JOURS D'ALERTE
+    const alertData = calculateAlertDays(tensionResults);
 
     // Déterminer les couleurs selon le taux de stabilité
     const getStatusColor = () => {
@@ -2189,7 +2192,7 @@ function createStabilityChart(containerId, stabilityData, tensionResults) {
                 <div style="display: flex; align-items: center; gap: 12px;">
                     <span style="font-size: 32px;">🔄</span>
                     <div>
-                        <div style="font-weight: 700; font-size: 18px;">Analyse de Stabilité de Tension</div>
+                        <div style="font-weight: 700; font-size: 18px;">Analyse globale de Tension</div>
                         <div style="font-size: 12px; opacity: 0.9; margin-top: 4px;">Système ${systemType} DC - ${days} jour${days !== 1 ? 's' : ''} analysés</div>
                     </div>
                 </div>
@@ -2202,13 +2205,13 @@ function createStabilityChart(containerId, stabilityData, tensionResults) {
             <!-- Contenu principal -->
             <div style="padding: 20px;">
                 
-                <!-- Stats principales - Grille 2x2 -->
+                <!-- Stats principales - Grille 3x2 (modifié) -->
                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; margin-bottom: 25px;">
-                    <!-- Jours Stables -->
+                    <!-- Jours Conforme -->
                     <div style="background: linear-gradient(135deg, #f0fff4 0%, #ffffff 100%); padding: 16px; border-radius: 10px; border-left: 5px solid #22c55e; box-shadow: 0 2px 8px rgba(0,0,0,0.06); transition: all 0.3s ease;">
                         <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
                             <div style="background: #22c55e; color: white; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px;">✅</div>
-                            <div style="font-size: 11px; color: #718096; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Jours Stables</div>
+                            <div style="font-size: 11px; color: #718096; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Jours Conforme</div>
                         </div>
                         <div style="font-size: 32px; font-weight: 800; color: #22c55e; text-align: center; margin-bottom: 8px;">${stable}</div>
                         <div style="text-align: center; padding: 6px 12px; background: rgba(34, 197, 94, 0.1); border-radius: 6px; font-size: 12px; color: #15803d; font-weight: 600;">
@@ -2216,11 +2219,11 @@ function createStabilityChart(containerId, stabilityData, tensionResults) {
                         </div>
                     </div>
 
-                    <!-- Jours Instables -->
+                    <!-- Jours Non Conformes -->
                     <div style="background: linear-gradient(135deg, #fef3c7 0%, #ffffff 100%); padding: 16px; border-radius: 10px; border-left: 5px solid #f59e0b; box-shadow: 0 2px 8px rgba(0,0,0,0.06); transition: all 0.3s ease;">
                         <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
                             <div style="background: #f59e0b; color: white; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px;">⚠️</div>
-                            <div style="font-size: 11px; color: #718096; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Jours Instables</div>
+                            <div style="font-size: 11px; color: #718096; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Jours Non Conformes</div>
                         </div>
                         <div style="font-size: 32px; font-weight: 800; color: #f59e0b; text-align: center; margin-bottom: 8px;">${unstable}</div>
                         <div style="text-align: center; padding: 6px 12px; background: rgba(245, 158, 11, 0.1); border-radius: 6px; font-size: 12px; color: #92400e; font-weight: 600;">
@@ -2240,14 +2243,38 @@ function createStabilityChart(containerId, stabilityData, tensionResults) {
                         </div>
                     </div>
 
+                    <!-- CARTE NOUVELLE : Jours d'Alerte -->
+                    <div style="background: linear-gradient(135deg, #fff7ed 0%, #ffffff 100%); padding: 16px; border-radius: 10px; border-left: 5px solid #f97316; box-shadow: 0 2px 8px rgba(0,0,0,0.06); transition: all 0.3s ease;">
+                        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+                            <div style="background: #f97316; color: white; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px;">🚨</div>
+                            <div style="font-size: 11px; color: #718096; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Jours d'Alerte</div>
+                        </div>
+                        <div style="font-size: 32px; font-weight: 800; color: #f97316; text-align: center; margin-bottom: 8px;">
+                            ${alertData.alertDays} / ${alertData.totalDays}
+                        </div>
+                        <div style="text-align: center; padding: 6px 12px; background: rgba(249, 115, 22, 0.1); border-radius: 6px; font-size: 12px; color: #92400e; font-weight: 600;">
+                            ⚡ ${alertData.alertHours} heure(s) hors seuil
+                        </div>
+                    </div>
+
                     <!-- Variation Moyenne -->
-                    <div style="background: linear-gradient(135deg, #ecfdf5 0%, #ffffff 100%); padding: 16px; border-radius: 10px; border-left: 5px solid #10b981; box-shadow: 0 2px 8px rgba(0,0,0,0.06); transition: all 0.3s ease;">
+                    <!-- <div style="background: linear-gradient(135deg, #ecfdf5 0%, #ffffff 100%); padding: 16px; border-radius: 10px; border-left: 5px solid #10b981; box-shadow: 0 2px 8px rgba(0,0,0,0.06); transition: all 0.3s ease;">
                         <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
                             <div style="background: #10b981; color: white; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px;">📈</div>
                             <div style="font-size: 11px; color: #718096; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Variation Moy.</div>
                         </div>
                         <div style="font-size: 32px; font-weight: 800; color: #10b981; text-align: center; margin-bottom: 8px;">${averageVariation}</div>
                         <div style="text-align: center; padding: 6px 12px; background: rgba(16, 185, 129, 0.1); border-radius: 6px; font-size: 12px; color: #065f46; font-weight: 600;">V/h</div>
+                    </div>-->
+
+                    <!-- Carte supplémentaire : Système -->
+                    <div style="background: linear-gradient(135deg, #e0e7ff 0%, #ffffff 100%); padding: 16px; border-radius: 10px; border-left: 5px solid #6366f1; box-shadow: 0 2px 8px rgba(0,0,0,0.06); transition: all 0.3s ease;">
+                        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+                            <div style="background: #6366f1; color: white; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px;">⚡</div>
+                            <div style="font-size: 11px; color: #718096; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Système</div>
+                        </div>
+                        <div style="font-size: 28px; font-weight: 800; color: #6366f1; text-align: center; margin-bottom: 8px;">${systemType}</div>
+                        <div style="text-align: center; padding: 6px 12px; background: rgba(99, 102, 241, 0.1); border-radius: 6px; font-size: 12px; color: #4f46e5; font-weight: 600;">DC</div>
                     </div>
                 </div>
 
@@ -2257,7 +2284,7 @@ function createStabilityChart(containerId, stabilityData, tensionResults) {
                         <span style="font-size: 24px; line-height: 1.2;">${statusColor.icon}</span>
                         <div style="flex: 1;">
                             <div style="font-weight: 700; color: ${statusColor.text}; margin-bottom: 6px; font-size: 14px;">
-                                ${stabilityPercentage >= 90 ? 'EXCELLENTE STABILITÉ' : stabilityPercentage >= 75 ? 'BONNE STABILITÉ' : stabilityPercentage >= 60 ? 'STABILITÉ ACCEPTABLE' : 'STABILITÉ CRITIQUE'}
+                                ${stabilityPercentage >= 90 ? 'EXCELLENTE' : stabilityPercentage >= 75 ? 'BONNE' : stabilityPercentage >= 60 ? 'ACCEPTABLE' : 'CRITIQUE'}
                             </div>
                             <div style="color: ${statusColor.text}; font-size: 13px; line-height: 1.5;">
                                 ${getConclusionMessage(stabilityPercentage, stable, unstable, outOfLimits, days, systemType, averageVariation)}
@@ -2265,6 +2292,48 @@ function createStabilityChart(containerId, stabilityData, tensionResults) {
                         </div>
                     </div>
                 </div>
+
+                ${alertData.daysList.length > 0 ? `
+                <!-- Liste des jours d'alerte - AJOUTÉ ICI -->
+                <div style="background: #fff7ed; border-radius: 10px; padding: 16px; margin-bottom: 15px; border: 1px solid #fed7aa;">
+                    <div style="font-weight: 600; color: #92400e; margin-bottom: 12px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 8px;">
+                        <span>📅</span> Jours avec dépassement de seuil (${alertData.daysList.length})
+                    </div>
+                    <div style="max-height: 200px; overflow-y: auto;">
+                        <table style="width: 100%; font-size: 11px; border-collapse: collapse;">
+                            <thead>
+                                <tr style="background: #fed7aa; color: #92400e;">
+                                    <th style="padding: 8px; text-align: left;">Date</th>
+                                    <th style="padding: 8px; text-align: center;">Variation</th>
+                                    <th style="padding: 8px; text-align: center;">Heures alerte</th>
+                                    <th style="padding: 8px; text-align: center;">Min/Max</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${alertData.daysList.slice(0, 10).map(day => `
+                                <tr style="border-bottom: 1px solid #fed7aa;">
+                                    <td style="padding: 8px; font-weight: 500;">${day.date}</td>
+                                    <td style="padding: 8px; text-align: center; color: ${parseFloat(day.dailyVariation) > alertData.limits.maxVariation ? '#dc2626' : '#f97316'};">
+                                        ${day.dailyVariation}V
+                                    </td>
+                                    <td style="padding: 8px; text-align: center; color: ${day.hoursAboveThreshold > 0 ? '#dc2626' : '#f97316'};">
+                                        ${day.hoursAboveThreshold}h
+                                    </td>
+                                    <td style="padding: 8px; text-align: center; color: ${day.isOutOfLimits ? '#dc2626' : '#92400e'};">
+                                        ${day.min}V / ${day.max}V
+                                    </td>
+                                </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                        ${alertData.daysList.length > 10 ? `
+                        <div style="text-align: center; padding: 8px; color: #92400e; font-size: 10px;">
+                            + ${alertData.daysList.length - 10} jour(s) supplémentaire(s)
+                        </div>
+                        ` : ''}
+                    </div>
+                </div>
+                ` : ''}
 
                 <!-- Normes système -->
                 <div style="background: #f8fafc; border-radius: 10px; padding: 16px; border: 1px solid #e2e8f0;">
@@ -2292,13 +2361,200 @@ function createStabilityChart(containerId, stabilityData, tensionResults) {
                 </div>
             </div>
         </div>
-    
     `;
 
     // Create the pie chart
     setTimeout(() => {
         createStabilityPieChart(`${containerId}-stability-chart`, stable, unstable, outOfLimits);
     }, 100);
+}
+// ======================== CALCUL DES JOURS D'ALERTE ========================
+function calculateAlertDays(tensionResults) {
+    if (!tensionResults || !tensionResults.length) {
+        return {
+            alertDays: 0,
+            totalDays: 0,
+            percentage: 0,
+            daysList: [],
+            alertHours: 0
+        };
+    }
+
+    // Group by date
+    const dailyData = {};
+    tensionResults.forEach(item => {
+        const date = item.date;
+        if (!dailyData[date]) {
+            dailyData[date] = {
+                values: [],
+                min: Infinity,
+                max: -Infinity,
+                variations: []
+            };
+        }
+        const tension = item.tension || item.valeur || 0;
+        dailyData[date].values.push(tension);
+        dailyData[date].min = Math.min(dailyData[date].min, tension);
+        dailyData[date].max = Math.max(dailyData[date].max, tension);
+        
+        // Calculer les variations entre mesures successives
+        if (dailyData[date].values.length > 1) {
+            const lastValue = dailyData[date].values[dailyData[date].values.length - 2];
+            const variation = Math.abs(tension - lastValue);
+            dailyData[date].variations.push(variation);
+        }
+    });
+
+    // Détecter le type de système
+    const systemType = detectSystemType(tensionResults);
+    const limits = getSystemLimits(systemType);
+    
+    let alertDays = 0;
+    let alertHours = 0;
+    const daysList = [];
+
+    // Analyser chaque jour
+    Object.entries(dailyData).forEach(([date, data]) => {
+        // Variation maximale de la journée
+        const dailyVariation = data.max - data.min;
+        
+        // Variation horaire moyenne
+        const avgHourlyVariation = data.variations.length > 0 
+            ? data.variations.reduce((a, b) => a + b, 0) / data.variations.length
+            : 0;
+
+        // Compter les heures avec variation > seuil
+        const hoursAboveThreshold = data.variations.filter(v => v > limits.alertThreshold).length;
+        
+        // Conditions d'alerte
+        const isAlertDay = 
+            dailyVariation > limits.maxVariation ||          // Variation journalière trop élevée
+            avgHourlyVariation > limits.alertThreshold ||    // Variation horaire moyenne trop élevée
+            hoursAboveThreshold >= 3 ||                      // Au moins 3 heures au-dessus du seuil
+            data.min < limits.min ||                         // Tension minimum trop basse
+            data.max > limits.max;                           // Tension maximum trop élevée
+
+        if (isAlertDay) {createStabilityChart
+            alertDays++;
+            alertHours += hoursAboveThreshold;
+            daysList.push({
+                date: date,
+                dailyVariation: dailyVariation.toFixed(2),
+                avgHourlyVariation: avgHourlyVariation.toFixed(2),
+                hoursAboveThreshold: hoursAboveThreshold,
+                min: data.min.toFixed(2),
+                max: data.max.toFixed(2),
+                isOutOfLimits: data.min < limits.min || data.max > limits.max
+            });
+        }
+    });
+
+    const totalDays = Object.keys(dailyData).length;
+    const percentage = totalDays > 0 ? Math.round((alertDays / totalDays) * 100) : 0;
+
+    return {
+        alertDays,
+        totalDays,
+        percentage,
+        daysList: daysList.sort((a, b) => parseFloat(b.dailyVariation) - parseFloat(a.dailyVariation)),
+        alertHours,
+        systemType,
+        limits
+    };
+}
+// ======================== CALCUL DES JOURS D'ALERTE ========================
+function calculateAlertDays(tensionResults) {
+    if (!tensionResults || !tensionResults.length) {
+        return {
+            alertDays: 0,
+            totalDays: 0,
+            percentage: 0,
+            daysList: [],
+            alertHours: 0
+        };
+    }
+
+    // Group by date
+    const dailyData = {};
+    tensionResults.forEach(item => {
+        const date = item.date;
+        if (!dailyData[date]) {
+            dailyData[date] = {
+                values: [],
+                min: Infinity,
+                max: -Infinity,
+                variations: []
+            };
+        }
+        const tension = item.tension || item.valeur || 0;
+        dailyData[date].values.push(tension);
+        dailyData[date].min = Math.min(dailyData[date].min, tension);
+        dailyData[date].max = Math.max(dailyData[date].max, tension);
+        
+        // Calculer les variations entre mesures successives
+        if (dailyData[date].values.length > 1) {
+            const lastValue = dailyData[date].values[dailyData[date].values.length - 2];
+            const variation = Math.abs(tension - lastValue);
+            dailyData[date].variations.push(variation);
+        }
+    });
+
+    // Détecter le type de système
+    const systemType = detectSystemType(tensionResults);
+    const limits = getSystemLimits(systemType);
+    
+    let alertDays = 0;
+    let alertHours = 0;
+    const daysList = [];
+
+    // Analyser chaque jour
+    Object.entries(dailyData).forEach(([date, data]) => {
+        // Variation maximale de la journée
+        const dailyVariation = data.max - data.min;
+        
+        // Variation horaire moyenne
+        const avgHourlyVariation = data.variations.length > 0 
+            ? data.variations.reduce((a, b) => a + b, 0) / data.variations.length
+            : 0;
+
+        // Compter les heures avec variation > seuil
+        const hoursAboveThreshold = data.variations.filter(v => v > limits.alertThreshold).length;
+        
+        // Conditions d'alerte (ajustez selon vos besoins)
+        const isAlertDay = 
+            dailyVariation > limits.maxVariation ||          // Variation journalière trop élevée
+            avgHourlyVariation > limits.alertThreshold ||    // Variation horaire moyenne trop élevée
+            hoursAboveThreshold >= 3 ||                      // Au moins 3 heures au-dessus du seuil
+            data.min < limits.min ||                         // Tension minimum trop basse
+            data.max > limits.max;                           // Tension maximum trop élevée
+
+        if (isAlertDay) {
+            alertDays++;
+            alertHours += hoursAboveThreshold;
+            daysList.push({
+                date: date,
+                dailyVariation: dailyVariation.toFixed(2),
+                avgHourlyVariation: avgHourlyVariation.toFixed(2),
+                hoursAboveThreshold: hoursAboveThreshold,
+                min: data.min.toFixed(2),
+                max: data.max.toFixed(2),
+                isOutOfLimits: data.min < limits.min || data.max > limits.max
+            });
+        }
+    });
+
+    const totalDays = Object.keys(dailyData).length;
+    const percentage = totalDays > 0 ? Math.round((alertDays / totalDays) * 100) : 0;
+
+    return {
+        alertDays,
+        totalDays,
+        percentage,
+        daysList: daysList.sort((a, b) => parseFloat(b.dailyVariation) - parseFloat(a.dailyVariation)),
+        alertHours,
+        systemType,
+        limits
+    };
 }
 
 function createStabilityPieChart(canvasId, stable, unstable, outOfLimits) {
@@ -2352,7 +2608,1069 @@ function createStabilityPieChart(canvasId, stable, unstable, outOfLimits) {
     });
 }
 
+// ======================== FILTRE GLOBAL PAR DATES ========================
+function createGlobalDateFilter() {
+    const allDates = allClientsHourlyMatrix.dates || [];
+    if (allDates.length === 0) return null;
+
+    // Vérifier si un filtre est actif
+    const isFilterActive = window.filteredDates && 
+                          window.filteredDates.length > 0 && 
+                          window.filteredDates.length < allDates.length;
+    
+    // Déterminer la classe CSS selon l'état
+    const containerClass = isFilterActive ? 'global-filter-container filter-active' : 'global-filter-container';
+
+    return `
+        <div class="${containerClass}">
+            <!-- En-tête avec titre et actions -->
+            <div class="filter-header">
+                <div class="filter-title">
+                    <span class="filter-title-icon">🔍</span>
+                    <div>
+                        <div>Filtre Global des Données</div>
+                        <div style="font-size: 12px; color: #718096; margin-top: 2px;">
+                            ${allDates.length} jour${allDates.length !== 1 ? 's' : ''} disponibles
+                            ${isFilterActive ? ` · ${window.filteredDates.length} sélectionné${window.filteredDates.length !== 1 ? 's' : ''}` : ''}
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="filter-actions">
+                    <button id="reset-all-filters-btn" class="filter-btn filter-btn-secondary">
+                        <span style="font-size: 14px;">🔄</span>
+                        Réinitialiser
+                    </button>
+                    <button id="apply-filter-btn" class="filter-btn filter-btn-primary">
+                        <span style="font-size: 14px;">✅</span>
+                        Appliquer
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Filtres principaux -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; margin-bottom: 20px;">
+                <!-- Sélection par période -->
+                <div class="filter-group">
+                    <div class="filter-group-title">
+                        <span>📅</span> Période
+                    </div>
+                    <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+                        <div style="flex: 1; min-width: 140px;">
+                            <label style="display: block; font-size: 12px; color: #64748b; margin-bottom: 6px; font-weight: 500;">
+                                Date de début
+                            </label>
+                            <input type="date" id="filter-start-date" class="filter-date-input" 
+                                   style="width: 100%; padding: 12px; border: 2px solid #e2e8f0; border-radius: 8px; 
+                                          font-size: 13px; transition: all 0.2s;"
+                                   onfocus="this.style.borderColor='#3b82f6'; this.style.boxShadow='0 0 0 3px rgba(59, 130, 246, 0.1)'"
+                                   onblur="this.style.borderColor='#e2e8f0'; this.style.boxShadow='none'">
+                        </div>
+                        <div style="flex: 1; min-width: 140px;">
+                            <label style="display: block; font-size: 12px; color: #64748b; margin-bottom: 6px; font-weight: 500;">
+                                Date de fin
+                            </label>
+                            <input type="date" id="filter-end-date" class="filter-date-input" 
+                                   style="width: 100%; padding: 12px; border: 2px solid #e2e8f0; border-radius: 8px; 
+                                          font-size: 13px; transition: all 0.2s;"
+                                   onfocus="this.style.borderColor='#3b82f6'; this.style.boxShadow='0 0 0 3px rgba(59, 130, 246, 0.1)'"
+                                   onblur="this.style.borderColor='#e2e8f0'; this.style.boxShadow='none'">
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Filtre par année/mois -->
+                <div class="filter-group">
+                    <div class="filter-group-title">
+                        <span>🗓️</span> Année/Mois
+                    </div>
+                    <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+                        <div style="flex: 1; min-width: 120px;">
+                            <label style="display: block; font-size: 12px; color: #64748b; margin-bottom: 6px; font-weight: 500;">
+                                Année
+                            </label>
+                            <select id="filter-year" class="filter-select" 
+                                    style="width: 100%; padding: 12px; border: 2px solid #e2e8f0; border-radius: 8px; 
+                                           font-size: 13px; background: white; cursor: pointer;
+                                           transition: all 0.2s;"
+                                    onfocus="this.style.borderColor='#3b82f6'; this.style.boxShadow='0 0 0 3px rgba(59, 130, 246, 0.1)'"
+                                    onblur="this.style.borderColor='#e2e8f0'; this.style.boxShadow='none'">
+                                <option value="all">Toutes les années</option>
+                                ${[...new Set(allDates.map(d => d.split('/')[2]))].sort((a, b) => b - a).map(year => 
+                                    `<option value="${year}">${year}</option>`
+                                ).join('')}
+                            </select>
+                        </div>
+                        <div style="flex: 1; min-width: 120px;">
+                            <label style="display: block; font-size: 12px; color: #64748b; margin-bottom: 6px; font-weight: 500;">
+                                Mois
+                            </label>
+                            <select id="filter-month" class="filter-select" 
+                                    style="width: 100%; padding: 12px; border: 2px solid #e2e8f0; border-radius: 8px; 
+                                           font-size: 13px; background: white; cursor: pointer;
+                                           transition: all 0.2s;"
+                                    onfocus="this.style.borderColor='#3b82f6'; this.style.boxShadow='0 0 0 3px rgba(59, 130, 246, 0.1)'"
+                                    onblur="this.style.borderColor='#e2e8f0'; this.style.boxShadow='none'">
+                                <option value="all">Tous les mois</option>
+                                <option value="1">Janvier</option>
+                                <option value="2">Février</option>
+                                <option value="3">Mars</option>
+                                <option value="4">Avril</option>
+                                <option value="5">Mai</option>
+                                <option value="6">Juin</option>
+                                <option value="7">Juillet</option>
+                                <option value="8">Août</option>
+                                <option value="9">Septembre</option>
+                                <option value="10">Octobre</option>
+                                <option value="11">Novembre</option>
+                                <option value="12">Décembre</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Sélection individuelle de dates -->
+            <div class="filter-group">
+                <div class="filter-group-title">
+                    <span>📌</span> Sélection de dates spécifiques
+                </div>
+                
+                <div class="date-selection-section">
+                    <div class="date-selection-actions">
+                        <button id="select-all-dates" class="date-select-btn date-select-btn-primary">
+                            ✅ Tout sélectionner
+                        </button>
+                        <button id="deselect-all-dates" class="date-select-btn date-select-btn-secondary">
+                            ❌ Tout désélectionner
+                        </button>
+                    </div>
+                    
+                    <div class="date-checkbox-container">
+                        ${allDates.map(date => {
+                            const isChecked = window.filteredDates ? 
+                                window.filteredDates.includes(date) : true;
+                            const labelClass = isChecked ? 'date-checkbox-label checked' : 'date-checkbox-label';
+                            
+                            return `
+                                <label class="${labelClass}">
+                                    <input type="checkbox" class="date-checkbox" value="${date}" ${isChecked ? 'checked' : ''}>
+                                    <span>${date}</span>
+                                </label>
+                            `;
+                        }).join('')}
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Indicateur de sélection -->
+            <div id="filter-indicator" class="filter-indicator ${isFilterActive ? 'filtered' : ''}">
+                <span class="filter-indicator-icon">📊</span>
+                <div class="filter-indicator-info">
+                    <div class="filter-indicator-title">
+                        <span id="selected-dates-count">${isFilterActive ? window.filteredDates.length : allDates.length}</span>
+                        jour${(isFilterActive ? window.filteredDates.length : allDates.length) !== 1 ? 's' : ''} sélectionné${(isFilterActive ? window.filteredDates.length : allDates.length) !== 1 ? 's' : ''}
+                    </div>
+                    <div class="filter-indicator-description">
+                        Le filtre s'applique à tous les graphiques et tableaux de l'onglet TECHNIQUE
+                    </div>
+                </div>
+                ${isFilterActive ? `
+                <button onclick="resetAllFilters()" style="background: #f1f5f9; border: 1px solid #cbd5e1; 
+                        padding: 8px 16px; border-radius: 6px; font-size: 12px; cursor: pointer; 
+                        color: #64748b; font-weight: 500;">
+                    Effacer le filtre
+                </button>
+                ` : ''}
+            </div>
+        </div>
+    `;
+}
+// ======================== RÉINITIALISATION COMPLÈTE DES FILTRES ========================
+function resetAllFilters() {
+    document.querySelectorAll('.date-checkbox').forEach(cb => {
+        cb.checked = true;
+        if (cb.parentElement) {
+            cb.parentElement.classList.add('checked');
+        }
+    });
+    
+    document.getElementById('filter-start-date').value = '';
+    document.getElementById('filter-end-date').value = '';
+    document.getElementById('filter-year').value = 'all';
+    document.getElementById('filter-month').value = 'all';
+    
+    window.filteredDates = allClientsHourlyMatrix.dates;
+    refreshAllTechniqueComponents();
+    console.log('✅ Tous les filtres réinitialisés');
+}
+
+// ======================== MISE À JOUR DE L'INDICATEUR ========================
+function updateFilterIndicator() {
+    const allDates = allClientsHourlyMatrix.dates || [];
+    const selectedCount = window.filteredDates ? window.filteredDates.length : allDates.length;
+    const isFilterActive = selectedCount < allDates.length;
+    
+    const indicator = document.getElementById('filter-indicator');
+    const countSpan = document.getElementById('selected-dates-count');
+    const container = document.querySelector('.global-filter-container');
+    
+    if (countSpan) {
+        countSpan.textContent = selectedCount;
+    }
+    
+    if (indicator) {
+        indicator.className = isFilterActive ? 'filter-indicator filtered' : 'filter-indicator';
+    }
+    
+    if (container) {
+        container.className = isFilterActive ? 
+            'global-filter-container filter-active' : 
+            'global-filter-container';
+    }
+}
+// ======================== FONCTION D'APPLICATION DU FILTRE ========================
+function applyGlobalDateFilter() {
+    const selectedCheckboxes = document.querySelectorAll('.date-checkbox:checked');
+    const selectedDates = Array.from(selectedCheckboxes).map(cb => cb.value);
+    
+    if (selectedDates.length === 0) {
+        alert('Veuillez sélectionner au moins une date');
+        return false;
+    }
+    
+    window.filteredDates = selectedDates.sort((a, b) => {
+        const dateA = new Date(a.split('/').reverse().join('-'));
+        const dateB = new Date(b.split('/').reverse().join('-'));
+        return dateA - dateB;
+    });
+    
+    refreshAllTechniqueComponents();
+    console.log(`✅ Filtre appliqué: ${selectedDates.length} jour(s) sélectionné(s)`);
+    return true;
+}
+
+// Dans addAllClientsStyles() ou dans une nouvelle fonction
+function addDPDTStyles() {
+    if (document.querySelector('#dpdt-styles')) return;
+    
+    const styles = document.createElement('style');
+    styles.id = 'dpdt-styles';
+    styles.textContent = `
+        /* Styles pour le tableau DP/DT */
+        .dpdt-table-container {
+            margin-top: 20px;
+            background: white;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+            overflow: hidden;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        
+        .dpdt-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+        }
+        
+        .dpdt-table th {
+            background: #f8fafc;
+            padding: 12px 10px;
+            text-align: left;
+            font-weight: 600;
+            color: #475569;
+            border-bottom: 2px solid #e2e8f0;
+            position: sticky;
+            top: 0;
+        }
+        
+        .dpdt-table td {
+            padding: 10px;
+            border-bottom: 1px solid #e2e8f0;
+            vertical-align: top;
+        }
+        
+        .dpdt-dt-row {
+            background: linear-gradient(90deg, rgba(254, 226, 226, 0.1) 0%, rgba(254, 226, 226, 0.05) 100%);
+            border-left: 3px solid #ef4444;
+        }
+        
+        .dpdt-dp-row {
+            background: linear-gradient(90deg, rgba(254, 243, 199, 0.1) 0%, rgba(254, 243, 199, 0.05) 100%);
+            border-left: 3px solid #f59e0b;
+        }
+        
+        .dpdt-dt-row:hover {
+            background: linear-gradient(90deg, rgba(254, 226, 226, 0.2) 0%, rgba(254, 226, 226, 0.1) 100%);
+        }
+        
+        .dpdt-dp-row:hover {
+            background: linear-gradient(90deg, rgba(254, 243, 199, 0.2) 0%, rgba(254, 243, 199, 0.1) 100%);
+        }
+        
+        .dpdt-type-badge {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 10px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .dpdt-type-badge.dt {
+            background: #fee2e2;
+            color: #dc2626;
+            border: 1px solid #fecaca;
+        }
+        
+        .dpdt-type-badge.dp {
+            background: #fef3c7;
+            color: #d97706;
+            border: 1px solid #fde68a;
+        }
+        
+        .dpdt-hour-chip {
+            display: inline-block;
+            margin: 2px;
+            padding: 4px 8px;
+            background: #f1f5f9;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            color: #4a5568;
+            border: 1px solid #e2e8f0;
+        }
+        
+        .dpdt-hour-chip.dt {
+            background: #fee2e2;
+            border-color: #fecaca;
+            color: #991b1b;
+        }
+        
+        .dpdt-hour-chip.dp {
+            background: #fef3c7;
+            border-color: #fde68a;
+            color: #92400e;
+        }
+        
+        /* Statistiques DP/DT */
+        .dpdt-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+            padding: 15px;
+            background: #f8fafc;
+            border-top: 1px solid #e2e8f0;
+        }
+        
+        .dpdt-stat-card {
+            text-align: center;
+            padding: 15px;
+            border-radius: 8px;
+            background: white;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        }
+        
+        .dpdt-stat-card.dt {
+            border-top: 3px solid #ef4444;
+        }
+        
+        .dpdt-stat-card.dp {
+            border-top: 3px solid #f59e0b;
+        }
+        
+        .dpdt-stat-value {
+            display: block;
+            font-size: 24px;
+            font-weight: 800;
+            margin-bottom: 5px;
+        }
+        
+        .dpdt-stat-value.dt {
+            color: #dc2626;
+        }
+        
+        .dpdt-stat-value.dp {
+            color: #d97706;
+        }
+        
+        .dpdt-stat-label {
+            font-size: 11px;
+            color: #718096;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .dpdt-table {
+                font-size: 11px;
+            }
+            
+            .dpdt-table th,
+            .dpdt-table td {
+                padding: 8px 6px;
+            }
+            
+            .dpdt-stats {
+                grid-template-columns: 1fr;
+            }
+        }
+    `;
+    
+    document.head.appendChild(styles);
+}
+
+// ======================== AFFICHAGE COMPACT DES PÉRIODES DP/DT ========================
+function createCompactDPDTDisplay(dates, eventsByDate) {
+    if (dates.length === 0) {
+        return `
+            <div style="text-align: center; padding: 20px; color: #718096; font-size: 14px;">
+                <span>📭 Aucun événement de délestage pour les dates sélectionnées</span>
+            </div>
+        `;
+    }
+    
+    let displayHTML = '';
+    
+    dates.forEach((date, dateIndex) => {
+        const dateEvents = eventsByDate[date] || [];
+        
+        if (dateEvents.length === 0) return;
+        
+        // Séparer DP et DT
+        const dpEvents = dateEvents.filter(e => e.type === 'DP');
+        const dtEvents = dateEvents.filter(e => e.type === 'DT');
+        
+        // Grouper les événements en périodes continues
+        const dpPeriods = groupEventsIntoPeriods(dpEvents);
+        const dtPeriods = groupEventsIntoPeriods(dtEvents);
+        
+        // Format compact pour les périodes DP
+        let dpCompact = '';
+        if (dpPeriods.length > 0) {
+            dpCompact = dpPeriods.map(period => {
+                const startHour = period.events[0].heure.substring(0, 5);
+                const endHour = period.events[period.events.length - 1].heure.substring(0, 5);
+                const duration = calculateDuration(startHour, endHour);
+                const extra = period.events.length > 1 ? ` (+${period.events.length - 1})` : '';
+                
+                return `
+                    <div style="display: inline-block; margin-right: 15px;">
+                        <span style="font-family: 'Courier New', monospace; font-weight: 600; color: #92400e;">
+                            ${startHour}
+                        </span>
+                        <span style="color: #a0aec0; margin: 0 5px;">→</span>
+                        <span style="font-family: 'Courier New', monospace; font-weight: 600; color: #92400e;">
+                            ${endHour}
+                        </span>
+                        <span style="font-family: 'Courier New', monospace; color: #d97706; margin-left: 5px; font-size: 11px;">
+                            ${duration}${extra}
+                        </span>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        // Format compact pour les périodes DT
+        let dtCompact = '';
+        if (dtPeriods.length > 0) {
+            dtCompact = dtPeriods.map(period => {
+                const startHour = period.events[0].heure.substring(0, 5);
+                const endHour = period.events[period.events.length - 1].heure.substring(0, 5);
+                const duration = calculateDuration(startHour, endHour);
+                const extra = period.events.length > 1 ? ` (+${period.events.length - 1})` : '';
+                
+                return `
+                    <div style="display: inline-block; margin-right: 15px;">
+                        <span style="font-family: 'Courier New', monospace; font-weight: 600; color: #991b1b;">
+                            ${startHour}
+                        </span>
+                        <span style="color: #a0aec0; margin: 0 5px;">→</span>
+                        <span style="font-family: 'Courier New', monospace; font-weight: 600; color: #991b1b;">
+                            ${endHour}
+                        </span>
+                        <span style="font-family: 'Courier New', monospace; color: #dc2626; margin-left: 5px; font-size: 11px;">
+                            ${duration}${extra}
+                        </span>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        displayHTML += `
+            <div style="background: white; border-radius: 8px; border: 1px solid #e2e8f0; 
+                  margin-bottom: ${dateIndex < dates.length - 1 ? '10px' : '0'}; 
+                  padding: 12px 15px;">
+                
+                <!-- En-tête de la date -->
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <div style="font-weight: 700; color: #2d3748; font-size: 14px;">
+                        ${date}
+                        <span style="font-size: 11px; color: #718096; font-weight: normal; margin-left: 8px;">
+                            ${dateEvents.length} événement${dateEvents.length !== 1 ? 's' : ''}
+                        </span>
+                    </div>
+                    
+                    <!-- Indicateurs rapides -->
+                    <div style="display: flex; gap: 10px;">
+                        ${dpEvents.length > 0 ? `
+                            <div style="display: flex; align-items: center; gap: 4px;">
+                                <div style="width: 8px; height: 8px; background: #f59e0b; border-radius: 50%;"></div>
+                                <span style="font-size: 11px; color: #92400e; font-weight: 600;">
+                                    ${dpEvents.length} DP
+                                </span>
+                            </div>
+                        ` : ''}
+                        ${dtEvents.length > 0 ? `
+                            <div style="display: flex; align-items: center; gap: 4px;">
+                                <div style="width: 8px; height: 8px; background: #ef4444; border-radius: 50%;"></div>
+                                <span style="font-size: 11px; color: #991b1b; font-weight: 600;">
+                                    ${dtEvents.length} DT
+                                </span>
+                            </div>
+                        ` : ''}
+                    </div>
+                </div>
+                
+                <!-- Périodes DP -->
+                ${dpCompact ? `
+                    <div style="margin-bottom: ${dtCompact ? '8px' : '0'};">
+                        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+                            <div style="width: 12px; height: 12px; background: #fef3c7; border-radius: 3px; 
+                                  border: 1px solid #fcd34d; display: flex; align-items: center; justify-content: center;">
+                                <span style="font-size: 8px; color: #92400e; font-weight: bold;">DP</span>
+                            </div>
+                            <span style="font-size: 11px; color: #718096; font-weight: 600;">Délestage Partiel</span>
+                        </div>
+                        <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-left: 20px;">
+                            ${dpCompact}
+                        </div>
+                    </div>
+                ` : ''}
+                
+                <!-- Périodes DT -->
+                ${dtCompact ? `
+                    <div>
+                        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+                            <div style="width: 12px; height: 12px; background: #fee2e2; border-radius: 3px; 
+                                  border: 1px solid #f87171; display: flex; align-items: center; justify-content: center;">
+                                <span style="font-size: 8px; color: #991b1b; font-weight: bold;">DT</span>
+                            </div>
+                            <span style="font-size: 11px; color: #718096; font-weight: 600;">Délestage Total</span>
+                        </div>
+                        <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-left: 20px;">
+                            ${dtCompact}
+                        </div>
+                    </div>
+                ` : ''}
+            </div>
+        `;
+    });
+    
+    // ⚠️ SUPPRIMEZ CE BLOC COMPLET (les 3 cartes) :
+    // const statsHTML = `...`; // ← EFFACER
+    
+    // Et modifiez cette ligne :
+    // return statsHTML + displayHTML; // ← ANCIENNE VERSION
+    return displayHTML; // ← NOUVELLE VERSION
+}
+
+// ======================== FONCTIONS UTILITAIRES ========================
+
+function groupEventsIntoPeriods(events) {
+    if (events.length === 0) return [];
+    
+    // Trier les événements par heure
+    const sortedEvents = [...events].sort((a, b) => {
+        const timeA = convertTimeToMinutes(a.heure);
+        const timeB = convertTimeToMinutes(b.heure);
+        return timeA - timeB;
+    });
+    
+    const periods = [];
+    let currentPeriod = null;
+    
+    sortedEvents.forEach((event, index) => {
+        const eventTime = convertTimeToMinutes(event.heure);
+        
+        if (!currentPeriod) {
+            // Démarrer une nouvelle période
+            currentPeriod = {
+                events: [event],
+                startTime: eventTime,
+                endTime: eventTime
+            };
+        } else {
+            const lastEventTime = currentPeriod.endTime;
+            const timeDiff = eventTime - lastEventTime;
+            
+            // Si l'événement est dans les 30 minutes du précédent, continuer la période
+            if (timeDiff <= 30) {
+                currentPeriod.events.push(event);
+                currentPeriod.endTime = eventTime;
+            } else {
+                // Fin de période, en commencer une nouvelle
+                periods.push(currentPeriod);
+                currentPeriod = {
+                    events: [event],
+                    startTime: eventTime,
+                    endTime: eventTime
+                };
+            }
+        }
+        
+        // Si c'est le dernier événement, terminer la période
+        if (index === sortedEvents.length - 1) {
+            periods.push(currentPeriod);
+        }
+    });
+    
+    return periods;
+}
+
+function convertTimeToMinutes(timeStr) {
+    if (!timeStr) return 0;
+    const [hours, minutes] = timeStr.split(':').map(Number);
+    return (hours || 0) * 60 + (minutes || 0);
+}
+
+function calculateDuration(startTime, endTime) {
+    const startMinutes = convertTimeToMinutes(startTime);
+    const endMinutes = convertTimeToMinutes(endTime);
+    const durationMinutes = endMinutes - startMinutes;
+    
+    if (durationMinutes < 60) {
+        return `${durationMinutes}mn`;
+    } else {
+        const hours = Math.floor(durationMinutes / 60);
+        const minutes = durationMinutes % 60;
+        return minutes > 0 ? `${hours}h${minutes.toString().padStart(2, '0')}mn` : `${hours}h`;
+    }
+}
+// Fonction utilitaire pour les noms de mois
+function getMonthName(monthNumber) {
+    const months = [
+        'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
+        'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'
+    ];
+    return months[monthNumber - 1];
+}
+
+// Fonction pour afficher les détails d'un jour (modal)
+function showDayDetails(date) {
+    // Implémentez cette fonction pour afficher un modal avec les détails du jour
+    alert(`Détails pour ${date}`);
+}
+// ======================== RAFRAÎCHISSEMENT COMPLET DE L'ONGLET TECHNIQUE ========================
+function refreshAllTechniqueComponents() {
+    if (!window.filteredDates || window.filteredDates.length === 0) {
+        window.filteredDates = allClientsHourlyMatrix.dates;
+    }
+    displayAllClientsTab();
+}
+// 1. Tableau matriciel
+function refreshFilteredMatrixTable() {
+    const tableBody = document.querySelector('.all-clients-table tbody');
+    if (tableBody) {
+        const filteredRows = generateFilteredTableRows();
+        tableBody.innerHTML = filteredRows;
+        console.log('✅ Tableau matriciel mis à jour');
+    }
+}
+
+// 2. Statistiques techniques
+function refreshFilteredTechnicalStats() {
+    // Recalculer les statistiques avec les dates filtrées
+    const filteredStats = calculateFilteredTechnicalStats();
+    
+    // Mettre à jour l'affichage des statistiques
+    updateStatsDisplay(filteredStats);
+}
+// Calcul des statistiques techniques filtrées
+function calculateFilteredTechnicalStats() {
+    const dates = window.filteredDates || allClientsHourlyMatrix.dates;
+    const sortedClients = Object.keys(allResultsByClient).sort((a, b) => {
+        const numA = parseInt(a, 16) || 0;
+        const numB = parseInt(b, 16) || 0;
+        return numA - numB;
+    });
+
+    // Calculer l'énergie maximale par jour (filtrée)
+    const energyDataByDay = {};
+    dates.forEach(date => {
+        let totalDayEnergy = 0;
+        sortedClients.forEach(clientId => {
+            const clientData = allResultsByClient[clientId];
+            let maxEnergyForDay = 0;
+
+            if (clientData.combinedHourlyData && clientData.combinedHourlyData.length > 0) {
+                clientData.combinedHourlyData.forEach(item => {
+                    if (item.date === date && item.energie && !isNaN(item.energie)) {
+                        maxEnergyForDay = Math.max(maxEnergyForDay, parseFloat(item.energie));
+                    }
+                });
+            }
+            totalDayEnergy += maxEnergyForDay;
+        });
+        energyDataByDay[date] = totalDayEnergy;
+    });
+
+    // Calculer les tensions filtrées
+    let tensionValues = [];
+    let maxTensionValue = 0;
+    let maxTensionDate = '';
+    let minTensionValue = Infinity;
+    let minTensionDate = '';
+
+    dates.forEach(date => {
+        allClientsHourlyMatrix.hours.forEach(hour => {
+            const key = `${date}_${hour}`;
+            const rowData = allClientsHourlyMatrix.data[key];
+            if (rowData && rowData.tension !== null && rowData.tension !== undefined) {
+                tensionValues.push(rowData.tension);
+                if (rowData.tension > maxTensionValue) {
+                    maxTensionValue = rowData.tension;
+                    maxTensionDate = date;
+                }
+                if (rowData.tension < minTensionValue) {
+                    minTensionValue = rowData.tension;
+                    minTensionDate = date;
+                }
+            }
+        });
+    });
+
+    const averageTension = tensionValues.length > 0
+        ? (tensionValues.reduce((a, b) => a + b, 0) / tensionValues.length).toFixed(2)
+        : 'N/A';
+
+    const minTensionDisplay = minTensionValue !== Infinity ? minTensionValue.toFixed(2) : 'N/A';
+
+    // Trouver l'énergie maximale
+    let maxEnergyValue = 0;
+    let maxEnergyDate = '';
+    Object.entries(energyDataByDay).forEach(([date, energy]) => {
+        if (energy > maxEnergyValue) {
+            maxEnergyValue = energy;
+            maxEnergyDate = date;
+        }
+    });
+
+    return {
+        dates: dates,
+        clients: sortedClients,
+        energyDataByDay: energyDataByDay,
+        maxEnergyValue: maxEnergyValue,
+        maxEnergyDate: maxEnergyDate,
+        averageTension: averageTension,
+        maxTensionValue: maxTensionValue > 0 ? maxTensionValue.toFixed(2) : 'N/A',
+        maxTensionDate: maxTensionDate,
+        minTensionValue: minTensionDisplay,
+        minTensionDate: minTensionDate
+    };
+}
+
+// Mise à jour de l'affichage des statistiques
+function updateStatsDisplay(stats) {
+    // Mettre à jour le tableau des statistiques
+    const statsTable = document.querySelector('.stats-summary-table');
+    if (statsTable) {
+        statsTable.innerHTML = `
+            <tbody>
+                <tr>
+                    <td class="stats-label">⚡ Énergie Maximale</td>
+                    <td class="stats-value">${stats.maxEnergyValue} Wh</td>
+                    <td class="stats-date">${stats.maxEnergyDate}</td>
+                </tr>
+                <tr>
+                    <td class="stats-label">📊 Tension Moyenne</td>
+                    <td class="stats-value">${stats.averageTension} V</td>
+                    <td class="stats-date">Système ${detectSystemTypeFromTensionValue(parseFloat(stats.averageTension) || 14)}</td>
+                </tr>
+                <tr>
+                    <td class="stats-label">⚡ Tension Minimale</td>
+                    <td class="stats-value">${stats.minTensionValue} V</td>
+                    <td class="stats-date">${stats.minTensionDate || '-'}</td>
+                </tr>
+                <tr>
+                    <td class="stats-label">⚡ Tension Maximale</td>
+                    <td class="stats-value">${stats.maxTensionValue} V</td>
+                    <td class="stats-date">${stats.maxTensionDate || '-'}</td>
+                </tr>
+                <tr>
+                    <td class="stats-label">📏 Variation Max/Jour</td>
+                    <td class="stats-value" style="color: #d69e2e;">
+                        ${(detectSystemTypeFromTensionValue(parseFloat(stats.averageTension) || 14) === '24V' ? 5 : 2.5).toFixed(1)} V
+                    </td>
+                    <td class="stats-date">
+                        Seuil alerte: ${detectSystemTypeFromTensionValue(parseFloat(stats.averageTension) || 14) === '24V' ? '3' : '1.5'} V/h
+                    </td>
+                </tr>
+            </tbody>
+        `;
+    }
+    
+    // Mettre à jour les en-têtes
+    const header = document.querySelector('.all-clients-stats');
+    if (header) {
+        const statItems = header.querySelectorAll('.stat-item');
+        if (statItems[0]) {
+            statItems[0].querySelector('.stat-text').textContent = `${stats.dates.length} jours`;
+        }
+        if (statItems[1]) {
+            statItems[1].querySelector('.stat-text').textContent = `${stats.clients.length} client${stats.clients.length !== 1 ? 's' : ''}`;
+        }
+    }
+}
+// 3. Analyse de stabilité
+function refreshFilteredStabilityAnalysis() {
+    if (tensionResults && tensionResults.length > 0) {
+        // Filtrer les résultats de tension
+        const filteredTensionResults = tensionResults.filter(item => 
+            window.filteredDates.includes(item.date)
+        );
+        
+        if (filteredTensionResults.length > 0) {
+            // Recalculer l'analyse de stabilité
+            const filteredStabilityData = analyzeTensionStability(filteredTensionResults);
+            
+            // Mettre à jour l'affichage
+            const container = document.getElementById('stability-analysis-container');
+            if (container) {
+                createStabilityChart('stability-analysis-container', filteredStabilityData, filteredTensionResults);
+                console.log('✅ Analyse de stabilité mise à jour');
+            }
+        }
+    }
+}
+
+// 4. Graphique d'énergie
+function refreshFilteredEnergyChart() {
+    const filteredEnergyData = calculateFilteredEnergyData();
+    const maxEnergyValue = Math.max(...Object.values(filteredEnergyData));
+    const maxEnergyDate = Object.keys(filteredEnergyData).find(date => filteredEnergyData[date] === maxEnergyValue);
+    
+    if (window.allClientsEnergyChartInstance) {
+        window.allClientsEnergyChartInstance.destroy();
+    }
+    
+    // Recréer le graphique avec données filtrées
+    createAllClientsEnergyChart(window.filteredDates, filteredEnergyData, maxEnergyDate);
+    console.log('✅ Graphique d\'énergie mis à jour');
+}
+
+// 5. Graphique de tension
+function refreshFilteredTensionChart() {
+    const filteredTensionData = calculateFilteredTensionData();
+    const systemType = detectSystemTypeFromTensionValue(
+        Object.values(filteredTensionData).reduce((acc, day) => {
+            if (day && day.min && day.max) {
+                return acc + (day.min + day.max) / 2;
+            }
+            return acc;
+        }, 0) / Object.keys(filteredTensionData).length
+    );
+    const systemLimits = getSystemLimits(systemType);
+    
+    if (window.allClientsTensionChartInstance) {
+        window.allClientsTensionChartInstance.destroy();
+    }
+    
+    createAllClientsTensionChart(window.filteredDates, filteredTensionData, systemType, systemLimits);
+    console.log('✅ Graphique de tension mis à jour');
+}
+function refreshFilteredDisplay() {
+    // Mettre à jour le tableau
+    const tableBody = document.querySelector('.all-clients-table tbody');
+    if (tableBody) {
+        // Recréer les lignes avec les dates filtrées
+        const filteredRows = generateFilteredTableRows();
+        tableBody.innerHTML = filteredRows;
+    }
+    
+    // Mettre à jour les graphiques
+    updateFilteredCharts();
+}
+
+function generateFilteredTableRows() {
+    if (!window.filteredDates || window.filteredDates.length === 0) {
+        return generateAllClientsTableRows(0, allClientsHourlyMatrix.dates.length * allClientsHourlyMatrix.hours.length);
+    }
+    
+    let rows = '';
+    let rowIndex = 0;
+    const itemsPerPage = window.allClientsItemsPerPage || 50;
+    const currentPage = window.allClientsCurrentPage || 1;
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    
+    // Filtrer les dates
+    const filteredDates = window.filteredDates;
+    
+    // Parcourir toutes les combinaisons date/heure filtrées
+    for (let i = 0; i < filteredDates.length; i++) {
+        const date = filteredDates[i];
+        
+        for (let j = 0; j < allClientsHourlyMatrix.hours.length; j++) {
+            const hour = allClientsHourlyMatrix.hours[j];
+            
+            // Vérifier si cette ligne est dans la plage de pagination
+            if (rowIndex >= startIndex && rowIndex < endIndex) {
+                const key = `${date}_${hour}`;
+                const rowData = allClientsHourlyMatrix.data[key] || {};
+                
+                // Déterminer la couleur de la tension
+                const tension = rowData.tension;
+                const hasTension = tension !== null && tension !== undefined;
+                const tensionColor = hasTension ? getTensionColor(tension) : '#718096';
+                
+                rows += `
+                    <tr>
+                        <td class="row-index">${rowIndex + 1}</td>
+                        <td class="row-date">${date}</td>
+                        <td class="row-hour">${hour}</td>
+                        ${allClientsHourlyMatrix.clients.map(clientId => {
+                    const energie = rowData[`client_${clientId}`];
+                    return `
+                                <td class="row-energy client-energy">
+                                    ${energie !== null && energie !== undefined ? energie : '-'}
+                                </td>
+                            `;
+                }).join('')}
+                        <td class="row-tension" style="color: ${tensionColor}">
+                            ${hasTension ? tension.toFixed(1) : '-'}
+                        </td>
+                    </tr>
+                `;
+            }
+            
+            rowIndex++;
+            if (rowIndex >= endIndex) break;
+        }
+        if (rowIndex >= endIndex) break;
+    }
+    
+    return rows;
+}
+
+function updateFilteredCharts() {
+    // Mettre à jour le graphique d'énergie
+    const filteredEnergyData = calculateFilteredEnergyData();
+    const maxEnergyValue = Math.max(...Object.values(filteredEnergyData));
+    const maxEnergyDate = Object.keys(filteredEnergyData).find(date => filteredEnergyData[date] === maxEnergyValue);
+    
+    if (window.allClientsEnergyChartInstance) {
+        window.allClientsEnergyChartInstance.destroy();
+    }
+    
+    // Recréer le graphique avec données filtrées
+    createAllClientsEnergyChart(window.filteredDates || allClientsHourlyMatrix.dates, filteredEnergyData, maxEnergyDate);
+    
+    // Mettre à jour le graphique de tension
+    const filteredTensionData = calculateFilteredTensionData();
+    const systemType = detectSystemTypeFromTensionValue(
+        Object.values(filteredTensionData).reduce((acc, day) => {
+            if (day && day.min && day.max) {
+                return acc + (day.min + day.max) / 2;
+            }
+            return acc;
+        }, 0) / Object.keys(filteredTensionData).length
+    );
+    const systemLimits = getSystemLimits(systemType);
+    
+    if (window.allClientsTensionChartInstance) {
+        window.allClientsTensionChartInstance.destroy();
+    }
+    
+    createAllClientsTensionChart(window.filteredDates || allClientsHourlyMatrix.dates, filteredTensionData, systemType, systemLimits);
+}
+
+function calculateFilteredEnergyData() {
+    const dates = window.filteredDates || allClientsHourlyMatrix.dates;
+    const energyDataByDay = {};
+    
+    // Pour chaque date filtrée
+    dates.forEach(date => {
+        let totalDayEnergy = 0;
+        
+        // Pour chaque client
+        allClientsHourlyMatrix.clients.forEach(clientId => {
+            const clientData = allResultsByClient[clientId];
+            let maxEnergyForDay = 0;
+            
+            if (clientData.combinedHourlyData && clientData.combinedHourlyData.length > 0) {
+                // Trouver le max d'énergie pour ce client ce jour-là
+                clientData.combinedHourlyData.forEach(item => {
+                    if (item.date === date && item.energie && !isNaN(item.energie)) {
+                        maxEnergyForDay = Math.max(maxEnergyForDay, parseFloat(item.energie));
+                    }
+                });
+            }
+            
+            totalDayEnergy += maxEnergyForDay;
+        });
+        
+        energyDataByDay[date] = totalDayEnergy;
+    });
+    
+    return energyDataByDay;
+}
+
+function calculateFilteredTensionData() {
+    const dates = window.filteredDates || allClientsHourlyMatrix.dates;
+    const tensionByDay = {};
+    
+    dates.forEach(date => {
+        tensionByDay[date] = { min: Infinity, max: -Infinity };
+        allClientsHourlyMatrix.hours.forEach(hour => {
+            const key = `${date}_${hour}`;
+            const rowData = allClientsHourlyMatrix.data[key];
+            if (rowData && rowData.tension !== null && rowData.tension !== undefined) {
+                tensionByDay[date].min = Math.min(tensionByDay[date].min, rowData.tension);
+                tensionByDay[date].max = Math.max(tensionByDay[date].max, rowData.tension);
+            }
+        });
+        
+        // Si aucune donnée n'existe pour ce jour, ne pas afficher
+        if (tensionByDay[date].min === Infinity) {
+            delete tensionByDay[date];
+        }
+    });
+    
+    return tensionByDay;
+}
+function addFilterIndicator() {
+    const header = document.querySelector('.all-clients-header h3');
+    if (header && window.filteredDates) {
+        const totalDates = allClientsHourlyMatrix.dates.length;
+        const filteredCount = window.filteredDates.length;
+        
+        if (filteredCount < totalDates) {
+            // Ajouter un badge de filtrage
+            if (!document.querySelector('.filter-badge')) {
+                const badge = document.createElement('span');
+                badge.className = 'filter-badge';
+                badge.innerHTML = `
+                    <span style="background: #3b82f6; color: white; padding: 2px 8px; 
+                          border-radius: 12px; font-size: 12px; margin-left: 10px;">
+                        🔍 Filtre actif: ${filteredCount}/${totalDates} jours
+                    </span>
+                `;
+                header.appendChild(badge);
+            }
+        } else {
+            // Retirer le badge si pas de filtre
+            const badge = document.querySelector('.filter-badge');
+            if (badge) {
+                badge.remove();
+            }
+        }
+    }
+}
 // NOUVELLE FONCTION : Afficher l'onglet TOUS LES CLIENTS
+// ======================== AFFICHAGE ONGLET TOUS LES CLIENTS ========================
 function displayAllClientsTab() {
     const contentElement = document.getElementById('sub-content-ALL');
     if (!contentElement) return;
@@ -2402,7 +3720,7 @@ function displayAllClientsTab() {
     });
 
     // Préparer les données paginées
-    const itemsPerPage = 50;
+    const itemsPerPage = window.allClientsItemsPerPage || 50;
     const currentPage = window.allClientsCurrentPage || 1;
     const totalItems = allClientsHourlyMatrix.dates.length * allClientsHourlyMatrix.hours.length;
     const totalPages = Math.ceil(totalItems / itemsPerPage);
@@ -2474,24 +3792,122 @@ function displayAllClientsTab() {
     // === DÉTECTION DU TYPE DE MONTAGE ===
     const systemType = parseFloat(averageTension) > 20 ? '24V' : '12V';
     const systemLimits = systemType === '24V'
-        ? { min: 21.4, max: 31.5, ideal: { min: 24, max: 29 }, normal: 28 }
-        : { min: 10.7, max: 15.6, ideal: { min: 12, max: 14.5 }, normal: 14 };
+        ? { min: 22, max: 31, ideal: { min: 24, max: 29 }, normal: 28 }
+        : { min: 11, max: 15, ideal: { min: 12, max: 14.5 }, normal: 14 };
+
+    // === ANALYSE DES ÉVÉNEMENTS DP/DT ===
+    const dpdtEvents = analyzeDPDTEvents();
+    const hasDPDTEvents = dpdtEvents && dpdtEvents.length > 0;
+    
+    // Filtrer les événements DP/DT selon le filtre global
+    let filteredDPDTEvents = dpdtEvents;
+    if (window.filteredDates && window.filteredDates.length > 0) {
+        filteredDPDTEvents = dpdtEvents.filter(event => 
+            window.filteredDates.includes(event.date)
+        );
+    }
+    
+    // Grouper les événements DP/DT par date pour l'affichage
+    const dpdtEventsByDate = {};
+    filteredDPDTEvents.forEach(event => {
+        if (!dpdtEventsByDate[event.date]) {
+            dpdtEventsByDate[event.date] = [];
+        }
+        dpdtEventsByDate[event.date].push(event);
+    });
+    
+    const dpdtDates = Object.keys(dpdtEventsByDate).sort((a, b) => {
+        const dateA = new Date(a.split('/').reverse().join('-'));
+        const dateB = new Date(b.split('/').reverse().join('-'));
+        return dateA - dateB;
+    });
 
     // === ANALYSE DE STABILITÉ ===
     let stabilityData = null;
     let stabilitySectionHTML = '';
 
     if (tensionResults && tensionResults.length > 0) {
-        stabilityData = analyzeTensionStability(tensionResults);
-        stabilitySectionHTML = `
-            <!-- SECTION STABILITÉ -->
-            <div class="stability-section" style="margin: 25px 0; padding: 20px; background: white; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); border: 1px solid #e2e8f0;">
-                <h4 style="margin-top: 0; margin-bottom: 15px; color: #2c3e50; display: flex; align-items: center; gap: 10px;">
-                    <span>🔄</span> Analyse de Stabilité de la Tension
-                </h4>
-                <div id="stability-analysis-container"></div>
-            </div>
-        `;
+        // Filtrer les données de tension si un filtre est actif
+        const filteredTensionResults = window.filteredDates ? 
+            tensionResults.filter(item => window.filteredDates.includes(item.date)) : 
+            tensionResults;
+        
+        if (filteredTensionResults.length > 0) {
+            stabilityData = analyzeTensionStability(filteredTensionResults);
+            
+            // Créer la section stabilité avec tableau DP/DT
+            stabilitySectionHTML = `
+                <!-- SECTION STABILITÉ AVEC TABLEAU DP/DT -->
+                <div class="stability-section" style="margin: 25px 0; background: white; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); border: 1px solid #e2e8f0; overflow: hidden;">
+                    <!-- En-tête de la section -->
+                    <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px;">
+                        <h4 style="margin: 0; display: flex; align-items: center; gap: 10px;">
+                            <span>🔄</span> Analyse globale de la Tension
+                            ${window.filteredDates && window.filteredDates.length < allClientsHourlyMatrix.dates.length ? 
+                                `<span style="font-size: 12px; background: rgba(255,255,255,0.2); padding: 2px 8px; border-radius: 12px; margin-left: 10px;">
+                                    🔍 Filtre: ${window.filteredDates.length}/${allClientsHourlyMatrix.dates.length} jours
+                                </span>` : ''
+                            }
+                        </h4>
+                    </div>
+                    
+                    <!-- Conteneur principal -->
+                    <div style="padding: 0;">
+                        <!-- Analyse de stabilité -->
+                        <div id="stability-analysis-container" style="padding: 20px; ${hasDPDTEvents ? 'border-bottom: 1px solid #e2e8f0;' : ''}"></div>
+                        
+                        <!-- Tableau des événements DP/DT -->
+                        ${hasDPDTEvents && dpdtDates.length > 0 ? `
+                        <div style="padding: 20px; background: #f8fafc;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                                <h5 style="margin: 0; color: #2c3e50; display: flex; align-items: center; gap: 8px; font-size: 16px;">
+                                    <span>⚡</span> Événements de Délestage (DP/DT)
+                                    <span style="font-size: 12px; background: #fef3c7; color: #92400e; padding: 2px 8px; border-radius: 12px; margin-left: 10px;">
+                                        ${filteredDPDTEvents.length} événement${filteredDPDTEvents.length !== 1 ? 's' : ''}
+                                    </span>
+                                </h5>
+                                <div style="display: flex; gap: 10px; font-size: 11px; color: #718096;">
+                                    <div style="display: flex; align-items: center; gap: 4px;">
+                                        <div style="width: 10px; height: 10px; background: #fef3c7; border-radius: 2px; border: 1px solid #fcd34d;"></div>
+                                        <span>DP = Délestage Partiel</span>
+                                    </div>
+                                    <div style="display: flex; align-items: center; gap: 4px;">
+                                        <div style="width: 10px; height: 10px; background: #fee2e2; border-radius: 2px; border: 1px solid #f87171;"></div>
+                                        <span>DT = Délestage Total</span>
+                                    </div>
+                                </div>
+                            </div>
+                            ${createCompactDPDTDisplay(dpdtDates, dpdtEventsByDate)}
+                        </div>
+                        ` : hasDPDTEvents ? `
+                        <div style="padding: 30px; text-align: center; background: #f8fafc; border-top: 1px solid #e2e8f0;">
+                            <div style="color: #718096; font-size: 14px; display: flex; align-items: center; justify-content: center; gap: 10px; flex-direction: column;">
+                                <span style="font-size: 32px;">📭</span>
+                                <span>Aucun événement de délestage (DP/DT) pour les dates filtrées</span>
+                                <small style="color: #a0aec0; margin-top: 5px;">
+                                    (${dpdtEvents.length} événement${dpdtEvents.length !== 1 ? 's' : ''} détecté${dpdtEvents.length !== 1 ? 's' : ''} au total)
+                                </small>
+                            </div>
+                        </div>
+                        ` : `
+                        <div style="padding: 20px; text-align: center; background: #f8fafc; border-top: 1px solid #e2e8f0;">
+                            <div style="color: #718096; font-size: 14px; display: flex; align-items: center; justify-content: center; gap: 10px;">
+                                <span>ℹ️</span>
+                                <span>Aucun événement de délestage (DP/DT) détecté dans les fichiers ENR analysés</span>
+                            </div>
+                        </div>
+                        `}
+                    </div>
+                </div>
+            `;
+        } else {
+            stabilitySectionHTML = `
+                <div class="no-stability-data" style="margin: 25px 0; padding: 40px; background: #f7fafc; border-radius: 8px; border: 2px dashed #cbd5e0; text-align: center;">
+                    <span style="font-size: 48px; display: block; margin-bottom: 15px; color: #a0aec0;">📊</span>
+                    <span style="color: #718096; font-size: 14px;">Données de tension insuffisantes pour l'analyse de stabilité</span>
+                </div>
+            `;
+        }
     } else {
         stabilitySectionHTML = `
             <div class="no-stability-data" style="margin: 25px 0; padding: 40px; background: #f7fafc; border-radius: 8px; border: 2px dashed #cbd5e0; text-align: center;">
@@ -2501,13 +3917,43 @@ function displayAllClientsTab() {
         `;
     }
 
+    // === DÉTERMINER LES DATES À UTILISER ===
+    const datesToUse = window.filteredDates || allClientsHourlyMatrix.dates;
+    
+    // === CALCUL DES DONNÉES FILTRÉES ===
+    const filteredEnergyData = {};
+    datesToUse.forEach(date => {
+        if (energyDataByDay[date] !== undefined) {
+            filteredEnergyData[date] = energyDataByDay[date];
+        }
+    });
+    
+    const filteredTensionData = {};
+    datesToUse.forEach(date => {
+        if (tensionByDay[date]) {
+            filteredTensionData[date] = tensionByDay[date];
+        }
+    });
+
+    // === CONSTRUCTION DU HTML ===
     contentElement.innerHTML = `
+        <!-- FILTRE GLOBAL DES DATES EN HAUT -->
+        ${createGlobalDateFilter() || ''}
+        
         <div class="all-clients-header">
             <h3>👥 DONNÉES TECHNIQUES DU NR</h3>
+            ${window.filteredDates && window.filteredDates.length < allClientsHourlyMatrix.dates.length ? 
+                `<div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px; padding: 8px 12px; background: #dbeafe; border-radius: 6px; border-left: 4px solid #3b82f6;">
+                    <span style="font-size: 14px;">🔍</span>
+                    <span style="font-size: 12px; color: #1e40af; font-weight: 500;">
+                        Filtre actif: ${window.filteredDates.length} jour${window.filteredDates.length !== 1 ? 's' : ''} sélectionné${window.filteredDates.length !== 1 ? 's' : ''} sur ${allClientsHourlyMatrix.dates.length}
+                    </span>
+                </div>` : ''
+            }
             <div class="all-clients-stats">
                 <div class="stat-item">
                     <span class="stat-icon">📅</span>
-                    <span class="stat-text">${allClientsHourlyMatrix.dates.length} jours</span>
+                    <span class="stat-text">${datesToUse.length} jour${datesToUse.length !== 1 ? 's' : ''}</span>
                 </div>
                 <div class="stat-item">
                     <span class="stat-icon">👤</span>
@@ -2557,7 +4003,14 @@ function displayAllClientsTab() {
         
         <!-- GRAPHIQUE EN BARRES : ÉNERGIE MAX PAR JOUR -->
         <div class="all-clients-chart-section">
-            <h4>⚡ Énergie Maximale Totale par Jour (Somme des Max Clients)</h4>
+            <h4>
+                ⚡ Énergie Maximale Totale par Jour (Somme des Max Clients)
+                ${window.filteredDates && window.filteredDates.length < allClientsHourlyMatrix.dates.length ? 
+                    `<span style="font-size: 12px; background: #f0f9ff; color: #0369a1; padding: 2px 8px; border-radius: 12px; margin-left: 10px;">
+                        Données filtrées
+                    </span>` : ''
+                }
+            </h4>
             <div class="chart-container all-clients-bar-chart-container">
                 <canvas id="allClientsEnergyChart"></canvas>
                 <div id="allClientsEnergySummary" class="kit-summary"></div>
@@ -2566,7 +4019,14 @@ function displayAllClientsTab() {
         
         <!-- GRAPHIQUE TENSION : MIN/MAX PAR JOUR -->
         <div class="all-clients-chart-section">
-            <h4>📈 Tension Min/Max par Jour (Système ${systemType})</h4>
+            <h4>
+                📈 Tension Min/Max par Jour (Système ${systemType})
+                ${window.filteredDates && window.filteredDates.length < allClientsHourlyMatrix.dates.length ? 
+                    `<span style="font-size: 12px; background: #fef3c7; color: #92400e; padding: 2px 8px; border-radius: 12px; margin-left: 10px;">
+                        Données filtrées
+                    </span>` : ''
+                }
+            </h4>
             <div class="system-info">
                 <span>🔧 Type: ${systemType} DC</span>
                 <span>Min acceptable: ${systemLimits.min}V</span>
@@ -2589,6 +4049,12 @@ function displayAllClientsTab() {
                         <option value="0" ${itemsPerPage === 0 ? 'selected' : ''}>Tous</option>
                     </select>
                 </div>
+                ${window.filteredDates && window.filteredDates.length < allClientsHourlyMatrix.dates.length ? 
+                    `<div class="filter-info" style="margin-left: 20px; padding: 6px 12px; background: #dbeafe; border-radius: 6px; font-size: 12px; color: #1e40af;">
+                        <span>🔍</span>
+                        <span>Affichage des données filtrées (${window.filteredDates.length} jours)</span>
+                    </div>` : ''
+                }
             </div>
         </div>
         
@@ -2609,7 +4075,7 @@ function displayAllClientsTab() {
                         </tr>
                     </thead>
                     <tbody>
-                        ${generateAllClientsTableRows(startIndex, endIndex)}
+                        ${window.filteredDates ? generateFilteredTableRows() : generateAllClientsTableRows(startIndex, endIndex)}
                     </tbody>
                 </table>
             </div>
@@ -2631,6 +4097,11 @@ function displayAllClientsTab() {
                     <div class="page-info">
                         Page <strong>${currentPage}</strong> sur <strong>${totalPages}</strong>
                         <span class="items-info">(${totalItems} point${totalItems !== 1 ? 's' : ''} de données)</span>
+                        ${window.filteredDates && window.filteredDates.length < allClientsHourlyMatrix.dates.length ? 
+                            `<span class="filter-info-badge" style="margin-left: 10px; padding: 2px 8px; background: #dbeafe; border-radius: 12px; font-size: 11px; color: #1e40af;">
+                                🔍 Filtre actif
+                            </span>` : ''
+                        }
                     </div>
                     
                     <button class="pagination-btn next" 
@@ -2648,32 +4119,183 @@ function displayAllClientsTab() {
                 <div class="table-info">
                     📋 Lignes ${startIndex + 1} à ${endIndex} sur ${totalItems} au total
                     | 👥 ${allClientsHourlyMatrix.clients.length} client${allClientsHourlyMatrix.clients.length !== 1 ? 's' : ''}
+                    ${window.filteredDates && window.filteredDates.length < allClientsHourlyMatrix.dates.length ? 
+                        `| 📅 ${window.filteredDates.length} jour${window.filteredDates.length !== 1 ? 's' : ''} filtré${window.filteredDates.length !== 1 ? 's' : ''}` : ''
+                    }
                 </div>
             </div>
             ` : ''}
         </div>
     `;
 
-    // === CRÉER LES GRAPHIQUES ===
+    // === INITIALISATION DES ÉVÉNEMENTS ===
+    // Initialiser les événements du filtre (EN HAUT)
+    initializeFilterEvents();
+    
+    // === CRÉER LES GRAPHIQUES AVEC DONNÉES FILTRÉES ===
     setTimeout(() => {
-        createAllClientsEnergyChart(allClientsHourlyMatrix.dates, energyDataByDay, maxEnergyDate);
-        createAllClientsTensionChart(allClientsHourlyMatrix.dates, tensionByDay, systemType, systemLimits);
+        // Calculer l'énergie max sur les dates filtrées
+        let filteredMaxEnergyValue = 0;
+        let filteredMaxEnergyDate = '';
+        Object.entries(filteredEnergyData).forEach(([date, energy]) => {
+            if (energy > filteredMaxEnergyValue) {
+                filteredMaxEnergyValue = energy;
+                filteredMaxEnergyDate = date;
+            }
+        });
 
-        // AJOUT IMPORTANT : Créer le graphique de stabilité
+        // 1. Graphique d'énergie
+        createAllClientsEnergyChart(datesToUse, filteredEnergyData, filteredMaxEnergyDate);
+        
+        // 2. Graphique de tension
+        createAllClientsTensionChart(datesToUse, filteredTensionData, systemType, systemLimits);
+
+        // 3. Graphique de stabilité (si données disponibles)
         if (stabilityData) {
-            createStabilityChart('stability-analysis-container', stabilityData, tensionResults);
+            const filteredTensionResults = window.filteredDates ? 
+                tensionResults.filter(item => window.filteredDates.includes(item.date)) : 
+                tensionResults;
+            
+            if (filteredTensionResults.length > 0) {
+                createStabilityChart('stability-analysis-container', stabilityData, filteredTensionResults);
+            }
         }
+
+        console.log(`✅ Onglet TECHNIQUE affiché avec ${datesToUse.length} jour(s)`);
+        console.log(`📊 Données filtrées: ${Object.keys(filteredEnergyData).length} jours d'énergie, ${Object.keys(filteredTensionData).length} jours de tension`);
+        console.log(`⚡ Événements DP/DT: ${filteredDPDTEvents.length} événement${filteredDPDTEvents.length !== 1 ? 's' : ''} (sur ${dpdtDates.length} jour${dpdtDates.length !== 1 ? 's' : ''})`);
+        
     }, 100);
 }
+function initializeFilterEvents() {
+    console.log('🔧 Initialisation des événements du filtre global');
+    
+    // Appliquer le filtre
+    const applyBtn = document.getElementById('apply-filter-btn');
+    if (applyBtn) {
+        applyBtn.addEventListener('click', function() {
+            applyGlobalDateFilter();
+            updateFilterIndicator();
+        });
+    }
+    
+    // Réinitialiser tous les filtres
+    const resetBtn = document.getElementById('reset-all-filters-btn');
+    if (resetBtn) {
+        resetBtn.addEventListener('click', resetAllFilters);
+    }
+    
+    // Sélectionner/désélectionner toutes les dates
+    const selectAllBtn = document.getElementById('select-all-dates');
+    if (selectAllBtn) {
+        selectAllBtn.addEventListener('click', function() {
+            document.querySelectorAll('.date-checkbox').forEach(cb => {
+                cb.checked = true;
+                cb.parentElement.classList.add('checked');
+            });
+            updateSelectedCount();
+        });
+    }
+    
+    const deselectAllBtn = document.getElementById('deselect-all-dates');
+    if (deselectAllBtn) {
+        deselectAllBtn.addEventListener('click', function() {
+            document.querySelectorAll('.date-checkbox').forEach(cb => {
+                cb.checked = false;
+                cb.parentElement.classList.remove('checked');
+            });
+            updateSelectedCount();
+        });
+    }
+    
+    // Mettre à jour les cases à cocher quand les autres filtres changent
+    const dateInputs = document.querySelectorAll('.filter-date-input, .filter-select');
+    dateInputs.forEach(input => {
+        input.addEventListener('change', updateDateCheckboxesFromFilters);
+    });
+    
+    // Mettre à jour le style des cases quand elles changent
+    document.querySelectorAll('.date-checkbox').forEach(cb => {
+        cb.addEventListener('change', function() {
+            if (this.checked) {
+                this.parentElement.classList.add('checked');
+            } else {
+                this.parentElement.classList.remove('checked');
+            }
+            updateSelectedCount();
+        });
+    });
+}
 
+function updateSelectedCount() {
+    const selectedCount = document.querySelectorAll('.date-checkbox:checked').length;
+    const totalCount = document.querySelectorAll('.date-checkbox').length;
+    const countSpan = document.getElementById('selected-dates-count');
+    if (countSpan) {
+        countSpan.textContent = selectedCount;
+        
+        // Changer la couleur de l'indicateur
+        const indicator = document.getElementById('filter-indicator');
+        if (indicator) {
+            if (selectedCount === totalCount) {
+                indicator.className = 'filter-indicator';
+            } else if (selectedCount <= 5) {
+                indicator.className = 'filter-indicator warning';
+            } else {
+                indicator.className = 'filter-indicator filtered';
+            }
+        }
+    }
+}
+
+function updateDateCheckboxesFromFilters() {
+    const startDate = document.getElementById('filter-start-date').value;
+    const endDate = document.getElementById('filter-end-date').value;
+    const year = document.getElementById('filter-year').value;
+    const month = document.getElementById('filter-month').value;
+    
+    document.querySelectorAll('.date-checkbox').forEach(cb => {
+        const dateStr = cb.value;
+        const [day, monthStr, yearStr] = dateStr.split('/');
+        const dateObj = new Date(`${yearStr}-${monthStr.padStart(2, '0')}-${day.padStart(2, '0')}`);
+        
+        let shouldBeChecked = true;
+        
+        // Filtre par période
+        if (startDate) {
+            const startDateObj = new Date(startDate);
+            if (dateObj < startDateObj) shouldBeChecked = false;
+        }
+        
+        if (endDate) {
+            const endDateObj = new Date(endDate);
+            if (dateObj > endDateObj) shouldBeChecked = false;
+        }
+        
+        // Filtre par année
+        if (year !== 'all' && parseInt(yearStr) !== parseInt(year)) {
+            shouldBeChecked = false;
+        }
+        
+        // Filtre par mois
+        if (month !== 'all' && parseInt(monthStr) !== parseInt(month)) {
+            shouldBeChecked = false;
+        }
+        
+        cb.checked = shouldBeChecked;
+    });
+    
+    updateSelectedCount();
+}
 // NOUVELLE FONCTION : Générer les lignes du tableau tous clients
 function generateAllClientsTableRows(startIndex, endIndex) {
     let rows = '';
     let rowIndex = 0;
+    const dates = window.filteredDates || allClientsHourlyMatrix.dates;
 
     // Parcourir toutes les combinaisons date/heure
-    for (let i = 0; i < allClientsHourlyMatrix.dates.length; i++) {
-        const date = allClientsHourlyMatrix.dates[i];
+    for (let i = 0; i < dates.length; i++) {
+        const date = dates[i];
 
         for (let j = 0; j < allClientsHourlyMatrix.hours.length; j++) {
             const hour = allClientsHourlyMatrix.hours[j];
@@ -2721,14 +4343,15 @@ function generateAllClientsTableRows(startIndex, endIndex) {
 window.changeAllClientsItemsPerPage = function (value) {
     const itemsPerPg = parseInt(value) || 0;
     window.allClientsItemsPerPage = itemsPerPg === 0 ?
-        allClientsHourlyMatrix.dates.length * allClientsHourlyMatrix.hours.length :
+        (window.filteredDates || allClientsHourlyMatrix.dates).length * allClientsHourlyMatrix.hours.length :
         itemsPerPg;
     window.allClientsCurrentPage = 1;
     displayAllClientsTab();
 };
 
 window.changeAllClientsMatrixPage = function (page) {
-    const totalItems = allClientsHourlyMatrix.dates.length * allClientsHourlyMatrix.hours.length;
+    const totalDates = window.filteredDates || allClientsHourlyMatrix.dates;
+    const totalItems = totalDates.length * allClientsHourlyMatrix.hours.length;
     const itemsPerPage = window.allClientsItemsPerPage || 50;
     const totalPages = Math.ceil(totalItems / itemsPerPage);
 
@@ -2783,11 +4406,11 @@ function getTensionColor(tension) {
     const systemType = detectSystemTypeFromTensionValue(tension);
 
     if (systemType === '24V') {
-        if (tension < 21.4 || tension > 31.5) return '#e53e3e';
+        if (tension < 22 || tension > 31) return '#e53e3e';
         if (tension < 24 || tension > 29) return '#d69e2e';
         return '#38a169';
     } else {
-        if (tension < 10.7 || tension > 15.6) return '#e53e3e';
+        if (tension < 11 || tension > 15) return '#e53e3e';
         if (tension < 12 || tension > 14.5) return '#d69e2e';
         return '#38a169';
     }
@@ -2863,204 +4486,295 @@ function addAllClientsStyles() {
         const style = document.createElement('style');
         style.id = 'all-clients-styles';
         style.textContent = `
-            /* Styles pour l'onglet TOUS LES CLIENTS */
-            .all-clients-tab {
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
-                color: white !important;
-                font-weight: bold !important;
-                border-left: 4px solid #4c51bf !important;
-            }
-            
-            .all-clients-tab:hover {
-                background: linear-gradient(135deg, #5a67d8 0%, #6b46c1 100%) !important;
-            }
-            
-            .all-clients-tab.active {
-                background: linear-gradient(135deg, #553c9a 0%, #44337a 100%) !important;
-                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2) !important;
-            }
-            
-            .all-clients-header {
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                color: white;
+            /* STYLE POUR FILTRE EN HAUT */
+            .global-filter-container {
+                margin-bottom: 25px;
+                background: white;
+                border-radius: 12px;
                 padding: 20px;
-                border-radius: 8px;
-                margin-bottom: 20px;
-                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+                box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+                border: 1px solid #e2e8f0;
+                transition: all 0.3s ease;
             }
             
-            .all-clients-header h3 {
-                margin: 0 0 15px 0;
-                font-size: 1.5em;
+            /* Animation pour indiquer le filtrage */
+            .global-filter-container.filter-active {
+                border: 2px solid #3b82f6;
+                box-shadow: 0 4px 20px rgba(59, 130, 246, 0.2);
+                background: linear-gradient(135deg, #f0f9ff 0%, #ffffff 100%);
+            }
+            
+            .global-filter-container .filter-header {
                 display: flex;
+                justify-content: space-between;
                 align-items: center;
-                gap: 10px;
-            }
-            
-            .all-clients-stats {
-                display: flex;
+                margin-bottom: 15px;
                 flex-wrap: wrap;
                 gap: 15px;
-                justify-content: center;
             }
             
-            .stat-item {
-                background: rgba(255, 255, 255, 0.2);
-                padding: 8px 16px;
-                border-radius: 20px;
+            .global-filter-container .filter-title {
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                font-weight: 700;
+                color: #2c3e50;
+                font-size: 18px;
+            }
+            
+            .global-filter-container .filter-title-icon {
+                font-size: 24px;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+                background-clip: text;
+            }
+            
+            .global-filter-container .filter-actions {
+                display: flex;
+                gap: 10px;
+                align-items: center;
+            }
+            
+            /* Boutons spécifiques pour le filtre */
+            .filter-btn {
+                padding: 10px 20px;
+                border: none;
+                border-radius: 8px;
+                font-weight: 600;
+                font-size: 13px;
+                cursor: pointer;
+                transition: all 0.2s;
                 display: flex;
                 align-items: center;
                 gap: 8px;
-                backdrop-filter: blur(10px);
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
             }
             
-            .stat-icon {
-                font-size: 1.2em;
+            .filter-btn:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 4px 8px rgba(0,0,0,0.15);
             }
             
-            .stat-text {
-                font-weight: 500;
+            .filter-btn:active {
+                transform: translateY(0);
             }
             
-            /* Styles pour le tableau matrice */
-            .all-clients-table {
-                width: 100%;
-                border-collapse: collapse;
-                font-size: 12px;
-                min-width: 100%;
-                table-layout: fixed;
-            }
-            
-            .all-clients-table th {
-                background: #4a5568;
+            .filter-btn-primary {
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
                 color: white;
-                padding: 12px 8px;
-                text-align: center;
+            }
+            
+            .filter-btn-secondary {
+                background: #f1f5f9;
+                color: #64748b;
+                border: 1px solid #cbd5e1;
+            }
+            
+            .filter-btn-danger {
+                background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+                color: white;
+            }
+            
+            /* Groupes de filtres */
+            .filter-group {
+                background: #f8fafc;
+                border-radius: 10px;
+                padding: 18px;
+                border: 1px solid #e2e8f0;
+                margin-bottom: 20px;
+                transition: all 0.3s ease;
+            }
+            
+            .filter-group:hover {
+                border-color: #cbd5e1;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            }
+            
+            .filter-group-title {
                 font-weight: 600;
-                position: sticky;
-                top: 0;
-                z-index: 10;
-                border-right: 1px solid #718096;
+                color: #475569;
+                margin-bottom: 14px;
+                font-size: 14px;
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
             }
             
-            .all-clients-table th.client-header {
-                background: #2d3748;
-                min-width: 80px;
-                max-width: 100px;
-                white-space: nowrap;
-                overflow: hidden;
-                text-overflow: ellipsis;
-                font-size: 11px;
+            /* Sections de dates */
+            .date-selection-section {
+                max-height: 180px;
+                overflow-y: auto;
+                background: white;
+                border-radius: 8px;
+                padding: 16px;
+                border: 1px solid #e2e8f0;
+                margin-bottom: 15px;
             }
             
-            .all-clients-table th.tension-header {
-                background: #805ad5;
-                min-width: 90px;
-            }
-            
-            .all-clients-table td {
-                padding: 8px;
+            .date-selection-actions {
+                display: flex;
+                gap: 10px;
+                margin-bottom: 15px;
+                padding-bottom: 15px;
                 border-bottom: 1px solid #e2e8f0;
+            }
+            
+            .date-select-btn {
+                padding: 8px 16px;
+                border: none;
+                border-radius: 6px;
+                font-size: 12px;
+                font-weight: 600;
+                cursor: pointer;
+                transition: all 0.2s;
+                flex: 1;
                 text-align: center;
-                border-right: 1px solid #f7fafc;
             }
             
-            .all-clients-table td.row-index {
-                background: #f7fafc;
-                font-weight: bold;
-                width: 50px;
+            .date-select-btn:hover {
+                opacity: 0.9;
+                transform: translateY(-1px);
             }
             
-            .all-clients-table td.row-date {
-                background: #f0fff4;
-                font-weight: bold;
-                width: 90px;
+            .date-select-btn-primary {
+                background: #dbeafe;
+                color: #1e40af;
             }
             
-            .all-clients-table td.row-hour {
-                background: #ebf8ff;
-                font-weight: bold;
-                width: 70px;
+            .date-select-btn-secondary {
+                background: #f1f5f9;
+                color: #64748b;
             }
             
-            .all-clients-table td.client-energy {
-                font-family: 'Courier New', monospace;
-                background: #faf5ff;
-                font-weight: 500;
+            /* Cases à cocher */
+            .date-checkbox-container {
+                display: grid;
+                grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+                gap: 10px;
             }
             
-            .all-clients-table td.row-tension {
-                font-family: 'Courier New', monospace;
-                font-weight: bold;
-                background: #faf5ff;
-                width: 90px;
-            }
-            
-            .all-clients-table tr:hover td {
-                background: #e6fffa !important;
-            }
-            
-            .all-clients-table .sticky-header {
-                position: sticky;
-                top: 0;
-                z-index: 20;
-            }
-            
-            /* Styles pour le tableau par client */
-            .client-hourly-section {
-                margin-top: 30px;
-            }
-            
-            .client-hourly-table {
-                width: 100%;
-                border-collapse: collapse;
+            .date-checkbox-label {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                padding: 10px 12px;
+                background: white;
+                border-radius: 6px;
+                border: 2px solid #e2e8f0;
+                cursor: pointer;
+                transition: all 0.2s;
                 font-size: 13px;
             }
             
-            .client-hourly-table th {
-                background: #4a5568;
-                color: white;
-                padding: 12px 15px;
-                text-align: left;
+            .date-checkbox-label:hover {
+                border-color: #cbd5e1;
+                background: #f8fafc;
+                transform: translateY(-1px);
+            }
+            
+            .date-checkbox-label.checked {
+                border-color: #3b82f6;
+                background: #dbeafe;
                 font-weight: 600;
+                color: #1e40af;
             }
             
-            .client-hourly-table td {
-                padding: 10px 15px;
-                border-bottom: 1px solid #e2e8f0;
+            .date-checkbox-label input[type="checkbox"] {
+                cursor: pointer;
+                accent-color: #3b82f6;
+                width: 16px;
+                height: 16px;
             }
             
-            .client-hourly-table tr:hover {
-                background: #f7fafc;
+            /* Indicateur de filtrage */
+            .filter-indicator {
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                padding: 16px;
+                background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+                border-radius: 10px;
+                border: 2px solid #bae6fd;
+                margin-top: 20px;
+                transition: all 0.3s ease;
             }
             
-            .client-hourly-table .row-energy,
-            .client-hourly-table .row-tension {
-                font-family: 'Courier New', monospace;
-                text-align: right;
+            .filter-indicator.filtered {
+                background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);
+                border-color: #86efac;
             }
             
-            /* Améliorations responsives */
-            @media (max-width: 1200px) {
-                .all-clients-table {
-                    font-size: 11px;
-                }
-                
-                .all-clients-table th,
-                .all-clients-table td {
-                    padding: 6px 4px;
-                }
+            .filter-indicator.warning {
+                background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+                border-color: #fcd34d;
             }
             
+            .filter-indicator-icon {
+                font-size: 24px;
+            }
+            
+            .filter-indicator-info {
+                flex: 1;
+            }
+            
+            .filter-indicator-title {
+                font-weight: 700;
+                color: #0369a1;
+                font-size: 14px;
+                margin-bottom: 4px;
+            }
+            
+            .filter-indicator-description {
+                font-size: 12px;
+                color: #0c4a6e;
+            }
+            
+            /* Responsive */
             @media (max-width: 768px) {
-                .all-clients-stats {
-                    flex-direction: column;
-                    align-items: flex-start;
+                .global-filter-container {
+                    padding: 15px;
                 }
                 
-                .stat-item {
+                .filter-group {
+                    padding: 15px;
+                }
+                
+                .filter-header {
+                    flex-direction: column;
+                    align-items: flex-start !important;
+                }
+                
+                .filter-actions {
                     width: 100%;
-                    justify-content: flex-start;
+                    justify-content: space-between;
+                }
+                
+                .date-checkbox-container {
+                    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+                }
+                
+                .date-selection-section {
+                    max-height: 150px;
+                }
+            }
+            
+            @media (max-width: 576px) {
+                .date-checkbox-container {
+                    grid-template-columns: 1fr;
+                }
+                
+                .filter-btn {
+                    padding: 10px 15px;
+                    font-size: 12px;
+                }
+                
+                .filter-indicator {
+                    flex-direction: column;
+                    text-align: center;
+                    gap: 8px;
                 }
             }
         `;
@@ -3202,6 +4916,7 @@ async function displayENRAnalysis() {
         addMultiFileStyles();
         addECSimpleStyles();
         addCombinedTableStyles(); // NOUVEAU : Ajouter les styles pour le tableau combiné
+        addDPDTStyles();
 
     } catch (error) {
         console.error('❌ Erreur lors de l\'analyse ENR:', error);
@@ -3686,7 +5401,71 @@ function createSimpleECTable(data, filename) {
         </div>
     `;
 }
-
+// ======================== ANALYSE DES ÉVÉNEMENTS DP/DT ========================
+function analyzeDPDTEvents() {
+    console.log('🔍 Analyse des événements DP/DT depuis les fichiers ENR...');
+    
+    const allDPDTEvents = [];
+    
+    // Vérifier si nous avons des fichiers ENR
+    if (window.enrFiles && window.enrFiles.length > 0) {
+        for (const file of window.enrFiles) {
+            try {
+                console.log(`📄 Analyse du fichier ENR: ${file.name}`);
+                const enrResults = analyzeENRSimple(file.content);
+                
+                enrResults.forEach(event => {
+                    const analysis = event['Analyse État'] || '';
+                    
+                    // Détecter DP (Délestage Partiel)
+                    if (analysis.includes('DP')) {
+                        allDPDTEvents.push({
+                            type: 'DP',
+                            date: event.Date,
+                            heure: event.Heure.replace('h', ':'),
+                            client: event.client || '00',
+                            source: 'ENR',
+                            file: file.name,
+                            'Tension Forte': event['Tension Forte'],
+                            'Tension Faible': event['Tension Faible'],
+                            'État Hex': event.État
+                        });
+                    }
+                    
+                    // Détecter DT (Délestage Total)
+                    if (analysis.includes('DT')) {
+                        allDPDTEvents.push({
+                            type: 'DT',
+                            date: event.Date,
+                            heure: event.Heure.replace('h', ':'),
+                            client: event.client || '00',
+                            source: 'ENR',
+                            file: file.name,
+                            'Tension Forte': event['Tension Forte'],
+                            'Tension Faible': event['Tension Faible'],
+                            'État Hex': event.État
+                        });
+                    }
+                });
+                
+                console.log(`✅ ${enrResults.length} événements ENR analysés depuis ${file.name}`);
+            } catch (error) {
+                console.error(`❌ Erreur analyse ENR ${file.name}:`, error);
+            }
+        }
+    }
+    
+    // Trier par date et heure
+    const sortedEvents = allDPDTEvents.sort((a, b) => {
+        const dateA = new Date(a.date.split('/').reverse().join('-') + 'T' + a.heure);
+        const dateB = new Date(b.date.split('/').reverse().join('-') + 'T' + b.heure);
+        return dateA - dateB;
+    });
+    
+    console.log(`📊 Total événements DP/DT: ${sortedEvents.length} (DP: ${sortedEvents.filter(e => e.type === 'DP').length}, DT: ${sortedEvents.filter(e => e.type === 'DT').length})`);
+    
+    return sortedEvents;
+}
 // Fonction pour créer l'affichage du contenu brut des fichiers
 function createRawFileContent(file, fileType) {
     const fileId = file.name.replace(/[^a-zA-Z0-9]/g, '_');
@@ -4314,8 +6093,58 @@ function createAllClientsEnergyChart(dates, energyDataByDay, maxEnergyDate) {
         { label: 'Kit 4', value: 1080, color: '#667eea' }    // Bleu
     ];
 
+    // Trouver l'énergie maximale dans les données (hors zéros)
+    const nonZeroValues = data.filter(v => v && v > 0);
+    const maxDataValue = nonZeroValues.length > 0 ? Math.max(...nonZeroValues) : 0;
+
+    // DÉTERMINER LES KITS À AFFICHER DYNAMIQUEMENT
+    let visibleKitThresholds = [];
+    
+    if (maxDataValue === 0) {
+        // Aucune consommation : afficher seulement Kit 0
+        visibleKitThresholds = [kitThresholds[0]];
+    } else {
+        // Trouver le plus petit kit qui dépasse la consommation max
+        const relevantKits = kitThresholds.filter(kit => kit.value >= maxDataValue);
+        
+        if (relevantKits.length > 0) {
+            // Afficher le kit trouvé + tous les kits inférieurs
+            const maxKitIndex = kitThresholds.findIndex(kit => kit.value === relevantKits[0].value);
+            visibleKitThresholds = kitThresholds.slice(0, maxKitIndex + 1);
+            
+            // Ajouter un kit supplémentaire si on est très proche du seuil supérieur
+            if (maxKitIndex < kitThresholds.length - 1) {
+                const nextKit = kitThresholds[maxKitIndex + 1];
+                const ratio = maxDataValue / relevantKits[0].value;
+                if (ratio > 0.8) { // Si on dépasse 80% du kit, montrer le suivant
+                    visibleKitThresholds.push(nextKit);
+                }
+            }
+        } else {
+            // La consommation dépasse tous les kits : afficher tous les kits
+            visibleKitThresholds = [...kitThresholds];
+            // Ajouter une ligne spéciale pour la valeur max observée
+            visibleKitThresholds.push({
+                label: 'MAX',
+                value: Math.ceil(maxDataValue / 100) * 100, // Arrondir à la centaine supérieure
+                color: '#1f2933',
+                dashed: true
+            });
+        }
+    }
+
+    // Si on a très peu de données, afficher au moins 2 kits pour l'échelle
+    if (visibleKitThresholds.length < 2 && maxDataValue > 0) {
+        const firstKitIndex = kitThresholds.findIndex(kit => kit.value >= maxDataValue);
+        if (firstKitIndex > 0) {
+            visibleKitThresholds.push(kitThresholds[firstKitIndex - 1]);
+        }
+    }
+
+    // Trier par valeur croissante
+    visibleKitThresholds.sort((a, b) => a.value - b.value);
+
     // Couleur des points selon le kit "adapté"
-    // On prend le plus petit kit dont le seuil est >= à la valeur d'énergie.
     const pointBackgroundColors = data.map(value => {
         if (value === 0 || value == null) {
             // Aucun kit consommé / pas de données : couleur neutre
@@ -4323,46 +6152,70 @@ function createAllClientsEnergyChart(dates, energyDataByDay, maxEnergyDate) {
         }
 
         // Trouver le premier kit dont la valeur est >= à l'énergie du jour
-        const matchingKit = kitThresholds.find(kit => value <= kit.value);
+        const matchingKit = visibleKitThresholds.find(kit => value <= kit.value);
 
         if (matchingKit) {
             return matchingKit.color;
         }
 
-        // Si la consommation dépasse le plus gros kit, on met une couleur d'alerte
+        // Si la consommation dépasse le plus gros kit visible
         return '#1f2933';
     });
 
     // Déterminer un "kit recommandé" global pour la période
-    // Règle simple : on prend la plus grande valeur observée (hors zéros)
-    // et on choisit le plus petit kit dont le seuil couvre cette valeur.
-    const nonZeroValues = data.filter(v => v && v > 0);
     let recommendedKit = null;
     if (nonZeroValues.length > 0) {
         const maxValue = Math.max(...nonZeroValues);
-        recommendedKit = kitThresholds.find(kit => maxValue <= kit.value) || null;
+        recommendedKit = visibleKitThresholds.find(kit => maxValue <= kit.value) || null;
     }
 
-    // Mettre à jour un texte de synthèse sous le graphique, si l'élément existe
-    // (par exemple un <div id="allClientsEnergySummary"></div> juste sous le canvas)
+    // Calculer l'échelle Y maximale pour avoir de la marge
+    const maxVisibleKit = visibleKitThresholds[visibleKitThresholds.length - 1];
+    const maxYValue = Math.max(
+        maxDataValue * 1.2, // 20% de marge au-dessus des données
+        maxVisibleKit.value * 1.1 // 10% au-dessus du plus haut kit
+    );
+
+    // Mettre à jour le texte de synthèse
     const summaryElement = document.getElementById('allClientsEnergySummary');
     if (summaryElement) {
         if (recommendedKit) {
             summaryElement.innerHTML = `
-                <strong>Kit recommandé pour la période :</strong> ${recommendedKit.label}
-                (jusqu'à ${recommendedKit.value.toLocaleString('fr-FR')} Wh par jour).<br>
-                Sur la période affichée, la consommation maximale observée reste couverte par ce kit.
-                Si la courbe dépasse régulièrement ce seuil, il peut être nécessaire d'envisager un kit supérieur.
+                <div style="background: #f0f9ff; padding: 12px; border-radius: 8px; border-left: 4px solid #3b82f6; margin-top: 10px; margin-bottom: 10px;">
+                    <strong style="color: #1e40af;">📊 Analyse dimensionnement :</strong>
+                    <div style="margin-top: 8px; font-size: 13px; color: #374151;">
+                        <strong>Kit recommandé :</strong> ${recommendedKit.label} (jusqu'à ${recommendedKit.value.toLocaleString('fr-FR')} Wh/jour)
+                        <br>
+                        <small style="color: #6b7280;">
+                            ${visibleKitThresholds.length > 1 ? 
+                                `Seuils affichés : ${visibleKitThresholds.map(k => k.label).join(', ')}` : 
+                                `Seuil unique : ${visibleKitThresholds[0].label}`
+                            }
+                        </small>
+                    </div>
+                </div>
             `;
         } else if (nonZeroValues.length === 0) {
             summaryElement.innerHTML = `
-                Aucune consommation significative n'a été détectée sur la période sélectionnée.
-                Un dimensionnement de kit n'est pas pertinent avec ces données.
+                <div style="background: #f8fafc; padding: 12px; border-radius: 8px; border-left: 4px solid #94a3b8; margin-top: 10px;">
+                    <strong style="color: #475569;">ℹ️ Information :</strong>
+                    <div style="margin-top: 8px; font-size: 13px; color: #64748b;">
+                        Aucune consommation significative détectée. Le dimensionnement de kit n'est pas pertinent avec ces données.
+                    </div>
+                </div>
             `;
         } else {
             summaryElement.innerHTML = `
-                La consommation dépasse le plus grand kit disponible (${kitThresholds[kitThresholds.length - 1].label}).
-                Il peut être nécessaire de revoir le dimensionnement ou d'ajouter des capacités supplémentaires.
+                <div style="background: #fef3c7; padding: 12px; border-radius: 8px; border-left: 4px solid #f59e0b; margin-top: 10px;">
+                    <strong style="color: #92400e;">⚠️ Attention :</strong>
+                    <div style="margin-top: 8px; font-size: 13px; color: #92400e;">
+                        La consommation dépasse le plus grand kit disponible (${maxVisibleKit.label}).
+                        <br>
+                        <small style="color: #b45309;">
+                            ${visibleKitThresholds.length} seuil(s) affiché(s) sur ${kitThresholds.length} disponible(s)
+                        </small>
+                    </div>
+                </div>
             `;
         }
     }
@@ -4370,7 +6223,7 @@ function createAllClientsEnergyChart(dates, energyDataByDay, maxEnergyDate) {
     // Créer le graphique
     const ctx = chartCanvas.getContext('2d');
     window.allClientsEnergyChartInstance = new Chart(ctx, {
-        type: 'line',  // CHANGÉ: De 'bar' à 'line'
+        type: 'line',
         data: {
             labels: labels,
             datasets: [
@@ -4384,7 +6237,6 @@ function createAllClientsEnergyChart(dates, energyDataByDay, maxEnergyDate) {
                     fill: true,
                     tension: 0.4,
                     pointRadius: 4,
-                    // Couleur de chaque point selon le kit correspondant
                     pointBackgroundColor: pointBackgroundColors,
                     pointBorderColor: '#fff',
                     pointBorderWidth: 2,
@@ -4393,13 +6245,13 @@ function createAllClientsEnergyChart(dates, energyDataByDay, maxEnergyDate) {
                     pointHoverBorderColor: '#fff',
                     pointHoverBorderWidth: 3
                 },
-                // Dataset pour les lignes de seuils des kits
-                ...kitThresholds.map(kit => ({
+                // Dataset pour les lignes de seuils des kits (DYNAMIQUE)
+                ...visibleKitThresholds.map(kit => ({
                     label: kit.label,
                     data: labels.map(() => kit.value),
                     borderColor: kit.color,
-                    borderWidth: 2,
-                    borderDash: [10, 5],  // Ligne discontinue
+                    borderWidth: kit.dashed ? 3 : 2,
+                    borderDash: kit.dashed ? [10, 5] : [5, 3],
                     fill: false,
                     pointRadius: 0,
                     tension: 0
@@ -4413,94 +6265,10 @@ function createAllClientsEnergyChart(dates, energyDataByDay, maxEnergyDate) {
                 duration: 1000,
                 easing: 'easeInOutQuart'
             },
-            plugins: {
-                legend: {
-                    display: true,
-                    position: 'top',
-                    labels: {
-                        font: {
-                            size: 13,
-                            weight: 'bold',
-                            family: "'Segoe UI', 'Helvetica Neue', sans-serif"
-                        },
-                        color: '#2c3e50',
-                        padding: 15,
-                        usePointStyle: true,
-                        filter: function(item, chart) {
-                            // Afficher toutes les légendes
-                            return true;
-                        }
-                    },
-                    onClick: function(e, legendItem, legend) {
-                        const index = legendItem.datasetIndex;
-                        const chart = legend.chart;
-                        const meta = chart.getDatasetMeta(index);
-                        
-                        // Empêcher la désactivation des datasets de seuils
-                        if (index === 0) {
-                            // Pour le dataset principal, on peut toggle
-                            meta.hidden = meta.hidden === null ? !chart.data.datasets[index].hidden : null;
-                        } else {
-                            // Pour les seuils, on ne permet pas de les cacher
-                            return;
-                        }
-                        
-                        chart.update();
-                    }
-                },
-                tooltip: {
-                    backgroundColor: 'rgba(45, 55, 72, 0.95)',
-                    padding: 14,
-                    titleFont: {
-                        size: 15,
-                        weight: 'bold',
-                        color: '#fff'
-                    },
-                    bodyFont: {
-                        size: 13,
-                        color: '#e2e8f0'
-                    },
-                    cornerRadius: 8,
-                    displayColors: true,
-                    borderColor: 'rgba(102, 126, 234, 0.5)',
-                    borderWidth: 1,
-                    boxPadding: 8,
-                    caretSize: 8,
-                    callbacks: {
-                        title: function(context) {
-                            if (context[0].datasetIndex === 0) {
-                                return '📊 ' + context[0].label;
-                            }
-                            return kitThresholds[context[0].datasetIndex - 1].label + ' - Seuil';
-                        },
-                        label: function (context) {
-                            const datasetIndex = context.datasetIndex;
-                            const value = context.parsed.y.toLocaleString('fr-FR');
-                            
-                            if (datasetIndex === 0) {
-                                const date = context.label === maxEnergyDate ? ' ⚡ MAXIMUM' : '';
-                                return `${context.dataset.label}: ${value} Wh${date}`;
-                            } else {
-                                const kit = kitThresholds[datasetIndex - 1];
-                                return `Seuil ${kit.label}: ${kit.value} Wh`;
-                            }
-                        },
-                        afterLabel: function(context) {
-                            const lines = [];
-
-                            // Message spécial pour le jour d'énergie maximale
-                            if (context.datasetIndex === 0 && context.label === maxEnergyDate) {
-                                lines.push('🏆 Énergie maximale enregistrée');
-                            }
-
-                            return lines;
-                        }
-                    }
-                }
-            },
             scales: {
                 y: {
                     beginAtZero: true,
+                    max: maxYValue, // ÉCHELLE DYNAMIQUE
                     ticks: {
                         font: {
                             size: 12,
@@ -4562,11 +6330,227 @@ function createAllClientsEnergyChart(dates, energyDataByDay, maxEnergyDate) {
                         padding: 12
                     }
                 }
+            },
+            plugins: {
+                legend: {
+                    display: true,
+                    position: 'top',
+                    labels: {
+                        font: {
+                            size: 13,
+                            weight: 'bold',
+                            family: "'Segoe UI', 'Helvetica Neue', sans-serif"
+                        },
+                        color: '#2c3e50',
+                        padding: 15,
+                        usePointStyle: true,
+                        filter: function(item, chart) {
+                            // Afficher toutes les légendes
+                            return true;
+                        }
+                    },
+                    onClick: function(e, legendItem, legend) {
+                        const index = legendItem.datasetIndex;
+                        const chart = legend.chart;
+                        const meta = chart.getDatasetMeta(index);
+                        
+                        // Empêcher la désactivation des datasets de seuils
+                        if (index === 0) {
+                            // Pour le dataset principal, on peut toggle
+                            meta.hidden = meta.hidden === null ? !chart.data.datasets[index].hidden : null;
+                        } else {
+                            // Pour les seuils, on ne permet pas de les cacher
+                            return;
+                        }
+                        
+                        chart.update();
+                    }
+                },
+                tooltip: {
+                    backgroundColor: 'rgba(45, 55, 72, 0.95)',
+                    padding: 14,
+                    titleFont: {
+                        size: 15,
+                        weight: 'bold',
+                        color: '#fff'
+                    },
+                    bodyFont: {
+                        size: 13,
+                        color: '#e2e8f0'
+                    },
+                    cornerRadius: 8,
+                    displayColors: true,
+                    borderColor: 'rgba(102, 126, 234, 0.5)',
+                    borderWidth: 1,
+                    boxPadding: 8,
+                    caretSize: 8,
+                    callbacks: {
+                        title: function(context) {
+                            if (context[0].datasetIndex === 0) {
+                                return '📊 ' + context[0].label;
+                            }
+                            const kitIndex = context[0].datasetIndex - 1;
+                            if (kitIndex < visibleKitThresholds.length) {
+                                const kit = visibleKitThresholds[kitIndex];
+                                return kit.dashed ? '🚨 ' + kit.label + ' - Consommation MAX' : '📏 ' + kit.label + ' - Seuil';
+                            }
+                            return 'Seuil';
+                        },
+                        label: function (context) {
+                            const datasetIndex = context.datasetIndex;
+                            const value = context.parsed.y.toLocaleString('fr-FR');
+                            
+                            if (datasetIndex === 0) {
+                                const date = context.label === maxEnergyDate ? ' ⚡ MAXIMUM' : '';
+                                return `${context.dataset.label}: ${value} Wh${date}`;
+                            } else {
+                                const kitIndex = datasetIndex - 1;
+                                if (kitIndex < visibleKitThresholds.length) {
+                                    const kit = visibleKitThresholds[kitIndex];
+                                    if (kit.dashed) {
+                                        return `Seuil max recommandé: ${kit.value} Wh`;
+                                    }
+                                    return `Seuil ${kit.label}: ${kit.value} Wh`;
+                                }
+                                return `Seuil: ${value} Wh`;
+                            }
+                        },
+                        afterLabel: function(context) {
+                            const lines = [];
+
+                            // Message spécial pour le jour d'énergie maximale
+                            if (context.datasetIndex === 0 && context.label === maxEnergyDate) {
+                                lines.push('🏆 Énergie maximale enregistrée');
+                            }
+
+                            return lines;
+                        }
+                    }
+                }
             }
         }
     });
 }
-
+// Ajoutez cette fonction pour inclure les styles dynamiques
+function addDynamicKitStyles() {
+    if (document.querySelector('#dynamic-kit-styles')) return;
+    
+    const styles = document.createElement('style');
+    styles.id = 'dynamic-kit-styles';
+    styles.textContent = `
+        /* Styles pour l'info-bulle des kits */
+        .kit-threshold-info {
+            position: absolute;
+            background: white;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 1000;
+            max-width: 300px;
+            font-size: 12px;
+        }
+        
+        .kit-threshold-info h4 {
+            margin: 0 0 8px 0;
+            color: #2d3748;
+            font-size: 13px;
+            border-bottom: 1px solid #e2e8f0;
+            padding-bottom: 6px;
+        }
+        
+        .kit-list {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+        }
+        
+        .kit-item {
+            display: flex;
+            align-items: center;
+            padding: 4px 0;
+            border-bottom: 1px solid #f7fafc;
+        }
+        
+        .kit-color {
+            width: 12px;
+            height: 12px;
+            border-radius: 3px;
+            margin-right: 8px;
+            border: 1px solid rgba(0,0,0,0.1);
+        }
+        
+        /* Légende améliorée */
+        .kit-legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 10px;
+            padding: 10px;
+            background: #f8fafc;
+            border-radius: 6px;
+            border: 1px solid #e2e8f0;
+        }
+        
+        .kit-legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 11px;
+            color: #4a5568;
+        }
+        
+        .kit-legend-color {
+            width: 12px;
+            height: 12px;
+            border-radius: 2px;
+        }
+        
+        /* Message d'info sur le dimensionnement */
+        .dimensioning-info {
+            background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+            border-left: 4px solid #0ea5e9;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+        }
+        
+        .dimensioning-info h5 {
+            margin: 0 0 8px 0;
+            color: #0369a1;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .kit-status {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 10px;
+            font-weight: bold;
+            margin-left: 8px;
+        }
+        
+        .kit-status.adequate {
+            background: #dcfce7;
+            color: #166534;
+        }
+        
+        .kit-status.inadequate {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        
+        .kit-status.warning {
+            background: #fef3c7;
+            color: #92400e;
+        }
+    `;
+    
+    document.head.appendChild(styles);
+}
 // === FONCTION POUR CRÉER LE GRAPHIQUE TENSION (MIN/MAX PAR JOUR) ===
 function createAllClientsTensionChart(dates, tensionByDay, systemType, systemLimits) {
     const chartCanvas = document.getElementById('allClientsTensionChart');
