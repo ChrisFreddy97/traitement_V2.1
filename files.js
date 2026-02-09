@@ -57,7 +57,7 @@ function initializeDOMElements() {
     validationHint = document.getElementById('validation-hint');
     
     // Main page elements
-    backToHomeBtn = document.getElementById('back-to-home-btn');
+    backToHomeBtn = document.getElementById('back-to-home-btn'); 
     foldersListSection = document.getElementById('folders-list-section');
     foldersListDiv = document.getElementById('folders-list');
     noFoldersMessage = document.getElementById('no-folders-message');
@@ -68,7 +68,7 @@ function initializeDOMElements() {
 
 function setupEventListeners() {
     // Modal events
-    openAddModalBtn.addEventListener('click', openAddModal);
+    openAddModalBtn.addEventListener('click', openAddModal); 
     closeModal.addEventListener('click', closeAddModal);
     cancelModalBtn.addEventListener('click', closeAddModal);
     
