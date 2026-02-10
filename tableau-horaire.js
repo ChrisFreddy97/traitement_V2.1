@@ -4039,26 +4039,92 @@ function displayAllClientsTab() {
             </div>
         </div>
 
-        <!-- GRAPHIQUE PAS HORAIRE : SOMME ÉNERGIE HEURE PAR HEURE -->
+        <!-- GRAPHIQUE PAS HORAIRE : SOMME ÉNERGIE HEURE PAR HEURE AVEC FILTRES -->
         <div class="all-clients-chart-section">
-            <h4>
-                ⏰ Énergie Totale par Heure (Somme Clients)
-                ${window.filteredDates && window.filteredDates.length < allClientsHourlyMatrix.dates.length ? 
-                    `<span style="font-size:12px; background:#f0f9ff; color:#0369a1; padding:2px 8px; border-radius:12px; margin-left:10px;">
-                        Données filtrées
-                    </span>` : ''
-                }
-            </h4>
-            <div class="system-info">
-                <span>📊 Affichage: 15 jours par défaut</span>
-                <span>🕐 Pas horaire: 1 heure</span>
-                <span>👥 Clients: ${allClientsHourlyMatrix.clients.length}</span>
-                <button onclick="toggleHourlyChartRange()" style="background:#3b82f6; color:white; border:none; padding:6px 12px; border-radius:6px; font-size:11px; cursor:pointer;">
-                    🔄 Changer période
-                </button>
+            <div class="hourly-chart-header">
+                <h4>
+                    ⏰ Énergie Totale par Heure (Somme Clients)
+                    ${window.filteredDates && window.filteredDates.length < allClientsHourlyMatrix.dates.length ? 
+                        `<span class="filter-badge">🔍 Filtre global actif</span>` : ''
+                    }
+                </h4>
+                <div class="hourly-chart-controls">
+                    <!-- Filtres rapides -->
+                    <div class="quick-filters">
+                        <span class="filter-label">📅 Période rapide:</span>
+                        <div class="filter-buttons">
+                            <button class="filter-btn-small" onclick="setHourlyChartRange('7days')">7 jours</button>
+                            <button class="filter-btn-small" onclick="setHourlyChartRange('15days')">15 jours</button>
+                            <button class="filter-btn-small" onclick="setHourlyChartRange('30days')">30 jours</button>
+                            <button class="filter-btn-small" onclick="setHourlyChartRange('all')">Tout</button>
+                        </div>
+                    </div>
+                    
+                    <!-- Sélecteur de dates -->
+                    <div class="date-range-selector">
+                        <span class="filter-label">🗓️ Période spécifique:</span>
+                        <div class="date-inputs">
+                            <input type="date" id="hourly-start-date" class="date-input" 
+                                value="${getDefaultStartDate(datesToUse)}"
+                                onchange="updateHourlyChartWithCustomDates()">
+                            <span style="color:#64748b; margin:0 5px;">à</span>
+                            <input type="date" id="hourly-end-date" class="date-input" 
+                                value="${getDefaultEndDate(datesToUse)}"
+                                onchange="updateHourlyChartWithCustomDates()">
+                        </div>
+                    </div>
+                    
+                    <!-- Filtre par jour de semaine -->
+                    <div class="day-filter">
+                        <span class="filter-label">📆 Jours:</span>
+                        <div class="day-buttons">
+                            <button class="day-btn" data-day="all" onclick="toggleDayFilter('all')" style="background:#3b82f6; color:white;">Tous</button>
+                            <button class="day-btn" data-day="weekday" onclick="toggleDayFilter('weekday')">Semaine</button>
+                            <button class="day-btn" data-day="weekend" onclick="toggleDayFilter('weekend')">Weekend</button>
+                        </div>
+                    </div>
+                    
+                    <!-- Statistiques rapides -->
+                    <div class="hourly-stats-summary">
+                        <span class="stat-item">👥 ${allClientsHourlyMatrix.clients.length} clients</span>
+                        <span class="stat-item">🕐 Pas: 1h</span>
+                        <span id="hourly-days-count" class="stat-item">📅 ${datesToUse.length} jours</span>
+                    </div>
+                </div>
             </div>
+            
+            <!-- Conteneur du graphique -->
             <div class="chart-container all-clients-hourly-chart-container">
                 <canvas id="allClientsHourlyChart"></canvas>
+            </div>
+            
+            <!-- Légende et contrôles avancés -->
+            <div class="hourly-chart-footer">
+                <div class="chart-legend">
+                    <div class="legend-item">
+                        <span class="legend-color" style="background:#667eea;"></span>
+                        <span class="legend-text">📊 Énergie Totale (Somme Clients)</span>
+                    </div>
+                    <div class="legend-item">
+                        <span class="legend-color" style="background:#f59e0b;"></span>
+                        <span class="legend-text">⚡ Heures de pointe (>80% du max)</span>
+                    </div>
+                </div>
+                
+                <div class="advanced-controls">
+                    <button class="btn-control" onclick="toggleClientsOnChart()" title="Afficher/masquer les clients individuels">
+                        👤 Clients
+                    </button>
+                    <button class="btn-control" onclick="togglePeakHoursHighlight()" title="Surligner les heures de pointe">
+                        ⚡ Pointe
+                    </button>
+                    <button class="btn-control" onclick="exportHourlyChartData()" title="Exporter les données">
+                        📤 Exporter
+                    </button>
+                    <button class="btn-control" onclick="resetHourlyChartFilters()" title="Réinitialiser tous les filtres">
+                        🔄 Réinitialiser
+                    </button>
+                </div>
             </div>
         </div>
         
@@ -4197,22 +4263,85 @@ function displayAllClientsTab() {
 }
 
 // ======================== CALCUL DES DONNÉES HORAIRES ========================
-function calculateHourlyEnergyData(dates, maxDays = 15) {
+function calculateHourlyEnergyData(dates, maxDays = null) {
     console.log('📊 Calcul des données horaires...');
     
-    // Limiter aux X derniers jours si beaucoup de données
-    const datesToUse = dates.length > maxDays ? dates.slice(-maxDays) : dates;
+    // Vérifier si on a des données
+    if (!dates || dates.length === 0 || !allClientsHourlyMatrix || !allClientsHourlyMatrix.hours) {
+        console.warn('⚠️ Pas de données disponibles pour le calcul horaire');
+        return {
+            hourlyData: {
+                labels: [],
+                datasets: [],
+                totalByHour: [],
+                maxTotal: 0,
+                peakThreshold: 0,
+                peakHours: []
+            },
+            datesUsed: [],
+            hours: [],
+            totalDays: 0,
+            stats: {
+                totalEnergy: 0,
+                averagePerHour: 0,
+                maxHourEnergy: 0,
+                maxHourTime: '',
+                peakHoursCount: 0,
+                clientContributions: {}
+            }
+        };
+    }
+    
+    // Si maxDays est spécifié et qu'on a plus de dates, limiter aux X derniers jours
+    const datesToUse = maxDays && dates.length > maxDays ? 
+        dates.slice(-maxDays) : 
+        [...dates];
+    
+    console.log(`📅 Calcul sur ${datesToUse.length} jour(s) sur ${dates.length} disponible(s)`);
     
     // Obtenir toutes les heures uniques (de 00:00 à 23:00)
-    const allHours = Array.from({length: 24}, (_, i) => `${i.toString().padStart(2, '0')}:00`);
+    const allHours = Array.from({length: 24}, (_, i) => {
+        return `${i.toString().padStart(2, '0')}:00`;
+    });
     
     // Initialiser la structure de données
     const hourlyData = {
         labels: [], // Format: "Date Heure" (ex: "01/01/2024 09:00")
         datasets: [], // Données par client
         totalByHour: new Array(allHours.length * datesToUse.length).fill(0), // Somme totale par créneau
-        maxTotal: 0
+        maxTotal: 0,
+        peakThreshold: 0,
+        peakHours: [], // Indices des heures de pointe
+        clientContributions: {}, // Contribution par client
+        hourStats: {} // Statistiques par heure
     };
+    
+    // Initialiser les contributions par client
+    allClientsHourlyMatrix.clients.forEach(clientId => {
+        hourlyData.clientContributions[clientId] = {
+            total: 0,
+            maxHour: 0,
+            maxHourTime: '',
+            percentage: 0
+        };
+    });
+    
+    // Initialiser les stats par heure
+    allHours.forEach(hour => {
+        hourlyData.hourStats[hour] = {
+            total: 0,
+            count: 0,
+            average: 0,
+            clientsActive: 0
+        };
+    });
+    
+    // Variables pour les statistiques globales
+    let globalTotalEnergy = 0;
+    let maxHourEnergy = 0;
+    let maxHourIndex = -1;
+    let maxHourDate = '';
+    let maxHourTime = '';
     
     // Pour chaque date et heure, calculer la somme de tous les clients
     datesToUse.forEach((date, dateIndex) => {
@@ -4223,31 +4352,98 @@ function calculateHourlyEnergyData(dates, maxDays = 15) {
             
             // Calculer la somme de l'énergie de tous les clients pour cette heure
             let hourTotal = 0;
+            let clientsActive = 0;
+            
             allClientsHourlyMatrix.clients.forEach(clientId => {
                 const clientEnergy = rowData[`client_${clientId}`];
                 if (clientEnergy !== null && clientEnergy !== undefined && !isNaN(clientEnergy)) {
-                    hourTotal += parseFloat(clientEnergy);
+                    const energyValue = parseFloat(clientEnergy);
+                    if (energyValue > 0) {
+                        hourTotal += energyValue;
+                        clientsActive++;
+                        
+                        // Mettre à jour les contributions par client
+                        hourlyData.clientContributions[clientId].total += energyValue;
+                        
+                        // Trouver l'heure max pour ce client
+                        if (energyValue > hourlyData.clientContributions[clientId].maxHour) {
+                            hourlyData.clientContributions[clientId].maxHour = energyValue;
+                            hourlyData.clientContributions[clientId].maxHourTime = `${date} ${hour}`;
+                        }
+                    }
                 }
             });
             
+            // Mettre à jour le total par heure
             hourlyData.totalByHour[globalIndex] = hourTotal;
-            hourlyData.maxTotal = Math.max(hourlyData.maxTotal, hourTotal);
+            globalTotalEnergy += hourTotal;
             
-            // Créer le label (date + heure)
-            if (hourIndex === 0 || hour === '12:00') {
-                // Afficher la date seulement à minuit et midi pour éviter la surcharge
+            // Mettre à jour le maximum global
+            if (hourTotal > hourlyData.maxTotal) {
+                hourlyData.maxTotal = hourTotal;
+            }
+            
+            // Trouver l'heure avec le maximum d'énergie
+            if (hourTotal > maxHourEnergy) {
+                maxHourEnergy = hourTotal;
+                maxHourIndex = globalIndex;
+                maxHourDate = date;
+                maxHourTime = hour;
+            }
+            
+            // Mettre à jour les statistiques par heure
+            hourlyData.hourStats[hour].total += hourTotal;
+            hourlyData.hourStats[hour].count++;
+            hourlyData.hourStats[hour].clientsActive += clientsActive;
+            
+            // Créer le label
+            if (hourIndex === 0) {
+                // À minuit, afficher la date complète
                 hourlyData.labels.push(`${date} ${hour}`);
+            } else if (hour === '12:00') {
+                // À midi, afficher juste "12:00" avec un indicateur
+                hourlyData.labels.push(`🕛 ${hour}`);
             } else {
+                // Autres heures, juste l'heure
                 hourlyData.labels.push(hour);
             }
         });
     });
     
-    // Créer les datasets par client (optionnel - pour tooltip détaillé)
+    // Calculer le seuil de pointe (80% du maximum)
+    hourlyData.peakThreshold = hourlyData.maxTotal * 0.8;
+    
+    // Identifier les heures de pointe
+    hourlyData.totalByHour.forEach((energy, index) => {
+        if (energy >= hourlyData.peakThreshold) {
+            hourlyData.peakHours.push(index);
+        }
+    });
+    
+    // Calculer les moyennes par heure
+    allHours.forEach(hour => {
+        if (hourlyData.hourStats[hour].count > 0) {
+            hourlyData.hourStats[hour].average = hourlyData.hourStats[hour].total / hourlyData.hourStats[hour].count;
+            hourlyData.hourStats[hour].clientsActive = Math.round(hourlyData.hourStats[hour].clientsActive / datesToUse.length);
+        }
+    });
+    
+    // Calculer les pourcentages de contribution par client
     allClientsHourlyMatrix.clients.forEach(clientId => {
-        const clientData = [];
+        if (globalTotalEnergy > 0) {
+            hourlyData.clientContributions[clientId].percentage = 
+                (hourlyData.clientContributions[clientId].total / globalTotalEnergy) * 100;
+        }
+    });
+    
+    // Créer les datasets par client (pour l'affichage individuel)
+    const clientColors = {};
+    allClientsHourlyMatrix.clients.forEach((clientId, index) => {
         const clientLabel = `Client ${clientId.padStart(2, '0')}`;
         const clientColor = getClientColor(clientId);
+        clientColors[clientId] = clientColor;
+        
+        const clientData = [];
         
         datesToUse.forEach(date => {
             allHours.forEach(hour => {
@@ -4261,11 +4457,15 @@ function calculateHourlyEnergyData(dates, maxDays = 15) {
         hourlyData.datasets.push({
             label: clientLabel,
             data: clientData,
-            backgroundColor: clientColor + '20',
+            backgroundColor: clientColor + '20', // 20 = 12% d'opacité
             borderColor: clientColor,
-            borderWidth: 1,
+            borderWidth: 1.5,
             hidden: true, // Caché par défaut, on affiche seulement la somme
-            stack: 'stack'
+            stack: 'stack',
+            pointRadius: 0,
+            pointHoverRadius: 4,
+            tension: 0.2,
+            fill: false
         });
     });
     
@@ -4273,24 +4473,118 @@ function calculateHourlyEnergyData(dates, maxDays = 15) {
     hourlyData.datasets.unshift({
         label: '📊 Énergie Totale (Somme Clients)',
         data: hourlyData.totalByHour,
-        backgroundColor: '#667eea80',
+        backgroundColor: 'rgba(102, 126, 234, 0.15)',
         borderColor: '#667eea',
-        borderWidth: 2,
+        borderWidth: 2.5,
         fill: true,
-        tension: 0.2,
+        tension: 0.3,
         pointRadius: 2,
-        pointHoverRadius: 5
+        pointBackgroundColor: hourlyData.totalByHour.map((value, index) => {
+            // Colorer les points selon s'ils sont en pointe
+            return hourlyData.peakHours.includes(index) ? '#f59e0b' : '#667eea';
+        }),
+        pointBorderColor: '#fff',
+        pointBorderWidth: 1,
+        pointHoverRadius: 6,
+        pointHoverBackgroundColor: '#764ba2',
+        pointHoverBorderColor: '#fff',
+        pointHoverBorderWidth: 2
     });
     
-    console.log(`✅ Données horaires calculées: ${datesToUse.length} jours × ${allHours.length} heures = ${hourlyData.totalByHour.length} points`);
-    console.log(`📈 Énergie max/heure: ${hourlyData.maxTotal.toFixed(2)} Wh`);
+    // Dataset pour les heures de pointe (surlignage)
+    const peakHourData = hourlyData.totalByHour.map((value, index) => {
+        return hourlyData.peakHours.includes(index) ? value : null;
+    });
+    
+    hourlyData.datasets.push({
+        label: '⚡ Heures de pointe (>80% du max)',
+        data: peakHourData,
+        backgroundColor: 'rgba(245, 158, 11, 0.25)',
+        borderColor: 'transparent',
+        borderWidth: 0,
+        fill: true,
+        pointRadius: 0,
+        tension: 0,
+        hidden: !window.hourlyChartFilters?.highlightPeak ?? true // Suivre le paramètre global
+    });
+    
+    // Calculer les statistiques finales
+    const stats = {
+        totalEnergy: globalTotalEnergy,
+        averagePerHour: datesToUse.length > 0 ? globalTotalEnergy / (datesToUse.length * 24) : 0,
+        maxHourEnergy: maxHourEnergy,
+        maxHourTime: maxHourTime,
+        maxHourDate: maxHourDate,
+        peakHoursCount: hourlyData.peakHours.length,
+        peakHoursPercentage: hourlyData.totalByHour.length > 0 ? 
+            (hourlyData.peakHours.length / hourlyData.totalByHour.length * 100).toFixed(1) : 0,
+        totalHours: datesToUse.length * 24,
+        clientContributions: hourlyData.clientContributions,
+        hourStats: hourlyData.hourStats,
+        // Top 3 des heures les plus chargées en moyenne
+        topHours: Object.entries(hourlyData.hourStats)
+            .sort(([, a], [, b]) => b.average - a.average)
+            .slice(0, 3)
+            .map(([hour, data]) => ({
+                hour: hour,
+                average: data.average,
+                clientsActive: data.clientsActive
+            })),
+        // Client dominant
+        dominantClient: allClientsHourlyMatrix.clients.reduce((dominant, clientId) => {
+            const currentContrib = hourlyData.clientContributions[clientId];
+            if (!dominant || currentContrib.percentage > dominant.percentage) {
+                return {
+                    clientId: clientId,
+                    percentage: currentContrib.percentage,
+                    total: currentContrib.total
+                };
+            }
+            return dominant;
+        }, null)
+    };
+    
+    console.log(`✅ Données horaires calculées:`, {
+        jours: datesToUse.length,
+        heures: hourlyData.totalByHour.length,
+        énergieTotale: `${globalTotalEnergy.toFixed(0)} Wh`,
+        énergieMaxHeure: `${maxHourEnergy.toFixed(1)} Wh (${maxHourDate} ${maxHourTime})`,
+        heuresPointe: `${hourlyData.peakHours.length} (${stats.peakHoursPercentage}%)`,
+        clientDominant: stats.dominantClient ? 
+            `Client ${stats.dominantClient.clientId} (${stats.dominantClient.percentage.toFixed(1)}%)` : 'Aucun'
+    });
     
     return {
         hourlyData: hourlyData,
         datesUsed: datesToUse,
         hours: allHours,
-        totalDays: datesToUse.length
+        totalDays: datesToUse.length,
+        stats: stats,
+        clientColors: clientColors
     };
+}
+
+// Fonction utilitaire pour générer une couleur par client (version améliorée)
+function getClientColor(clientId) {
+    // Palette de couleurs distinctes
+    const colorPalettes = {
+        primary: ['#667eea', '#764ba2', '#f093fb', '#f5576c', '#4facfe', '#00f2fe'],
+        secondary: ['#43e97b', '#38f9d7', '#fa709a', '#fee140', '#a8edea', '#fed6e3'],
+        tertiary: ['#96fbc4', '#f9d423', '#ff5858', '#ff9a9e', '#a8edea', '#d299c2']
+    };
+    
+    // Convertir l'ID client en nombre
+    const clientNum = parseInt(clientId, 16) || parseInt(clientId) || 0;
+    
+    // Choisir une palette selon le numéro du client
+    const paletteIndex = clientNum % 3;
+    const paletteName = ['primary', 'secondary', 'tertiary'][paletteIndex];
+    const palette = colorPalettes[paletteName];
+    
+    // Choisir une couleur dans la palette
+    const colorIndex = clientNum % palette.length;
+    
+    return palette[colorIndex];
 }
 
 // Fonction utilitaire pour générer une couleur par client
@@ -4338,7 +4632,404 @@ function toggleHourlyChartRange() {
         }
     }
 }
+// ======================== FONCTIONS UTILITAIRES POUR LES FILTRES ========================
 
+// Fonctions pour les dates par défaut
+function getDefaultStartDate(dates) {
+    if (!dates || dates.length === 0) return '';
+    
+    // Par défaut, 15 derniers jours
+    const defaultDays = Math.min(15, dates.length);
+    const startDate = dates[dates.length - defaultDays];
+    
+    // Convertir "DD/MM/YYYY" en "YYYY-MM-DD"
+    const [day, month, year] = startDate.split('/');
+    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+}
+
+function getDefaultEndDate(dates) {
+    if (!dates || dates.length === 0) return '';
+    
+    // Dernière date disponible
+    const lastDate = dates[dates.length - 1];
+    const [day, month, year] = lastDate.split('/');
+    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+}
+
+// Fonction pour convertir une date "YYYY-MM-DD" en "DD/MM/YYYY"
+function formatDateToFrench(dateString) {
+    if (!dateString) return '';
+    const [year, month, day] = dateString.split('-');
+    return `${day.padStart(2, '0')}/${month.padStart(2, '0')}/${year}`;
+}
+
+// Fonction pour obtenir le jour de la semaine (0=dimanche, 1=lundi, ...)
+function getDayOfWeek(dateStr) {
+    const [day, month, year] = dateStr.split('/');
+    const date = new Date(year, month - 1, day);
+    return date.getDay(); // 0=dimanche, 6=samedi
+}
+
+// Vérifier si c'est un jour de week-end
+function isWeekend(dateStr) {
+    const day = getDayOfWeek(dateStr);
+    return day === 0 || day === 6; // Dimanche ou samedi
+}
+// ======================== FONCTIONS DE FILTRAGE POUR LE GRAPHIQUE HORAIRE ========================
+
+// Variables globales pour les filtres
+window.hourlyChartFilters = {
+    dateRange: '15days', // '7days', '15days', '30days', 'all', 'custom'
+    startDate: null,
+    endDate: null,
+    dayFilter: 'all', // 'all', 'weekday', 'weekend'
+    showClients: false,
+    highlightPeak: true
+};
+
+// Définir la période rapide
+function setHourlyChartRange(rangeType) {
+    const allDates = window.filteredDates || allClientsHourlyMatrix.dates;
+    if (!allDates || allDates.length === 0) return;
+    
+    window.hourlyChartFilters.dateRange = rangeType;
+    
+    let filteredDates = [];
+    const today = allDates[allDates.length - 1];
+    
+    switch(rangeType) {
+        case '7days':
+            filteredDates = allDates.slice(-7);
+            break;
+        case '15days':
+            filteredDates = allDates.slice(-15);
+            break;
+        case '30days':
+            filteredDates = allDates.slice(-30);
+            break;
+        case 'all':
+            filteredDates = [...allDates];
+            break;
+        case 'custom':
+            // Garder les dates actuelles
+            filteredDates = getFilteredDatesByCustomRange();
+            break;
+    }
+    
+    // Appliquer le filtre de jour si actif
+    if (window.hourlyChartFilters.dayFilter !== 'all') {
+        filteredDates = filterDatesByDayType(filteredDates);
+    }
+    
+    // Mettre à jour les champs de date
+    if (rangeType !== 'custom' && filteredDates.length > 0) {
+        document.getElementById('hourly-start-date').value = getDefaultStartDate(filteredDates);
+        document.getElementById('hourly-end-date').value = getDefaultEndDate(filteredDates);
+    }
+    
+    // Recalculer et mettre à jour le graphique
+    updateHourlyChartWithFilters(filteredDates);
+    
+    // Mettre à jour le bouton actif
+    updateActiveRangeButton(rangeType);
+    
+    // Mettre à jour le compteur de jours
+    updateDaysCount(filteredDates.length);
+}
+
+// Filtrer par jour de semaine/week-end
+function toggleDayFilter(dayType) {
+    window.hourlyChartFilters.dayFilter = dayType;
+    
+    // Mettre à jour l'apparence des boutons
+    document.querySelectorAll('.day-btn').forEach(btn => {
+        if (btn.dataset.day === dayType) {
+            btn.style.background = '#3b82f6';
+            btn.style.color = 'white';
+        } else {
+            btn.style.background = '#f1f5f9';
+            btn.style.color = '#64748b';
+        }
+    });
+    
+    // Recalculer les dates filtrées
+    const allDates = window.filteredDates || allClientsHourlyMatrix.dates;
+    let filteredDates = getFilteredDatesByCurrentRange(allDates);
+    
+    if (dayType !== 'all') {
+        filteredDates = filterDatesByDayType(filteredDates);
+    }
+    
+    updateHourlyChartWithFilters(filteredDates);
+    updateDaysCount(filteredDates.length);
+}
+
+// Filtrer les dates par type de jour
+function filterDatesByDayType(dates) {
+    const dayType = window.hourlyChartFilters.dayFilter;
+    
+    return dates.filter(date => {
+        const isWeekendDay = isWeekend(date);
+        
+        if (dayType === 'weekday') {
+            return !isWeekendDay;
+        } else if (dayType === 'weekend') {
+            return isWeekendDay;
+        }
+        
+        return true;
+    });
+}
+
+// Obtenir les dates filtrées selon la plage actuelle
+function getFilteredDatesByCurrentRange(allDates) {
+    const rangeType = window.hourlyChartFilters.dateRange;
+    
+    switch(rangeType) {
+        case '7days':
+            return allDates.slice(-7);
+        case '15days':
+            return allDates.slice(-15);
+        case '30days':
+            return allDates.slice(-30);
+        case 'all':
+            return [...allDates];
+        case 'custom':
+            return getFilteredDatesByCustomRange();
+        default:
+            return allDates.slice(-15);
+    }
+}
+
+// Filtrer par plage de dates personnalisée
+function getFilteredDatesByCustomRange() {
+    const startInput = document.getElementById('hourly-start-date').value;
+    const endInput = document.getElementById('hourly-end-date').value;
+    
+    if (!startInput || !endInput) {
+        const allDates = window.filteredDates || allClientsHourlyMatrix.dates;
+        return allDates.slice(-15); // Fallback à 15 jours
+    }
+    
+    const startDate = formatDateToFrench(startInput);
+    const endDate = formatDateToFrench(endInput);
+    const allDates = window.filteredDates || allClientsHourlyMatrix.dates;
+    
+    return allDates.filter(date => {
+        const dateObj = new Date(date.split('/').reverse().join('-'));
+        const startObj = new Date(startInput);
+        const endObj = new Date(endInput);
+        
+        return dateObj >= startObj && dateObj <= endObj;
+    });
+}
+
+// Mettre à jour avec dates personnalisées
+function updateHourlyChartWithCustomDates() {
+    window.hourlyChartFilters.dateRange = 'custom';
+    updateActiveRangeButton('custom');
+    
+    const filteredDates = getFilteredDatesByCustomRange();
+    
+    // Appliquer le filtre de jour si actif
+    if (window.hourlyChartFilters.dayFilter !== 'all') {
+        filteredDates = filterDatesByDayType(filteredDates);
+    }
+    
+    updateHourlyChartWithFilters(filteredDates);
+    updateDaysCount(filteredDates.length);
+}
+
+// Mettre à jour le graphique avec les dates filtrées
+function updateHourlyChartWithFilters(filteredDates) {
+    if (!filteredDates || filteredDates.length === 0) {
+        console.warn('⚠️ Aucune date à afficher');
+        return;
+    }
+    
+    // Recalculer les données horaires
+    const hourlyChartData = calculateHourlyEnergyData(filteredDates, filteredDates.length); // Toutes les dates filtrées
+    
+    // Sauvegarder les données
+    window.hourlyChartData = hourlyChartData;
+    
+    // Mettre à jour le graphique
+    createAllClientsHourlyChart(hourlyChartData);
+    
+    console.log(`✅ Graphique horaire mis à jour: ${filteredDates.length} jours`);
+}
+
+// Mettre à jour le bouton actif
+function updateActiveRangeButton(activeRange) {
+    // Réinitialiser tous les boutons
+    document.querySelectorAll('.filter-btn-small').forEach(btn => {
+        btn.style.background = '#f1f5f9';
+        btn.style.color = '#64748b';
+        btn.style.fontWeight = 'normal';
+    });
+    
+    // Activer le bouton sélectionné
+    const activeBtn = Array.from(document.querySelectorAll('.filter-btn-small'))
+        .find(btn => btn.textContent.includes(activeRange.replace('days', '').replace('all', 'Tout')));
+    
+    if (activeBtn) {
+        activeBtn.style.background = '#3b82f6';
+        activeBtn.style.color = 'white';
+        activeBtn.style.fontWeight = 'bold';
+    }
+}
+
+// Mettre à jour le compteur de jours
+function updateDaysCount(count) {
+    const daysCountElement = document.getElementById('hourly-days-count');
+    if (daysCountElement) {
+        daysCountElement.textContent = `📅 ${count} jour${count !== 1 ? 's' : ''}`;
+    }
+}
+
+// Afficher/masquer les clients individuels
+function toggleClientsOnChart() {
+    window.hourlyChartFilters.showClients = !window.hourlyChartFilters.showClients;
+    
+    if (!window.allClientsHourlyChartInstance) return;
+    
+    const chart = window.allClientsHourlyChartInstance;
+    
+    // Montrer/masquer les datasets des clients (à partir de l'index 1)
+    for (let i = 1; i < chart.data.datasets.length; i++) {
+        const meta = chart.getDatasetMeta(i);
+        meta.hidden = !window.hourlyChartFilters.showClients;
+    }
+    
+    chart.update();
+    
+    // Mettre à jour le bouton
+    const btn = document.querySelector('.btn-control[title*="Clients"]');
+    if (btn) {
+        btn.style.background = window.hourlyChartFilters.showClients ? '#10b981' : '#3b82f6';
+        btn.innerHTML = window.hourlyChartFilters.showClients ? '👤 <small>Clients ON</small>' : '👤 Clients';
+    }
+}
+
+// Surligner les heures de pointe
+function togglePeakHoursHighlight() {
+    window.hourlyChartFilters.highlightPeak = !window.hourlyChartFilters.highlightPeak;
+    
+    if (!window.allClientsHourlyChartInstance || !window.hourlyChartData) return;
+    
+    const chart = window.allClientsHourlyChartInstance;
+    const { hourlyData } = window.hourlyChartData;
+    
+    if (window.hourlyChartFilters.highlightPeak) {
+        // Ajouter un dataset pour les heures de pointe
+        const peakThreshold = hourlyData.maxTotal * 0.8; // 80% du maximum
+        
+        const peakData = hourlyData.totalByHour.map(value => 
+            value >= peakThreshold ? value : null
+        );
+        
+        // Vérifier si le dataset de pointe existe déjà
+        let peakDatasetIndex = -1;
+        chart.data.datasets.forEach((dataset, index) => {
+            if (dataset.label && dataset.label.includes('Heures de pointe')) {
+                peakDatasetIndex = index;
+            }
+        });
+        
+        if (peakDatasetIndex === -1) {
+            // Ajouter le dataset de pointe
+            chart.data.datasets.push({
+                label: '⚡ Heures de pointe (>80% du max)',
+                data: peakData,
+                backgroundColor: 'rgba(245, 158, 11, 0.3)',
+                borderColor: '#f59e0b',
+                borderWidth: 2,
+                pointRadius: 0,
+                fill: true,
+                tension: 0
+            });
+        }
+    } else {
+        // Retirer le dataset de pointe
+        chart.data.datasets = chart.data.datasets.filter(dataset => 
+            !dataset.label.includes('Heures de pointe')
+        );
+    }
+    
+    chart.update();
+    
+    // Mettre à jour le bouton
+    const btn = document.querySelector('.btn-control[title*="Pointe"]');
+    if (btn) {
+        btn.style.background = window.hourlyChartFilters.highlightPeak ? '#f59e0b' : '#3b82f6';
+        btn.innerHTML = window.hourlyChartFilters.highlightPeak ? '⚡ <small>Pointe ON</small>' : '⚡ Pointe';
+    }
+}
+
+// Exporter les données
+function exportHourlyChartData() {
+    if (!window.hourlyChartData) return;
+    
+    const { hourlyData, datesUsed, hours } = window.hourlyChartData;
+    
+    // Créer un tableau CSV
+    let csv = 'Date,Heure,Énergie Totale (Wh),Nombre Clients\n';
+    
+    datesUsed.forEach((date, dateIndex) => {
+        hours.forEach((hour, hourIndex) => {
+            const index = dateIndex * hours.length + hourIndex;
+            const totalEnergy = hourlyData.totalByHour[index];
+            
+            // Compter les clients avec consommation > 0
+            let clientCount = 0;
+            for (let i = 1; i < hourlyData.datasets.length; i++) {
+                const clientValue = hourlyData.datasets[i].data[index];
+                if (clientValue > 0) clientCount++;
+            }
+            
+            csv += `${date},${hour},${totalEnergy.toFixed(2)},${clientCount}\n`;
+        });
+    });
+    
+    // Créer et télécharger le fichier
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    
+    link.setAttribute('href', url);
+    link.setAttribute('download', `energie_horaire_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    console.log('📤 Données horaires exportées');
+}
+
+// Réinitialiser tous les filtres
+function resetHourlyChartFilters() {
+    window.hourlyChartFilters = {
+        dateRange: '15days',
+        startDate: null,
+        endDate: null,
+        dayFilter: 'all',
+        showClients: false,
+        highlightPeak: true
+    };
+    
+    // Réinitialiser les boutons
+    updateActiveRangeButton('15days');
+    toggleDayFilter('all');
+    
+    // Réinitialiser les dates
+    const allDates = window.filteredDates || allClientsHourlyMatrix.dates;
+    document.getElementById('hourly-start-date').value = getDefaultStartDate(allDates);
+    document.getElementById('hourly-end-date').value = getDefaultEndDate(allDates);
+    
+    // Mettre à jour le graphique
+    setHourlyChartRange('15days');
+}
 // ======================== CRÉATION GRAPHIQUE HORAIRE ========================
 function createAllClientsHourlyChart(hourlyChartData) {
     const chartCanvas = document.getElementById('allClientsHourlyChart');
