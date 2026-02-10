@@ -1214,7 +1214,8 @@ function displayClientsTabs() {
     // Onglets clients individuels (COMMERCIALE)
     sortedClients.forEach((clientId, index) => {
         const clientData = allResultsByClient[clientId];
-        const tabLabel = `${clientId.padStart(2, '0')}-${clientData.forfait || 'N/A'}`;
+        // Format modifié : Client 2(ECO) au lieu de 02-ECO
+        const tabLabel = `Client ${parseInt(clientId).toString().padStart(2, '0')}(${clientData.forfait || 'N/A'})`;
 
         subTabsHTML += `
             <button class="sub-tab" 
@@ -1370,7 +1371,7 @@ function displayClientData(clientId, clientData) {
     const dailySummary = dailySummaryByClient[clientId] || [];
     const hasEnergy = clientData.energyFiles.length > 0;
 
-    const clientTitle = `${clientId.padStart(2, '0')}-${clientData.forfait || 'N/A'}`;
+    const clientTitle = `Client ${parseInt(clientId).toString().padStart(2, '0')}(${clientData.forfait || 'N/A'})`;
     // Générer la section commerciale (phrases analytiques)
     const commercialSectionHTML = generateCommercialSectionHTML(clientId, clientData);
     // Générer la section crédit (analyse comportement crédit)
@@ -1398,7 +1399,7 @@ function displayClientData(clientId, clientData) {
                 summaryColor = '#4b5563'; // gris neutre
             } else if (percentOverQuotaDays >= 30 && (profileType === 'excellent' || profileType === 'bon')) {
                 summaryTitle = 'Client très actif, sous-dimensionné';
-                summaryBody = "Le client consomme fortement et dépasse souvent le forfait tout en maintenant un profil de crédit correct. Cela indique un usage intensif et maîtrisé : un forfait ou un kit supérieur paraît adapté pour sécuriser la qualité de service.";
+                summaryBody = "Le client consomme fortement et dépasse souvent le forfait tout en maintenant un profil de crédit correct. Cela indique un usage intensif et maîtrisé : un forfait paraît adapté pour sécuriser la qualité de service.";
                 summaryColor = '#b91c1c'; // rouge (alerte : sous-dimensionné)
             } else if (percentZeroDays >= 50 && zeroCreditDays >= Math.round(creditProfile.totalDays * 0.5)) {
                 summaryTitle = 'Client très peu utilisateur';
@@ -1589,7 +1590,7 @@ function generateCommercialSectionHTML(clientId, clientData) {
         behaviorDescription = "Sur la période analysée, aucune consommation significative n’a été enregistrée. Le kit peut être éteint, non utilisé ou installé sans usage réel.";
     } else if (percentOverQuotaDays >= 30) {
         behaviorLabel = 'Dépassement régulier du forfait';
-        behaviorDescription = "Le client dépasse fréquemment le plafond de son forfait. Cela traduit un usage intensif et récurrent : un forfait ou un kit supérieur pourrait être envisagé pour sécuriser le service.";
+        behaviorDescription = "Le client dépasse fréquemment le plafond de son forfait. Cela traduit un usage intensif et récurrent : un forfait pourrait être envisagé pour sécuriser le service.";
     } else if (percentZeroDays >= 50 && percentOverQuotaDays === 0) {
         behaviorLabel = 'Consommation très occasionnelle / irrégulière';
         behaviorDescription = "La majorité des jours n’affichent aucune consommation. Le client utilise le kit de manière ponctuelle ou très irrégulière, avec peu de pression sur le forfait.";
@@ -1631,12 +1632,12 @@ function generateCommercialSectionHTML(clientId, clientData) {
                 </div>
                 <div style="text-align:center; padding:8px; background:white; border-radius:8px; border-left:4px solid #8b5cf6;">
                     <div style="font-size:24px; font-weight:bold; color:#8b5cf6;">${avgMax}</div>
-                    <div style="font-size:11px; color:#64748b; margin-top:4px;">Moyenne pics (Wh)</div>
+                    <div style="font-size:11px; color:#64748b; margin-top:4px;">Moyenne journalière (Wh)</div>
                 </div>
-                <div style="text-align:center; padding:8px; background:white; border-radius:8px; border-left:4px solid #10b981;">
-                    <div style="font-size:24px; font-weight:bold; color:#10b981;">${minMax}</div>
-                    <div style="font-size:11px; color:#64748b; margin-top:4px;">Minimum observé (Wh)</div>
-                    <div style="font-size:12px; color:#64748b; margin-top:4px;">Pic le plus faible</div>
+                <div style="text-align:center; padding:8px; background:white; border-radius:8px; border-left:4px solid #f97316;">
+                    <div style="font-size:24px; font-weight:bold; color:#f97316;">${overQuotaDays}</div>
+                    <div style="font-size:11px; color:#64748b; margin-top:4px;">Jours avec dépassement</div>
+                    <div style="font-size:12px; color:#64748b; margin-top:4px;">Puissance dépassée</div>
                 </div>
             </div>
 
@@ -4037,6 +4038,29 @@ function displayAllClientsTab() {
                 <canvas id="allClientsTensionChart"></canvas>
             </div>
         </div>
+
+        <!-- GRAPHIQUE PAS HORAIRE : SOMME ÉNERGIE HEURE PAR HEURE -->
+        <div class="all-clients-chart-section">
+            <h4>
+                ⏰ Énergie Totale par Heure (Somme Clients)
+                ${window.filteredDates && window.filteredDates.length < allClientsHourlyMatrix.dates.length ? 
+                    `<span style="font-size:12px; background:#f0f9ff; color:#0369a1; padding:2px 8px; border-radius:12px; margin-left:10px;">
+                        Données filtrées
+                    </span>` : ''
+                }
+            </h4>
+            <div class="system-info">
+                <span>📊 Affichage: 15 jours par défaut</span>
+                <span>🕐 Pas horaire: 1 heure</span>
+                <span>👥 Clients: ${allClientsHourlyMatrix.clients.length}</span>
+                <button onclick="toggleHourlyChartRange()" style="background:#3b82f6; color:white; border:none; padding:6px 12px; border-radius:6px; font-size:11px; cursor:pointer;">
+                    🔄 Changer période
+                </button>
+            </div>
+            <div class="chart-container all-clients-hourly-chart-container">
+                <canvas id="allClientsHourlyChart"></canvas>
+            </div>
+        </div>
         
         <div class="table-controls">
             <div class="pagination-controls">
@@ -4160,6 +4184,10 @@ function displayAllClientsTab() {
                 createStabilityChart('stability-analysis-container', stabilityData, filteredTensionResults);
             }
         }
+        // 4. Graphique horaire (pas horaire)
+        const hourlyChartData = calculateHourlyEnergyData(datesToUse, 15); // 15 jours par défaut
+        window.hourlyChartData = hourlyChartData;
+        createAllClientsHourlyChart(hourlyChartData);
 
         console.log(`✅ Onglet TECHNIQUE affiché avec ${datesToUse.length} jour(s)`);
         console.log(`📊 Données filtrées: ${Object.keys(filteredEnergyData).length} jours d'énergie, ${Object.keys(filteredTensionData).length} jours de tension`);
@@ -4167,6 +4195,358 @@ function displayAllClientsTab() {
         
     }, 100);
 }
+
+// ======================== CALCUL DES DONNÉES HORAIRES ========================
+function calculateHourlyEnergyData(dates, maxDays = 15) {
+    console.log('📊 Calcul des données horaires...');
+    
+    // Limiter aux X derniers jours si beaucoup de données
+    const datesToUse = dates.length > maxDays ? dates.slice(-maxDays) : dates;
+    
+    // Obtenir toutes les heures uniques (de 00:00 à 23:00)
+    const allHours = Array.from({length: 24}, (_, i) => `${i.toString().padStart(2, '0')}:00`);
+    
+    // Initialiser la structure de données
+    const hourlyData = {
+        labels: [], // Format: "Date Heure" (ex: "01/01/2024 09:00")
+        datasets: [], // Données par client
+        totalByHour: new Array(allHours.length * datesToUse.length).fill(0), // Somme totale par créneau
+        maxTotal: 0
+    };
+    
+    // Pour chaque date et heure, calculer la somme de tous les clients
+    datesToUse.forEach((date, dateIndex) => {
+        allHours.forEach((hour, hourIndex) => {
+            const globalIndex = dateIndex * allHours.length + hourIndex;
+            const key = `${date}_${hour}`;
+            const rowData = allClientsHourlyMatrix.data[key] || {};
+            
+            // Calculer la somme de l'énergie de tous les clients pour cette heure
+            let hourTotal = 0;
+            allClientsHourlyMatrix.clients.forEach(clientId => {
+                const clientEnergy = rowData[`client_${clientId}`];
+                if (clientEnergy !== null && clientEnergy !== undefined && !isNaN(clientEnergy)) {
+                    hourTotal += parseFloat(clientEnergy);
+                }
+            });
+            
+            hourlyData.totalByHour[globalIndex] = hourTotal;
+            hourlyData.maxTotal = Math.max(hourlyData.maxTotal, hourTotal);
+            
+            // Créer le label (date + heure)
+            if (hourIndex === 0 || hour === '12:00') {
+                // Afficher la date seulement à minuit et midi pour éviter la surcharge
+                hourlyData.labels.push(`${date} ${hour}`);
+            } else {
+                hourlyData.labels.push(hour);
+            }
+        });
+    });
+    
+    // Créer les datasets par client (optionnel - pour tooltip détaillé)
+    allClientsHourlyMatrix.clients.forEach(clientId => {
+        const clientData = [];
+        const clientLabel = `Client ${clientId.padStart(2, '0')}`;
+        const clientColor = getClientColor(clientId);
+        
+        datesToUse.forEach(date => {
+            allHours.forEach(hour => {
+                const key = `${date}_${hour}`;
+                const rowData = allClientsHourlyMatrix.data[key] || {};
+                const energy = rowData[`client_${clientId}`];
+                clientData.push(energy !== null && energy !== undefined ? parseFloat(energy) : 0);
+            });
+        });
+        
+        hourlyData.datasets.push({
+            label: clientLabel,
+            data: clientData,
+            backgroundColor: clientColor + '20',
+            borderColor: clientColor,
+            borderWidth: 1,
+            hidden: true, // Caché par défaut, on affiche seulement la somme
+            stack: 'stack'
+        });
+    });
+    
+    // Dataset pour la somme totale (affiché par défaut)
+    hourlyData.datasets.unshift({
+        label: '📊 Énergie Totale (Somme Clients)',
+        data: hourlyData.totalByHour,
+        backgroundColor: '#667eea80',
+        borderColor: '#667eea',
+        borderWidth: 2,
+        fill: true,
+        tension: 0.2,
+        pointRadius: 2,
+        pointHoverRadius: 5
+    });
+    
+    console.log(`✅ Données horaires calculées: ${datesToUse.length} jours × ${allHours.length} heures = ${hourlyData.totalByHour.length} points`);
+    console.log(`📈 Énergie max/heure: ${hourlyData.maxTotal.toFixed(2)} Wh`);
+    
+    return {
+        hourlyData: hourlyData,
+        datesUsed: datesToUse,
+        hours: allHours,
+        totalDays: datesToUse.length
+    };
+}
+
+// Fonction utilitaire pour générer une couleur par client
+function getClientColor(clientId) {
+    const colors = [
+        '#667eea', '#764ba2', '#f093fb', '#f5576c', '#4facfe', '#00f2fe',
+        '#43e97b', '#38f9d7', '#fa709a', '#fee140', '#a8edea', '#fed6e3',
+        '#a8edea', '#d299c2', '#f6d365', '#fda085', '#96fbc4', '#f9d423'
+    ];
+    const index = parseInt(clientId, 16) % colors.length;
+    return colors[index];
+}
+
+// Fonction pour basculer entre 15 jours et toutes les données
+function toggleHourlyChartRange() {
+    const chartCanvas = document.getElementById('allClientsHourlyChart');
+    if (!chartCanvas || !window.hourlyChartData) return;
+    
+    const currentDays = window.hourlyChartData.totalDays;
+    const allDates = window.filteredDates || allClientsHourlyMatrix.dates;
+    
+    let newMaxDays = 15;
+    if (currentDays <= 15 && allDates.length > 15) {
+        newMaxDays = allDates.length; // Afficher tout
+    } else if (currentDays > 15) {
+        newMaxDays = 15; // Revenir à 15 jours
+    }
+    
+    // Recalculer avec la nouvelle période
+    const newHourlyData = calculateHourlyEnergyData(allDates, newMaxDays);
+    window.hourlyChartData = newHourlyData;
+    
+    // Mettre à jour le graphique
+    createAllClientsHourlyChart(newHourlyData);
+    
+    // Mettre à jour le bouton
+    const button = document.querySelector('.system-info button');
+    if (button) {
+        if (newMaxDays <= 15) {
+            button.textContent = '🔁 Voir tout';
+            document.querySelector('.system-info span:first-child').textContent = `📊 Affichage: ${newMaxDays} jours`;
+        } else {
+            button.textContent = '🔁 Voir 15 jours';
+            document.querySelector('.system-info span:first-child').textContent = `📊 Affichage: ${newMaxDays} jours (complet)`;
+        }
+    }
+}
+
+// ======================== CRÉATION GRAPHIQUE HORAIRE ========================
+function createAllClientsHourlyChart(hourlyChartData) {
+    const chartCanvas = document.getElementById('allClientsHourlyChart');
+    if (!chartCanvas || !hourlyChartData) return;
+
+    // Détruire le graphique existant s'il existe
+    if (window.allClientsHourlyChartInstance) {
+        window.allClientsHourlyChartInstance.destroy();
+    }
+
+    const { hourlyData, datesUsed, hours, totalDays } = hourlyChartData;
+    
+    // Déterminer le pas d'affichage des labels X
+    const labelStep = Math.max(1, Math.floor(hourlyData.labels.length / 20));
+    
+    const ctx = chartCanvas.getContext('2d');
+    window.allClientsHourlyChartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: hourlyData.labels.map((label, index) => 
+                (index % labelStep === 0 || index === hourlyData.labels.length - 1) ? label : ''
+            ),
+            datasets: hourlyData.datasets
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            interaction: {
+                mode: 'index',
+                intersect: false
+            },
+            animation: {
+                duration: 800,
+                easing: 'easeInOutQuart'
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Énergie Totale (Wh)',
+                        font: {
+                            size: 13,
+                            weight: 'bold'
+                        },
+                        color: '#2c3e50',
+                        padding: 10
+                    },
+                    ticks: {
+                        font: {
+                            size: 11
+                        },
+                        color: '#718096',
+                        callback: function(value) {
+                            return value.toLocaleString('fr-FR');
+                        }
+                    },
+                    grid: {
+                        color: 'rgba(113, 128, 150, 0.08)',
+                        lineWidth: 1
+                    }
+                },
+                x: {
+                    ticks: {
+                        font: {
+                            size: 10
+                        },
+                        color: '#718096',
+                        maxRotation: 45,
+                        minRotation: 0,
+                        callback: function(value, index) {
+                            // Afficher seulement les labels non vides
+                            return hourlyData.labels[index] || '';
+                        }
+                    },
+                    grid: {
+                        color: 'rgba(113, 128, 150, 0.05)',
+                        lineWidth: 1
+                    },
+                    title: {
+                        display: true,
+                        text: totalDays <= 15 ? 
+                            `Heures (${totalDays} jours complets)` : 
+                            `Heures (${totalDays} jours - période complète)`,
+                        font: {
+                            size: 12,
+                            weight: 'bold'
+                        },
+                        color: '#2c3e50',
+                        padding: 10
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    display: true,
+                    position: 'top',
+                    labels: {
+                        font: {
+                            size: 12,
+                            weight: 'bold'
+                        },
+                        color: '#2c3e50',
+                        padding: 15,
+                        usePointStyle: true,
+                        filter: function(item, chart) {
+                            // Par défaut, on n'affiche que la somme totale
+                            return item.text.includes('Totale') || item.hidden === false;
+                        }
+                    },
+                    onClick: function(e, legendItem, legend) {
+                        // Permettre de montrer/cacher les clients individuels
+                        const index = legendItem.datasetIndex;
+                        const chart = legend.chart;
+                        const meta = chart.getDatasetMeta(index);
+                        
+                        if (index === 0) {
+                            // Ne pas permettre de cacher la somme totale
+                            return;
+                        }
+                        
+                        meta.hidden = meta.hidden === null ? !chart.data.datasets[index].hidden : null;
+                        chart.update();
+                    }
+                },
+                tooltip: {
+                    backgroundColor: 'rgba(45, 55, 72, 0.95)',
+                    padding: 12,
+                    titleFont: {
+                        size: 13,
+                        weight: 'bold',
+                        color: '#fff'
+                    },
+                    bodyFont: {
+                        size: 12,
+                        color: '#e2e8f0'
+                    },
+                    cornerRadius: 6,
+                    displayColors: true,
+                    callbacks: {
+                        title: function(context) {
+                            const index = context[0].dataIndex;
+                            const dateIndex = Math.floor(index / hours.length);
+                            const hourIndex = index % hours.length;
+                            
+                            const date = datesUsed[dateIndex];
+                            const hour = hours[hourIndex];
+                            return `📅 ${date} - ${hour}`;
+                        },
+                        label: function(context) {
+                            const label = context.dataset.label || '';
+                            const value = context.parsed.y.toLocaleString('fr-FR');
+                            
+                            if (label.includes('Totale')) {
+                                // Pour la somme totale, montrer aussi la répartition
+                                let tooltipText = `${label}: ${value} Wh`;
+                                
+                                // Ajouter la répartition par client (optionnel)
+                                const index = context.dataIndex;
+                                let clientDetails = '';
+                                let clientCount = 0;
+                                
+                                // Compter combien de clients ont contribué
+                                for (let i = 1; i < hourlyData.datasets.length; i++) {
+                                    const clientValue = hourlyData.datasets[i].data[index];
+                                    if (clientValue > 0) {
+                                        clientCount++;
+                                    }
+                                }
+                                
+                                if (clientCount > 0) {
+                                    tooltipText += ` (${clientCount} client${clientCount > 1 ? 's' : ''})`;
+                                }
+                                
+                                return tooltipText;
+                            }
+                            
+                            return `${label}: ${value} Wh`;
+                        },
+                        afterLabel: function(context) {
+                            // Optionnel: ajouter des infos supplémentaires
+                            if (context.datasetIndex === 0) {
+                                const index = context.dataIndex;
+                                let maxClient = '';
+                                let maxValue = 0;
+                                
+                                // Trouver le client avec la plus grande contribution
+                                for (let i = 1; i < hourlyData.datasets.length; i++) {
+                                    const clientValue = hourlyData.datasets[i].data[index];
+                                    if (clientValue > maxValue) {
+                                        maxValue = clientValue;
+                                        maxClient = hourlyData.datasets[i].label;
+                                    }
+                                }
+                                
+                                if (maxValue > 0) {
+                                    return `👤 Plus gros contributeur: ${maxClient} (${maxValue.toFixed(1)} Wh)`;
+                                }
+                            }
+                            return null;
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
 function initializeFilterEvents() {
     console.log('🔧 Initialisation des événements du filtre global');
     
