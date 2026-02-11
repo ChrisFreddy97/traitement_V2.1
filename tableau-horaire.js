@@ -1445,55 +1445,6 @@ function displayClientData(clientId, clientData) {
         ${creditSectionHTML}
         <!-- Tableau Journalier -->
         ${dailySummary.length > 0 ? displayDailySummaryTable(clientId, dailySummary) : ''}
-        
-        ${hasEnergy ? `
-        <div class="client-hourly-section">
-            <h4>📊 Données Horaires</h4>
-            <div class="table-container">
-                <div class="table-wrapper">
-                    <table class="client-hourly-table">
-                        <thead>
-                            <tr>
-                                <th>#</th>
-                                <th>Date</th>
-                                <th>Heure</th>
-                                <th>Énergie (Wh)</th>
-                                <th>Tension (V)</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${clientData.combinedHourlyData && clientData.combinedHourlyData.length > 0 ?
-                clientData.combinedHourlyData.map((item, index) => {
-                    const heure = formatHeureColon(item.heure);
-                    const hasTension = item.tension !== null && item.tension !== undefined;
-                    const tensionColor = hasTension ? getTensionColor(item.tension) : '#718096';
-
-                    return `
-                                    <tr>
-                                        <td class="row-index">${index + 1}</td>
-                                        <td class="row-date">${item.date || 'N/A'}</td>
-                                        <td class="row-hour">${heure}</td>
-                                        <td class="row-energy">${item.energie || 0}</td>
-                                        <td class="row-tension" style="color: ${tensionColor}">
-                                            ${hasTension ? item.tension.toFixed(1) : '-'}
-                                        </td>
-                                    </tr>
-                                    `;
-                }).join('') :
-                '<tr><td colspan="5" style="text-align: center; padding: 20px;">Aucune donnée horaire disponible</td></tr>'
-            }
-                        </tbody>
-                    </table>
-                </div>
-                
-                ${clientData.combinedHourlyData && clientData.combinedHourlyData.length > 50 ? `
-                <div class="table-info">
-                    📋 ${clientData.combinedHourlyData.length} enregistrement(s) au total
-                </div>
-                ` : ''}
-            </div>
-        </div>
-        ` : ''}
     `;
 }
 
@@ -8676,5 +8627,5 @@ document.addEventListener('click', (event) => {
         closeTensionModal();
     }
 });
-
+ 
 document.addEventListener('DOMContentLoaded', addAllClientsStyles);

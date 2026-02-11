@@ -1,3 +1,4 @@
+
 // ==================== FICHIER PRINCIPAL (analyze.js) ====================
 
 // ==================== VARIABLES GLOBALES ====================
@@ -505,7 +506,6 @@ function calculateTechnicalData() {
 }
 
 // ==================== FONCTIONS D'ANALYSE DE STABILITÉ ====================
-
 function analyzeTensionStability(tensionResults) {
     if (!tensionResults || !tensionResults.length) {
         return {
@@ -603,7 +603,178 @@ function analyzeTensionStability(tensionResults) {
         limits
     };
 }
+// ==================== FONCTION D'ANALYSE DES DÉPASSEMENTS DE SEUIL ====================
 
+function analyzeThresholdExceedances(tensionResults) {
+    if (!tensionResults || !tensionResults.length) {
+        return {
+            daysWithExceedance: 0,
+            totalExceedances: 0,
+            totalHoursOutOfLimits: 0,
+            exceedanceDays: [],
+            systemType: '12V',
+            limits: getSystemLimits('12V')
+        };
+    }
+
+    // Détecter le type de système
+    const systemType = detectSystemType(tensionResults);
+    const limits = getSystemLimits(systemType);
+    
+    // Grouper les données par jour pour analyse
+    const dailyData = {};
+    
+    tensionResults.forEach(item => {
+        if (!item['Date et Heure']) return;
+        
+        const date = item['Date et Heure'].split(' ')[0];
+        const time = item['Date et Heure'].split(' ')[1] || '';
+        const tMin = parseFloat(item['T_min']) || 0;
+        const tMax = parseFloat(item['T_max']) || 0;
+        const tMoy = parseFloat(item['T_moy']) || 0;
+        
+        if (!dailyData[date]) {
+            dailyData[date] = {
+                date: date,
+                records: [],
+                minValues: [],
+                maxValues: [],
+                avgValues: [],
+                minForDay: Infinity,
+                maxForDay: -Infinity,
+                avgForDay: 0,
+                exceedanceCount: 0,
+                hoursOutOfLimits: 0,
+                isOutOfLimits: false
+            };
+        }
+        
+        // Ajouter cet enregistrement
+        dailyData[date].records.push({
+            time: time,
+            tMin: tMin,
+            tMax: tMax,
+            tMoy: tMoy
+        });
+        
+        // Collecter les valeurs pour analyse
+        if (tMin > 0) dailyData[date].minValues.push(tMin);
+        if (tMax > 0) dailyData[date].maxValues.push(tMax);
+        if (tMoy > 0) dailyData[date].avgValues.push(tMoy);
+        
+        // Mettre à jour min/max du jour
+        if (tMin > 0 && tMin < dailyData[date].minForDay) {
+            dailyData[date].minForDay = tMin;
+        }
+        if (tMax > 0 && tMax > dailyData[date].maxForDay) {
+            dailyData[date].maxForDay = tMax;
+        }
+        
+        // Vérifier si cet enregistrement est hors limites
+        if ((tMin > 0 && tMin < limits.min) || (tMax > 0 && tMax > limits.max)) {
+            dailyData[date].exceedanceCount++;
+            dailyData[date].isOutOfLimits = true;
+            
+            // Estimer les heures hors limites (1 enregistrement ≈ 1 heure si données horaires)
+            // Ajustez selon la fréquence réelle de vos données
+            dailyData[date].hoursOutOfLimits++;
+        }
+    });
+
+    // Calculer les moyennes et préparer les résultats
+    const exceedanceDays = [];
+    let totalExceedances = 0;
+    let totalHoursOutOfLimits = 0;
+    let daysWithExceedance = 0;
+
+    Object.keys(dailyData).sort().forEach(date => {
+        const day = dailyData[date];
+        
+        // Calculer la moyenne du jour
+        if (day.avgValues.length > 0) {
+            day.avgForDay = day.avgValues.reduce((a, b) => a + b, 0) / day.avgValues.length;
+        }
+        
+        // Calculer la variation journalière
+        day.dailyVariation = day.maxForDay - day.minForDay;
+        
+        // Ne garder que les jours avec dépassement
+        if (day.isOutOfLimits) {
+            daysWithExceedance++;
+            totalExceedances += day.exceedanceCount;
+            totalHoursOutOfLimits += day.hoursOutOfLimits;
+            
+            // Formater les heures pour affichage
+            let hourRange = '';
+            if (day.records.length > 0) {
+                const times = day.records
+                    .filter(r => (r.tMin > 0 && r.tMin < limits.min) || (r.tMax > 0 && r.tMax > limits.max))
+                    .map(r => r.time.split(':').slice(0, 2).join(':'));
+                
+                if (times.length > 0) {
+                    const uniqueTimes = [...new Set(times)].sort();
+                    if (uniqueTimes.length > 3) {
+                        hourRange = `${uniqueTimes[0]} - ${uniqueTimes[uniqueTimes.length-1]}`;
+                    } else {
+                        hourRange = uniqueTimes.join(', ');
+                    }
+                }
+            }
+            
+            // Trouver les valeurs exactes de dépassement
+            let minOutOfLimit = null;
+            let maxOutOfLimit = null;
+            let minValue = null;
+            let maxValue = null;
+            
+            day.records.forEach(r => {
+                if (r.tMin > 0 && r.tMin < limits.min) {
+                    if (minOutOfLimit === null || r.tMin < minOutOfLimit) {
+                        minOutOfLimit = r.tMin;
+                        minValue = r.tMin;
+                    }
+                }
+                if (r.tMax > 0 && r.tMax > limits.max) {
+                    if (maxOutOfLimit === null || r.tMax > maxOutOfLimit) {
+                        maxOutOfLimit = r.tMax;
+                        maxValue = r.tMax;
+                    }
+                }
+            });
+            
+            exceedanceDays.push({
+                date: day.date,
+                formattedDate: new Date(day.date).toLocaleDateString('fr-FR', {
+                    day: '2-digit', month: '2-digit', year: 'numeric'
+                }),
+                dailyVariation: day.dailyVariation > 0 ? day.dailyVariation.toFixed(2) : '-',
+                exceedanceCount: day.exceedanceCount,
+                hoursOutOfLimits: day.hoursOutOfLimits,
+                hourRange: hourRange,
+                minValue: minValue !== null ? minValue.toFixed(2) : '-',
+                maxValue: maxValue !== null ? maxValue.toFixed(2) : '-',
+                minOutOfLimit: minOutOfLimit !== null ? minOutOfLimit.toFixed(2) : '-',
+                maxOutOfLimit: maxOutOfLimit !== null ? maxOutOfLimit.toFixed(2) : '-',
+                minTension: day.minForDay !== Infinity ? day.minForDay.toFixed(2) : '-',
+                maxTension: day.maxForDay !== -Infinity ? day.maxForDay.toFixed(2) : '-',
+                avgTension: day.avgForDay.toFixed(2)
+            });
+        }
+    });
+
+    // Trier du plus récent au plus ancien
+    exceedanceDays.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    return {
+        daysWithExceedance: daysWithExceedance,
+        totalExceedances: totalExceedances,
+        totalHoursOutOfLimits: totalHoursOutOfLimits,
+        exceedanceDays: exceedanceDays,
+        systemType: systemType,
+        limits: limits,
+        totalDays: Object.keys(dailyData).length
+    };
+}
 function detectSystemType(tensionResults) {
     if (!tensionResults || tensionResults.length === 0) return '12V';
 
@@ -627,8 +798,8 @@ function detectSystemType(tensionResults) {
 function getSystemLimits(systemType) {
     if (systemType === '24V') {
         return {
-            min: 21.4,
-            max: 31.5,
+            min: 22,
+            max: 31,
             ideal: { min: 24, max: 29 },
             normal: 28,
             maxVariation: 5,
@@ -636,8 +807,8 @@ function getSystemLimits(systemType) {
         };
     } else {
         return {
-            min: 10.7,
-            max: 15.6,
+            min: 11,
+            max: 15,
             ideal: { min: 12, max: 14.5 },
             normal: 14,
             maxVariation: 2.5,
@@ -860,7 +1031,6 @@ function analyzeCreditBehavior(creditData) {
 }
 
 // ==================== FONCTIONS D'AFFICHAGE DES ANALYSES ====================
-
 function displayTensionStabilityAnalysis() {
     const techniqueContent = document.getElementById('main-tab-content-technique');
     if (!techniqueContent) return;
@@ -875,6 +1045,7 @@ function displayTensionStabilityAnalysis() {
     if (dataToUse.length === 0) return;
     
     const stabilityData = analyzeTensionStability(dataToUse);
+    const exceedanceData = analyzeThresholdExceedances(dataToUse);
     
     const analysisDiv = document.createElement('div');
     analysisDiv.id = 'tension-stability-analysis';
@@ -898,23 +1069,23 @@ function displayTensionStabilityAnalysis() {
         align-items: center;
         gap: 10px;
     `;
-    header.innerHTML = `🔄 Analyse de Stabilité de Tension`;
+    header.innerHTML = `🔄 Analyse globale de la Tension`;
     analysisDiv.appendChild(header);
     
     // Content
     const content = document.createElement('div');
     content.style.cssText = `padding: 20px;`;
     
-    // Stats summary
-    const statsGrid = document.createElement('div');
-    statsGrid.style.cssText = `
+    // ============ PREMIÈRE LIGNE : 4 CARTES STATISTIQUES ============
+    const statsRow = document.createElement('div');
+    statsRow.style.cssText = `
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        grid-template-columns: repeat(4, 1fr);
         gap: 15px;
         margin-bottom: 25px;
     `;
     
-    // Stat: Stabilité Globale
+    // Carte 1: Conformité globale (existante)
     const globalStabilityCard = document.createElement('div');
     globalStabilityCard.style.cssText = `
         background: linear-gradient(135deg, #f0fff4 0%, #ffffff 100%);
@@ -926,7 +1097,7 @@ function displayTensionStabilityAnalysis() {
     `;
     globalStabilityCard.innerHTML = `
         <div style="font-size: 11px; color: #718096; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px;">
-            Stabilité Globale
+            📊 Conformité
         </div>
         <div style="font-size: 32px; font-weight: 800; color: #22c55e; margin-bottom: 8px;">
             ${stabilityData.stabilityPercentage}%
@@ -935,9 +1106,9 @@ function displayTensionStabilityAnalysis() {
             ${stabilityData.days} jour${stabilityData.days !== 1 ? 's' : ''} analysés
         </div>
     `;
-    statsGrid.appendChild(globalStabilityCard);
+    statsRow.appendChild(globalStabilityCard);
     
-    // Stat: Jours Stables
+    // Carte 2: Jours Stables
     const stableCard = document.createElement('div');
     stableCard.style.cssText = `
         background: linear-gradient(135deg, #f0fff4 0%, #ffffff 100%);
@@ -949,7 +1120,7 @@ function displayTensionStabilityAnalysis() {
     `;
     stableCard.innerHTML = `
         <div style="font-size: 11px; color: #718096; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px;">
-            Jours Stables
+            ✅ Jours Conforme
         </div>
         <div style="font-size: 28px; font-weight: 800; color: #22c55e; margin-bottom: 8px;">
             ${stabilityData.stable}
@@ -958,9 +1129,9 @@ function displayTensionStabilityAnalysis() {
             ${stabilityData.days > 0 ? Math.round((stabilityData.stable / stabilityData.days) * 100) : 0}% des jours
         </div>
     `;
-    statsGrid.appendChild(stableCard);
+    statsRow.appendChild(stableCard);
     
-    // Stat: Jours Instables
+    // Carte 3: Jours Instables
     const unstableCard = document.createElement('div');
     unstableCard.style.cssText = `
         background: linear-gradient(135deg, #fef3c7 0%, #ffffff 100%);
@@ -972,7 +1143,7 @@ function displayTensionStabilityAnalysis() {
     `;
     unstableCard.innerHTML = `
         <div style="font-size: 11px; color: #718096; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px;">
-            Jours Instables
+            ⚠️ Jours Non Conforme
         </div>
         <div style="font-size: 28px; font-weight: 800; color: #f59e0b; margin-bottom: 8px;">
             ${stabilityData.unstable}
@@ -981,11 +1152,11 @@ function displayTensionStabilityAnalysis() {
             ${stabilityData.days > 0 ? Math.round((stabilityData.unstable / stabilityData.days) * 100) : 0}% des jours
         </div>
     `;
-    statsGrid.appendChild(unstableCard);
+    statsRow.appendChild(unstableCard);
     
-    // Stat: Hors Limites
-    const outOfLimitsCard = document.createElement('div');
-    outOfLimitsCard.style.cssText = `
+    // Carte 4: Jours d'Alerte (NOUVELLE CARTE)
+    const alertDaysCard = document.createElement('div');
+    alertDaysCard.style.cssText = `
         background: linear-gradient(135deg, #fee2e2 0%, #ffffff 100%);
         padding: 16px;
         border-radius: 10px;
@@ -993,22 +1164,172 @@ function displayTensionStabilityAnalysis() {
         box-shadow: 0 2px 8px rgba(0,0,0,0.06);
         text-align: center;
     `;
-    outOfLimitsCard.innerHTML = `
+    alertDaysCard.innerHTML = `
         <div style="font-size: 11px; color: #718096; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px;">
-            Hors Limites
+            🚨 JOURS D'ALERTE
         </div>
-        <div style="font-size: 28px; font-weight: 800; color: #ef4444; margin-bottom: 8px;">
-            ${stabilityData.outOfLimits}
+        <div style="font-size: 32px; font-weight: 800; color: #ef4444; margin-bottom: 8px;">
+            ${exceedanceData.daysWithExceedance} / ${stabilityData.days}
         </div>
-        <div style="text-align: center; padding: 6px 12px; background: rgba(239, 68, 68, 0.1); border-radius: 6px; font-size: 12px; color: #991b1b; font-weight: 600;">
-            ${stabilityData.days > 0 ? Math.round((stabilityData.outOfLimits / stabilityData.days) * 100) : 0}% des jours
+        <div style="margin-top: 8px; font-size: 11px; color: #991b1b; background: rgba(239, 68, 68, 0.1); padding: 4px 8px; border-radius: 4px;">
+            Seuil ${exceedanceData.systemType}: ${exceedanceData.limits.min}V - ${exceedanceData.limits.max}V
         </div>
     `;
-    statsGrid.appendChild(outOfLimitsCard);
+    statsRow.appendChild(alertDaysCard);
     
-    content.appendChild(statsGrid);
+    content.appendChild(statsRow);
     
-    // Conclusion intelligente
+    // ============ TABLEAU DES JOURS AVEC DÉPASSEMENT ============
+    if (exceedanceData.exceedanceDays.length > 0) {
+        const exceedanceSection = document.createElement('div');
+        exceedanceSection.style.cssText = `
+            margin-bottom: 25px;
+            border: 1px solid #fee2e2;
+            border-radius: 10px;
+            overflow: hidden;
+        `;
+        
+        const exceedanceHeader = document.createElement('div');
+        exceedanceHeader.style.cssText = `
+            background: #fef2f2;
+            padding: 12px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #fee2e2;
+        `;
+        exceedanceHeader.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <span style="font-size: 18px;">📅</span>
+                <span style="font-weight: 700; color: #991b1b;">
+                    JOURS AVEC DÉPASSEMENT DE SEUIL (${exceedanceData.exceedanceDays.length})
+                </span>
+            </div>
+            <span style="font-size: 12px; color: #64748b;">
+                Total: ${exceedanceData.totalExceedances} dépassement${exceedanceData.totalExceedances !== 1 ? 's' : ''}
+            </span>
+        `;
+        
+        const tableWrapper = document.createElement('div');
+        tableWrapper.style.cssText = `
+            overflow-x: auto;
+            padding: 16px;
+            background: white;
+        `;
+        
+        let tableHTML = `
+            <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
+                <thead style="background: #f1f5f9;">
+                    <tr>
+                        <th style="padding: 12px 8px; text-align: left; color: #475569; font-weight: 600; border-bottom: 2px solid #cbd5e1;">Date</th>
+                        <th style="padding: 12px 8px; text-align: center; color: #475569; font-weight: 600; border-bottom: 2px solid #cbd5e1;">Variation</th>
+                        <th style="padding: 12px 8px; text-align: center; color: #475569; font-weight: 600; border-bottom: 2px solid #cbd5e1;">Heures alerte</th>
+                        <th style="padding: 12px 8px; text-align: center; color: #475569; font-weight: 600; border-bottom: 2px solid #cbd5e1;">Min / Max</th>
+                        <th style="padding: 12px 8px; text-align: center; color: #475569; font-weight: 600; border-bottom: 2px solid #cbd5e1;">Valeurs hors seuil</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+        
+        exceedanceData.exceedanceDays.forEach((day, index) => {
+            // Déterminer la couleur de fond selon la gravité
+            let rowBgColor = index % 2 === 0 ? '#ffffff' : '#fafbfc';
+            let severityColor = '#991b1b';
+            
+            // Mettre en évidence les jours avec beaucoup d'alertes
+            if (day.hoursOutOfLimits >= 3) {
+                rowBgColor = '#fff5f5';
+            }
+            
+            // Formater les valeurs Min/Max avec indication de dépassement
+            let minMaxDisplay = '';
+            if (day.minValue !== '-' && parseFloat(day.minValue) < exceedanceData.limits.min) {
+                minMaxDisplay += `<span style="color: #ef4444; font-weight: 700;">${day.minTension}V</span>`;
+            } else {
+                minMaxDisplay += `${day.minTension}V`;
+            }
+            minMaxDisplay += ` / `;
+            if (day.maxValue !== '-' && parseFloat(day.maxValue) > exceedanceData.limits.max) {
+                minMaxDisplay += `<span style="color: #ef4444; font-weight: 700;">${day.maxTension}V</span>`;
+            } else {
+                minMaxDisplay += `${day.maxTension}V`;
+            }
+            
+            // Formater les valeurs hors seuil
+            let exceedanceValues = [];
+            if (day.minOutOfLimit !== '-') {
+                exceedanceValues.push(`Min: ${day.minOutOfLimit}V`);
+            }
+            if (day.maxOutOfLimit !== '-') {
+                exceedanceValues.push(`Max: ${day.maxOutOfLimit}V`);
+            }
+            const exceedanceText = exceedanceValues.length > 0 ? exceedanceValues.join(' • ') : '-';
+            
+            tableHTML += `
+                <tr style="border-bottom: 1px solid #e2e8f0; background: ${rowBgColor};">
+                    <td style="padding: 10px 8px; text-align: left; color: #1e293b; font-weight: 500;">
+                        <div style="display: flex; flex-direction: column;">
+                            <span>${day.formattedDate}</span>
+                            <span style="font-size: 10px; color: #64748b;">${day.date}</span>
+                        </div>
+                    </td>
+                    <td style="padding: 10px 8px; text-align: center; color: ${day.dailyVariation > exceedanceData.limits.maxVariation ? '#f59e0b' : '#1e293b'}; font-weight: ${day.dailyVariation > exceedanceData.limits.maxVariation ? '700' : '400'};">
+                        ${day.dailyVariation}V
+                    </td>
+                    <td style="padding: 10px 8px; text-align: center;">
+                        <span style="background: ${day.hoursOutOfLimits > 0 ? 'rgba(239, 68, 68, 0.1)' : 'transparent'}; color: ${day.hoursOutOfLimits > 0 ? '#ef4444' : '#64748b'}; padding: 4px 8px; border-radius: 4px; font-weight: ${day.hoursOutOfLimits > 0 ? '600' : '400'};">
+                            ${day.hoursOutOfLimits}h
+                        </span>
+                    </td>
+                    <td style="padding: 10px 8px; text-align: center; color: #1e293b;">
+                        ${minMaxDisplay}
+                    </td>
+                    <td style="padding: 10px 8px; text-align: center;">
+                        <span style="background: rgba(239, 68, 68, 0.1); color: #ef4444; padding: 4px 8px; border-radius: 4px; font-weight: 600;">
+                            ${exceedanceText}
+                        </span>
+                    </td>
+                </tr>
+            `;
+        });
+        
+        tableHTML += `
+                </tbody>
+            </table>
+        `;
+        
+        tableWrapper.innerHTML = tableHTML;
+        exceedanceSection.appendChild(exceedanceHeader);
+        exceedanceSection.appendChild(tableWrapper);
+        content.appendChild(exceedanceSection);
+    } else {
+        // Message si aucun dépassement
+        const noExceedanceMsg = document.createElement('div');
+        noExceedanceMsg.style.cssText = `
+            margin-bottom: 25px;
+            padding: 20px;
+            background: #f0fff4;
+            border: 1px solid #22c55e;
+            border-radius: 10px;
+            text-align: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        `;
+        noExceedanceMsg.innerHTML = `
+            <span style="font-size: 24px;">✅</span>
+            <div>
+                <span style="font-weight: 700; color: #15803d;">Aucun dépassement de seuil détecté</span>
+                <div style="font-size: 12px; color: #64748b; margin-top: 4px;">
+                    La tension est restée dans les limites ${exceedanceData.systemType} (${exceedanceData.limits.min}V - ${exceedanceData.limits.max}V) pendant toute la période
+                </div>
+            </div>
+        `;
+        content.appendChild(noExceedanceMsg);
+    }
+    
+    // ============ CONCLUSION INTELLIGENTE ============
     const conclusionDiv = document.createElement('div');
     conclusionDiv.style.cssText = `
         background: ${stabilityData.stabilityPercentage >= 90 ? '#dcfce7' : 
@@ -1026,21 +1347,35 @@ function displayTensionStabilityAnalysis() {
                          stabilityData.stabilityPercentage >= 80 ? '⚠️' :
                          stabilityData.stabilityPercentage >= 60 ? '🔴' : '🚫';
     
-    const conclusionTitle = stabilityData.stabilityPercentage >= 90 ? 'EXCELLENTE STABILITÉ' :
-                          stabilityData.stabilityPercentage >= 80 ? 'STABILITÉ SATISFAISANTE' :
-                          stabilityData.stabilityPercentage >= 60 ? 'STABILITÉ PRÉOCCUPANTE' : 'STABILITÉ CRITIQUE';
+    const conclusionTitle = stabilityData.stabilityPercentage >= 90 ? 'EXCELLENTE' :
+                          stabilityData.stabilityPercentage >= 80 ? 'SATISFAISANTE' :
+                          stabilityData.stabilityPercentage >= 60 ? 'PRÉOCCUPANTE' : 'CRITIQUE';
     
     const stablePercent = stabilityData.days > 0 ? Math.round((stabilityData.stable/stabilityData.days)*100) : 0;
     
     let conclusionMessage = '';
     if (stabilityData.stabilityPercentage >= 90) {
-        conclusionMessage = `La tension du système ${stabilityData.systemType} est <strong>excellente</strong> avec ${stablePercent}% de jours stables. La variation moyenne de ${stabilityData.averageVariation} V/h est bien en dessous du seuil d'alerte. L'installation électrique fonctionne de manière optimale.`;
+        conclusionMessage = `La tension du système ${stabilityData.systemType} est <strong>excellente</strong> avec ${stablePercent}% de jours conformes. La variation moyenne de ${stabilityData.averageVariation} V/h est bien en dessous du seuil d'alerte. `;
+        if (exceedanceData.daysWithExceedance > 0) {
+            conclusionMessage += `<span style="color: #ef4444;">⚠️ ${exceedanceData.daysWithExceedance} jour${exceedanceData.daysWithExceedance !== 1 ? 's' : ''} présentent des dépassements ponctuels à surveiller.</span>`;
+        } else {
+            conclusionMessage += `Aucun dépassement de seuil détecté. L'installation électrique fonctionne de manière optimale.`;
+        }
     } else if (stabilityData.stabilityPercentage >= 80) {
-        conclusionMessage = `La tension est <strong>globalement stable</strong> (${stablePercent}% de jours stables) mais présente des variations importantes certains jours. Surveillez la variation moyenne de ${stabilityData.averageVariation} V/h.`;
+        conclusionMessage = `La tension est <strong>globalement stable</strong> (${stablePercent}% de jours conformes) mais présente des variations importantes certains jours. `;
+        if (exceedanceData.daysWithExceedance > 0) {
+            conclusionMessage += `<span style="color: #ef4444;">🚨 ${exceedanceData.daysWithExceedance} jour${exceedanceData.daysWithExceedance !== 1 ? 's' : ''} hors limites (${exceedanceData.totalHoursOutOfLimits}h).</span> Vérifier les périodes de ${exceedanceData.exceedanceDays[0]?.hourRange || 'forte consommation'}.`;
+        }
     } else if (stabilityData.stabilityPercentage >= 60) {
-        conclusionMessage = `La tension est <strong>préoccupante</strong> avec seulement ${stablePercent}% de jours stables. ${stabilityData.outOfLimits > 0 ? `${stabilityData.outOfLimits} jour${stabilityData.outOfLimits !== 1 ? 's' : ''} hors limites. ` : ''}Une vérification technique est recommandée.`;
+        conclusionMessage = `La tension est <strong>préoccupante</strong> avec seulement ${stablePercent}% de jours conformes. `;
+        if (exceedanceData.daysWithExceedance > 0) {
+            conclusionMessage += `<span style="color: #ef4444; font-weight: 700;">${exceedanceData.daysWithExceedance} jour${exceedanceData.daysWithExceedance !== 1 ? 's' : ''} hors limites (${exceedanceData.totalHoursOutOfLimits}h).</span> Une vérification technique est recommandée en priorité.`;
+        }
     } else {
-        conclusionMessage = `⚠️ <strong>ALERTE STABILITÉ</strong> ⚠️ La tension est <strong>critiquement instable</strong> (${stablePercent}% de jours stables seulement). ${stabilityData.outOfLimits > 0 ? `${stabilityData.outOfLimits} jour${stabilityData.outOfLimits !== 1 ? 's' : ''} présentent des tensions hors limites. ` : ''}<strong>Intervention technique urgente requise.</strong>`;
+        conclusionMessage = `⚠️ <strong>ALERTE CRITIQUE</strong> ⚠️ La tension est <strong>non conforme</strong> (${stablePercent}% de jours conformes seulement). `;
+        if (exceedanceData.daysWithExceedance > 0) {
+            conclusionMessage += `<span style="color: #ef4444; font-weight: 700;">${exceedanceData.daysWithExceedance} jour${exceedanceData.daysWithExceedance !== 1 ? 's' : ''} hors limites (${exceedanceData.totalHoursOutOfLimits}h).</span> <strong>Intervention technique URGENTE requise.</strong>`;
+        }
     }
     
     conclusionDiv.innerHTML = `
@@ -1065,7 +1400,7 @@ function displayTensionStabilityAnalysis() {
     
     content.appendChild(conclusionDiv);
     
-    // Normes système
+    // ============ NORMES SYSTÈME ============
     const normsDiv = document.createElement('div');
     normsDiv.style.cssText = `
         background: #f8fafc;
@@ -1076,11 +1411,11 @@ function displayTensionStabilityAnalysis() {
     
     normsDiv.innerHTML = `
         <div style="font-weight: 600; color: #2d3748; margin-bottom: 12px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 8px;">
-            <span>⚡</span> Normes Système ${stabilityData.systemType}
+            <span>⚡</span> Normes Système ${stabilityData.systemType} - Seuils d'alerte
         </div>
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px;">
             <div style="background: white; padding: 12px; border-radius: 8px; border-left: 3px solid #e53e3e;">
-                <div style="font-size: 11px; color: #718096; margin-bottom: 4px;">Tension Min</div>
+                <div style="font-size: 11px; color: #718096; margin-bottom: 4px;">Tension Min (alerte)</div>
                 <div style="font-size: 18px; font-weight: 700; color: #e53e3e;">${stabilityData.limits.min}V</div>
             </div>
             <div style="background: white; padding: 12px; border-radius: 8px; border-left: 3px solid #f59e0b;">
@@ -1088,13 +1423,17 @@ function displayTensionStabilityAnalysis() {
                 <div style="font-size: 18px; font-weight: 700; color: #f59e0b;">${stabilityData.limits.ideal.min}V - ${stabilityData.limits.ideal.max}V</div>
             </div>
             <div style="background: white; padding: 12px; border-radius: 8px; border-left: 3px solid #22c55e;">
-                <div style="font-size: 11px; color: #718096; margin-bottom: 4px;">Tension Max</div>
+                <div style="font-size: 11px; color: #718096; margin-bottom: 4px;">Tension Max (alerte)</div>
                 <div style="font-size: 18px; font-weight: 700; color: #22c55e;">${stabilityData.limits.max}V</div>
             </div>
             <div style="background: white; padding: 12px; border-radius: 8px; border-left: 3px solid #3b82f6;">
-                <div style="font-size: 11px; color: #718096; margin-bottom: 4px;">Seuil Alerte</div>
-                <div style="font-size: 18px; font-weight: 700; color: #3b82f6;">${stabilityData.limits.alertThreshold}V/h</div>
+                <div style="font-size: 11px; color: #718096; margin-bottom: 4px;">Variation max</div>
+                <div style="font-size: 18px; font-weight: 700; color: #3b82f6;">${stabilityData.limits.maxVariation}V</div>
             </div>
+        </div>
+        <div style="margin-top: 12px; padding: 10px; background: #fef2f2; border-radius: 6px; font-size: 11px; color: #991b1b; display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 14px;">🚨</span>
+            <span><strong>Dépassement de seuil détecté</strong> lorsque Tension < ${stabilityData.limits.min}V ou Tension > ${stabilityData.limits.max}V</span>
         </div>
     `;
     
@@ -1749,7 +2088,9 @@ function applyDateFilters() {
     updateTensionTable();
     
     // 5. Mettre à jour la carte technique
-    createTechnicalDataCard();
+    setTimeout(() => {
+        createTechnicalDataCard();
+    }, 300);
     
     // 6. Mettre à jour les analyses
     if (document.getElementById('main-tab-content-technique').classList.contains('active')) {
@@ -2235,7 +2576,6 @@ function resetFilters() {
     updateETCharts();
     updateEnergyTable();
     updateTensionTable();
-    createTechnicalDataCard(); // Mettre à jour la carte technique
     showFilterMessage('Filtres réinitialisés');
 }
 
@@ -2402,6 +2742,7 @@ document.addEventListener('DOMContentLoaded', function() {
     initializeAnalyzePage();
 });
 
+// MODIFIER la fin de initializeAnalyzePage() - VERSION CORRIGÉE
 async function initializeAnalyzePage() {
     const folderJSON = sessionStorage.getItem('analyzeFolder');
     
@@ -2444,8 +2785,6 @@ async function initializeAnalyzePage() {
         filterPeriod = 'all';
         filterMonth = null;
         filterYear = null;
-        filteredEnergyData = [];
-        filteredTensionData = [];
         
         totalFilesToLoad = countTotalFiles(folderStructure);
         
@@ -2456,19 +2795,26 @@ async function initializeAnalyzePage() {
         
         await loadFilesContent();
         
+        // ✅ ATTENDRE QUE TOUTES LES DONNÉES SOIENT TRAITÉES
         setTimeout(() => {
             hideLoadingScreen();
-            // Créer la carte technique après le chargement complet
-            createTechnicalDataCard();
             
-            // Afficher l'analyse de stabilité de tension dans l'onglet technique
-            if (document.getElementById('main-tab-content-technique').classList.contains('active')) {
-                displayTensionStabilityAnalysis();
-            } else if (document.getElementById('main-tab-content-commerciale').classList.contains('active')) {
-                displayCommercialAnalysis();
-            } else if (document.getElementById('main-tab-content-evenement').classList.contains('active')) {
-                displayEventAnalysis();
-            }
+            // ✅ CRÉER LA CARTE TECHNIQUE ICI - APRÈS CHARGEMENT COMPLET
+            setTimeout(() => {
+                createTechnicalDataCard();
+                
+                // Afficher l'analyse de stabilité de tension dans l'onglet technique
+                if (document.getElementById('main-tab-content-technique')?.classList.contains('active')) {
+                    setTimeout(() => {
+                        displayTensionStabilityAnalysis();
+                    }, 300);
+                } else if (document.getElementById('main-tab-content-commerciale')?.classList.contains('active')) {
+                    displayCommercialAnalysis();
+                } else if (document.getElementById('main-tab-content-evenement')?.classList.contains('active')) {
+                    displayEventAnalysis();
+                }
+            }, 300);
+            
         }, 500);
         
         console.log('✅ Page d\'analyse prête');
@@ -2935,6 +3281,8 @@ function createTotalEnergyChart() {
     
     // Grouper les données par jour et calculer le total max d'énergie
     const dailyTotalEnergy = {};
+    let maxEnergyDate = '';
+    let maxEnergyValue = 0;
     
     dataToUse.forEach(row => {
         if (!row['Date et Heure']) return;
@@ -2965,8 +3313,107 @@ function createTotalEnergyChart() {
         for (let i = 1; i <= 6; i++) {
             total += dailyTotalEnergy[date][`energie${i}`] || 0;
         }
+        
+        // Trouver la date avec l'énergie maximale
+        if (total > maxEnergyValue) {
+            maxEnergyValue = total;
+            maxEnergyDate = date;
+        }
+        
         return total;
     });
+    
+    // Définir les seuils des kits avec les nouvelles couleurs
+    const kitThresholds = [
+        { label: 'Kit 0', value: 250, color: '#FF6B6B' },    // Rouge
+        { label: 'Kit 1', value: 360, color: '#FFA726' },    // Orange
+        { label: 'Kit 2', value: 540, color: '#FFD93D' },    // Jaune
+        { label: 'Kit 3', value: 720, color: '#4ECDC4' },    // Turquoise
+        { label: 'Kit 4', value: 1080, color: '#667eea' }    // Bleu
+    ];
+    
+    // Trouver l'énergie maximale dans les données (hors zéros)
+    const nonZeroValues = totalEnergyData.filter(v => v && v > 0);
+    const maxDataValue = nonZeroValues.length > 0 ? Math.max(...nonZeroValues) : 0;
+    
+    // DÉTERMINER LES KITS À AFFICHER DYNAMIQUEMENT
+    let visibleKitThresholds = [];
+    
+    if (maxDataValue === 0) {
+        // Aucune consommation : afficher seulement Kit 0
+        visibleKitThresholds = [kitThresholds[0]];
+    } else {
+        // Trouver le plus petit kit qui dépasse la consommation max
+        const relevantKits = kitThresholds.filter(kit => kit.value >= maxDataValue);
+        
+        if (relevantKits.length > 0) {
+            // Afficher le kit trouvé + tous les kits inférieurs
+            const maxKitIndex = kitThresholds.findIndex(kit => kit.value === relevantKits[0].value);
+            visibleKitThresholds = kitThresholds.slice(0, maxKitIndex + 1);
+            
+            // Ajouter un kit supplémentaire si on est très proche du seuil supérieur
+            if (maxKitIndex < kitThresholds.length - 1) {
+                const nextKit = kitThresholds[maxKitIndex + 1];
+                const ratio = maxDataValue / relevantKits[0].value;
+                if (ratio > 0.8) { // Si on dépasse 80% du kit, montrer le suivant
+                    visibleKitThresholds.push(nextKit);
+                }
+            }
+        } else {
+            // La consommation dépasse tous les kits : afficher tous les kits
+            visibleKitThresholds = [...kitThresholds];
+            // Ajouter une ligne spéciale pour la valeur max observée
+            visibleKitThresholds.push({
+                label: 'MAX',
+                value: Math.ceil(maxDataValue / 100) * 100, // Arrondir à la centaine supérieure
+                color: '#1f2933',
+                dashed: true
+            });
+        }
+    }
+    
+    // Si on a très peu de données, afficher au moins 2 kits pour l'échelle
+    if (visibleKitThresholds.length < 2 && maxDataValue > 0) {
+        const firstKitIndex = kitThresholds.findIndex(kit => kit.value >= maxDataValue);
+        if (firstKitIndex > 0) {
+            visibleKitThresholds.push(kitThresholds[firstKitIndex - 1]);
+        }
+    }
+    
+    // Trier par valeur croissante
+    visibleKitThresholds.sort((a, b) => a.value - b.value);
+    
+    // Couleur des points selon le kit "adapté"
+    const pointBackgroundColors = totalEnergyData.map(value => {
+        if (value === 0 || value == null) {
+            // Aucun kit consommé / pas de données : couleur neutre
+            return '#CBD5E0';
+        }
+        
+        // Trouver le premier kit dont la valeur est >= à l'énergie du jour
+        const matchingKit = visibleKitThresholds.find(kit => value <= kit.value);
+        
+        if (matchingKit) {
+            return matchingKit.color;
+        }
+        
+        // Si la consommation dépasse le plus gros kit visible
+        return '#1f2933';
+    });
+    
+    // Déterminer un "kit recommandé" global pour la période
+    let recommendedKit = null;
+    if (nonZeroValues.length > 0) {
+        const maxValue = Math.max(...nonZeroValues);
+        recommendedKit = visibleKitThresholds.find(kit => maxValue <= kit.value) || null;
+    }
+    
+    // Calculer l'échelle Y maximale pour avoir de la marge
+    const maxVisibleKit = visibleKitThresholds[visibleKitThresholds.length - 1];
+    const maxYValue = Math.max(
+        maxDataValue * 1.2, // 20% de marge au-dessus des données
+        maxVisibleKit.value * 1.1 // 10% au-dessus du plus haut kit
+    );
     
     // Créer le conteneur du graphique
     const totalEnergyChartContainer = document.createElement('div');
@@ -2981,22 +3428,73 @@ function createTotalEnergyChart() {
     
     const chartHeader = document.createElement('div');
     chartHeader.style.cssText = `
-        background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%);
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         color: white;
-        padding: 12px 25px;
+        padding: 15px 25px;
         font-size: 16px;
         font-weight: 600;
         display: flex;
         align-items: center;
         gap: 10px;
     `;
-    chartHeader.innerHTML = '📊 Total Énergie Max par Jour (Tous Clients)';
+    chartHeader.innerHTML = '📊 Total Énergie Max par Jour & Dimensionnement Kit';
     
     const chartWrapper = document.createElement('div');
-    chartWrapper.style.cssText = `padding: 20px; height: 300px;`;
+    chartWrapper.style.cssText = `padding: 20px;`;
+    
+    // Conteneur pour le résumé
+    const summaryContainer = document.createElement('div');
+    summaryContainer.id = 'total-energy-summary';
+    summaryContainer.style.cssText = `margin-bottom: 20px;`;
+    
+    // Mettre à jour le texte de synthèse
+    if (recommendedKit) {
+        summaryContainer.innerHTML = `
+            <div style="background: #f0f9ff; padding: 12px; border-radius: 8px; border-left: 4px solid #3b82f6;">
+                <strong style="color: #1e40af;">📊 Analyse dimensionnement :</strong>
+                <div style="margin-top: 8px; font-size: 13px; color: #374151;">
+                    <strong>Kit recommandé :</strong> ${recommendedKit.label} (jusqu'à ${recommendedKit.value.toLocaleString('fr-FR')} Wh/jour)
+                    <br>
+                    <small style="color: #6b7280;">
+                        ${visibleKitThresholds.length > 1 ? 
+                            `Seuils affichés : ${visibleKitThresholds.map(k => k.label).join(', ')}` : 
+                            `Seuil unique : ${visibleKitThresholds[0].label}`
+                        }
+                    </small>
+                </div>
+            </div>
+        `;
+    } else if (nonZeroValues.length === 0) {
+        summaryContainer.innerHTML = `
+            <div style="background: #f8fafc; padding: 12px; border-radius: 8px; border-left: 4px solid #94a3b8;">
+                <strong style="color: #475569;">ℹ️ Information :</strong>
+                <div style="margin-top: 8px; font-size: 13px; color: #64748b;">
+                    Aucune consommation significative détectée. Le dimensionnement de kit n'est pas pertinent avec ces données.
+                </div>
+            </div>
+        `;
+    } else {
+        summaryContainer.innerHTML = `
+            <div style="background: #fef3c7; padding: 12px; border-radius: 8px; border-left: 4px solid #f59e0b;">
+                <strong style="color: #92400e;">⚠️ Attention :</strong>
+                <div style="margin-top: 8px; font-size: 13px; color: #92400e;">
+                    La consommation dépasse le plus grand kit disponible (${maxVisibleKit.label}).
+                    <br>
+                    <small style="color: #b45309;">
+                        ${visibleKitThresholds.length} seuil(s) affiché(s) sur ${kitThresholds.length} disponible(s)
+                    </small>
+                </div>
+            </div>
+        `;
+    }
+    
+    const canvasContainer = document.createElement('div');
+    canvasContainer.style.cssText = `height: 350px; position: relative;`;
     
     totalEnergyChartContainer.appendChild(chartHeader);
     totalEnergyChartContainer.appendChild(chartWrapper);
+    chartWrapper.appendChild(summaryContainer);
+    chartWrapper.appendChild(canvasContainer);
     
     // Insérer le graphique au début du contenu énergie
     const energyTableContent = document.getElementById('combined-energy-table-content');
@@ -3020,80 +3518,229 @@ function createTotalEnergyChart() {
     ctx.id = 'total-energy-chart-canvas';
     ctx.style.width = '100%';
     ctx.style.height = '100%';
-    chartWrapper.appendChild(ctx);
+    canvasContainer.appendChild(ctx);
     
     setTimeout(() => {
         if (typeof Chart === 'undefined') return;
         
         try {
-            const existingChart = Chart.getChart(ctx);
-            if (existingChart) existingChart.destroy();
+            // Détruire le graphique existant s'il existe
+            if (window.totalEnergyChartInstance) {
+                window.totalEnergyChartInstance.destroy();
+            }
             
-            // Trouver la valeur maximale pour l'échelle Y
-            const maxValue = Math.max(...totalEnergyData);
-            const yMax = Math.ceil(maxValue * 1.1); // Ajouter 10% de marge
-            
-            new Chart(ctx, {
-                type: 'bar',
+            // Créer le graphique
+            window.totalEnergyChartInstance = new Chart(ctx, {
+                type: 'line',
                 data: {
                     labels: dates,
-                    datasets: [{
-                        label: 'Total Énergie Max (Wh)',
-                        data: totalEnergyData,
-                        backgroundColor: 'rgba(46, 204, 113, 0.6)',
-                        borderColor: 'rgba(39, 174, 96, 1)',
-                        borderWidth: 1,
-                        borderRadius: 4
-                    }]
+                    datasets: [
+                        // Dataset principal - ligne d'énergie
+                        {
+                            label: 'Énergie Maximale Totale par Jour (Wh)',
+                            data: totalEnergyData,
+                            backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                            borderColor: '#667eea',
+                            borderWidth: 3,
+                            fill: true,
+                            tension: 0.4,
+                            pointRadius: 4,
+                            pointBackgroundColor: pointBackgroundColors,
+                            pointBorderColor: '#fff',
+                            pointBorderWidth: 2,
+                            pointHoverRadius: 7,
+                            pointHoverBackgroundColor: '#764ba2',
+                            pointHoverBorderColor: '#fff',
+                            pointHoverBorderWidth: 3
+                        },
+                        // Dataset pour les lignes de seuils des kits (DYNAMIQUE)
+                        ...visibleKitThresholds.map(kit => ({
+                            label: kit.label,
+                            data: dates.map(() => kit.value),
+                            borderColor: kit.color,
+                            borderWidth: kit.dashed ? 3 : 2.5,
+                            borderDash: kit.dashed ? [10, 5] : [6, 4],
+                            fill: false,
+                            pointRadius: 0,
+                            tension: 0
+                        }))
+                    ]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    plugins: {
-                        legend: { 
-                            position: 'top', 
-                            labels: { font: { size: 11 } } 
+                    animation: {
+                        duration: 1000,
+                        easing: 'easeInOutQuart'
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: maxYValue, // ÉCHELLE DYNAMIQUE
+                            ticks: {
+                                font: {
+                                    size: 12,
+                                    weight: '500'
+                                },
+                                color: '#718096',
+                                callback: function (value) {
+                                    return value.toLocaleString('fr-FR');
+                                },
+                                padding: 10
+                            },
+                            grid: {
+                                color: 'rgba(102, 126, 234, 0.08)',
+                                lineWidth: 1.5,
+                                drawBorder: true,
+                                borderDash: [5, 5]
+                            },
+                            border: {
+                                display: false
+                            },
+                            title: {
+                                display: true,
+                                text: 'Énergie (Wh)',
+                                font: {
+                                    size: 13,
+                                    weight: 'bold'
+                                },
+                                color: '#2c3e50',
+                                padding: 12
+                            }
                         },
-                        tooltip: { 
-                            mode: 'index', 
-                            intersect: false,
-                            callbacks: {
-                                label: function(context) {
-                                    let label = context.dataset.label || '';
-                                    if (label) {
-                                        label += ': ';
-                                    }
-                                    label += context.parsed.y.toFixed(2) + ' Wh';
-                                    return label;
-                                }
+                        x: {
+                            ticks: {
+                                font: {
+                                    size: 12,
+                                    weight: '500'
+                                },
+                                color: '#718096',
+                                maxRotation: 45,
+                                minRotation: 0,
+                                padding: 8
+                            },
+                            grid: {
+                                display: false,
+                                drawBorder: false
+                            },
+                            border: {
+                                display: true,
+                                color: 'rgba(113, 128, 150, 0.2)'
+                            },
+                            title: {
+                                display: true,
+                                text: 'Dates',
+                                font: {
+                                    size: 13,
+                                    weight: 'bold'
+                                },
+                                color: '#2c3e50',
+                                padding: 12
                             }
                         }
                     },
-                    scales: {
-                        x: {
-                            title: { 
-                                display: true, 
-                                text: 'Date', 
-                                font: { size: 12, weight: 'bold' } 
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top',
+                            labels: {
+                                font: {
+                                    size: 13,
+                                    weight: 'bold',
+                                    family: "'Segoe UI', 'Helvetica Neue', sans-serif"
+                                },
+                                color: '#2c3e50',
+                                padding: 15,
+                                usePointStyle: true,
+                                filter: function(item, chart) {
+                                    // Afficher toutes les légendes
+                                    return true;
+                                }
                             },
-                            ticks: { 
-                                maxRotation: 45, 
-                                font: { size: 10 } 
+                            onClick: function(e, legendItem, legend) {
+                                const index = legendItem.datasetIndex;
+                                const chart = legend.chart;
+                                const meta = chart.getDatasetMeta(index);
+                                
+                                // Empêcher la désactivation des datasets de seuils
+                                if (index === 0) {
+                                    // Pour le dataset principal, on peut toggle
+                                    meta.hidden = meta.hidden === null ? !chart.data.datasets[index].hidden : null;
+                                } else {
+                                    // Pour les seuils, on ne permet pas de les cacher
+                                    return;
+                                }
+                                
+                                chart.update();
                             }
                         },
-                        y: {
-                            title: { 
-                                display: true, 
-                                text: 'Énergie Totale Max (Wh)', 
-                                font: { size: 12, weight: 'bold' } 
+                        tooltip: {
+                            backgroundColor: 'rgba(45, 55, 72, 0.95)',
+                            padding: 14,
+                            titleFont: {
+                                size: 15,
+                                weight: 'bold',
+                                color: '#fff'
                             },
-                            ticks: { font: { size: 10 } },
-                            beginAtZero: true,
-                            max: yMax
+                            bodyFont: {
+                                size: 13,
+                                color: '#e2e8f0'
+                            },
+                            cornerRadius: 8,
+                            displayColors: true,
+                            borderColor: 'rgba(102, 126, 234, 0.5)',
+                            borderWidth: 1,
+                            boxPadding: 8,
+                            caretSize: 8,
+                            callbacks: {
+                                title: function(context) {
+                                    if (context[0].datasetIndex === 0) {
+                                        return '📊 ' + context[0].label;
+                                    }
+                                    const kitIndex = context[0].datasetIndex - 1;
+                                    if (kitIndex < visibleKitThresholds.length) {
+                                        const kit = visibleKitThresholds[kitIndex];
+                                        return kit.dashed ? '🚨 ' + kit.label + ' - Consommation MAX' : '📏 ' + kit.label + ' - Seuil';
+                                    }
+                                    return 'Seuil';
+                                },
+                                label: function (context) {
+                                    const datasetIndex = context.datasetIndex;
+                                    const value = context.parsed.y.toLocaleString('fr-FR');
+                                    
+                                    if (datasetIndex === 0) {
+                                        const date = context.label === maxEnergyDate ? ' ⚡ MAXIMUM' : '';
+                                        return `${context.dataset.label}: ${value} Wh${date}`;
+                                    } else {
+                                        const kitIndex = datasetIndex - 1;
+                                        if (kitIndex < visibleKitThresholds.length) {
+                                            const kit = visibleKitThresholds[kitIndex];
+                                            if (kit.dashed) {
+                                                return `Seuil max recommandé: ${kit.value} Wh`;
+                                            }
+                                            return `Seuil ${kit.label}: ${kit.value} Wh`;
+                                        }
+                                        return `Seuil: ${value} Wh`;
+                                    }
+                                },
+                                afterLabel: function(context) {
+                                    const lines = [];
+                                    
+                                    // Message spécial pour le jour d'énergie maximale
+                                    if (context.datasetIndex === 0 && context.label === maxEnergyDate) {
+                                        lines.push('🏆 Énergie maximale enregistrée');
+                                    }
+                                    
+                                    return lines;
+                                }
+                            }
                         }
                     }
                 }
             });
+            
+            console.log(`📈 Graphique total énergie créé avec ${visibleKitThresholds.length} seuils de kits affichés: ${visibleKitThresholds.map(k => k.label).join(', ')}`);
+            
         } catch (error) {
             console.error('Erreur lors de la création du graphique total énergie:', error);
         }
@@ -3316,7 +3963,6 @@ function updateETCharts() {
 }
 
 // ==================== MISE À JOUR DES TABLEAUX ====================
-
 function updateCombinedTables() {
     parseAndCombineData();
     updateEnergyTable();
@@ -3335,16 +3981,7 @@ function updateCombinedTables() {
         
         createETCharts();
         
-        // Mettre à jour les analyses si les onglets sont actifs
-        if (document.getElementById('main-tab-content-technique').classList.contains('active')) {
-            displayTensionStabilityAnalysis();
-        }
-        if (document.getElementById('main-tab-content-commerciale').classList.contains('active')) {
-            displayCommercialAnalysis();
-        }
-        if (document.getElementById('main-tab-content-evenement').classList.contains('active')) {
-            displayEventAnalysis();
-        }
+        // ✅ NE PAS CRÉER LA CARTE TECHNIQUE ICI - ELLE SERA CRÉÉE DANS initializeAnalyzePage
     }, 500);
 }
 
@@ -4974,11 +5611,6 @@ function parseAndCombineData() {
     parseAndCombineEventData();
     parseAndCombineSoldeData();
     parseAndCombineRechargeData();
-    
-    // Mettre à jour la carte technique après le parsing des données
-    setTimeout(() => {
-        createTechnicalDataCard();
-    }, 100);
 }
 
 function parseAndCombineEnergyData() {
