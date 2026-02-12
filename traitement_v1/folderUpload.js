@@ -7,7 +7,7 @@ let selectedFiles = new Set();
 let detectedNrNumber = null;
 
 // Éléments DOM
-let openUploadModalBtn, openArduinoPageBtn, uploadFolderModal, closeModal, cancelUploadModalBtn; // AJOUT: openArduinoPageBtn
+let openUploadModalBtn, uploadFolderModal, closeModal, cancelUploadModalBtn;
 let selectFolderBtn, selectedFolderInfo, folderAnalysisSection;
 let folderNameInput, validateUploadBtn; // RETIRÉ: folderDescriptionInput
 let foldersListDiv, noFoldersMessage, folderSearchInput;
@@ -37,7 +37,6 @@ function initializeApp() {
 function initializeDOMElements() {
     // Modal elements
     openUploadModalBtn = document.getElementById('open-upload-modal-btn');
-    openArduinoPageBtn = document.getElementById('open-arduino-page-btn'); // NOUVEAU
     uploadFolderModal = document.getElementById('upload-folder-modal');
     closeModal = uploadFolderModal.querySelector('.close');
     cancelUploadModalBtn = document.getElementById('cancel-upload-modal-btn');
@@ -97,14 +96,13 @@ function initializeDOMElements() {
     const backBtn = document.getElementById('back-to-home-btn');
     if (backBtn) {
         backBtn.addEventListener('click', () => {
-            window.location.href = '../home.html';
+            window.location.href = 'index.html';
         });
     }
 }
 function setupEventListeners() {
     // Modal
     openUploadModalBtn.addEventListener('click', openUploadModal);
-    openArduinoPageBtn.addEventListener('click', openArduinoPage); // NOUVEAU
     closeModal.addEventListener('click', closeUploadModal);
     cancelUploadModalBtn.addEventListener('click', closeUploadModal);
     uploadFolderModal.addEventListener('click', (e) => {

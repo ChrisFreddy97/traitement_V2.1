@@ -3756,8 +3756,17 @@ function createTensionChart() {
         return;
     }
     
+    // Détecter le type de système (12V ou 24V)
+    const systemType = detectSystemType(dataToUse);
+    const limits = getSystemLimits(systemType);
+    
     // Grouper les données par jour et calculer min, max, moyenne
     const dailyData = {};
+    const pointsExceedingLimits = {
+        min: [],
+        max: [],
+        avg: []
+    };
     
     dataToUse.forEach(row => {
         if (!row['Date et Heure']) return;
@@ -3766,6 +3775,16 @@ function createTensionChart() {
         const tMin = parseFloat(row['T_min']) || 0;
         const tMoy = parseFloat(row['T_moy']) || 0;
         const tMax = parseFloat(row['T_max']) || 0;
+        
+        if (tMin > 0 && tMin < limits.min) {
+            pointsExceedingLimits.min.push({ date, value: tMin });
+        }
+        if (tMax > 0 && tMax > limits.max) {
+            pointsExceedingLimits.max.push({ date, value: tMax });
+        }
+        if (tMoy > 0 && (tMoy < limits.min || tMoy > limits.max)) {
+            pointsExceedingLimits.avg.push({ date, value: tMoy });
+        }
         
         if (!dailyData[date]) {
             dailyData[date] = { 
@@ -3777,15 +3796,10 @@ function createTensionChart() {
                 allMaxs: [tMax]
             };
         } else {
-            // Pour min: prendre le plus petit
             dailyData[date].allMins.push(tMin);
             dailyData[date].min = Math.min(dailyData[date].min, tMin);
-            
-            // Pour max: prendre le plus grand
             dailyData[date].allMaxs.push(tMax);
             dailyData[date].max = Math.max(dailyData[date].max, tMax);
-            
-            // Pour moyenne: accumuler pour calculer la moyenne plus tard
             dailyData[date].sumMoy += tMoy;
             dailyData[date].countMoy++;
         }
@@ -3796,7 +3810,111 @@ function createTensionChart() {
     const maxValues = dates.map(date => dailyData[date].max);
     const avgValues = dates.map(date => dailyData[date].sumMoy / dailyData[date].countMoy);
     
-    // Créer le conteneur du graphique tension
+    // Couleurs des points
+    const pointBackgroundColorsMin = minValues.map(v => 
+        v > 0 && (v < limits.min || v > limits.max) ? '#ef4444' : '#3b82f6'
+    );
+    const pointBackgroundColorsMax = maxValues.map(v => 
+        v > 0 && (v > limits.max || v < limits.min) ? '#ef4444' : '#ef4444'
+    );
+    const pointBackgroundColorsAvg = avgValues.map(v => 
+        v > 0 && (v < limits.min || v > limits.max) ? '#ef4444' : '#10b981'
+    );
+    
+    // 🔥 CORRECTION: AGRANDIR L'ESPACE VERTICAL ENTRE LES SEUILS
+    // 1. Récupérer les vraies données
+    const validMinValues = minValues.filter(v => v > 0);
+    const validMaxValues = maxValues.filter(v => v > 0);
+    const validAvgValues = avgValues.filter(v => v > 0);
+    
+    // 2. Trouver le minimum et maximum DES DONNÉES
+    const dataMin = validMinValues.length > 0 ? Math.min(...validMinValues) : limits.min;
+    const dataMax = validMaxValues.length > 0 ? Math.max(...validMaxValues) : limits.max;
+    
+    // 3. 🔥 FORCER UN GRAND ÉCARTEMENT DES SEUILS
+    //    Au lieu de coller aux données, on ÉLARGIT la zone entre min et max
+    let yMin, yMax;
+    
+    if (systemType === '12V') {
+        // Pour 12V : ÉTIRER l'espace entre 11V et 15V
+        // On garde une marge généreuse en HAUT et en BAS
+        const thresholdMin = 11;
+        const thresholdMax = 15;
+        const thresholdRange = thresholdMax - thresholdMin; // 4V
+        
+        // 🔥 On ajoute 40% de marge au-dessus et en-dessous de la plage des seuils
+        yMin = Math.max(0, Math.floor(thresholdMin - (thresholdRange * 0.4))); // 11 - 1.6 = 9.4 → 9
+        yMax = Math.ceil(thresholdMax + (thresholdRange * 0.4)); // 15 + 1.6 = 16.6 → 17
+        
+        // Si les données descendent plus bas, on ajuste
+        if (dataMin < yMin + 1) {
+            yMin = Math.max(0, Math.floor(dataMin - 1.5));
+        }
+        // Si les données montent plus haut, on ajuste
+        if (dataMax > yMax - 1) {
+            yMax = Math.ceil(dataMax + 1.5);
+        }
+        
+    } else if (systemType === '24V') {
+        // Pour 24V : ÉTIRER l'espace entre 22V et 31V
+        const thresholdMin = 22;
+        const thresholdMax = 31;
+        const thresholdRange = thresholdMax - thresholdMin; // 9V
+        
+        // 🔥 30% de marge pour le 24V (car la plage est déjà plus grande)
+        yMin = Math.max(0, Math.floor(thresholdMin - (thresholdRange * 0.3))); // 22 - 2.7 = 19.3 → 19
+        yMax = Math.ceil(thresholdMax + (thresholdRange * 0.3)); // 31 + 2.7 = 33.7 → 34
+        
+        if (dataMin < yMin + 2) {
+            yMin = Math.max(0, Math.floor(dataMin - 2.5));
+        }
+        if (dataMax > yMax - 2) {
+            yMax = Math.ceil(dataMax + 2.5);
+        }
+    }
+    
+    // 🔥 GARANTIR UN ESPACE MINIMUM ENTRE MIN ET MAX
+    // Pour 12V : au moins 8V d'écart (au lieu de 4V)
+    if (systemType === '12V' && (yMax - yMin) < 8) {
+        const center = (yMin + yMax) / 2;
+        yMin = Math.max(0, Math.floor(center - 4));
+        yMax = Math.ceil(center + 4);
+    }
+    
+    // Pour 24V : au moins 15V d'écart (au lieu de 9V)
+    if (systemType === '24V' && (yMax - yMin) < 15) {
+        const center = (yMin + yMax) / 2;
+        yMin = Math.max(0, Math.floor(center - 7.5));
+        yMax = Math.ceil(center + 7.5);
+    }
+    
+    // Définir les seuils - ORANGE pour 12V, JAUNE pour 24V
+    const voltageThresholds = [
+        { value: 11, color: '#f97316', borderWidth: 4, dash: [10, 8], system: '12V' },
+        { value: 15, color: '#f97316', borderWidth: 4, dash: [10, 8], system: '12V' },
+        { value: 22, color: '#eab308', borderWidth: 4, dash: [10, 8], system: '24V' },
+        { value: 31, color: '#eab308', borderWidth: 4, dash: [10, 8], system: '24V' }
+    ];
+    
+    // Filtrer SEULEMENT le système actif
+    const visibleThresholds = voltageThresholds.filter(t => t.system === systemType);
+    
+    // Datasets des seuils (sans label)
+    const thresholdDatasets = visibleThresholds.map(threshold => ({
+        label: '',
+        data: dates.map(() => threshold.value),
+        borderColor: threshold.color,
+        borderWidth: threshold.borderWidth,
+        borderDash: threshold.dash,
+        pointRadius: 0,
+        pointHoverRadius: 0,
+        fill: false,
+        type: 'line',
+        tension: 0,
+        backgroundColor: 'transparent'
+    }));
+    
+    // Créer le conteneur
     const tensionChartContainer = document.createElement('div');
     tensionChartContainer.id = 'tension-chart-container';
     tensionChartContainer.style.cssText = `
@@ -3807,49 +3925,72 @@ function createTensionChart() {
         overflow: hidden;
     `;
     
+    // En-tête avec stats
+    const exceedanceCount = {
+        total: pointsExceedingLimits.min.length + pointsExceedingLimits.max.length + pointsExceedingLimits.avg.length
+    };
+    
     const chartHeader = document.createElement('div');
     chartHeader.style.cssText = `
         background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
         color: white;
-        padding: 12px 25px;
+        padding: 15px 25px;
         font-size: 16px;
         font-weight: 600;
         display: flex;
+        justify-content: space-between;
         align-items: center;
-        gap: 10px;
     `;
-    chartHeader.innerHTML = '📊 Tension - Min, Max et Moyenne par Jour (Données TENSION uniquement)';
+    
+    chartHeader.innerHTML = `
+        <div style="display: flex; align-items: center; gap: 10px;">
+            <span>📊</span>
+            <span>Tension - Min, Max et Moyenne par Jour</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 15px;">
+            <div style="display: flex; align-items: center; gap: 8px; font-size: 12px; background: rgba(255,255,255,0.2); padding: 5px 12px; border-radius: 20px;">
+                <span style="display: inline-block; width: 12px; height: 12px; background: ${systemType === '12V' ? '#f97316' : '#eab308'}; border-radius: 2px;"></span>
+                <span>Système <strong>${systemType}</strong></span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px; font-size: 12px; background: rgba(255,255,255,0.2); padding: 5px 12px; border-radius: 20px;">
+                <span>📊 Plage: ${yMin}V - ${yMax}V</span>
+            </div>
+            ${exceedanceCount.total > 0 ? `
+                <div style="display: flex; align-items: center; gap: 8px; font-size: 12px; background: rgba(239, 68, 68, 0.3); padding: 5px 12px; border-radius: 20px;">
+                    <span style="display: inline-block; width: 12px; height: 12px; background: #ef4444; border-radius: 50%;"></span>
+                    <span>⚠️ ${exceedanceCount.total} dépassement(s)</span>
+                </div>
+            ` : ''}
+        </div>
+    `;
     
     const chartWrapper = document.createElement('div');
-    chartWrapper.style.cssText = `padding: 20px; height: 300px;`;
+    chartWrapper.style.cssText = `padding: 20px; height: 400px;`;
     
     tensionChartContainer.appendChild(chartHeader);
     tensionChartContainer.appendChild(chartWrapper);
     
-    // Insérer le graphique au début du contenu tension
+    const canvasContainer = document.createElement('div');
+    canvasContainer.style.cssText = `height: 330px; position: relative; margin-top: 10px;`;
+    chartWrapper.appendChild(canvasContainer);
+    
+    // Insérer dans le DOM
     const tensionTableContent = document.getElementById('combined-tension-table-content');
-    
-    // Supprimer l'ancien graphique s'il existe
     const existingChart = document.getElementById('tension-chart-container');
-    if (existingChart) {
-        existingChart.remove();
-    }
+    if (existingChart) existingChart.remove();
     
-    // Vérifier s'il y a déjà un contenu dans le tableau de tension
     if (tensionTableContent.children.length > 0) {
-        // Insérer le graphique en premier
         tensionTableContent.insertBefore(tensionChartContainer, tensionTableContent.firstChild);
     } else {
-        // Sinon, l'ajouter directement
         tensionTableContent.appendChild(tensionChartContainer);
     }
     
-    // Créer le canvas pour le graphique
+    // Créer le canvas
     const ctx = document.createElement('canvas');
     ctx.id = 'tension-chart-canvas';
     ctx.style.width = '100%';
     ctx.style.height = '100%';
-    chartWrapper.appendChild(ctx);
+    canvasContainer.appendChild(ctx);
     
     setTimeout(() => {
         if (typeof Chart === 'undefined') return;
@@ -3858,74 +3999,134 @@ function createTensionChart() {
             const existingChart = Chart.getChart(ctx);
             if (existingChart) existingChart.destroy();
             
+            const datasets = [
+                ...thresholdDatasets,
+                {
+                    label: 'Tension Minimale',
+                    data: minValues,
+                    borderColor: '#3b82f6',
+                    backgroundColor: 'rgba(59, 130, 246, 0.05)',
+                    borderWidth: 2.5,
+                    pointRadius: 4,
+                    pointBackgroundColor: pointBackgroundColorsMin,
+                    pointBorderColor: 'white',
+                    pointBorderWidth: 2,
+                    pointHoverRadius: 7,
+                    fill: false,
+                    tension: 0.4
+                },
+                {
+                    label: 'Tension Moyenne',
+                    data: avgValues,
+                    borderColor: '#10b981',
+                    backgroundColor: 'rgba(16, 185, 129, 0.05)',
+                    borderWidth: 3.5,
+                    pointRadius: 4,
+                    pointBackgroundColor: pointBackgroundColorsAvg,
+                    pointBorderColor: 'white',
+                    pointBorderWidth: 2,
+                    pointHoverRadius: 7,
+                    fill: false,
+                    tension: 0.4
+                },
+                {
+                    label: 'Tension Maximale',
+                    data: maxValues,
+                    borderColor: '#ef4444',
+                    backgroundColor: 'rgba(239, 68, 68, 0.05)',
+                    borderWidth: 2.5,
+                    pointRadius: 4,
+                    pointBackgroundColor: pointBackgroundColorsMax,
+                    pointBorderColor: 'white',
+                    pointBorderWidth: 2,
+                    pointHoverRadius: 7,
+                    fill: false,
+                    tension: 0.4
+                }
+            ];
+            
             new Chart(ctx, {
                 type: 'line',
-                data: {
-                    labels: dates,
-                    datasets: [
-                        {
-                            label: 'Tension Min',
-                            data: minValues,
-                            borderColor: '#3498db',
-                            backgroundColor: 'rgba(52, 152, 219, 0.1)',
-                            borderWidth: 2,
-                            fill: false,
-                            tension: 0.4
-                        },
-                        {
-                            label: 'Tension Moyenne',
-                            data: avgValues,
-                            borderColor: '#2ecc71',
-                            backgroundColor: 'rgba(46, 204, 113, 0.1)',
-                            borderWidth: 3,
-                            fill: false,
-                            tension: 0.4
-                        },
-                        {
-                            label: 'Tension Max',
-                            data: maxValues,
-                            borderColor: '#e74c3c',
-                            backgroundColor: 'rgba(231, 76, 60, 0.1)',
-                            borderWidth: 2,
-                            fill: false,
-                            tension: 0.4
-                        }
-                    ]
-                },
+                data: { labels: dates, datasets },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
                     plugins: {
-                        legend: { position: 'top', labels: { font: { size: 11 } } },
-                        tooltip: { 
-                            mode: 'index', 
-                            intersect: false,
+                        legend: { 
+                            position: 'top',
+                            labels: { 
+                                font: { size: 12, weight: 'bold' },
+                                usePointStyle: true,
+                                pointStyle: 'circle',
+                                padding: 20,
+                                filter: item => item.text !== ''
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                            titleFont: { size: 13, weight: 'bold' },
+                            bodyFont: { size: 12 },
+                            padding: 12,
+                            cornerRadius: 8,
                             callbacks: {
                                 label: function(context) {
                                     let label = context.dataset.label || '';
-                                    if (label) {
-                                        label += ': ';
-                                    }
-                                    label += context.parsed.y.toFixed(2) + ' V';
-                                    return label;
+                                    let value = context.parsed.y.toFixed(2);
+                                    const isExceeding = (
+                                        (label.includes('Minimale') && parseFloat(value) < limits.min) ||
+                                        (label.includes('Maximale') && parseFloat(value) > limits.max) ||
+                                        (label.includes('Moyenne') && (parseFloat(value) < limits.min || parseFloat(value) > limits.max))
+                                    );
+                                    return `${isExceeding ? '🔴' : '✅'} ${label}: ${value} V${isExceeding ? ' ⚠️ HORS LIMITES' : ''}`;
+                                },
+                                afterLabel: function(context) {
+                                    const value = context.parsed.y;
+                                    if (value < limits.min) return `⬇️ Sous seuil minimum (${limits.min}V)`;
+                                    if (value > limits.max) return `⬆️ Au-dessus seuil maximum (${limits.max}V)`;
+                                    return '';
                                 }
                             }
                         }
                     },
                     scales: {
                         x: {
-                            title: { display: true, text: 'Date', font: { size: 12, weight: 'bold' } },
-                            ticks: { maxRotation: 45, font: { size: 10 } }
+                            title: { display: true, text: 'Date', font: { size: 13, weight: 'bold' } },
+                            ticks: { maxRotation: 45, font: { size: 11 } },
+                            grid: { color: 'rgba(0, 0, 0, 0.05)' }
                         },
                         y: {
-                            title: { display: true, text: 'Tension (V)', font: { size: 12, weight: 'bold' } },
-                            ticks: { font: { size: 10 } }
+                            title: { display: true, text: 'Tension (Volts)', font: { size: 13, weight: 'bold' } },
+                            ticks: { 
+                                font: { size: 11, weight: '500' },
+                                stepSize: systemType === '12V' ? 1 : 2,
+                                callback: function(value) {
+                                    if (value === 11 || value === 15) return `⚠️ ${value}V`;
+                                    if (value === 22 || value === 31) return `⚠️ ${value}V`;
+                                    return value + 'V';
+                                }
+                            },
+                            min: yMin,
+                            max: yMax,
+                            grid: {
+                                color: function(context) {
+                                    const v = context.tick.value;
+                                    if (v === 11 || v === 15) return 'rgba(249, 115, 22, 0.3)';
+                                    if (v === 22 || v === 31) return 'rgba(234, 179, 8, 0.3)';
+                                    return 'rgba(0, 0, 0, 0.06)';
+                                },
+                                lineWidth: ctx => [11, 15, 22, 31].includes(ctx.tick.value) ? 2 : 1,
+                                borderDash: ctx => [11, 15, 22, 31].includes(ctx.tick.value) ? [10, 8] : []
+                            }
                         }
                     }
                 }
             });
+            
+            console.log(`📈 Graphique tension - Système ${systemType} - Échelle: ${yMin}V à ${yMax}V - Espace entre seuils: ${(yMax - yMin).toFixed(1)}V`);
+            
         } catch (error) {
-            console.error('Erreur lors de la création du graphique tension:', error);
+            console.error('Erreur graphique tension:', error);
         }
     }, 50);
 }
