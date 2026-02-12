@@ -473,3 +473,33 @@ tr:nth-child(even) {background:#fafafa;}
     font-weight:600;
     font-size:1.1em;
 }
+
+.header {
+    background: linear-gradient(135deg,#667eea 0%,#764ba2 100%);
+    color: white;
+    padding: 30px;
+}
+
+.header h1 {
+    font-size: 2em;
+}
+
+.back-button {
+    display: inline-block;
+    padding: 10px 20px;
+    background: rgba(255, 255, 255, 0.15);
+    color: white;
+    text-decoration: none;
+    border-radius: 50px;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(5px);
+}
+
+.back-button:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+    border-color: rgba(255, 255, 255, 0.4);
+}

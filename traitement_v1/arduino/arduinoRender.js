@@ -3,7 +3,6 @@ import { database } from './arduinoCore.js';
 import { TABLE_TYPES, VOLTAGE_NORMS } from './arduinoConstants.js';
 import { getEventColor, handleCellClick } from './arduinoEvents.js';
 import { generatePagination, attachPaginationEvents } from './arduinoPagination.js';
-import Chart from 'chart.js/auto';
 
 // Variable pour stocker la référence du graphique Chart.js
 let tensionChartInstance = null;
