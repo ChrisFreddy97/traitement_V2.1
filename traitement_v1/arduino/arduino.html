@@ -4,25 +4,20 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Analyseur de Données - NANORESEAU</title>
-    
-    <!-- Liaison avec le fichier CSS externe -->
     <link rel="stylesheet" href="arduino.css">
+    <script src="../../chart.js"></script>
+    <script type="module" src="arduinoMain.js"></script>
 </head>
 <body>
-    <!-- ===== BOUTON RETOUR VERS LE PROJET PRINCIPAL ===== -->
-    <div class="back-button-container">
-        <a href="../index.html" class="back-button">
-            <span class="back-icon">←</span>
-            <span class="back-text">Retour au projet principal</span>
-        </a>
-    </div>
-
     <div class="container">
         <div class="header">
-            <h1>📊 Analyseur de Données NANORESEAU</h1>
-            <p>Importez votre fichier txt pour extraire et visualiser les données multiples</p>
+            <div style="display: flex; align-items: center; width: 100%;">
+                <a href="../index.html" class="back-button" style="margin-right: auto;">⬅️ Retour</a>
+                <h1 style="margin: 0; flex-grow: 1; text-align: center;">📊 Analyseur de Données NANORESEAU</h1>
+                <div style="width: 100px;"></div>
+            </div>
+            <p style="margin-top: 15px;">Importez votre fichier txt pour extraire et visualiser les données multiples</p>
         </div>
-
         <div class="content">
             <div class="upload-section" id="uploadSection">
                 <div class="file-input-wrapper">
@@ -31,8 +26,6 @@
                 </div>
                 <div class="file-name" id="fileName">Aucun fichier sélectionné</div>
             </div>
-
-            <!-- Animation de chargement -->
             <div class="loader-container" id="loaderContainer">
                 <div class="spinner"></div>
                 <div class="loader-text" id="loaderText">Analyse du fichier en cours...</div>
@@ -40,33 +33,26 @@
                     <div class="progress-fill" id="progressFill"></div>
                 </div>
             </div>
-
             <div class="error-message" id="errorMessage"></div>
-
             <div class="info-section" id="infoSection">
                 <h3>🔍 Informations extraites</h3>
                 <div>Numéro NANORESEAU :</div>
                 <div class="nanoreseau-value" id="nanoreseauValue">-</div>
-
                 <div class="tabs">
                     <div class="tab active" data-tab="Technique">Technique</div>
                     <div class="tab" data-tab="Commercial">Commercial</div>
                     <div class="tab" data-tab="Evenement">Événement</div>
                 </div>
-
-                <div class="summary-section" id="summarySection">
+                <div id="technicalDashboard"></div>
+                <div id="commercialDashboard"></div>
+                <div class="summary-section" id="summarySection" style="margin-top:20px;">
                     <div class="summary-title">📈 Résumé des données</div>
                     <div class="summary-grid" id="summaryGrid"></div>
                 </div>
-
                 <div class="type-legend" id="typeLegend"></div>
             </div>
-
             <div class="tables-container" id="tablesContainer"></div>
         </div>
     </div>
-
-    <!-- Liaison avec le fichier JavaScript externe -->
-    <script src="./arduino.js"></script>
 </body>
 </html>
