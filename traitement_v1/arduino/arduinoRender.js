@@ -4,6 +4,7 @@ import { TABLE_TYPES, VOLTAGE_NORMS } from './arduinoConstants.js';
 import { getEventColor, handleCellClick } from './arduinoEvents.js';
 import { generatePagination, attachPaginationEvents } from './arduinoPagination.js';
 
+
 // Variable pour stocker la référence du graphique Chart.js
 let tensionChartInstance = null;
 
@@ -15,6 +16,19 @@ export function renderTechnicalDashboard() {
     }
 
     const data = database.technicalData;
+    
+    // Déterminer quelle norme afficher en fonction de la tension moyenne
+    let normSystem = '';
+    let normData = null;
+    
+    if (data.globalAvg >= 22 && data.globalAvg <= 29) {
+        normSystem = '24V';
+        normData = VOLTAGE_NORMS['24V'];
+    } else if (data.globalAvg >= 11 && data.globalAvg <= 15) {
+        normSystem = '12V';
+        normData = VOLTAGE_NORMS['12V'];
+    }
+
     const html = `
         <div class="technical-dashboard">
             <div class="technical-title"><span>⚡ Analyse des Tensions</span></div>
@@ -31,50 +45,44 @@ export function renderTechnicalDashboard() {
                     <div class="stat-sub">clients actifs</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-label">📊 Tension moyenne globale</div>
-                    <div class="stat-value">${data.globalAvg.toFixed(2)}</div>
-                    <div class="stat-unit">V</div>
+                    <div class="stat-label">📊 Tension moyenne</div>
+                    <div class="stat-value">${data.globalAvg.toFixed(2)} V</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-label">⬇️ Tension minimale globale</div>
-                    <div class="stat-value" style="color:#64b5f6;">${data.globalMin.toFixed(2)}</div>
-                    <div class="stat-unit">V</div>
+                    <div class="stat-label">⬇️ Tension minimale</div>
+                    <div class="stat-value" style="color:#64b5f6;">${data.globalMin.toFixed(2)} V</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-label">⬆️ Tension maximale globale</div>
-                    <div class="stat-value" style="color:#ffb74d;">${data.globalMax.toFixed(2)}</div>
-                    <div class="stat-unit">V</div>
+                    <div class="stat-label">⬆️ Tension maximale</div>
+                    <div class="stat-value" style="color:#ffb74d;">${data.globalMax.toFixed(2)} V</div>
                 </div>
             </div>
+            
             <div class="chart-container">
                 <div class="chart-title"><span>📈 Évolution journalière des tensions</span></div>
                 <div class="chart-wrapper"><canvas id="tensionChart"></canvas></div>
             </div>
+            
+            ${normData ? `
             <div class="norms-container">
                 <div class="norm-card">
-                    <div class="norm-header"><span style="font-size:1.5em;">🔋</span><h3>Normes Système 24V</h3></div>
+                    <div class="norm-header"><span style="font-size:1.5em;">🔋</span><h3>Normes Système ${normSystem}</h3></div>
                     <div class="norm-grid">
-                        <div class="norm-item"><span class="norm-label">Tension minimale</span><span class="norm-value">${VOLTAGE_NORMS['24V'].min}V</span></div>
-                        <div class="norm-item"><span class="norm-label">Plage idéale</span><span class="norm-value norm-range">${VOLTAGE_NORMS['24V'].ideal}V</span></div>
-                        <div class="norm-item"><span class="norm-label">Tension maximale</span><span class="norm-value">${VOLTAGE_NORMS['24V'].max}V</span></div>
-                        <div class="norm-item"><span class="norm-label">Seuil d'alerte</span><span class="norm-value alert-threshold">${VOLTAGE_NORMS['24V'].alert}</span></div>
-                    </div>
-                </div>
-                <div class="norm-card">
-                    <div class="norm-header"><span style="font-size:1.5em;">🔋</span><h3>Normes Système 12V</h3></div>
-                    <div class="norm-grid">
-                        <div class="norm-item"><span class="norm-label">Tension minimale</span><span class="norm-value">${VOLTAGE_NORMS['12V'].min}V</span></div>
-                        <div class="norm-item"><span class="norm-label">Plage idéale</span><span class="norm-value norm-range">${VOLTAGE_NORMS['12V'].ideal}V</span></div>
-                        <div class="norm-item"><span class="norm-label">Tension maximale</span><span class="norm-value">${VOLTAGE_NORMS['12V'].max}V</span></div>
-                        <div class="norm-item"><span class="norm-label">Seuil d'alerte</span><span class="norm-value alert-threshold">${VOLTAGE_NORMS['12V'].alert}</span></div>
+                        <div class="norm-item"><span class="norm-label">Tension minimale</span><span class="norm-value">${normData.min}V</span></div>
+                        <div class="norm-item"><span class="norm-label">Plage idéale</span><span class="norm-value norm-range">${normData.ideal}V</span></div>
+                        <div class="norm-item"><span class="norm-label">Tension maximale</span><span class="norm-value">${normData.max}V</span></div>
+                        <div class="norm-item"><span class="norm-label">Seuil d'alerte</span><span class="norm-value alert-threshold">${normData.alert}</span></div>
                     </div>
                 </div>
             </div>
+            ` : ''}
         </div>
     `;
+    
     container.innerHTML = html;
     setTimeout(() => createTensionChart(data.dailyStats), 100);
 }
+
 
 function createTensionChart(dailyStats) {
     const ctx = document.getElementById('tensionChart');
@@ -113,43 +121,154 @@ export function renderCommercialDashboard() {
     }
 
     const data = database.commercialData;
+    
     let html = `
         <div class="commercial-dashboard">
             <div class="technical-title">
                 <span>💰 Analyse Crédit Clients</span>
                 <span style="font-size:0.7em; opacity:0.8;">${data.clientCount} clients analysés</span>
             </div>
-            <div class="client-stats-grid">
-    `;
-
-    data.clients.forEach(client => {
-        const avgCredit = client.averageCredit.toFixed(2);
-        const zeroCount = client.zeroCreditDates.length;
-        const lastZero = zeroCount > 0 ? client.zeroCreditDates[client.zeroCreditDates.length - 1] : 'Aucun';
-        html += `
-            <div class="client-card">
-                <div class="client-header"><span style="font-size:1.3em;">👤</span><span class="client-name">Client ${client.id}</span></div>
-                <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px; margin-bottom:15px;">
-                    <div><div style="font-size:0.8em; opacity:0.8;">Crédit moyen</div><div style="font-size:1.5em; font-weight:bold;">${avgCredit}</div></div>
-                    <div><div style="font-size:0.8em; opacity:0.8;">Crédit max</div><div style="font-size:1.5em; font-weight:bold; color:#ffb74d;">${client.maxCredit}</div></div>
+            
+            <!-- Onglets par client -->
+            <div class="client-tabs-container">
+                <button class="client-tab-nav prev" id="prevClient">◀</button>
+                <div class="client-tabs" id="clientTabs">
+                    ${data.clients.map((client, index) => `
+                        <button class="client-tab ${index === 0 ? 'active' : ''}" data-client-id="${client.id}" data-index="${index}">
+                            Client ${client.id}
+                        </button>
+                    `).join('')}
                 </div>
+                <button class="client-tab-nav next" id="nextClient">▶</button>
+            </div>
+            
+            <!-- Conteneur pour le client actif -->
+            <div id="activeClientContainer">
+                ${renderClientCard(data.clients[0])}
+            </div>
+        </div>
+    `;
+    
+    container.innerHTML = html;
+    attachClientTabEvents(data.clients);
+}
+
+function renderClientCard(client) {
+    const avgCredit = client.averageCredit.toFixed(2);
+    const zeroCount = client.zeroCreditDates.length;
+    
+    return `
+        <div class="client-card active-client">
+            <div class="client-header-large">
+                <span style="font-size:2em;">👤</span>
                 <div>
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-                        <span style="font-size:0.9em; opacity:0.9;">📉 Jours à zéro crédit</span>
-                        <span style="background:${zeroCount > 0 ? '#f44336' : '#4caf50'}; padding:2px 10px; border-radius:15px; font-size:0.8em; font-weight:bold;">
-                            ${zeroCount} jour(s)
-                        </span>
-                    </div>
-                    <div class="zero-credit-list">
-                        ${client.zeroCreditDates.map(date => `<div class="zero-credit-item"><span>📅 ${date}</span><span class="zero-credit-date">0 crédit</span></div>`).join('')}
-                        ${zeroCount === 0 ? '<div style="padding:10px; text-align:center; opacity:0.7;">Aucun jour à zéro crédit</div>' : ''}
-                    </div>
+                    <div class="client-name-large">Client ${client.id}</div>
+                    <div class="client-subtitle">Détail des crédits et jours sans crédit</div>
+                </div>
+                <span class="client-badge ${zeroCount > 0 ? 'badge-warning' : 'badge-success'}">
+                    ${zeroCount > 0 ? `${zeroCount} jour(s) sans crédit` : 'Aucun jour sans crédit'}
+                </span>
+            </div>
+            
+            <div class="client-stats-grid-large">
+                <div class="stat-card-client">
+                    <div class="stat-label">💶 Crédit moyen</div>
+                    <div class="stat-value-large">${avgCredit} <span class="stat-unit">€</span></div>
+                </div>
+                <div class="stat-card-client">
+                    <div class="stat-label">📈 Crédit maximum</div>
+                    <div class="stat-value-large" style="color:#ffb74d;">${client.maxCredit} <span class="stat-unit">€</span></div>
+                </div>
+                <div class="stat-card-client">
+                    <div class="stat-label">📊 Total jours à zéro</div>
+                    <div class="stat-value-large ${zeroCount > 0 ? 'text-danger' : 'text-success'}">${zeroCount}</div>
                 </div>
             </div>
-        `;
+            
+            <div class="zero-credit-section">
+                <div class="section-title">
+                    <span>📅 Historique des jours sans crédit</span>
+                    <span class="section-count">${zeroCount} enregistrement(s)</span>
+                </div>
+                
+                <div class="zero-credit-timeline">
+                    ${zeroCount > 0 ? 
+                        client.zeroCreditDates.map(date => `
+                            <div class="timeline-item">
+                                <div class="timeline-date">${date}</div>
+                                <div class="timeline-badge">0 crédit</div>
+                            </div>
+                        `).join('') 
+                        : 
+                        '<div class="no-data">✅ Aucun jour sans crédit enregistré</div>'
+                    }
+                </div>
+            </div>
+            
+            <div class="client-meta-info">
+                <div>Dernière mise à jour: ${new Date().toLocaleDateString('fr-FR')}</div>
+            </div>
+        </div>
+    `;
+}
+
+function attachClientTabEvents(clients) {
+    const tabs = document.querySelectorAll('.client-tab');
+    const container = document.getElementById('activeClientContainer');
+    const prevBtn = document.getElementById('prevClient');
+    const nextBtn = document.getElementById('nextClient');
+    
+    let activeIndex = 0;
+    
+    function switchToClient(index) {
+        // Mettre à jour l'index actif
+        activeIndex = index;
+        
+        // Mettre à jour les classes des onglets
+        tabs.forEach((tab, i) => {
+            if (i === index) {
+                tab.classList.add('active');
+                // Scroll l'onglet dans la vue
+                tab.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+            } else {
+                tab.classList.remove('active');
+            }
+        });
+        
+        // Afficher le client correspondant
+        container.innerHTML = renderClientCard(clients[index]);
+    }
+    
+    // Événements sur les onglets
+    tabs.forEach((tab, index) => {
+        tab.addEventListener('click', () => switchToClient(index));
     });
-    html += `</div></div>`;
-    container.innerHTML = html;
+    
+    // Navigation précédent/suivant
+    if (prevBtn) {
+        prevBtn.addEventListener('click', () => {
+            const newIndex = activeIndex > 0 ? activeIndex - 1 : clients.length - 1;
+            switchToClient(newIndex);
+        });
+    }
+    
+    if (nextBtn) {
+        nextBtn.addEventListener('click', () => {
+            const newIndex = activeIndex < clients.length - 1 ? activeIndex + 1 : 0;
+            switchToClient(newIndex);
+        });
+    }
+    
+    // Navigation au clavier
+    window.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowLeft') {
+            e.preventDefault();
+            prevBtn?.click();
+        } else if (e.key === 'ArrowRight') {
+            e.preventDefault();
+            nextBtn?.click();
+        }
+    });
 }
 
 export function displayTables(visibleTableIndices) {
@@ -251,24 +370,7 @@ export function renderByTab() {
         document.getElementById('technicalDashboard').innerHTML = '';
         document.getElementById('commercialDashboard').innerHTML = '';
     }
-
-    createSummary(visibleTableIndices);
     displayTables(visibleTableIndices);
-}
-
-function createSummary(visibleTableIndices) {
-    const summary = {};
-    visibleTableIndices.forEach(tableIdx => {
-        const table = database.tables[tableIdx];
-        summary[table.type] = (summary[table.type] || 0) + table.data.length;
-    });
-
-    let html = '';
-    Object.keys(summary).sort().forEach(type => {
-        const info = TABLE_TYPES[type] || { name: type, icon: '📋' };
-        html += `<div class="summary-item"><div class="summary-item-label">${info.icon} ${info.name}</div><div class="summary-item-value">${summary[type]}</div></div>`;
-    });
-    document.getElementById('summaryGrid').innerHTML = html;
 }
 
 export function createLegend() {
