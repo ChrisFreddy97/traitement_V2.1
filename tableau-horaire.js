@@ -4319,7 +4319,7 @@ function displayAllClientsTab() {
         <!-- GRAPHIQUE EN BARRES : ÉNERGIE MAX PAR JOUR -->
         <div class="all-clients-chart-section">
             <h4>
-                ⚡ Énergie Maximale Totale par Jour (Somme des Max Clients)
+                ⚡ Énergie Totale par Jour (Somme des Max Clients)
                 ${window.filteredDates && window.filteredDates.length < allClientsHourlyMatrix.dates.length ? 
                     `<span style="font-size: 12px; background: #f0f9ff; color: #0369a1; padding: 2px 8px; border-radius: 12px; margin-left: 10px;">
                         Données filtrées
@@ -8303,7 +8303,7 @@ function calculateDimensioningPercentages(energyData, kitThresholds) {
     };
 }
 
-// ======================== CRÉATION DU HTML DES STATISTIQUES DE DIMENSIONNEMENT (VERSION COMPACTE AVEC TEXTE EXPLICATIF) ========================
+// ======================== CRÉATION DU HTML DES STATISTIQUES DE DIMENSIONNEMENT ========================
 function createDimensioningStatsHTML(stats, kitThresholds) {
     if (stats.totalDays === 0) {
         return `
@@ -8332,7 +8332,7 @@ function createDimensioningStatsHTML(stats, kitThresholds) {
     const dominantColor = recommendedKitInfo ? recommendedKitInfo.color : 
                          (stats.recommendedKit === 'Kit 4+' ? '#dc2626' : '#667eea');
 
-    // Barres de progression
+    // Barres de progression avec pourcentage de temps
     let progressBarsHTML = '';
     const kitOrder = ['Kit 0', 'Kit 1', 'Kit 2', 'Kit 3', 'Kit 4', 'Kit 4+'];
     
@@ -8349,116 +8349,132 @@ function createDimensioningStatsHTML(stats, kitThresholds) {
         const isRecommended = stats.recommendedKit === kitLabel;
         
         progressBarsHTML += `
-            <div style="margin-bottom: 12px; ${isRecommended ? 'background: ' + dominantColor + '08; padding: 8px; border-radius: 8px; border-left: 4px solid ' + dominantColor + ';' : ''}">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-                    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-                        <span style="width: 12px; height: 12px; background: ${kitInfo.color}; border-radius: 3px;"></span>
-                        <span style="font-weight: ${isRecommended ? '700' : '500'}; font-size: 13px; color: ${isRecommended ? dominantColor : '#2d3748'};">
-                            ${kitLabel}
-                        </span>
-                        <span style="font-size: 11px; color: #64748b; background: #f1f5f9; padding: 2px 8px; border-radius: 12px;">
-                            ${count}j
+            <div style="margin-bottom: 14px; ${isRecommended ? 'background: ' + dominantColor + '08; padding: 10px; border-radius: 10px; border-left: 4px solid ' + dominantColor + ';' : ''}">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                    <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <span style="width: 14px; height: 14px; background: ${kitInfo.color}; border-radius: 4px;"></span>
+                            <span style="font-weight: ${isRecommended ? '700' : '600'}; font-size: 14px; color: ${isRecommended ? dominantColor : '#1e293b'};">
+                                ${kitLabel}
+                            </span>
+                        </div>
+                        <span style="font-size: 12px; color: #475569; background: #f1f5f9; padding: 3px 12px; border-radius: 20px;">
+                            📅 ${count} jour${count !== 1 ? 's' : ''}
                         </span>
                         ${isRecommended ? `
-                            <span style="background: ${dominantColor}; color: white; padding: 2px 10px; border-radius: 20px; font-size: 11px; font-weight: 600;">
-                                ⭐ ${percentage}%
+                            <span style="background: ${dominantColor}; color: white; padding: 3px 12px; border-radius: 30px; font-size: 11px; font-weight: 700; display: flex; align-items: center; gap: 4px;">
+                                ⭐ RECOMMANDÉ
                             </span>
                         ` : ''}
                     </div>
-                    <span style="font-weight: 700; font-size: 15px; color: ${kitInfo.color};">
-                        ${percentage}%
-                    </span>
+                    <div style="display: flex; align-items: baseline; gap: 8px;">
+                        <span style="font-weight: 800; font-size: 18px; color: ${kitInfo.color};">${percentage}%</span>
+                        <span style="font-size: 11px; color: #64748b;">du temps</span>
+                    </div>
                 </div>
-                <div style="width: 100%; height: 6px; background: #edf2f7; border-radius: 4px; overflow: hidden;">
-                    <div style="width: ${percentage}%; height: 100%; background: ${kitInfo.color}; border-radius: 4px;"></div>
+                
+                <!-- Barre de progression -->
+                <div style="position: relative; width: 100%; height: 10px; background: #edf2f7; border-radius: 6px; overflow: hidden; margin-top: 4px;">
+                    <div style="width: ${percentage}%; height: 100%; background: ${kitInfo.color}; border-radius: 6px;"></div>
+                </div>
+                
+                <!-- Phrase explicative pour chaque kit -->
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 6px;">
+                    <span style="font-size: 11px; color: #475569;">
+                        <span style="font-weight: 600;">${kitLabel}</span> correspond à 
+                        <span style="font-weight: 700; color: ${kitInfo.color};">${percentage}% du temps</span>
+                        ${isRecommended ? ' ⭐ (recommandé)' : ''}
+                    </span>
+                    <span style="font-size: 11px; color: #64748b;">
+                        ${count}/${stats.totalDays} jours
+                    </span>
                 </div>
             </div>
         `;
     });
 
     return `
-        <div style="background: white; border-radius: 12px; border: 1px solid #e2e8f0; margin-top: 20px; overflow: hidden; font-size: 13px;">
+        <div style="background: white; border-radius: 16px; border: 1px solid #e2e8f0; margin-top: 25px; 
+                    box-shadow: 0 8px 20px rgba(0,0,0,0.06); overflow: hidden;">
             
-            <!-- En-tête compact -->
-            <div style="background: linear-gradient(135deg, ${dominantColor}08 0%, white 100%); padding: 16px 20px; border-bottom: 2px solid ${dominantColor};">
-                <div style="display: flex; align-items: center; gap: 15px;">
-                    <div style="width: 40px; height: 40px; background: ${dominantColor}; border-radius: 10px; display: flex; align-items: center; justify-content: center;">
-                        <span style="font-size: 22px; color: white;">🎯</span>
+            <!-- En-tête -->
+            <div style="background: linear-gradient(135deg, ${dominantColor}10 0%, white 100%);
+                      padding: 18px 22px; border-bottom: 3px solid ${dominantColor};">
+                <div style="display: flex; align-items: center; gap: 16px;">
+                    <div style="width: 48px; height: 48px; background: ${dominantColor}; 
+                              border-radius: 14px; display: flex; align-items: center; justify-content: center;
+                              box-shadow: 0 6px 14px ${dominantColor}60;">
+                        <span style="font-size: 26px; color: white;">🎯</span>
                     </div>
                     <div style="flex: 1;">
-                        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
-                            <span style="font-size: 12px; color: #475569; font-weight: 600; letter-spacing: 0.5px;">
+                        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 6px;">
+                            <span style="font-size: 13px; color: #475569; font-weight: 700; letter-spacing: 0.8px;">
                                 DIMENSIONNEMENT RECOMMANDÉ
                             </span>
-                            <span style="background: ${dominantColor}20; color: ${dominantColor}; padding: 2px 10px; border-radius: 30px; font-size: 11px; font-weight: 600;">
-                                ${stats.recommendedKitPercentage}% des jours
+                            <span style="background: ${dominantColor}20; color: ${dominantColor}; padding: 4px 14px; 
+                                      border-radius: 40px; font-size: 12px; font-weight: 700;">
+                                🏆 ${stats.recommendedKitPercentage}% DU TEMPS
                             </span>
                         </div>
                         
-                        <div style="display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;">
-                            <span style="font-size: 22px; font-weight: 800; color: ${dominantColor};">
+                        <div style="display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap;">
+                            <span style="font-size: 28px; font-weight: 900; color: ${dominantColor}; line-height: 1;">
                                 ${stats.recommendedKit || 'Non déterminé'}
                             </span>
                             ${recommendedKitInfo ? `
-                                <span style="font-size: 13px; color: #475569; background: white; padding: 3px 12px; border-radius: 30px; border: 1px solid ${dominantColor}30;">
-                                    ${recommendedKitInfo.value} Wh/jour
+                                <span style="font-size: 15px; color: #475569; background: white; 
+                                          padding: 6px 18px; border-radius: 40px; border: 2px solid ${dominantColor}30;
+                                          font-weight: 600;">
+                                    ⚡ ${recommendedKitInfo.value.toLocaleString('fr-FR')} Wh/jour
                                 </span>
                             ` : stats.recommendedKit === 'Kit 4+' ? `
-                                <span style="font-size: 13px; color: #475569; background: white; padding: 3px 12px; border-radius: 30px; border: 1px solid #dc262630;">
-                                    >1080 Wh/jour
+                                <span style="font-size: 15px; color: #475569; background: white; 
+                                          padding: 6px 18px; border-radius: 40px; border: 2px solid #dc262630;
+                                          font-weight: 600;">
+                                    ⚡ >1080 Wh/jour
                                 </span>
                             ` : ''}
+                        </div>
+                        
+                        <div style="margin-top: 10px; font-size: 13px; color: #475569;">
+                            <span style="font-weight: 600;">${stats.recommendedKit}</span> est adapté pour 
+                            <span style="font-weight: 800; color: ${dominantColor};">${stats.recommendedKitPercentage}% du temps</span>
+                            (${stats.recommendedKitCount} jours sur ${stats.totalDays})
                         </div>
                     </div>
                 </div>
             </div>
             
-            <!-- Distribution et explications -->
-            <div style="padding: 16px 20px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                    <h5 style="margin: 0; font-size: 14px; color: #0f172a; display: flex; align-items: center; gap: 6px;">
-                        <span style="font-size: 16px;">📊</span>
-                        <span style="font-weight: 600;">Répartition par kit</span>
+            <!-- Distribution détaillée -->
+            <div style="padding: 22px 24px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px;">
+                    <h5 style="margin: 0; font-size: 16px; color: #0f172a; display: flex; align-items: center; gap: 10px;">
+                        <span style="font-size: 20px;">📊</span>
+                        <span style="font-weight: 700;">Répartition détaillée par kit</span>
                     </h5>
-                    <span style="font-size: 11px; color: #64748b; background: #f8fafc; padding: 4px 12px; border-radius: 30px;">
-                        ${stats.totalDays} jours analysés
+                    <span style="font-size: 12px; color: #475569; background: #f8fafc; padding: 6px 16px; 
+                              border-radius: 40px; border: 1px solid #e2e8f0; font-weight: 500;">
+                        📋 ${stats.totalDays} jours de consommation
                     </span>
                 </div>
                 
                 ${progressBarsHTML}
                 
-                <!-- ✅ TEXTE EXPLICATIF CONSERVÉ MAIS PLUS COMPACT -->
-                <div style="margin-top: 16px; padding: 14px 16px; background: #f8fafc; border-radius: 10px; border-left: 4px solid ${dominantColor}; font-size: 12px;">
-                    <div style="display: flex; align-items: flex-start; gap: 10px;">
-                        <span style="font-size: 16px; color: ${dominantColor};">📌</span>
-                        <div style="flex: 1; color: #334155;">
-                            <div style="font-weight: 600; color: ${dominantColor}; margin-bottom: 6px;">
-                                Ce kit est recommandé car il correspond au profil de consommation le plus fréquent
-                            </div>
-                            <ul style="margin: 0; padding-left: 16px; list-style-type: disc; line-height: 1.5;">
-                                <li style="margin-bottom: 2px;">
-                                    <strong>${stats.recommendedKitCount} jours</strong> sur ${stats.totalDays} 
-                                    <strong style="color: ${dominantColor};">(${stats.recommendedKitPercentage}%)</strong> sont dans cette gamme
-                                </li>
-                                <li style="margin-bottom: 2px;">
-                                    Le pic maximum de <strong>${Math.round(stats.maxEnergy)} Wh</strong> 
-                                    (${stats.maxKitReached}) est un cas exceptionnel 
-                                    <strong style="color: #64748b;">(${stats.percentages[stats.maxKitReached] || 0}% des jours)</strong>
-                                </li>
-                                <li style="margin-bottom: 2px;">
-                                    Dimensionner sur le pic reviendrait à surdimensionner pour 
-                                    <strong style="color: ${dominantColor};">${100 - (stats.percentages[stats.maxKitReached] || 0)}%</strong> des jours
-                                </li>
-                            </ul>
+                <!-- Explication concise -->
+                <div style="margin-top: 20px; padding: 14px 18px; background: #f8fafc; border-radius: 12px; 
+                          border-left: 5px solid ${dominantColor}; font-size: 13px;">
+                    <div style="display: flex; align-items: flex-start; gap: 12px;">
+                        <span style="font-size: 18px; color: ${dominantColor};">📌</span>
+                        <div style="flex: 1;">
+                            <span style="font-weight: 700; color: ${dominantColor};">En résumé :</span>
+                            <span style="color: #334155;">
+                                Le <strong style="color: ${dominantColor};">${stats.recommendedKit}</strong> est le meilleur choix car il correspond à 
+                                <strong style="color: ${dominantColor};">${stats.recommendedKitPercentage}% du temps</strong> 
+                                (${stats.recommendedKitCount} jours). Le pic à ${Math.round(stats.maxEnergy)} Wh 
+                                (${stats.maxKitReached}) n'est présent que ${stats.percentages[stats.maxKitReached] || 0}% du temps.
+                            </span>
                         </div>
                     </div>
-                </div>
-                
-                <!-- Stats rapides ultra compactes (optionnel, peut être supprimé si trop redondant) -->
-                <div style="margin-top: 12px; display: flex; gap: 16px; font-size: 11px; color: #64748b; padding: 8px 12px; background: white; border-radius: 8px; border: 1px solid #e2e8f0;">
-                    <span>📅 Jours avec conso: ${stats.totalDays}</span>
-                    <span>⚡ Pic: ${Math.round(stats.maxEnergy)} Wh</span>
-                    <span>📊 Taux moyen: ${stats.averagePercentage}%</span>
                 </div>
             </div>
         </div>
