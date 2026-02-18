@@ -1967,8 +1967,7 @@ function displayTensionStabilityAnalysis() {
     const analysisContent = createTensionAnalysisContent();
     if (analysisContent) cardContent.appendChild(analysisContent);
     
-    // ✅ AJOUTER LE NOUVEAU TABLEAU DES DÉPASSEMENTS À 14.2V/28V ICI
-    // (avant les graphiques)
+    // ✅ TABLEAU DES DÉPASSEMENTS À 14.2V/28V
     const voltageThresholdContainer = document.createElement('div');
     voltageThresholdContainer.id = 'voltage-threshold-table-container';
     voltageThresholdContainer.style.cssText = `
@@ -1977,8 +1976,21 @@ function displayTensionStabilityAnalysis() {
     `;
     cardContent.appendChild(voltageThresholdContainer);
     
-    // Créer le tableau des dépassements
+    // Créer le tableau des dépassements de tension
     createVoltageThresholdTable();
+    
+    // ✅ NOUVEAU : TABLEAU DES ÉVÉNEMENTS DE DÉLESTAGE
+    const delestageTableContainer = document.createElement('div');
+    delestageTableContainer.id = 'delestage-events-technique-container';
+    delestageTableContainer.style.cssText = `
+        margin: 20px 0;
+        width: 100%;
+    `;
+    cardContent.appendChild(delestageTableContainer);
+    
+    // Créer et ajouter le tableau des délestages
+    const delestageTable = createDelestageEventsTable();
+    delestageTableContainer.appendChild(delestageTable);
     
     // Graphique tension (min, max, moyenne)
     const chartContainer1 = document.createElement('div');
@@ -1998,7 +2010,606 @@ function displayTensionStabilityAnalysis() {
         createHourlyTensionChart('all');
     }, 100);
 }
-
+function analyzeDelestageEvents() {
+    if (combinedEventData.length === 0) {
+        return { 
+            allEvents: [], 
+            eventsByDay: [], 
+            totalEvents: 0, 
+            totalPartiel: 0, 
+            totalTotal: 0,
+            totalDuration: '0h'
+        };
+    }
+    
+    const eventsByDayMap = new Map();
+    let totalDurationMinutes = 0;
+    
+    combinedEventData.forEach(row => {
+        if (!row['Date et Heure'] || !row['Évènements']) return;
+        
+        const event = row['Évènements'].trim();
+        
+        // Vérifier si c'est un événement de délestage
+        if (event.includes('DelestagePartiel') || event.includes('DelestageTotal')) {
+            const dateTime = new Date(row['Date et Heure']);
+            if (isNaN(dateTime.getTime())) return;
+            
+            const dateStr = dateTime.toLocaleDateString('fr-FR', {
+                day: '2-digit', month: '2-digit', year: 'numeric'
+            });
+            const dateKey = dateTime.toISOString().split('T')[0];
+            const time = dateTime.toLocaleTimeString('fr-FR', {
+                hour: '2-digit', minute: '2-digit'
+            });
+            
+            const eventType = event.includes('DelestagePartiel') ? 'Délestage Partiel' : 'Délestage Total';
+            
+            // Initialiser le jour si nécessaire
+            if (!eventsByDayMap.has(dateKey)) {
+                eventsByDayMap.set(dateKey, {
+                    date: dateStr,
+                    dateObj: dateKey,
+                    partiel: [],
+                    total: [],
+                    hasBoth: false,
+                    events: []
+                });
+            }
+            
+            const dayData = eventsByDayMap.get(dateKey);
+            
+            // Chercher s'il y a déjà un événement du même type pour calculer début/fin
+            const existingEvents = dayData.events.filter(e => e.type === eventType);
+            
+            if (existingEvents.length === 0) {
+                // Premier événement de ce type pour cette journée
+                dayData.events.push({
+                    type: eventType,
+                    start: time,
+                    end: time,
+                    count: 1,
+                    times: [time]
+                });
+            } else {
+                // Mettre à jour l'événement existant
+                const lastEvent = existingEvents[existingEvents.length - 1];
+                lastEvent.end = time;
+                lastEvent.count++;
+                lastEvent.times.push(time);
+                
+                // Calculer la durée entre le premier et le dernier
+                const startTime = lastEvent.times[0];
+                const endTime = lastEvent.times[lastEvent.times.length - 1];
+                
+                const start = new Date(`2000-01-01T${startTime}`);
+                const end = new Date(`2000-01-01T${endTime}`);
+                if (end < start) end.setDate(end.getDate() + 1);
+                
+                const diffMs = end - start;
+                const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+                const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+                
+                lastEvent.duration = diffHours > 0 ? 
+                    `${diffHours}h${diffMinutes.toString().padStart(2, '0')}` : 
+                    `${diffMinutes}min`;
+                
+                totalDurationMinutes += diffMs / (1000 * 60);
+            }
+            
+            // Ajouter aux listes spécifiques
+            if (eventType === 'Délestage Partiel') {
+                // Mettre à jour la liste partiel
+                const existingPartiel = dayData.partiel.find(p => p.start === time);
+                if (!existingPartiel) {
+                    dayData.partiel.push({
+                        start: time,
+                        end: time,
+                        duration: '-',
+                        count: 1
+                    });
+                }
+            } else {
+                const existingTotal = dayData.total.find(t => t.start === time);
+                if (!existingTotal) {
+                    dayData.total.push({
+                        start: time,
+                        end: time,
+                        duration: '-',
+                        count: 1
+                    });
+                }
+            }
+        }
+    });
+    
+    // Traiter chaque jour pour calculer les durées finales
+    const eventsByDay = [];
+    let totalPartiel = 0;
+    let totalTotal = 0;
+    
+    eventsByDayMap.forEach((day, dateKey) => {
+        // Traiter les événements partiels
+        if (day.partiel.length > 0) {
+            day.partiel.sort((a, b) => a.start.localeCompare(b.start));
+            // Si plusieurs événements, prendre le premier début et dernière fin
+            if (day.partiel.length > 1) {
+                const first = day.partiel[0];
+                const last = day.partiel[day.partiel.length - 1];
+                
+                const start = new Date(`2000-01-01T${first.start}`);
+                const end = new Date(`2000-01-01T${last.end}`);
+                if (end < start) end.setDate(end.getDate() + 1);
+                
+                const diffMs = end - start;
+                const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+                const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+                
+                day.partiel = [{
+                    start: first.start,
+                    end: last.end,
+                    duration: diffHours > 0 ? `${diffHours}h${diffMinutes.toString().padStart(2, '0')}` : `${diffMinutes}min`,
+                    count: day.partiel.length
+                }];
+            }
+            totalPartiel += day.partiel.reduce((sum, p) => sum + (p.count || 1), 0);
+        }
+        
+        // Traiter les événements totaux
+        if (day.total.length > 0) {
+            day.total.sort((a, b) => a.start.localeCompare(b.start));
+            if (day.total.length > 1) {
+                const first = day.total[0];
+                const last = day.total[day.total.length - 1];
+                
+                const start = new Date(`2000-01-01T${first.start}`);
+                const end = new Date(`2000-01-01T${last.end}`);
+                if (end < start) end.setDate(end.getDate() + 1);
+                
+                const diffMs = end - start;
+                const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+                const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+                
+                day.total = [{
+                    start: first.start,
+                    end: last.end,
+                    duration: diffHours > 0 ? `${diffHours}h${diffMinutes.toString().padStart(2, '0')}` : `${diffMinutes}min`,
+                    count: day.total.length
+                }];
+            }
+            totalTotal += day.total.reduce((sum, t) => sum + (t.count || 1), 0);
+        }
+        
+        day.hasBoth = day.partiel.length > 0 && day.total.length > 0;
+        eventsByDay.push(day);
+    });
+    
+    // Trier par date décroissante
+    eventsByDay.sort((a, b) => new Date(b.dateObj) - new Date(a.dateObj));
+    
+    // Formater la durée totale
+    const totalHours = Math.floor(totalDurationMinutes / 60);
+    const totalMins = Math.floor(totalDurationMinutes % 60);
+    const totalDuration = totalHours > 0 ? 
+        `${totalHours}h${totalMins > 0 ? totalMins + 'min' : ''}` : 
+        `${totalMins}min`;
+    
+    return {
+        eventsByDay: eventsByDay,
+        totalEvents: totalPartiel + totalTotal,
+        totalPartiel: totalPartiel,
+        totalTotal: totalTotal,
+        totalDuration: totalDuration || '0h'
+    };
+}
+function createDelestageEventsTable() {
+    const container = document.createElement('div');
+    container.id = 'delestage-events-table-container';
+    container.style.cssText = `
+        margin-top: 25px;
+        background: white;
+        border-radius: 16px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+        overflow: hidden;
+        border: 1px solid #e2e8f0;
+    `;
+    
+    const delestageData = analyzeDelestageEvents();
+    
+    // ✅ Calculer le nombre total de jours avec diagnostic (données)
+    const totalDiagnosticDays = new Set();
+    
+    // Récupérer tous les jours des données d'énergie
+    if (combinedEnergyData.length > 0) {
+        combinedEnergyData.forEach(row => {
+            if (row['Date et Heure']) {
+                const date = row['Date et Heure'].split(' ')[0];
+                totalDiagnosticDays.add(date);
+            }
+        });
+    }
+    
+    // Récupérer tous les jours des données de tension
+    if (combinedTensionData.length > 0) {
+        combinedTensionData.forEach(row => {
+            if (row['Date et Heure']) {
+                const date = row['Date et Heure'].split(' ')[0];
+                totalDiagnosticDays.add(date);
+            }
+        });
+    }
+    
+    const totalDays = totalDiagnosticDays.size;
+    
+    // Vérifier si des données existent
+    if (!delestageData || delestageData.totalEvents === 0) {
+        const noData = document.createElement('div');
+        noData.style.cssText = `
+            padding: 60px;
+            text-align: center;
+            color: #64748b;
+            background: #f8fafc;
+        `;
+        noData.innerHTML = `
+            <span style="font-size: 64px; display: block; margin-bottom: 20px;">✅</span>
+            <h3 style="margin: 0 0 10px 0; color: #1e293b; font-size: 20px;">Aucun événement de délestage</h3>
+            <p style="margin: 0; color: #64748b; font-size: 14px;">Aucun délestage (partiel ou total) n'a été enregistré sur ${totalDays} jour(s) de diagnostic.</p>
+        `;
+        container.appendChild(noData);
+        return container;
+    }
+    
+    // Calculer les statistiques pour les pourcentages
+    const daysWithPartiel = delestageData.eventsByDay.filter(day => day.partiel.length > 0).length;
+    const daysWithTotal = delestageData.eventsByDay.filter(day => day.total.length > 0).length;
+    const daysWithBoth = delestageData.eventsByDay.filter(day => day.partiel.length > 0 && day.total.length > 0).length;
+    
+    // ✅ POURCENTAGES PAR RAPPORT AU NOMBRE TOTAL DE JOURS DE DIAGNOSTIC
+    const percentPartiel = totalDays > 0 ? ((daysWithPartiel / totalDays) * 100).toFixed(1) : 0;
+    const percentTotal = totalDays > 0 ? ((daysWithTotal / totalDays) * 100).toFixed(1) : 0;
+    const percentBoth = totalDays > 0 ? ((daysWithBoth / totalDays) * 100).toFixed(1) : 0;
+    
+    // En-tête
+    const header = document.createElement('div');
+    header.style.cssText = `
+        background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%);
+        color: white;
+        padding: 15px 25px;
+        font-size: 16px;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 15px;
+    `;
+    
+    header.innerHTML = `
+        <div style="display: flex; align-items: center; gap: 12px;">
+            <span style="font-size: 24px;">🔌</span>
+            <span>Événements de Délestage - Analyse détaillée</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 15px;">
+            <span style="background: rgba(255,255,255,0.15); padding: 6px 16px; border-radius: 30px; font-size: 12px; font-weight: 600;">
+                📅 ${totalDays} jour(s) de diagnostic
+            </span>
+            <span style="background: #ea580c80; padding: 6px 16px; border-radius: 30px; font-size: 12px; font-weight: 600;">
+                🔌 Partiel: ${delestageData.totalPartiel}
+            </span>
+            <span style="background: #991b1b80; padding: 6px 16px; border-radius: 30px; font-size: 12px; font-weight: 600;">
+                🔋 Total: ${delestageData.totalTotal}
+            </span>
+        </div>
+    `;
+    
+    container.appendChild(header);
+    
+    // ✅ CARTES DE POURCENTAGES
+    const statsCards = document.createElement('div');
+    statsCards.style.cssText = `
+        padding: 20px 25px;
+        background: #f8fafc;
+        border-bottom: 1px solid #e2e8f0;
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 15px;
+    `;
+    
+    statsCards.innerHTML = `
+        <!-- Délestage Partiel -->
+        <div style="background: white; padding: 15px; border-radius: 12px; border-left: 5px solid #ea580c; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <span style="font-size: 13px; color: #ea580c; font-weight: 700;">🔌 DÉLESTAGE PARTIEL</span>
+                <span style="background: #ea580c20; color: #ea580c; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 700;">${delestageData.totalPartiel} fois</span>
+            </div>
+            <div style="margin-bottom: 12px;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                    <span style="font-size: 12px; color: #64748b;">Jours concernés</span>
+                    <span style="font-weight: 700; color: #1e293b;">${daysWithPartiel} / ${totalDays}</span>
+                </div>
+                <div style="width: 100%; height: 10px; background: #e2e8f0; border-radius: 6px; overflow: hidden;">
+                    <div style="width: ${percentPartiel}%; height: 100%; background: #ea580c; border-radius: 6px;"></div>
+                </div>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                <span style="font-size: 24px; font-weight: 800; color: #ea580c;">${percentPartiel}%</span>
+                <span style="font-size: 11px; color: #64748b;">des jours de diagnostic</span>
+            </div>
+        </div>
+        
+        <!-- Délestage Total -->
+        <div style="background: white; padding: 15px; border-radius: 12px; border-left: 5px solid #991b1b; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <span style="font-size: 13px; color: #991b1b; font-weight: 700;">🔋 DÉLESTAGE TOTAL</span>
+                <span style="background: #991b1b20; color: #991b1b; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 700;">${delestageData.totalTotal} fois</span>
+            </div>
+            <div style="margin-bottom: 12px;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                    <span style="font-size: 12px; color: #64748b;">Jours concernés</span>
+                    <span style="font-weight: 700; color: #1e293b;">${daysWithTotal} / ${totalDays}</span>
+                </div>
+                <div style="width: 100%; height: 10px; background: #e2e8f0; border-radius: 6px; overflow: hidden;">
+                    <div style="width: ${percentTotal}%; height: 100%; background: #991b1b; border-radius: 6px;"></div>
+                </div>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                <span style="font-size: 24px; font-weight: 800; color: #991b1b;">${percentTotal}%</span>
+                <span style="font-size: 11px; color: #64748b;">des jours de diagnostic</span>
+            </div>
+        </div>
+        
+        <!-- Les deux types -->
+        <div style="background: white; padding: 15px; border-radius: 12px; border-left: 5px solid #8b5cf6; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <span style="font-size: 13px; color: #8b5cf6; font-weight: 700;">🔄 LES DEUX TYPES</span>
+                <span style="background: #8b5cf620; color: #8b5cf6; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 700;">${daysWithBoth} jours</span>
+            </div>
+            <div style="margin-bottom: 12px;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                    <span style="font-size: 12px; color: #64748b;">Jours avec les deux</span>
+                    <span style="font-weight: 700; color: #1e293b;">${daysWithBoth} / ${totalDays}</span>
+                </div>
+                <div style="width: 100%; height: 10px; background: #e2e8f0; border-radius: 6px; overflow: hidden;">
+                    <div style="width: ${percentBoth}%; height: 100%; background: #8b5cf6; border-radius: 6px;"></div>
+                </div>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                <span style="font-size: 24px; font-weight: 800; color: #8b5cf6;">${percentBoth}%</span>
+                <span style="font-size: 11px; color: #64748b;">des jours de diagnostic</span>
+            </div>
+        </div>
+        
+        <!-- Synthèse -->
+        <div style="background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); padding: 15px; border-radius: 12px; color: white;">
+            <div style="font-size: 13px; font-weight: 700; margin-bottom: 15px; opacity: 0.9;">📊 SYNTHÈSE</div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                <div>
+                    <div style="font-size: 11px; opacity: 0.8;">Jours diagnostic</div>
+                    <div style="font-size: 28px; font-weight: 800;">${totalDays}</div>
+                </div>
+                <div>
+                    <div style="font-size: 11px; opacity: 0.8;">Jours avec dél.</div>
+                    <div style="font-size: 28px; font-weight: 800;">${delestageData.eventsByDay.length}</div>
+                </div>
+                <div>
+                    <div style="font-size: 11px; opacity: 0.8;">Taux d'occurrence</div>
+                    <div style="font-size: 20px; font-weight: 700;">${totalDays > 0 ? ((delestageData.eventsByDay.length / totalDays) * 100).toFixed(1) : 0}%</div>
+                </div>
+                <div>
+                    <div style="font-size: 11px; opacity: 0.8;">Dernier</div>
+                    <div style="font-size: 14px; font-weight: 600;">${delestageData.eventsByDay[0]?.date || '-'}</div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    container.appendChild(statsCards);
+    
+    // Légende
+    const legend = document.createElement('div');
+    legend.style.cssText = `
+        padding: 12px 25px;
+        background: #f1f5f9;
+        border-bottom: 1px solid #e2e8f0;
+        display: flex;
+        align-items: center;
+        gap: 25px;
+        flex-wrap: wrap;
+        font-size: 12px;
+    `;
+    
+    legend.innerHTML = `
+        <div style="display: flex; align-items: center; gap: 8px;">
+            <div style="width: 14px; height: 14px; background: #ea580c; border-radius: 4px;"></div>
+            <span style="color: #9a3412; font-weight: 600;">🔌 Délestage Partiel</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px;">
+            <div style="width: 14px; height: 14px; background: #991b1b; border-radius: 4px;"></div>
+            <span style="color: #7f1d1d; font-weight: 600;">🔋 Délestage Total</span>
+        </div>
+        <div style="margin-left: auto; background: white; padding: 4px 12px; border-radius: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+            <span style="color: #475569;">⏱️ Durée = heure de fin - heure de début</span>
+        </div>
+    `;
+    
+    container.appendChild(legend);
+    
+    // Tableau avec hauteur fixe de 350px
+    const tableWrapper = document.createElement('div');
+    tableWrapper.style.cssText = `
+        max-height: 350px;
+        overflow-y: auto;
+        overflow-x: auto;
+        position: relative;
+        scrollbar-width: thin;
+        background: white;
+    `;
+    
+    let tableHTML = `
+        <table style="width: 100%; border-collapse: collapse; font-size: 12px; min-width: 1000px;">
+            <thead style="position: sticky; top: 0; z-index: 20; background: white;">
+                <tr style="background: #334155; color: white;">
+                    <th style="padding: 14px 10px; text-align: left; border-bottom: 3px solid #1e293b; position: sticky; left: 0; background: #334155; color: white; font-weight: 700;">📅 DATE</th>
+                    <th style="padding: 14px 10px; text-align: center; border-bottom: 3px solid #1e293b; background: #334155; color: white; font-weight: 700;" colspan="3">🔌 DÉLESTAGE PARTIEL</th>
+                    <th style="padding: 14px 10px; text-align: center; border-bottom: 3px solid #1e293b; background: #334155; color: white; font-weight: 700;" colspan="3">🔋 DÉLESTAGE TOTAL</th>
+                </tr>
+                <tr style="background: #f1f5f9;">
+                    <th style="padding: 12px 10px; text-align: left; border-bottom: 2px solid #cbd5e1; position: sticky; left: 0; background: #f1f5f9;"></th>
+                    <th style="padding: 12px 10px; text-align: center; border-bottom: 2px solid #cbd5e1; background: #f1f5f9;">Début</th>
+                    <th style="padding: 12px 10px; text-align: center; border-bottom: 2px solid #cbd5e1; background: #f1f5f9;">Fin</th>
+                    <th style="padding: 12px 10px; text-align: center; border-bottom: 2px solid #cbd5e1; background: #f1f5f9;">Durée</th>
+                    <th style="padding: 12px 10px; text-align: center; border-bottom: 2px solid #cbd5e1; background: #f1f5f9;">Début</th>
+                    <th style="padding: 12px 10px; text-align: center; border-bottom: 2px solid #cbd5e1; background: #f1f5f9;">Fin</th>
+                    <th style="padding: 12px 10px; text-align: center; border-bottom: 2px solid #cbd5e1; background: #f1f5f9;">Durée</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+    
+    // Grouper les événements par jour
+    delestageData.eventsByDay.forEach((day, index) => {
+        const bgColor = index % 2 === 0 ? '#ffffff' : '#fafbfc';
+        const rowSpan = Math.max(1, day.partiel.length, day.total.length);
+        
+        // Première ligne pour ce jour
+        tableHTML += `<tr style="border-bottom: 1px solid #e2e8f0; background: ${bgColor};">`;
+        
+        // Date (avec rowSpan)
+        tableHTML += `
+            <td style="padding: 12px 10px; position: sticky; left: 0; background: ${bgColor}; font-weight: 700; border-right: 1px solid #e2e8f0;" rowspan="${rowSpan}">
+                <div style="display: flex; flex-direction: column;">
+                    <span style="font-size: 13px;">${day.date}</span>
+                    <span style="font-size: 9px; color: #64748b; margin-top: 2px;">${day.dateObj}</span>
+                </div>
+            </td>
+        `;
+        
+        // Délestage Partiel - première occurrence
+        if (day.partiel.length > 0) {
+            const p = day.partiel[0];
+            tableHTML += `
+                <td style="padding: 12px 10px; text-align: center; background: #ea580c10; color: #9a3412; font-weight: 600; font-family: monospace;">${p.start}</td>
+                <td style="padding: 12px 10px; text-align: center; background: #ea580c10; color: #9a3412; font-weight: 600; font-family: monospace;">${p.end}</td>
+                <td style="padding: 12px 10px; text-align: center; background: #ea580c20; color: #ea580c; font-weight: 700; font-family: monospace;">${p.duration} ${p.count > 1 ? `<span style="background: white; padding: 2px 6px; border-radius: 12px; font-size: 9px; margin-left: 4px;">${p.count}x</span>` : ''}</td>
+            `;
+        } else {
+            tableHTML += `
+                <td style="padding: 12px 10px; text-align: center; color: #cbd5e1; font-style: italic;">-</td>
+                <td style="padding: 12px 10px; text-align: center; color: #cbd5e1; font-style: italic;">-</td>
+                <td style="padding: 12px 10px; text-align: center; color: #cbd5e1; font-style: italic;">-</td>
+            `;
+        }
+        
+        // Délestage Total - première occurrence
+        if (day.total.length > 0) {
+            const t = day.total[0];
+            tableHTML += `
+                <td style="padding: 12px 10px; text-align: center; background: #991b1b10; color: #7f1d1d; font-weight: 600; font-family: monospace;">${t.start}</td>
+                <td style="padding: 12px 10px; text-align: center; background: #991b1b10; color: #7f1d1d; font-weight: 600; font-family: monospace;">${t.end}</td>
+                <td style="padding: 12px 10px; text-align: center; background: #991b1b20; color: #991b1b; font-weight: 700; font-family: monospace;">${t.duration} ${t.count > 1 ? `<span style="background: white; padding: 2px 6px; border-radius: 12px; font-size: 9px; margin-left: 4px;">${t.count}x</span>` : ''}</td>
+            `;
+        } else {
+            tableHTML += `
+                <td style="padding: 12px 10px; text-align: center; color: #cbd5e1; font-style: italic;">-</td>
+                <td style="padding: 12px 10px; text-align: center; color: #cbd5e1; font-style: italic;">-</td>
+                <td style="padding: 12px 10px; text-align: center; color: #cbd5e1; font-style: italic;">-</td>
+            `;
+        }
+        
+        tableHTML += `</tr>`;
+        
+        // Lignes supplémentaires pour les événements multiples dans la même journée
+        const maxEvents = Math.max(day.partiel.length, day.total.length);
+        for (let i = 1; i < maxEvents; i++) {
+            tableHTML += `<tr style="border-bottom: 1px solid #e2e8f0; background: ${bgColor};">`;
+            
+            // Partiel (si existe)
+            if (i < day.partiel.length) {
+                const p = day.partiel[i];
+                tableHTML += `
+                    <td style="padding: 12px 10px; text-align: center; background: #ea580c10; color: #9a3412; font-weight: 600; font-family: monospace;">${p.start}</td>
+                    <td style="padding: 12px 10px; text-align: center; background: #ea580c10; color: #9a3412; font-weight: 600; font-family: monospace;">${p.end}</td>
+                    <td style="padding: 12px 10px; text-align: center; background: #ea580c20; color: #ea580c; font-weight: 700; font-family: monospace;">${p.duration} ${p.count > 1 ? `<span style="background: white; padding: 2px 6px; border-radius: 12px; font-size: 9px; margin-left: 4px;">${p.count}x</span>` : ''}</td>
+                `;
+            } else {
+                tableHTML += `
+                    <td style="padding: 12px 10px; text-align: center; color: #cbd5e1; font-style: italic;">-</td>
+                    <td style="padding: 12px 10px; text-align: center; color: #cbd5e1; font-style: italic;">-</td>
+                    <td style="padding: 12px 10px; text-align: center; color: #cbd5e1; font-style: italic;">-</td>
+                `;
+            }
+            
+            // Total (si existe)
+            if (i < day.total.length) {
+                const t = day.total[i];
+                tableHTML += `
+                    <td style="padding: 12px 10px; text-align: center; background: #991b1b10; color: #7f1d1d; font-weight: 600; font-family: monospace;">${t.start}</td>
+                    <td style="padding: 12px 10px; text-align: center; background: #991b1b10; color: #7f1d1d; font-weight: 600; font-family: monospace;">${t.end}</td>
+                    <td style="padding: 12px 10px; text-align: center; background: #991b1b20; color: #991b1b; font-weight: 700; font-family: monospace;">${t.duration} ${t.count > 1 ? `<span style="background: white; padding: 2px 6px; border-radius: 12px; font-size: 9px; margin-left: 4px;">${t.count}x</span>` : ''}</td>
+                `;
+            } else {
+                tableHTML += `
+                    <td style="padding: 12px 10px; text-align: center; color: #cbd5e1; font-style: italic;">-</td>
+                    <td style="padding: 12px 10px; text-align: center; color: #cbd5e1; font-style: italic;">-</td>
+                    <td style="padding: 12px 10px; text-align: center; color: #cbd5e1; font-style: italic;">-</td>
+                `;
+            }
+            
+            tableHTML += `</tr>`;
+        }
+    });
+    
+    // Ligne de total
+    tableHTML += `
+        <tr style="background: #1e293b; color: white; font-weight: 700; position: sticky; bottom: 0; z-index: 15;">
+            <td style="padding: 14px 10px; text-align: left; background: #1e293b; position: sticky; left: 0;">TOTAL GÉNÉRAL</td>
+            <td style="padding: 14px 10px; text-align: center; background: #1e293b;" colspan="3">
+                <span style="background: #ea580c; padding: 6px 16px; border-radius: 30px; font-size: 12px;">
+                    ${delestageData.totalPartiel} événement(s)
+                </span>
+            </td>
+            <td style="padding: 14px 10px; text-align: center; background: #1e293b;" colspan="3">
+                <span style="background: #991b1b; padding: 6px 16px; border-radius: 30px; font-size: 12px;">
+                    ${delestageData.totalTotal} événement(s)
+                </span>
+            </td>
+        </tr>
+    `;
+    
+    tableHTML += `</tbody></table>`;
+    tableWrapper.innerHTML = tableHTML;
+    container.appendChild(tableWrapper);
+    
+    // Pied de tableau avec statistiques
+    const footer = document.createElement('div');
+    footer.style.cssText = `
+        padding: 15px 25px;
+        background: #f8fafc;
+        border-top: 1px solid #e2e8f0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 12px;
+        color: #475569;
+        flex-wrap: wrap;
+        gap: 15px;
+    `;
+    
+    footer.innerHTML = `
+        <div style="display: flex; align-items: center; gap: 20px;">
+            <span>📊 <strong>${delestageData.eventsByDay.length}</strong> jour(s) avec délestages</span>
+            <span>⏱️ Durée totale: <strong>${delestageData.totalDuration}</strong></span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 20px;">
+            <span>🔌 Partiel: <strong style="color: #ea580c;">${delestageData.totalPartiel}</strong> fois</span>
+            <span>🔋 Total: <strong style="color: #991b1b;">${delestageData.totalTotal}</strong> fois</span>
+        </div>
+    `;
+    
+    container.appendChild(footer);
+    
+    return container;
+}
 // ==================== CARD 4 : ANALYSE TOTALE ÉNERGIE ====================
 function displayEnergyAnalysis() {
     const cardContent = document.getElementById('card-energy-analysis-content');
@@ -5041,6 +5652,7 @@ function displayEventAnalysis() {
 
 function createEventSummaryCard() {
     const dailyEvents = analyzeEventsByDay();
+    
     const totals = dailyEvents.reduce((acc, day) => {
         acc.SuspendP += day.SuspendP || 0;
         acc.SuspendE += day.SuspendE || 0;
@@ -5051,26 +5663,37 @@ function createEventSummaryCard() {
         return acc;
     }, { SuspendP: 0, SuspendE: 0, Surcharge: 0, DelestagePartiel: 0, DelestageTotal: 0, Total: 0 });
     
-    const allSuspendPClients = new Set(), allSuspendEClients = new Set();
+    // Collecter les clients uniques pour SuspendP et SuspendE
+    const allSuspendPClients = new Set();
+    const allSuspendEClients = new Set();
+    
     dailyEvents.forEach(day => {
-        if (day.SuspendP_clients_str && day.SuspendP_clients_str !== '-') {
-            day.SuspendP_clients_str.split(', ').forEach(client => { if (client.trim()) allSuspendPClients.add(client.trim()); });
+        // Pour SuspendP, le client est déjà extrait
+        if (day.SuspendP > 0 && day.client !== 'Système' && day.client !== 'N/A') {
+            allSuspendPClients.add(day.client);
         }
-        if (day.SuspendE_clients_str && day.SuspendE_clients_str !== '-') {
-            day.SuspendE_clients_str.split(', ').forEach(client => { if (client.trim()) allSuspendEClients.add(client.trim()); });
+        // Pour SuspendE
+        if (day.SuspendE > 0 && day.client !== 'Système' && day.client !== 'N/A') {
+            allSuspendEClients.add(day.client);
         }
     });
     
     const card = document.createElement('div');
     card.style.cssText = `background: linear-gradient(135deg, #f39c12 0%, #d35400 100%); border-radius: 12px; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1); overflow: hidden;`;
+    
     const cardHeader = document.createElement('div');
     cardHeader.style.cssText = `background: rgba(255, 255, 255, 0.1); color: white; padding: 15px 25px; font-size: 18px; font-weight: 600; display: flex; align-items: center; gap: 10px; backdrop-filter: blur(10px);`;
     cardHeader.innerHTML = `⚠️ SYNTHÈSE DES ÉVÉNEMENTS`;
+    
     const cardContent = document.createElement('div');
     cardContent.style.cssText = `padding: 20px 25px; display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; background: white;`;
     
-    cardContent.appendChild(createStatItem('⏸️', 'SuspendP', totals.SuspendP, '#7c3aed', '#f5f3ff', `${allSuspendPClients.size} client${allSuspendPClients.size !== 1 ? 's' : ''}: ${Array.from(allSuspendPClients).join(', ')}`));
-    cardContent.appendChild(createStatItem('⏸️', 'SuspendE', totals.SuspendE, '#0ea5e9', '#f0f9ff', `${allSuspendEClients.size} client${allSuspendEClients.size !== 1 ? 's' : ''}: ${Array.from(allSuspendEClients).join(', ')}`));
+    cardContent.appendChild(createStatItem('⏸️', 'SuspendP', totals.SuspendP, '#7c3aed', '#f5f3ff', 
+        `${allSuspendPClients.size} client${allSuspendPClients.size !== 1 ? 's' : ''}: ${Array.from(allSuspendPClients).sort().join(', ')}`));
+    
+    cardContent.appendChild(createStatItem('⏸️', 'SuspendE', totals.SuspendE, '#0ea5e9', '#f0f9ff', 
+        `${allSuspendEClients.size} client${allSuspendEClients.size !== 1 ? 's' : ''}: ${Array.from(allSuspendEClients).sort().join(', ')}`));
+    
     cardContent.appendChild(createStatItem('⚡', 'Surcharge', totals.Surcharge, '#dc2626', '#fef2f2'));
     cardContent.appendChild(createStatItem('🔌', 'Delestage Partiel', totals.DelestagePartiel, '#ea580c', '#fff7ed'));
     cardContent.appendChild(createStatItem('🔋', 'Delestage Total', totals.DelestageTotal, '#991b1b', '#fef2f2'));
@@ -5279,17 +5902,32 @@ function createMainEventsTable(dailyEvents) {
 
 function analyzeEventsByDay() {
     if (combinedEventData.length === 0) return [];
+    
     const eventsByDay = {};
+    
     combinedEventData.forEach(row => {
         if (!row['Date et Heure'] || !row['Évènements']) return;
+        
         const dateTime = new Date(row['Date et Heure']);
         if (isNaN(dateTime.getTime())) return;
+        
         const date = dateTime.toISOString().split('T')[0];
         const time = dateTime.toTimeString().split(' ')[0];
         const event = row['Évènements'].trim();
-        if (!eventsByDay[date]) eventsByDay[date] = { date, eventsByClient: {}, eventsByType: {}, allEvents: [] };
+        
+        if (!eventsByDay[date]) {
+            eventsByDay[date] = { 
+                date, 
+                eventsByClient: {}, 
+                eventsByType: {}, 
+                allEvents: [] 
+            };
+        }
+        
         const day = eventsByDay[date];
         day.allEvents.push({ time, event, code1: row['Code 1'] || '', code2: row['Code 2'] || '', code3: row['Code 3'] || '', rawEvent: row['Évènements'] || '' });
+        
+        // Déterminer le type d'événement
         let eventType = '';
         if (event.includes('SuspendP')) eventType = 'SuspendP';
         else if (event.includes('SuspendE')) eventType = 'SuspendE';
@@ -5300,46 +5938,127 @@ function analyzeEventsByDay() {
         else if (event.includes('Arrêt')) eventType = 'Arrêt';
         else if (event.includes('Normal')) eventType = 'Normal';
         else eventType = 'Autre';
-        let clientNumber = '';
+        
+        // Déterminer le numéro du client
+        let clientNumber = 'Système';
+        
+        // Pour SuspendP et SuspendE, extraire le dernier chiffre du Code 1
         if (eventType === 'SuspendP' || eventType === 'SuspendE') {
-            clientNumber = row['Code 1'] || '';
-            clientNumber = clientNumber && /^\d+$/.test(clientNumber.trim()) ? clientNumber.trim() : 'N/A';
-        } else clientNumber = 'Système';
+            const code1 = row['Code 1'] || '';
+            if (code1 && /^\d+$/.test(code1.trim())) {
+                // Prendre le dernier chiffre du numéro
+                const lastDigit = code1.trim().slice(-1);
+                clientNumber = lastDigit;
+            } else {
+                clientNumber = 'N/A';
+            }
+        }
+        
         const clientTypeKey = `${clientNumber}_${eventType}`;
-        if (!day.eventsByClient[clientNumber]) day.eventsByClient[clientNumber] = { client: clientNumber, eventsByType: {}, allEvents: [] };
-        if (!day.eventsByClient[clientNumber].eventsByType[eventType]) day.eventsByClient[clientNumber].eventsByType[eventType] = { count: 0, startTime: null, endTime: null, events: [] };
-        if (!day.eventsByType[eventType]) day.eventsByType[eventType] = { count: 0, clients: new Set(), startTime: null, endTime: null, events: [] };
+        
+        // Initialiser les structures de données pour ce client
+        if (!day.eventsByClient[clientNumber]) {
+            day.eventsByClient[clientNumber] = { 
+                client: clientNumber, 
+                eventsByType: {}, 
+                allEvents: [] 
+            };
+        }
+        
+        if (!day.eventsByClient[clientNumber].eventsByType[eventType]) {
+            day.eventsByClient[clientNumber].eventsByType[eventType] = { 
+                count: 0, 
+                startTime: null, 
+                endTime: null, 
+                events: [] 
+            };
+        }
+        
+        if (!day.eventsByType[eventType]) {
+            day.eventsByType[eventType] = { 
+                count: 0, 
+                clients: new Set(), 
+                startTime: null, 
+                endTime: null, 
+                events: [] 
+            };
+        }
+        
+        // Ajouter l'événement pour ce client
         const clientEventInfo = day.eventsByClient[clientNumber].eventsByType[eventType];
         clientEventInfo.count++;
         clientEventInfo.events.push({ time, event });
-        if (!clientEventInfo.startTime || time < clientEventInfo.startTime) clientEventInfo.startTime = time;
-        if (!clientEventInfo.endTime || time > clientEventInfo.endTime) clientEventInfo.endTime = time;
+        
+        if (!clientEventInfo.startTime || time < clientEventInfo.startTime) {
+            clientEventInfo.startTime = time;
+        }
+        if (!clientEventInfo.endTime || time > clientEventInfo.endTime) {
+            clientEventInfo.endTime = time;
+        }
+        
+        // Ajouter l'événement pour le type global
         const typeEventInfo = day.eventsByType[eventType];
         typeEventInfo.count++;
-        if (clientNumber !== 'Système' && clientNumber !== 'N/A') typeEventInfo.clients.add(clientNumber);
+        if (clientNumber !== 'Système' && clientNumber !== 'N/A') {
+            typeEventInfo.clients.add(clientNumber);
+        }
         typeEventInfo.events.push({ time, event, client: clientNumber });
-        if (!typeEventInfo.startTime || time < typeEventInfo.startTime) typeEventInfo.startTime = time;
-        if (!typeEventInfo.endTime || time > typeEventInfo.endTime) typeEventInfo.endTime = time;
+        
+        if (!typeEventInfo.startTime || time < typeEventInfo.startTime) {
+            typeEventInfo.startTime = time;
+        }
+        if (!typeEventInfo.endTime || time > typeEventInfo.endTime) {
+            typeEventInfo.endTime = time;
+        }
     });
     
     const result = [];
+    
     Object.keys(eventsByDay).sort().forEach(date => {
         const day = eventsByDay[date];
         const clients = Object.keys(day.eventsByClient).sort();
+        
         clients.forEach(clientNumber => {
             if (clientNumber === 'TOTAL') return;
+            
             const clientData = day.eventsByClient[clientNumber];
+            
             const row = {
-                date, client: clientNumber,
-                SuspendP: 0, SuspendP_start: '-', SuspendP_end: '-', SuspendP_duration: '-', SuspendP_clients_str: clientNumber === 'Système' || clientNumber === 'N/A' ? '-' : clientNumber,
-                SuspendE: 0, SuspendE_start: '-', SuspendE_end: '-', SuspendE_duration: '-', SuspendE_clients_str: clientNumber === 'Système' || clientNumber === 'N/A' ? '-' : clientNumber,
-                Surcharge: 0, Surcharge_start: '-', Surcharge_end: '-', Surcharge_duration: '-',
-                DelestagePartiel: 0, DelestagePartiel_start: '-', DelestagePartiel_end: '-', DelestagePartiel_duration: '-',
-                DelestageTotal: 0, DelestageTotal_start: '-', DelestageTotal_end: '-', DelestageTotal_duration: '-',
+                date,
+                client: clientNumber,
+                SuspendP: 0, 
+                SuspendP_start: '-', 
+                SuspendP_end: '-', 
+                SuspendP_duration: '-', 
+                SuspendP_clients_str: clientNumber === 'Système' || clientNumber === 'N/A' ? '-' : clientNumber,
+                
+                SuspendE: 0, 
+                SuspendE_start: '-', 
+                SuspendE_end: '-', 
+                SuspendE_duration: '-', 
+                SuspendE_clients_str: clientNumber === 'Système' || clientNumber === 'N/A' ? '-' : clientNumber,
+                
+                Surcharge: 0, 
+                Surcharge_start: '-', 
+                Surcharge_end: '-', 
+                Surcharge_duration: '-',
+                
+                DelestagePartiel: 0, 
+                DelestagePartiel_start: '-', 
+                DelestagePartiel_end: '-', 
+                DelestagePartiel_duration: '-',
+                
+                DelestageTotal: 0, 
+                DelestageTotal_start: '-', 
+                DelestageTotal_end: '-', 
+                DelestageTotal_duration: '-',
+                
                 Total: 0
             };
+            
             Object.keys(clientData.eventsByType).forEach(eventType => {
                 const eventInfo = clientData.eventsByType[eventType];
+                
                 if (eventType === 'SuspendP') {
                     row.SuspendP = eventInfo.count;
                     if (eventInfo.startTime && eventInfo.endTime) {
@@ -5376,12 +6095,36 @@ function analyzeEventsByDay() {
                         row.DelestageTotal_duration = calculateDuration(eventInfo.startTime, eventInfo.endTime);
                     }
                 }
+                
                 row.Total += eventInfo.count;
             });
+            
             result.push(row);
         });
     });
+    
     return result;
+}
+function getEventsByClient(clientNumber) {
+    const dailyEvents = analyzeEventsByDay();
+    
+    // Convertir clientNumber en string pour la comparaison
+    const clientStr = clientNumber.toString();
+    
+    // Filtrer les événements pour ce client uniquement
+    const clientEvents = dailyEvents.filter(event => 
+        event.client === clientStr || 
+        (event.client !== 'Système' && event.client !== 'N/A' && event.client === clientStr)
+    );
+    
+    // Filtrer aussi les événements système qui concernent ce client
+    // (dans le cas où certains événements système sont liés à des clients)
+    const systemEventsForClient = dailyEvents.filter(event => 
+        event.client === 'Système' && 
+        (event.SuspendP_clients_str === clientStr || event.SuspendE_clients_str === clientStr)
+    );
+    
+    return [...clientEvents, ...systemEventsForClient];
 }
 
 function calculateDuration(startTime, endTime) {
@@ -6083,8 +6826,12 @@ function countTotalFiles(structure) {
 function displayFolderInfo() {
     const titleEl = document.getElementById('folder-title');
     const subtitleEl = document.getElementById('folder-info-subtitle');
-    titleEl.textContent = '📂 NR-' + escapeHtml(currentFolder.name);
+    
+    // Plus besoin d'ajouter des classes, tout est déjà dans le HTML
+    titleEl.textContent = '📂 Relèves-' + escapeHtml(currentFolder.name);
     subtitleEl.textContent = 'Créé le ' + currentFolder.date;
+    
+    // Le badge est déjà dans le HTML, pas besoin de l'ajouter
 }
 
 // ==================== CRÉATION DES ONGLETS PRINCIPAUX ====================
@@ -6094,11 +6841,12 @@ function createMainTabs() {
     mainTabsContainer.className = 'main-tabs-container';
     mainTabsContainer.style.cssText = `background: white; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1); overflow: hidden;`;
     
-    // Onglets principaux (TECHNIQUE, COMMERCIALE, ÉVÉNEMENTS)
+    // Onglets principaux (TECHNIQUE, COMMERCIALE et FRAUDE)
     const mainTabsHeader = document.createElement('div');
     mainTabsHeader.className = 'main-tabs-header';
     mainTabsHeader.style.cssText = `display: flex; background: #f8f9fa; border-bottom: 2px solid #e9ecef; padding: 0;`;
     
+    // Onglet TECHNIQUE
     const techniqueTab = document.createElement('button');
     techniqueTab.id = 'main-tab-technique';
     techniqueTab.className = 'main-tab-btn active';
@@ -6106,6 +6854,7 @@ function createMainTabs() {
     techniqueTab.innerHTML = '🔧 TECHNIQUE';
     techniqueTab.addEventListener('click', () => showMainTab('technique'));
     
+    // Onglet COMMERCIALE
     const commercialeTab = document.createElement('button');
     commercialeTab.id = 'main-tab-commerciale';
     commercialeTab.className = 'main-tab-btn';
@@ -6113,44 +6862,51 @@ function createMainTabs() {
     commercialeTab.innerHTML = '💰 COMMERCIALE';
     commercialeTab.addEventListener('click', () => showMainTab('commerciale'));
     
-    const evenementTab = document.createElement('button');
-    evenementTab.id = 'main-tab-evenement';
-    evenementTab.className = 'main-tab-btn';
-    evenementTab.style.cssText = `flex: 1; padding: 18px 25px; background: #e9ecef; color: #6c757d; border: none; font-size: 16px; font-weight: 600; cursor: pointer; transition: all 0.3s ease; display: flex; align-items: center; justify-content: center; gap: 10px;`;
-    evenementTab.innerHTML = '⚠️ ÉVÉNEMENTS';
-    evenementTab.addEventListener('click', () => showMainTab('evenement'));
+    // ✅ NOUVEL ONGLET FRAUDE
+    const fraudeTab = document.createElement('button');
+    fraudeTab.id = 'main-tab-fraude';
+    fraudeTab.className = 'main-tab-btn';
+    fraudeTab.style.cssText = `flex: 1; padding: 18px 25px; background: #e9ecef; color: #6c757d; border: none; font-size: 16px; font-weight: 600; cursor: pointer; transition: all 0.3s ease; display: flex; align-items: center; justify-content: center; gap: 10px;`;
+    fraudeTab.innerHTML = '🔍 FRAUDE';
+    fraudeTab.addEventListener('click', () => showMainTab('fraude'));
     
     mainTabsHeader.appendChild(techniqueTab);
     mainTabsHeader.appendChild(commercialeTab);
-    mainTabsHeader.appendChild(evenementTab);
+    mainTabsHeader.appendChild(fraudeTab);
     mainTabsContainer.appendChild(mainTabsHeader);
     
+    // Contenu des onglets
     const mainTabsContent = document.createElement('div');
     mainTabsContent.className = 'main-tabs-content';
     mainTabsContent.style.cssText = `padding: 0;`;
     
+    // Contenu TECHNIQUE
     const techniqueContent = document.createElement('div');
     techniqueContent.id = 'main-tab-content-technique';
     techniqueContent.className = 'main-tab-content active';
     techniqueContent.style.cssText = `padding: 0; display: block;`;
     
+    // Contenu COMMERCIALE
     const commercialeContent = document.createElement('div');
     commercialeContent.id = 'main-tab-content-commerciale';
     commercialeContent.className = 'main-tab-content';
-    commercialeContent.style.cssText = `padding: 20px; display: none;`;
+    commercialeContent.style.cssText = `padding: 0; display: none;`;
     
-    const evenementContent = document.createElement('div');
-    evenementContent.id = 'main-tab-content-evenement';
-    evenementContent.className = 'main-tab-content';
-    evenementContent.style.cssText = `padding: 0; display: none;`;
+    // ✅ NOUVEAU CONTENU FRAUDE
+    const fraudeContent = document.createElement('div');
+    fraudeContent.id = 'main-tab-content-fraude';
+    fraudeContent.className = 'main-tab-content';
+    fraudeContent.style.cssText = `padding: 0; display: none;`;
     
     mainTabsContent.appendChild(techniqueContent);
     mainTabsContent.appendChild(commercialeContent);
-    mainTabsContent.appendChild(evenementContent);
+    mainTabsContent.appendChild(fraudeContent);
     mainTabsContainer.appendChild(mainTabsContent);
     
+    // Supprimer l'ancien conteneur d'onglets s'il existe
     const existingTabsContainer = document.querySelector('.tabs-container');
     if (existingTabsContainer) existingTabsContainer.remove();
+    
     mainElement.appendChild(mainTabsContainer);
 }
 
@@ -6181,32 +6937,86 @@ function showMainTab(tabName) {
             displayEnergyAnalysis();
         } else if (tabName === 'commerciale') {
             createClientSubTabs();
-            
-            // ✅ NOUVEAU : Sélectionner automatiquement le Client 1 après la création des sous-onglets
             setTimeout(() => {
                 const activeClients = detectActiveClients();
                 if (activeClients.length > 0) {
-                    // Sélectionner le premier client actif (normalement le client 1)
-                    const firstClient = activeClients[0];
-                    showClientTab(firstClient);
-                } else {
-                    // Si aucun client actif, afficher un message
-                    const contentDiv = document.getElementById('client-sub-tabs-content');
-                    if (contentDiv) {
-                        contentDiv.innerHTML = `
-                            <div style="text-align: center; padding: 50px; background: white; border-radius: 12px;">
-                                <div style="font-size: 48px; margin-bottom: 20px;">👥</div>
-                                <h3 style="color: #2c3e50; margin-bottom: 10px;">Aucun client actif</h3>
-                                <p style="color: #7f8c8d;">Aucune donnée de consommation ou de crédit n'a été trouvée.</p>
-                            </div>
-                        `;
-                    }
+                    showClientTab(activeClients[0]);
                 }
-            }, 100); // Petit délai pour laisser le DOM se créer
-        } else if (tabName === 'evenement') {
-            displayEventAnalysis();
+            }, 100);
+        } else if (tabName === 'fraude') {
+            displayFraudeAnalysis();
         }
     }
+}
+
+function getTabGradient(tabName) {
+    switch(tabName) {
+        case 'technique': return 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+        case 'commerciale': return 'linear-gradient(135deg, #48bb78 0%, #38a169 100%)';
+        case 'fraude': return 'linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)';
+        default: return '#e9ecef';
+    }
+}
+
+function displayCommercialEventsAnalysis() {
+    const eventContent = document.getElementById('commercial-events-content');
+    if (!eventContent) return;
+    
+    eventContent.innerHTML = '';
+    
+    if (combinedEventData.length === 0) {
+        eventContent.innerHTML = `
+            <div style="text-align: center; padding: 40px;">
+                <div style="font-size: 48px; margin-bottom: 15px;">📭</div>
+                <h3 style="margin: 0 0 10px 0; color: #1e293b;">Aucun événement trouvé</h3>
+                <p style="color: #64748b; margin: 0;">Aucun événement n'a été détecté dans les données analysées.</p>
+            </div>
+        `;
+        return;
+    }
+    
+    // Afficher la carte de synthèse
+    const summaryCard = createEventSummaryCard();
+    eventContent.appendChild(summaryCard);
+    
+    // Afficher les statistiques
+    const dailyEvents = analyzeEventsByDay();
+    const statsSection = addEventStatisticsSummary(dailyEvents);
+    eventContent.appendChild(statsSection);
+    
+    // Afficher la répartition par type
+    const typeSummary = addEventTypeSummary(dailyEvents);
+    eventContent.appendChild(typeSummary);
+    
+    // Afficher le tableau détaillé
+    const tableWrapper = document.createElement('div');
+    tableWrapper.style.cssText = `
+        margin-top: 20px;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        overflow: hidden;
+    `;
+    
+    const tableHeader = document.createElement('div');
+    tableHeader.style.cssText = `
+        background: #f1f5f9;
+        padding: 10px 15px;
+        font-weight: 600;
+        color: #334155;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-bottom: 1px solid #e2e8f0;
+    `;
+    tableHeader.innerHTML = `
+        <span>📋 Tableau détaillé des événements</span>
+        <span style="font-size: 11px; color: #64748b;">${dailyEvents.length} entrée(s)</span>
+    `;
+    
+    const mainTable = createMainEventsTable(dailyEvents);
+    tableWrapper.appendChild(tableHeader);
+    tableWrapper.appendChild(mainTable);
+    eventContent.appendChild(tableWrapper);
 }
 
 function getTabGradient(tabName) {
@@ -6375,7 +7185,7 @@ function showClientTab(clientNumber) {
     displayClientCommercialAnalysis(contentDiv, parseInt(clientNumber));
 }
 function displayClientCommercialAnalysis(container, clientNumber) {
-    // En-tête avec informations du client (inchangé)
+    // En-tête avec informations du client
     const clientHeader = document.createElement('div');
     clientHeader.style.cssText = `
         background: linear-gradient(135deg, #4299e1 0%, #3182ce 100%);
@@ -6401,7 +7211,7 @@ function displayClientCommercialAnalysis(container, clientNumber) {
     `;
     container.appendChild(clientHeader);
     
-    // Statistiques rapides du client (inchangé)
+    // Statistiques rapides du client
     const statsGrid = document.createElement('div');
     statsGrid.style.cssText = `
         display: grid;
@@ -6432,30 +7242,425 @@ function displayClientCommercialAnalysis(container, clientNumber) {
     `;
     container.appendChild(statsGrid);
     
-    // Analyse de consommation pour ce client
+    // Analyse de consommation pour ce client (inclut maintenant le tableau des événements)
     if (combinedEnergyData.length > 0) {
         const energyAnalysis = createClientEnergyAnalysis(clientNumber);
         container.appendChild(energyAnalysis);
     }
     
-    // ✅ NOUVELLE ANALYSE DE CRÉDIT AVEC DONNÉES DE RECHARGE
+    // Analyse de crédit avec données de recharge
     if (combinedSoldeData.length > 0 || combinedRechargeData.length > 0) {
         const creditAnalysis = createClientCreditAnalysis(clientNumber);
         container.appendChild(creditAnalysis);
     }
     
-    // Tableau SOLDE filtré par client
+    // Tableau SOLDE filtré par client (avec hauteur fixe)
     if (combinedSoldeData.length > 0) {
         const soldeTable = createSoldeTableForClient(clientNumber);
         container.appendChild(soldeTable);
     }
     
-    // Le tableau RECHARGE est maintenant intégré dans l'analyse de crédit
-    // mais on peut le garder si vous voulez
+    // Tableau RECHARGE
     if (combinedRechargeData.length > 0) {
         const rechargeTable = createRechargeTableForClient(clientNumber);
         container.appendChild(rechargeTable);
     }
+}
+function createClientEventsTable(clientNumber) {
+    const container = document.createElement('div');
+    container.className = 'client-events-table';
+    container.style.cssText = `
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        margin-bottom: 20px;
+        overflow: hidden;
+    `;
+    
+    const header = document.createElement('div');
+    header.style.cssText = `
+        background: linear-gradient(135deg, #f39c12 0%, #d35400 100%);
+        color: white;
+        padding: 15px 20px;
+        font-size: 16px;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    `;
+    header.innerHTML = `<span>⚠️ Événements (SuspendP / SuspendE) - Client ${clientNumber}</span>`;
+    container.appendChild(header);
+    
+    const content = document.createElement('div');
+    content.style.cssText = `padding: 20px;`;
+    
+    // Récupérer tous les événements
+    const dailyEvents = analyzeEventsByDay();
+    
+    // Filtrer pour ce client (en utilisant le dernier chiffre)
+    const clientStr = clientNumber.toString();
+    const clientEvents = dailyEvents.filter(event => {
+        // Vérifier si c'est un événement pour ce client
+        if (event.client === clientStr) return true;
+        
+        // Vérifier dans les colonnes SuspendP_clients_str et SuspendE_clients_str
+        if (event.SuspendP_clients_str === clientStr) return true;
+        if (event.SuspendE_clients_str === clientStr) return true;
+        
+        return false;
+    });
+    
+    if (clientEvents.length === 0) {
+        content.innerHTML = `
+            <div style="text-align: center; padding: 30px; color: #94a3b8;">
+                Aucun événement SuspendP ou SuspendE pour ce client
+            </div>
+        `;
+        container.appendChild(content);
+        return container;
+    }
+    
+    // Filtrer pour ne garder que SuspendP et SuspendE
+    const filteredEvents = clientEvents.map(event => ({
+        date: event.date,
+        formattedDate: new Date(event.date).toLocaleDateString('fr-FR', {
+            day: '2-digit', month: '2-digit', year: 'numeric'
+        }),
+        client: event.client,
+        SuspendP: event.SuspendP,
+        SuspendP_start: event.SuspendP_start,
+        SuspendP_end: event.SuspendP_end,
+        SuspendP_duration: event.SuspendP_duration,
+        SuspendE: event.SuspendE,
+        SuspendE_start: event.SuspendE_start,
+        SuspendE_end: event.SuspendE_end,
+        SuspendE_duration: event.SuspendE_duration
+    })).filter(event => event.SuspendP > 0 || event.SuspendE > 0);
+    
+    if (filteredEvents.length === 0) {
+        content.innerHTML = `
+            <div style="text-align: center; padding: 30px; color: #94a3b8;">
+                Aucun événement SuspendP ou SuspendE pour ce client
+            </div>
+        `;
+        container.appendChild(content);
+        return container;
+    }
+    
+    // ✅ Calculer le nombre total de jours avec diagnostic pour ce client
+    const totalDiagnosticDays = new Set();
+    
+    // Récupérer tous les jours des données d'énergie pour ce client
+    if (combinedEnergyData.length > 0) {
+        const energyKey = `Energie${clientNumber}`;
+        combinedEnergyData.forEach(row => {
+            if (row['Date et Heure']) {
+                const value = row[energyKey];
+                // Vérifier si le client a des données ce jour-là
+                if (value && value.toString().trim() !== '' && value.toString().trim() !== '-') {
+                    const date = row['Date et Heure'].split(' ')[0];
+                    totalDiagnosticDays.add(date);
+                }
+            }
+        });
+    }
+    
+    // Récupérer tous les jours des données de solde pour ce client
+    if (combinedSoldeData.length > 0) {
+        const creditKey = `Credit${clientNumber}`;
+        combinedSoldeData.forEach(row => {
+            if (row['Date et Heure']) {
+                const value = row[creditKey];
+                if (value && value.toString().trim() !== '' && value.toString().trim() !== '-') {
+                    const date = row['Date et Heure'].split(' ')[0];
+                    totalDiagnosticDays.add(date);
+                }
+            }
+        });
+    }
+    
+    const totalDays = totalDiagnosticDays.size;
+    
+    // Calculer les statistiques pour les pourcentages
+    const daysWithSuspendP = filteredEvents.filter(e => e.SuspendP > 0).length;
+    const daysWithSuspendE = filteredEvents.filter(e => e.SuspendE > 0).length;
+    const daysWithBoth = filteredEvents.filter(e => e.SuspendP > 0 && e.SuspendE > 0).length;
+    
+    // ✅ POURCENTAGES PAR RAPPORT AU NOMBRE TOTAL DE JOURS DE DIAGNOSTIC
+    const percentSuspendP = totalDays > 0 ? ((daysWithSuspendP / totalDays) * 100).toFixed(1) : 0;
+    const percentSuspendE = totalDays > 0 ? ((daysWithSuspendE / totalDays) * 100).toFixed(1) : 0;
+    const percentBoth = totalDays > 0 ? ((daysWithBoth / totalDays) * 100).toFixed(1) : 0;
+    
+    // Calculer les totaux
+    const totalSuspendP = filteredEvents.reduce((sum, e) => sum + e.SuspendP, 0);
+    const totalSuspendE = filteredEvents.reduce((sum, e) => sum + e.SuspendE, 0);
+    
+    // Calculer la durée totale (si disponible)
+    let totalDurationP = 0;
+    let totalDurationE = 0;
+    
+    filteredEvents.forEach(event => {
+        // Convertir les durées en minutes pour le calcul
+        if (event.SuspendP_duration && event.SuspendP_duration !== '-') {
+            const duration = event.SuspendP_duration;
+            if (duration.includes('h')) {
+                const [hours, mins] = duration.split('h');
+                totalDurationP += parseInt(hours) * 60 + parseInt(mins || 0);
+            } else if (duration.includes('min')) {
+                totalDurationP += parseInt(duration.replace('min', ''));
+            }
+        }
+        if (event.SuspendE_duration && event.SuspendE_duration !== '-') {
+            const duration = event.SuspendE_duration;
+            if (duration.includes('h')) {
+                const [hours, mins] = duration.split('h');
+                totalDurationE += parseInt(hours) * 60 + parseInt(mins || 0);
+            } else if (duration.includes('min')) {
+                totalDurationE += parseInt(duration.replace('min', ''));
+            }
+        }
+    });
+    
+    // Formater les durées totales
+    const formatTotalDuration = (minutes) => {
+        if (minutes === 0) return '-';
+        const hours = Math.floor(minutes / 60);
+        const mins = minutes % 60;
+        return hours > 0 ? `${hours}h${mins > 0 ? mins + 'min' : ''}` : `${mins}min`;
+    };
+    
+    // ✅ CARTES DE POURCENTAGES
+    const statsCards = document.createElement('div');
+    statsCards.style.cssText = `
+        background: #f8fafc;
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 20px;
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 15px;
+        border: 1px solid #e2e8f0;
+    `;
+    
+    statsCards.innerHTML = `
+        <!-- SuspendP -->
+        <div style="background: white; padding: 15px; border-radius: 10px; border-left: 5px solid #7c3aed; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <span style="font-size: 13px; color: #7c3aed; font-weight: 700;">⏸️ SUSPEND P</span>
+                <span style="background: #7c3aed20; color: #7c3aed; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 700;">${totalSuspendP} fois</span>
+            </div>
+            <div style="margin-bottom: 12px;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                    <span style="font-size: 12px; color: #64748b;">Jours concernés</span>
+                    <span style="font-weight: 700; color: #1e293b;">${daysWithSuspendP} / ${totalDays}</span>
+                </div>
+                <div style="width: 100%; height: 10px; background: #e2e8f0; border-radius: 6px; overflow: hidden;">
+                    <div style="width: ${percentSuspendP}%; height: 100%; background: #7c3aed; border-radius: 6px;"></div>
+                </div>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                <span style="font-size: 24px; font-weight: 800; color: #7c3aed;">${percentSuspendP}%</span>
+                <span style="font-size: 11px; color: #64748b;">des jours de diagnostic</span>
+            </div>
+            ${totalDurationP > 0 ? `<div style="margin-top: 8px; font-size: 11px; color: #475569;">⏱️ Durée totale: <strong>${formatTotalDuration(totalDurationP)}</strong></div>` : ''}
+        </div>
+        
+        <!-- SuspendE -->
+        <div style="background: white; padding: 15px; border-radius: 10px; border-left: 5px solid #0ea5e9; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <span style="font-size: 13px; color: #0ea5e9; font-weight: 700;">⏸️ SUSPEND E</span>
+                <span style="background: #0ea5e920; color: #0ea5e9; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 700;">${totalSuspendE} fois</span>
+            </div>
+            <div style="margin-bottom: 12px;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                    <span style="font-size: 12px; color: #64748b;">Jours concernés</span>
+                    <span style="font-weight: 700; color: #1e293b;">${daysWithSuspendE} / ${totalDays}</span>
+                </div>
+                <div style="width: 100%; height: 10px; background: #e2e8f0; border-radius: 6px; overflow: hidden;">
+                    <div style="width: ${percentSuspendE}%; height: 100%; background: #0ea5e9; border-radius: 6px;"></div>
+                </div>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                <span style="font-size: 24px; font-weight: 800; color: #0ea5e9;">${percentSuspendE}%</span>
+                <span style="font-size: 11px; color: #64748b;">des jours de diagnostic</span>
+            </div>
+            ${totalDurationE > 0 ? `<div style="margin-top: 8px; font-size: 11px; color: #475569;">⏱️ Durée totale: <strong>${formatTotalDuration(totalDurationE)}</strong></div>` : ''}
+        </div>
+        
+        <!-- Les deux ensemble -->
+        <div style="background: white; padding: 15px; border-radius: 10px; border-left: 5px solid #8b5cf6; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <span style="font-size: 13px; color: #8b5cf6; font-weight: 700;">🔄 LES DEUX TYPES</span>
+                <span style="background: #8b5cf620; color: #8b5cf6; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 700;">${daysWithBoth} jours</span>
+            </div>
+            <div style="margin-bottom: 12px;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                    <span style="font-size: 12px; color: #64748b;">Jours avec les deux</span>
+                    <span style="font-weight: 700; color: #1e293b;">${daysWithBoth} / ${totalDays}</span>
+                </div>
+                <div style="width: 100%; height: 10px; background: #e2e8f0; border-radius: 6px; overflow: hidden;">
+                    <div style="width: ${percentBoth}%; height: 100%; background: #8b5cf6; border-radius: 6px;"></div>
+                </div>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                <span style="font-size: 24px; font-weight: 800; color: #8b5cf6;">${percentBoth}%</span>
+                <span style="font-size: 11px; color: #64748b;">des jours de diagnostic</span>
+            </div>
+        </div>
+        
+        <!-- Synthèse -->
+        <div style="background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); padding: 15px; border-radius: 10px; color: white;">
+            <div style="font-size: 13px; font-weight: 700; margin-bottom: 15px; opacity: 0.9;">📊 SYNTHÈSE</div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                <div>
+                    <div style="font-size: 11px; opacity: 0.8;">Jours diagnostic</div>
+                    <div style="font-size: 28px; font-weight: 800;">${totalDays}</div>
+                </div>
+                <div>
+                    <div style="font-size: 11px; opacity: 0.8;">Jours avec susp.</div>
+                    <div style="font-size: 28px; font-weight: 800;">${filteredEvents.length}</div>
+                </div>
+                <div>
+                    <div style="font-size: 11px; opacity: 0.8;">Taux d'occurrence</div>
+                    <div style="font-size: 20px; font-weight: 700;">${totalDays > 0 ? ((filteredEvents.length / totalDays) * 100).toFixed(1) : 0}%</div>
+                </div>
+                <div>
+                    <div style="font-size: 11px; opacity: 0.8;">Total susp.</div>
+                    <div style="font-size: 20px; font-weight: 700;">${totalSuspendP + totalSuspendE}</div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    content.appendChild(statsCards);
+    
+    // Créer le tableau avec hauteur fixe et défilement
+    const tableWrapper = document.createElement('div');
+    tableWrapper.style.cssText = `
+        max-height: 250px;
+        overflow-y: auto;
+        overflow-x: auto;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        position: relative;
+        scrollbar-width: thin;
+    `;
+    
+    let tableHTML = `
+        <table style="width: 100%; border-collapse: collapse; font-size: 12px; min-width: 900px;">
+            <thead style="position: sticky; top: 0; z-index: 10; background: white;">
+                <tr style="background: #f1f5f9;">
+                    <th colspan="1" style="padding: 10px; text-align: left; border-bottom: 2px solid #cbd5e1;">Date</th>
+                    <th colspan="4" style="padding: 10px; text-align: center; background: #7c3aed20; color: #7c3aed; border-bottom: 2px solid #cbd5e1;">SUSPEND P</th>
+                    <th colspan="4" style="padding: 10px; text-align: center; background: #0ea5e920; color: #0ea5e9; border-bottom: 2px solid #cbd5e1;">SUSPEND E</th>
+                </tr>
+                <tr style="background: #f8fafc;">
+                    <th style="padding: 8px; text-align: left; border-bottom: 1px solid #e2e8f0;"></th>
+                    <th style="padding: 8px; text-align: center; border-bottom: 1px solid #e2e8f0;">Nombre</th>
+                    <th style="padding: 8px; text-align: center; border-bottom: 1px solid #e2e8f0;">Début</th>
+                    <th style="padding: 8px; text-align: center; border-bottom: 1px solid #e2e8f0;">Fin</th>
+                    <th style="padding: 8px; text-align: center; border-bottom: 1px solid #e2e8f0;">Durée</th>
+                    <th style="padding: 8px; text-align: center; border-bottom: 1px solid #e2e8f0;">Nombre</th>
+                    <th style="padding: 8px; text-align: center; border-bottom: 1px solid #e2e8f0;">Début</th>
+                    <th style="padding: 8px; text-align: center; border-bottom: 1px solid #e2e8f0;">Fin</th>
+                    <th style="padding: 8px; text-align: center; border-bottom: 1px solid #e2e8f0;">Durée</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+    
+    // Trier par date décroissante (plus récent en premier)
+    filteredEvents.sort((a, b) => new Date(b.date) - new Date(a.date)).forEach((event, index) => {
+        const bgColor = index % 2 === 0 ? '#ffffff' : '#fafbfc';
+        
+        tableHTML += `
+            <tr style="border-bottom: 1px solid #e2e8f0; background: ${bgColor};">
+                <td style="padding: 8px; position: sticky; left: 0; background: ${bgColor};">
+                    <div style="display: flex; flex-direction: column;">
+                        <span style="font-weight: 600;">${event.formattedDate}</span>
+                        <span style="font-size: 9px; color: #64748b;">${event.date}</span>
+                    </div>
+                </td>
+                <td style="padding: 8px; text-align: center; font-weight: 700; color: #7c3aed;">${event.SuspendP}</td>
+                <td style="padding: 8px; text-align: center;">${event.SuspendP_start}</td>
+                <td style="padding: 8px; text-align: center;">${event.SuspendP_end}</td>
+                <td style="padding: 8px; text-align: center; background: #7c3aed10; font-weight: 600;">${event.SuspendP_duration}</td>
+                <td style="padding: 8px; text-align: center; font-weight: 700; color: #0ea5e9;">${event.SuspendE}</td>
+                <td style="padding: 8px; text-align: center;">${event.SuspendE_start}</td>
+                <td style="padding: 8px; text-align: center;">${event.SuspendE_end}</td>
+                <td style="padding: 8px; text-align: center; background: #0ea5e910; font-weight: 600;">${event.SuspendE_duration}</td>
+            </tr>
+        `;
+    });
+    
+    // Ligne de total (collée en bas)
+    tableHTML += `
+        <tr style="background: #f1f5f9; font-weight: 700; position: sticky; bottom: 0; z-index: 5;">
+            <td style="padding: 10px 8px; text-align: left; background: #f1f5f9;">TOTAL</td>
+            <td style="padding: 10px 8px; text-align: center; color: #7c3aed; background: #f1f5f9;">${totalSuspendP}</td>
+            <td style="padding: 10px 8px; text-align: center; background: #f1f5f9;">-</td>
+            <td style="padding: 10px 8px; text-align: center; background: #f1f5f9;">-</td>
+            <td style="padding: 10px 8px; text-align: center; background: #f1f5f9;">${formatTotalDuration(totalDurationP)}</td>
+            <td style="padding: 10px 8px; text-align: center; color: #0ea5e9; background: #f1f5f9;">${totalSuspendE}</td>
+            <td style="padding: 10px 8px; text-align: center; background: #f1f5f9;">-</td>
+            <td style="padding: 10px 8px; text-align: center; background: #f1f5f9;">-</td>
+            <td style="padding: 10px 8px; text-align: center; background: #f1f5f9;">${formatTotalDuration(totalDurationE)}</td>
+        </tr>
+    `;
+    
+    tableHTML += `</tbody></table>`;
+    tableWrapper.innerHTML = tableHTML;
+    content.appendChild(tableWrapper);
+    
+    // Indicateur de nombre de lignes
+    const infoRow = document.createElement('div');
+    infoRow.style.cssText = `
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 10px;
+        font-size: 11px;
+        color: #64748b;
+    `;
+    infoRow.innerHTML = `
+        <span>📋 ${filteredEvents.length} jour(s) avec suspensions sur ${totalDays} jours de diagnostic</span>
+        <span>⬆️ ${totalSuspendP} SuspendP • ⬆️ ${totalSuspendE} SuspendE</span>
+    `;
+    content.appendChild(infoRow);
+    
+    // Légende
+    const legend = document.createElement('div');
+    legend.style.cssText = `
+        margin-top: 15px;
+        padding: 10px;
+        background: #f8fafc;
+        border-radius: 6px;
+        font-size: 11px;
+        color: #475569;
+        display: flex;
+        align-items: center;
+        gap: 20px;
+        flex-wrap: wrap;
+    `;
+    legend.innerHTML = `
+        <div style="display: flex; align-items: center; gap: 5px;">
+            <div style="width: 12px; height: 12px; background: #7c3aed; border-radius: 3px;"></div>
+            <span>SuspendP : Suspension de puissance</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 5px;">
+            <div style="width: 12px; height: 12px; background: #0ea5e9; border-radius: 3px;"></div>
+            <span>SuspendE : Suspension énergétique</span>
+        </div>
+        <div style="margin-left: auto;">
+            <span style="background: #e2e8f0; padding: 4px 8px; border-radius: 4px;">
+                Client extrait du dernier chiffre du Code 1
+            </span>
+        </div>
+    `;
+    content.appendChild(legend);
+    
+    container.appendChild(content);
+    return container;
 }
 function calculateClientStats(clientNumber) {
     const energyKey = `Energie${clientNumber}`;
@@ -6547,7 +7752,7 @@ function createSoldeTableForClient(clientNumber) {
         align-items: center;
         gap: 10px;
     `;
-    header.innerHTML = `<span>💰</span> Historique SOLDE - ${clientNumber === 'all' ? 'Tous les clients' : `Client ${clientNumber}`}`;
+    header.innerHTML = `<span>💰 Historique SOLDE - Client ${clientNumber}</span>`;
     container.appendChild(header);
     
     const content = document.createElement('div');
@@ -6569,12 +7774,24 @@ function createSoldeTableForClient(clientNumber) {
         return container;
     }
     
+    // ✅ TABLEAU AVEC HAUTEUR FIXE DE 350px ET DÉFILEMENT
     const tableWrapper = document.createElement('div');
-    tableWrapper.style.cssText = `overflow-x: auto;`;
+    tableWrapper.style.cssText = `
+        max-height: 350px;
+        overflow-y: auto;
+        overflow-x: auto;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        position: relative;
+        scrollbar-width: thin;
+    `;
     
-    let tableHTML = `<table style="width: 100%; border-collapse: collapse; font-size: 12px;">`;
-    tableHTML += `<thead><tr style="background: #f7fafc;">`;
-    tableHTML += `<th style="padding: 12px; text-align: left; border-bottom: 2px solid #e2e8f0;">Date et Heure</th>`;
+    let tableHTML = `<table style="width: 100%; border-collapse: collapse; font-size: 12px; min-width: 800px;">`;
+    
+    // En-tête fixe
+    tableHTML += `<thead style="position: sticky; top: 0; z-index: 10; background: white;">`;
+    tableHTML += `<tr style="background: #f7fafc;">`;
+    tableHTML += `<th style="padding: 12px; text-align: left; border-bottom: 2px solid #e2e8f0; position: sticky; left: 0; background: #f7fafc;">Date et Heure</th>`;
     
     if (clientNumber === 'all') {
         for (let i = 1; i <= 6; i++) {
@@ -6586,35 +7803,54 @@ function createSoldeTableForClient(clientNumber) {
     
     tableHTML += `</tr></thead><tbody>`;
     
-    filteredData.slice(0, 100).forEach((row, index) => {
-        tableHTML += `<tr style="border-bottom: 1px solid #edf2f7; background: ${index % 2 === 0 ? '#ffffff' : '#fafbfc'};">`;
-        tableHTML += `<td style="padding: 10px 12px;">${row['Date et Heure'] || '-'}</td>`;
+    // Trier par date décroissante (plus récent en premier)
+    const sortedData = [...filteredData].sort((a, b) => 
+        new Date(b['Date et Heure']) - new Date(a['Date et Heure'])
+    );
+    
+    sortedData.forEach((row, index) => {
+        const bgColor = index % 2 === 0 ? '#ffffff' : '#fafbfc';
+        tableHTML += `<tr style="border-bottom: 1px solid #edf2f7; background: ${bgColor};">`;
+        
+        // Date avec fond fixe pour la première colonne
+        tableHTML += `<td style="padding: 10px 12px; position: sticky; left: 0; background: ${bgColor};">${row['Date et Heure'] || '-'}</td>`;
         
         if (clientNumber === 'all') {
             for (let i = 1; i <= 6; i++) {
                 const value = row[`Credit${i}`] || '-';
-                tableHTML += `<td style="padding: 10px 12px; text-align: center; ${value !== '-' ? 'color: #48bb78; font-weight: 600;' : 'color: #a0aec0;'}">${value}</td>`;
+                const isPositive = value !== '-' && parseFloat(value) > 0;
+                tableHTML += `<td style="padding: 10px 12px; text-align: center; ${isPositive ? 'color: #48bb78; font-weight: 600;' : 'color: #a0aec0;'}">${value}</td>`;
             }
         } else {
             const value = row[`Credit${clientNumber}`] || '-';
-            tableHTML += `<td style="padding: 10px 12px; text-align: center; ${value !== '-' ? 'color: #48bb78; font-weight: 600;' : 'color: #a0aec0;'}">${value}</td>`;
+            const isPositive = value !== '-' && parseFloat(value) > 0;
+            tableHTML += `<td style="padding: 10px 12px; text-align: center; ${isPositive ? 'color: #48bb78; font-weight: 600;' : 'color: #a0aec0;'}">${value}</td>`;
         }
         
         tableHTML += `</tr>`;
     });
     
     tableHTML += `</tbody></table>`;
-    
-    if (filteredData.length > 100) {
-        tableHTML += `<div style="padding: 10px; text-align: center; color: #718096; font-size: 11px; border-top: 1px solid #e2e8f0;">`;
-        tableHTML += `Affichage des 100 premières lignes sur ${filteredData.length}`;
-        tableHTML += `</div>`;
-    }
-    
     tableWrapper.innerHTML = tableHTML;
     content.appendChild(tableWrapper);
-    container.appendChild(content);
     
+    // Indicateur de nombre de lignes
+    const infoRow = document.createElement('div');
+    infoRow.style.cssText = `
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 10px;
+        font-size: 11px;
+        color: #64748b;
+    `;
+    infoRow.innerHTML = `
+        <span>📋 ${filteredData.length} enregistrement(s) de solde</span>
+        <span>⬆️ Dernier: ${sortedData[0]?.['Date et Heure'] || 'N/A'}</span>
+    `;
+    content.appendChild(infoRow);
+    
+    container.appendChild(content);
     return container;
 }
 function createRechargeTableForClient(clientNumber) {
@@ -6639,7 +7875,7 @@ function createRechargeTableForClient(clientNumber) {
         align-items: center;
         gap: 10px;
     `;
-    header.innerHTML = `<span>⚡</span> Historique RECHARGE - ${clientNumber === 'all' ? 'Tous les clients' : `Client ${clientNumber}`}`;
+    header.innerHTML = `<span>⚡ Historique RECHARGE - Client ${clientNumber}</span>`;
     container.appendChild(header);
     
     const content = document.createElement('div');
@@ -6660,13 +7896,25 @@ function createRechargeTableForClient(clientNumber) {
         return container;
     }
     
+    // ✅ TABLEAU AVEC HAUTEUR FIXE DE 350px ET DÉFILEMENT
     const tableWrapper = document.createElement('div');
-    tableWrapper.style.cssText = `overflow-x: auto;`;
+    tableWrapper.style.cssText = `
+        max-height: 350px;
+        overflow-y: auto;
+        overflow-x: auto;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        position: relative;
+        scrollbar-width: thin;
+    `;
     
-    let tableHTML = `<table style="width: 100%; border-collapse: collapse; font-size: 12px;">`;
-    tableHTML += `<thead><tr style="background: #f7fafc;">`;
-    tableHTML += `<th style="padding: 12px; text-align: left; border-bottom: 2px solid #e2e8f0;">Date et Heure</th>`;
-    tableHTML += `<th style="padding: 12px; text-align: center; border-bottom: 2px solid #e2e8f0;">Code enregistrer</th>`;
+    let tableHTML = `<table style="width: 100%; border-collapse: collapse; font-size: 12px; min-width: 1000px;">`;
+    
+    // En-tête fixe
+    tableHTML += `<thead style="position: sticky; top: 0; z-index: 10; background: white;">`;
+    tableHTML += `<tr style="background: #f7fafc;">`;
+    tableHTML += `<th style="padding: 12px; text-align: left; border-bottom: 2px solid #e2e8f0; position: sticky; left: 0; background: #f7fafc;">Date et Heure</th>`;
+    tableHTML += `<th style="padding: 12px; text-align: center; border-bottom: 2px solid #e2e8f0;">Code</th>`;
     tableHTML += `<th style="padding: 12px; text-align: center; border-bottom: 2px solid #e2e8f0;">Type</th>`;
     tableHTML += `<th style="padding: 12px; text-align: center; border-bottom: 2px solid #e2e8f0;">Statut</th>`;
     tableHTML += `<th style="padding: 12px; text-align: center; border-bottom: 2px solid #e2e8f0;">Code 1</th>`;
@@ -6675,12 +7923,18 @@ function createRechargeTableForClient(clientNumber) {
     tableHTML += `<th style="padding: 12px; text-align: center; border-bottom: 2px solid #e2e8f0;">Code 4</th>`;
     tableHTML += `</tr></thead><tbody>`;
     
-    filteredData.slice(0, 100).forEach((row, index) => {
+    // Trier par date décroissante
+    const sortedData = [...filteredData].sort((a, b) => 
+        new Date(b['Date et Heure']) - new Date(a['Date et Heure'])
+    );
+    
+    sortedData.forEach((row, index) => {
+        const bgColor = index % 2 === 0 ? '#ffffff' : '#fafbfc';
         const statusColor = row['Status']?.toLowerCase().includes('reussie') ? '#48bb78' : 
                            row['Status']?.toLowerCase().includes('echoue') ? '#f56565' : '#ed8936';
         
-        tableHTML += `<tr style="border-bottom: 1px solid #edf2f7; background: ${index % 2 === 0 ? '#ffffff' : '#fafbfc'};">`;
-        tableHTML += `<td style="padding: 10px 12px;">${row['Date et Heure'] || '-'}</td>`;
+        tableHTML += `<tr style="border-bottom: 1px solid #edf2f7; background: ${bgColor};">`;
+        tableHTML += `<td style="padding: 10px 12px; position: sticky; left: 0; background: ${bgColor};">${row['Date et Heure'] || '-'}</td>`;
         tableHTML += `<td style="padding: 10px 12px; text-align: center; font-family: monospace;">${row['Code enregistrer'] || '-'}</td>`;
         tableHTML += `<td style="padding: 10px 12px; text-align: center;">${row['Type de code'] || '-'}</td>`;
         tableHTML += `<td style="padding: 10px 12px; text-align: center; color: ${statusColor}; font-weight: 600;">${row['Status'] || '-'}</td>`;
@@ -6692,17 +7946,26 @@ function createRechargeTableForClient(clientNumber) {
     });
     
     tableHTML += `</tbody></table>`;
-    
-    if (filteredData.length > 100) {
-        tableHTML += `<div style="padding: 10px; text-align: center; color: #718096; font-size: 11px; border-top: 1px solid #e2e8f0;">`;
-        tableHTML += `Affichage des 100 premières lignes sur ${filteredData.length}`;
-        tableHTML += `</div>`;
-    }
-    
     tableWrapper.innerHTML = tableHTML;
     content.appendChild(tableWrapper);
-    container.appendChild(content);
     
+    // Indicateur de nombre de lignes
+    const infoRow = document.createElement('div');
+    infoRow.style.cssText = `
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 10px;
+        font-size: 11px;
+        color: #64748b;
+    `;
+    infoRow.innerHTML = `
+        <span>📋 ${filteredData.length} recharge(s)</span>
+        <span>⬆️ Dernière: ${sortedData[0]?.['Date et Heure'] || 'N/A'}</span>
+    `;
+    content.appendChild(infoRow);
+    
+    container.appendChild(content);
     return container;
 }
 function createClientEnergyAnalysis(clientNumber) {
@@ -6814,6 +8077,13 @@ function createClientEnergyAnalysis(clientNumber) {
             </div>
         `;
         content.appendChild(toleranceCard);
+        
+        // ✅ NOUVEAU : TABLEAU DES ÉVÉNEMENTS PAR CLIENT (SuspendP et SuspendE)
+        if (combinedEventData.length > 0) {
+            const eventsTable = createClientEventsTable(clientNumber);
+            content.appendChild(eventsTable);
+        }
+        
         // ✅ ANALYSE DES CHANGEMENTS DE FORFAIT
         if (consumptionAnalysis.forfaitComparisons && consumptionAnalysis.forfaitComparisons.length > 0) {
             const comparisonSection = document.createElement('div');
@@ -6848,7 +8118,6 @@ function createClientEnergyAnalysis(clientNumber) {
                     border: 1px solid ${comparison.statusColor}30;
                 `;
                 
-                // ✅ VERSION CORRIGÉE AVEC "Hors tolérance" au lieu de "Jours >100%"
                 card.innerHTML = `
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 10px;">
                         <div style="display: flex; align-items: center; gap: 15px;">
@@ -6867,7 +8136,7 @@ function createClientEnergyAnalysis(clientNumber) {
                     </div>
                     
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 10px;">
-                        <!-- Ancien forfait - CORRIGÉ -->
+                        <!-- Ancien forfait -->
                         <div style="background: #fff7ed; padding: 12px; border-radius: 8px;">
                             <div style="font-size: 12px; color: #9a3412; margin-bottom: 5px;">AVANT - ${comparison.oldForfait}</div>
                             <div style="font-size: 11px; color: #64748b; margin-bottom: 5px;">
@@ -6891,7 +8160,7 @@ function createClientEnergyAnalysis(clientNumber) {
                             </div>
                         </div>
                         
-                        <!-- Nouveau forfait - CORRIGÉ -->
+                        <!-- Nouveau forfait -->
                         <div style="background: ${comparison.stillProblematic ? '#fee2e2' : '#f0fdf4'}; padding: 12px; border-radius: 8px;">
                             <div style="font-size: 12px; color: ${comparison.stillProblematic ? '#991b1b' : '#166534'}; margin-bottom: 5px;">APRÈS - ${comparison.newForfait}</div>
                             <div style="font-size: 11px; color: #64748b; margin-bottom: 5px;">
@@ -6916,7 +8185,7 @@ function createClientEnergyAnalysis(clientNumber) {
                         </div>
                     </div>
                     
-                    <!-- Conclusion --> 
+                    <!-- Conclusion -->
                     <div style="margin-top: 15px; padding: 10px; background: white; border-radius: 6px; border-left: 4px solid ${comparison.statusColor};">
                         <div style="display: flex; align-items: center; gap: 8px;">
                             <span style="font-size: 16px;">${comparison.statusIcon}</span>
@@ -6980,6 +8249,7 @@ function createClientEnergyAnalysis(clientNumber) {
             
             content.appendChild(currentSituationCard);
         }
+        
         // Analyse par forfait
         if (Object.keys(consumptionAnalysis.consumptionByForfait).length > 0) {
             const forfaitSection = document.createElement('div');
@@ -7732,7 +9002,7 @@ function createVoltageThresholdTable() {
     // Conteneur du tableau avec hauteur fixe et scroll
     const tableWrapper = document.createElement('div');
     tableWrapper.style.cssText = `
-        max-height: 250px;
+        max-height: 350px;
         overflow-y: auto;
         overflow-x: auto;
         position: relative;
@@ -8319,7 +9589,6 @@ function analyzeVoltageThresholdExceedances(tensionData) {
     };
 }
 // ==================== CRÉATION DES TABLEAUX COMBINÉS (STRUCTURE DES CARDS) ====================
-
 function createCombinedTables() {
     const techniqueContent = document.getElementById('main-tab-content-technique');
     if (techniqueContent) {
@@ -8469,10 +9738,466 @@ function createCombinedTables() {
         evenementGrid.appendChild(combinedEventContainer);
         evenementContent.appendChild(evenementGrid);
     }
+
+    //✅ ONGLETS FRAUDE
+    const fraudeContent = document.getElementById('main-tab-content-fraude');
+    if (fraudeContent) {
+        fraudeContent.innerHTML = '';
+        const fraudeGrid = document.createElement('div');
+        fraudeGrid.style.cssText = `display: flex; flex-direction: column; gap: 30px; padding: 20px;`;
+        
+        // Le contenu sera généré dynamiquement par displayFraudeAnalysis()
+        
+        fraudeContent.appendChild(fraudeGrid);
+    }
 }
 
-// ==================== ANIMATIONS CSS ====================
 
+// ==================== ANALYSE DES CHUTES DE TENSION (24h/24) ====================
+function analyzeTensionDrops() {
+    const results = {
+        drops: [],
+        criticalDrops: [],
+        summary: {
+            totalDrops: 0,
+            totalCritical: 0,
+            worstDrop: null,
+            worstDay: null,
+            dropsByHour: Array(24).fill(0) // Pour voir les heures les plus critiques
+        }
+    };
+    
+    if (combinedTensionData.length === 0) return results;
+    
+    // Détecter le système de tension
+    const systemType = detectSystemType(combinedTensionData);
+    const limits = getSystemLimits(systemType);
+    
+    // Seuil critique : chute de 30% ou plus
+    const criticalThreshold = limits.normal * 0.3;
+    
+    // Organiser toutes les données par ordre chronologique
+    const tensionPoints = [];
+    
+    combinedTensionData.forEach(row => {
+        if (!row['Date et Heure']) return;
+        
+        const dateTime = new Date(row['Date et Heure']);
+        const tMin = parseFloat(row['T_min']) || 0;
+        const tMoy = parseFloat(row['T_moy']) || 0;
+        
+        if (tMin > 0) {
+            tensionPoints.push({
+                datetime: row['Date et Heure'],
+                date: row['Date et Heure'].split(' ')[0],
+                time: row['Date et Heure'].split(' ')[1],
+                hour: dateTime.getHours(),
+                tMin: tMin,
+                tMoy: tMoy
+            });
+        }
+    });
+    
+    // Trier par date/heure
+    tensionPoints.sort((a, b) => new Date(a.datetime) - new Date(b.datetime));
+    
+    if (tensionPoints.length < 2) return results;
+    
+    // Analyser les chutes entre points consécutifs
+    for (let i = 1; i < tensionPoints.length; i++) {
+        const prev = tensionPoints[i-1];
+        const curr = tensionPoints[i];
+        
+        // Calculer la chute
+        const drop = prev.tMin - curr.tMin;
+        
+        // Ne garder que les chutes (pas les montées)
+        if (drop <= 0) continue;
+        
+        // Calculer le temps écoulé
+        const timeDiff = getTimeDifferenceMinutes(prev.time, curr.time, prev.date, curr.date);
+        
+        // Chute significative : > 1.5V en moins de 2 heures
+        // (on élargit à 2h pour la journée car les relevés peuvent être plus espacés)
+        if (drop > 1.5 && timeDiff < 120) {
+            const dropInfo = {
+                date: curr.date,
+                time: curr.time,
+                fromValue: prev.tMin.toFixed(2),
+                toValue: curr.tMin.toFixed(2),
+                drop: drop.toFixed(2),
+                duration: timeDiff,
+                fromHour: prev.hour,
+                toHour: curr.hour,
+                fromTime: prev.time,
+                period: getPeriodOfDay(curr.hour), // Matin, Après-midi, Soir, Nuit
+                isCritical: drop > criticalThreshold
+            };
+            
+            results.drops.push(dropInfo);
+            results.summary.dropsByHour[curr.hour]++;
+            
+            if (drop > criticalThreshold) {
+                results.criticalDrops.push(dropInfo);
+            }
+            
+            // Mettre à jour le pire drop
+            if (!results.summary.worstDrop || drop > parseFloat(results.summary.worstDrop.drop)) {
+                results.summary.worstDrop = dropInfo;
+            }
+        }
+    }
+    
+    // Compter les chutes par jour
+    const dropsByDay = {};
+    results.drops.forEach(drop => {
+        if (!dropsByDay[drop.date]) dropsByDay[drop.date] = 0;
+        dropsByDay[drop.date]++;
+    });
+    
+    // Trouver le pire jour
+    let maxDrops = 0;
+    Object.keys(dropsByDay).forEach(date => {
+        if (dropsByDay[date] > maxDrops) {
+            maxDrops = dropsByDay[date];
+            results.summary.worstDay = date;
+        }
+    });
+    
+    results.summary.totalDrops = results.drops.length;
+    results.summary.totalCritical = results.criticalDrops.length;
+    
+    return results;
+}
+
+// Fonction utilitaire pour obtenir la période de la journée
+function getPeriodOfDay(hour) {
+    if (hour >= 5 && hour < 12) return '🌅 Matin';
+    if (hour >= 12 && hour < 18) return '☀️ Après-midi';
+    if (hour >= 18 && hour < 22) return '🌆 Soir';
+    return '🌙 Nuit';
+}
+
+// Version améliorée de getTimeDifferenceMinutes qui gère les changements de jour
+function getTimeDifferenceMinutes(time1, time2, date1, date2) {
+    const [h1, m1] = time1.split(':').map(Number);
+    const [h2, m2] = time2.split(':').map(Number);
+    
+    let minutes1 = h1 * 60 + m1;
+    let minutes2 = h2 * 60 + m2;
+    
+    // Si les dates sont différentes, ajouter 24h
+    if (date1 !== date2) {
+        minutes2 += 24 * 60;
+    }
+    
+    return minutes2 - minutes1;
+}
+// ==================== AFFICHAGE DANS L'ONGLET FRAUDE ====================
+
+function displayFraudeAnalysis() {
+    const fraudeContent = document.getElementById('main-tab-content-fraude');
+    if (!fraudeContent) return;
+    
+    fraudeContent.innerHTML = '';
+    
+    // Créer le conteneur principal
+    const fraudeContainer = document.createElement('div');
+    fraudeContainer.style.cssText = `
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+    `;
+    
+    // Titre
+    const title = document.createElement('h2');
+    title.style.cssText = `
+        margin: 0 0 10px 0;
+        color: #1e293b;
+        font-size: 20px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    `;
+    title.innerHTML = `🔍 Analyse des Chutes de Tension (24h/24) - ${escapeHtml(currentFolder.name)}`;
+    fraudeContainer.appendChild(title);
+    
+    // Lancer l'analyse
+    const analysis = analyzeTensionDrops();
+    
+    // Détecter le système de tension pour afficher les seuils
+    const systemType = detectSystemType(combinedTensionData);
+    const limits = getSystemLimits(systemType);
+    
+    // Carte de synthèse
+    const summaryCard = document.createElement('div');
+    summaryCard.style.cssText = `
+        background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+        border-radius: 12px;
+        padding: 20px;
+        color: white;
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 15px;
+    `;
+    
+    summaryCard.innerHTML = `
+        <div>
+            <div style="font-size: 12px; opacity: 0.8;">Chutes détectées</div>
+            <div style="font-size: 32px; font-weight: 700;">${analysis.summary.totalDrops}</div>
+        </div>
+        <div>
+            <div style="font-size: 12px; opacity: 0.8;">Chutes critiques</div>
+            <div style="font-size: 32px; font-weight: 700; color: #ef4444;">${analysis.summary.totalCritical}</div>
+        </div>
+        <div>
+            <div style="font-size: 12px; opacity: 0.8;">Pire chute</div>
+            <div style="font-size: 20px; font-weight: 700;">${analysis.summary.worstDrop ? analysis.summary.worstDrop.drop + ' V' : '0 V'}</div>
+        </div>
+        <div>
+            <div style="font-size: 12px; opacity: 0.8;">Jour le plus actif</div>
+            <div style="font-size: 16px; font-weight: 700;">${analysis.summary.worstDay ? new Date(analysis.summary.worstDay).toLocaleDateString('fr-FR') : 'Aucun'}</div>
+        </div>
+    `;
+    
+    fraudeContainer.appendChild(summaryCard);
+    
+    // Informations sur le système
+    const systemCard = document.createElement('div');
+    systemCard.style.cssText = `
+        background: white;
+        border-radius: 12px;
+        padding: 15px 20px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        display: flex;
+        align-items: center;
+        gap: 20px;
+        flex-wrap: wrap;
+        border: 1px solid #e2e8f0;
+    `;
+    
+    systemCard.innerHTML = `
+        <div style="display: flex; align-items: center; gap: 10px;">
+            <span style="font-size: 20px;">⚡</span>
+            <div>
+                <div style="font-size: 12px; color: #64748b;">Système détecté</div>
+                <div style="font-weight: 700; color: #1e293b;">${systemType}</div>
+            </div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 10px;">
+            <span style="font-size: 20px;">📊</span>
+            <div>
+                <div style="font-size: 12px; color: #64748b;">Tension normale</div>
+                <div style="font-weight: 700; color: #1e293b;">${limits.normal} V</div>
+            </div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 10px;">
+            <span style="font-size: 20px;">⚠️</span>
+            <div>
+                <div style="font-size: 12px; color: #64748b;">Seuil critique (-30%)</div>
+                <div style="font-weight: 700; color: #ef4444;">${(limits.normal * 0.3).toFixed(1)} V</div>
+            </div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 10px; margin-left: auto;">
+            <span style="font-size: 20px;">📅</span>
+            <div>
+                <div style="font-size: 12px; color: #64748b;">Période analysée</div>
+                <div style="font-weight: 700; color: #1e293b;">24h/24</div>
+            </div>
+        </div>
+    `;
+    
+    fraudeContainer.appendChild(systemCard);
+    
+    // Graphique de répartition horaire (simple)
+    const chartCard = document.createElement('div');
+    chartCard.style.cssText = `
+        background: white;
+        border-radius: 12px;
+        padding: 20px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        border: 1px solid #e2e8f0;
+    `;
+    
+    chartCard.innerHTML = `<h3 style="margin: 0 0 15px 0; font-size: 16px;">📊 Répartition des chutes par heure</h3>`;
+    
+    const chartBars = document.createElement('div');
+    chartBars.style.cssText = `display: flex; align-items: flex-end; gap: 2px; height: 150px;`;
+    
+    const maxValue = Math.max(...analysis.summary.dropsByHour, 1);
+    
+    for (let hour = 0; hour < 24; hour++) {
+        const count = analysis.summary.dropsByHour[hour];
+        const height = count > 0 ? (count / maxValue) * 100 : 0;
+        const period = getPeriodOfDay(hour);
+        
+        let barColor = '#3b82f6';
+        if (period.includes('Nuit')) barColor = '#1e293b';
+        if (period.includes('Soir')) barColor = '#f97316';
+        if (period.includes('Matin')) barColor = '#22c55e';
+        
+        chartBars.innerHTML += `
+            <div style="flex: 1; display: flex; flex-direction: column; align-items: center;">
+                <div style="width: 100%; background: ${barColor}20; border-radius: 4px 4px 0 0; height: ${height}%; min-height: ${count > 0 ? '4px' : '0'}; position: relative;">
+                    ${count > 0 ? `<div style="position: absolute; top: -20px; left: 50%; transform: translateX(-50%); font-size: 10px; background: ${barColor}; color: white; padding: 2px 4px; border-radius: 4px;">${count}</div>` : ''}
+                </div>
+                <div style="font-size: 9px; margin-top: 5px; color: #64748b;">${hour}h</div>
+            </div>
+        `;
+    }
+    
+    chartCard.appendChild(chartBars);
+    
+    // Légende des périodes
+    const legend = document.createElement('div');
+    legend.style.cssText = `
+        display: flex;
+        justify-content: center;
+        gap: 20px;
+        margin-top: 15px;
+        padding-top: 15px;
+        border-top: 1px solid #e2e8f0;
+        font-size: 11px;
+    `;
+    legend.innerHTML = `
+        <div style="display: flex; align-items: center; gap: 5px;"><div style="width: 12px; height: 12px; background: #22c55e; border-radius: 3px;"></div>Matin (5h-12h)</div>
+        <div style="display: flex; align-items: center; gap: 5px;"><div style="width: 12px; height: 12px; background: #3b82f6; border-radius: 3px;"></div>Après-midi (12h-18h)</div>
+        <div style="display: flex; align-items: center; gap: 5px;"><div style="width: 12px; height: 12px; background: #f97316; border-radius: 3px;"></div>Soir (18h-22h)</div>
+        <div style="display: flex; align-items: center; gap: 5px;"><div style="width: 12px; height: 12px; background: #1e293b; border-radius: 3px;"></div>Nuit (22h-5h)</div>
+    `;
+    chartCard.appendChild(legend);
+    
+    fraudeContainer.appendChild(chartCard);
+    
+    // Tableau des chutes
+    if (analysis.drops.length > 0) {
+        const dropsCard = document.createElement('div');
+        dropsCard.style.cssText = `
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        `;
+        
+        const dropsHeader = document.createElement('div');
+        dropsHeader.style.cssText = `
+            background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+            color: white;
+            padding: 15px 20px;
+            font-size: 16px;
+            font-weight: 600;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        `;
+        dropsHeader.innerHTML = `
+            <span>📉 Détail des chutes de tension</span>
+            <span style="background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 20px; font-size: 12px;">
+                ${analysis.drops.length} chute(s)
+            </span>
+        `;
+        dropsCard.appendChild(dropsHeader);
+        
+        const dropsContent = document.createElement('div');
+        dropsContent.style.cssText = `padding: 20px; max-height: 500px; overflow-y: auto;`;
+        
+        let dropsHTML = `
+            <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
+                <thead style="position: sticky; top: 0; background: #f1f5f9;">
+                    <tr>
+                        <th style="padding: 10px; text-align: left;">Date</th>
+                        <th style="padding: 10px; text-align: center;">Période</th>
+                        <th style="padding: 10px; text-align: center;">Chute (V)</th>
+                        <th style="padding: 10px; text-align: center;">Tension</th>
+                        <th style="padding: 10px; text-align: center;">Durée</th>
+                        <th style="padding: 10px; text-align: center;">Horaire</th>
+                        <th style="padding: 10px; text-align: center;">Statut</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+        
+        analysis.drops.forEach((drop, index) => {
+            const isCritical = drop.isCritical;
+            const rowColor = isCritical ? '#fef2f2' : (index % 2 === 0 ? '#ffffff' : '#fafbfc');
+            const statusText = isCritical ? 'CRITIQUE' : 'Significatif';
+            const statusColor = isCritical ? '#ef4444' : '#3b82f6';
+            
+            dropsHTML += `
+                <tr style="border-bottom: 1px solid #e2e8f0; background: ${rowColor};">
+                    <td style="padding: 10px;">${new Date(drop.date).toLocaleDateString('fr-FR')}</td>
+                    <td style="padding: 10px; text-align: center;">${drop.period}</td>
+                    <td style="padding: 10px; text-align: center; font-weight: 700; color: ${statusColor};">${drop.drop} V</td>
+                    <td style="padding: 10px; text-align: center;">${drop.fromValue} → ${drop.toValue} V</td>
+                    <td style="padding: 10px; text-align: center;">${drop.duration} min</td>
+                    <td style="padding: 10px; text-align center;">${drop.fromTime} → ${drop.time}</td>
+                    <td style="padding: 10px; text-align: center;">
+                        <span style="background: ${statusColor}20; color: ${statusColor}; padding: 4px 8px; border-radius: 12px; font-weight: 600;">
+                            ${statusText}
+                        </span>
+                    </td>
+                </tr>
+            `;
+        });
+        
+        dropsHTML += `</tbody></table>`;
+        dropsContent.innerHTML = dropsHTML;
+        dropsCard.appendChild(dropsContent);
+        
+        // Ajouter une légende
+        const legend2 = document.createElement('div');
+        legend2.style.cssText = `
+            padding: 10px 20px;
+            background: #f8fafc;
+            border-top: 1px solid #e2e8f0;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            font-size: 11px;
+            flex-wrap: wrap;
+        `;
+        legend2.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 5px;">
+                <div style="width: 12px; height: 12px; background: #3b82f6; border-radius: 3px;"></div>
+                <span>Chute significative (>1.5V en <2h)</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 5px;">
+                <div style="width: 12px; height: 12px; background: #ef4444; border-radius: 3px;"></div>
+                <span>Chute critique (>${(limits.normal * 0.3).toFixed(1)}V)</span>
+            </div>
+            <div style="margin-left: auto; background: #e2e8f0; padding: 4px 8px; border-radius: 4px;">
+                ${combinedTensionData.length} relevés analysés
+            </div>
+        `;
+        dropsCard.appendChild(legend2);
+        
+        fraudeContainer.appendChild(dropsCard);
+    } else {
+        const noDataCard = document.createElement('div');
+        noDataCard.style.cssText = `
+            background: white;
+            border-radius: 12px;
+            padding: 40px;
+            text-align: center;
+            color: #64748b;
+            border: 1px solid #e2e8f0;
+        `;
+        noDataCard.innerHTML = `
+            <span style="font-size: 48px; display: block; margin-bottom: 20px;">📊</span>
+            <h3 style="margin: 0 0 10px 0; color: #1e293b;">Aucune chute de tension détectée</h3>
+            <p style="margin: 0;">Aucune chute significative (>1.5V) n'a été enregistrée sur l'ensemble des relevés.</p>
+            <p style="margin-top: 10px; font-size: 11px;">${combinedTensionData.length} relevés analysés</p>
+        `;
+        fraudeContainer.appendChild(noDataCard);
+    }
+    
+    fraudeContent.appendChild(fraudeContainer);
+}
+////////////////////////////////////////////////////////////////////////////
+
+// ==================== ANIMATIONS CSS ====================
+// Ajouter ces styles CSS au début du fichier ou dans la section des styles
 const style = document.createElement('style');
 style.textContent = `
     @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }

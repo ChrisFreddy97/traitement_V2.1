@@ -1178,6 +1178,12 @@ function displayClientsTabs() {
             <span class="tab-label">COMMERCIALE</span>
         </button>
         <button class="main-tab" 
+                data-main-tab="FRAUDE" 
+                onclick="switchMainTab('FRAUDE', this)">
+            <span class="tab-icon">🚨</span>
+            <span class="tab-label">FRAUDE</span>
+        </button>
+        <button class="main-tab" 
                 data-main-tab="EVENEMENT" 
                 onclick="switchMainTab('EVENEMENT', this)">
             <span class="tab-icon">📈</span>
@@ -1208,6 +1214,17 @@ function displayClientsTabs() {
                 onclick="switchSubTab('ENR', 'EVENEMENT', this)">
             <span class="tab-icon">📈</span>
             <span class="tab-label">ANALYSE ENR et EC</span>
+        </button>
+    `;
+
+    // Onglet "ANALYSE FRAUDE" (FRAUDE)
+    subTabsHTML += `
+        <button class="sub-tab" 
+                data-sub-tab="FRAUDE" 
+                data-main="FRAUDE"
+                onclick="switchSubTab('FRAUDE', 'FRAUDE', this)">
+            <span class="tab-icon">🚨</span>
+            <span class="tab-label">ANALYSE FRAUDE</span>
         </button>
     `;
 
@@ -1254,6 +1271,15 @@ function displayClientsTabs() {
     });
 
     contentHTML += '</div>';
+
+    // NOUVEAU : Contenu FRAUDE
+    contentHTML += `
+        <div class="main-content" id="main-content-FRAUDE">
+            <div class="sub-content" id="sub-content-FRAUDE">
+            </div>
+        </div>
+    `;
+
     contentHTML += `
         <div class="main-content" id="main-content-EVENEMENT">
             <div class="sub-content active" id="sub-content-ENR">
@@ -1324,6 +1350,8 @@ window.switchMainTab = function (mainTab, tabElement) {
                 displayAllClientsTab();
             } else if (subTabValue === 'ENR') {
                 displayENRAnalysis(); // NOUVELLE FONCTION
+            } else if (subTabValue === 'FRAUDE') {
+                displayFraudeAnalysis(); // À implémenter
             } else if (allResultsByClient[subTabValue]) {
                 displayClientData(subTabValue, allResultsByClient[subTabValue]);
             }
@@ -9222,6 +9250,75 @@ function addSimpleENRStyles() {
     document.head.appendChild(styles);
 }
 
+//=========================ANALYSES PICAGES=============================
+// ======================== ANALYSE FRAUDE ========================
+function displayFraudeAnalysis() {
+    const contentElement = document.getElementById('sub-content-FRAUDE');
+    if (!contentElement) return;
+
+    showLoader();
+
+    try {
+        contentElement.innerHTML = `
+            <div class="fraude-analysis-container">
+                <h3 style="margin: 0 0 20px 0; color: #2d3748; display: flex; align-items: center; gap: 10px;">
+                    <span style="font-size: 28px;">🚨</span>
+                    <span>Analyse des Fraudes</span>
+                </h3>
+                
+                <div class="coming-soon" style="text-align: center; padding: 60px 20px; background: white; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
+                    <div style="font-size: 64px; margin-bottom: 20px; opacity: 0.7;">🚧</div>
+                    <h4 style="color: #4a5568; font-size: 24px; margin-bottom: 10px;">Fonctionnalité en cours de développement</h4>
+                    <p style="color: #718096; font-size: 16px; max-width: 500px; margin: 0 auto;">
+                        L'analyse des fraudes sera bientôt disponible. Cette section permettra de détecter les anomalies de consommation et les comportements suspects.
+                    </p>
+                    <div style="margin-top: 30px; padding: 15px; background: #f0f9ff; border-radius: 8px; display: inline-block;">
+                        <span style="color: #0369a1;">🔧 En cours d'implémentation</span>
+                    </div>
+                </div>
+            </div>
+        `;
+    } catch (error) {
+        console.error('❌ Erreur lors de l\'affichage de l\'analyse fraude:', error);
+        contentElement.innerHTML = `
+            <div class="error-message">
+                <span class="error-icon">❌</span>
+                <span class="error-text">Erreur: ${error.message}</span>
+            </div>
+        `;
+    } finally {
+        hideLoader();
+    }
+}
+function addFraudeStyles() {
+    if (document.querySelector('#fraude-styles')) return;
+    
+    const styles = document.createElement('style');
+    styles.id = 'fraude-styles';
+    styles.textContent = `
+        .fraude-analysis-container {
+            padding: 20px;
+        }
+        
+        .coming-soon {
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% {
+                box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+            }
+            50% {
+                box-shadow: 0 8px 24px rgba(239, 68, 68, 0.15);
+            }
+            100% {
+                box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+            }
+        }
+    `;
+    
+    document.head.appendChild(styles);
+}
 
 // ======================== STYLES POUR LE TABLEAU COMBINÉ ========================
 function addCombinedTableStyles() {
@@ -9655,4 +9752,7 @@ document.addEventListener('click', (event) => {
     }
 });
  
-document.addEventListener('DOMContentLoaded', addAllClientsStyles);
+document.addEventListener('DOMContentLoaded', function() {
+    addAllClientsStyles()
+    addFraudeStyles(); // Ajouter cette ligne
+});
