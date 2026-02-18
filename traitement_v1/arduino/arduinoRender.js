@@ -15,6 +15,9 @@ export function renderTechnicalDashboard() {
         return;
     }
 
+
+
+
     const data = database.technicalData;
     
     // Déterminer quelle norme afficher en fonction de la tension moyenne
@@ -28,6 +31,8 @@ export function renderTechnicalDashboard() {
         normSystem = '12V';
         normData = VOLTAGE_NORMS['12V'];
     }
+        
+    const tableauSousTension = renderTableauSousTension();
 
     const html = `
         <div class="technical-dashboard">
@@ -77,10 +82,13 @@ export function renderTechnicalDashboard() {
             </div>
             ` : ''}
         </div>
+        ${tableauSousTension} 
+        ${renderVariationsRapides()}
     `;
     
     container.innerHTML = html;
     setTimeout(() => createTensionChart(data.dailyStats), 100);
+
 }
 
 
@@ -111,7 +119,144 @@ function createTensionChart(dailyStats) {
             }
         }
     });
+
+    
+
 }
+
+
+function renderTableauSousTension() {
+    if (!database.technicalData?.analyseSousTension) {
+        return '<p>Aucune donnée de sous-tension disponible</p>';
+    }
+    
+    const donnees = database.technicalData.analyseSousTension;
+    const totalJours = donnees.length;
+    
+    // Compter les jours par catégorie
+    const joursCritiques = donnees.filter(d => d.niveau === 'critique').length;
+    const joursTresBas = donnees.filter(d => d.niveau === 'tres_bas').length;
+    const joursBas = donnees.filter(d => d.niveau === 'bas').length;
+    const joursNormaux = donnees.filter(d => d.niveau === 'normal').length;
+    
+    let html = `
+        <div class="analyse-batterie-container">
+            <h4>🔋 Analyse de l'état de la batterie (sous-tension)</h4>
+            
+            <div class="stats-batterie">
+                <div class="stat-batterie-item" style="background: #4CAF50; color: white;">
+                    <span class="stat-label">Normaux</span>
+                    <span class="stat-valeur">${joursNormaux}</span>
+                </div>
+                <div class="stat-batterie-item" style="background: #ffeb3b; color: #333;">
+                    <span class="stat-label">Bas</span>
+                    <span class="stat-valeur">${joursBas}</span>
+                </div>
+                <div class="stat-batterie-item" style="background: #ff9800; color: white;">
+                    <span class="stat-label">Très bas</span>
+                    <span class="stat-valeur">${joursTresBas}</span>
+                </div>
+                <div class="stat-batterie-item" style="background: #f44336; color: white;">
+                    <span class="stat-label">Critique</span>
+                    <span class="stat-valeur">${joursCritiques}</span>
+                </div>
+            </div>
+            
+            <table class="tableau-batterie">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Tension min (V)</th>
+                        <th>État batterie</th>
+                    </tr>
+                </thead>
+                <tbody>
+    `;
+    
+    donnees.forEach(jour => {
+        const styleCouleur = `background-color: ${jour.couleur}; color: ${jour.couleurTexte || 'white'};`;
+        const etatEmoji = jour.niveau === 'critique' ? '🔴' : 
+                          jour.niveau === 'tres_bas' ? '🟠' : 
+                          jour.niveau === 'bas' ? '🟡' : '🟢';
+        
+        html += `
+            <tr>
+                <td><strong>${jour.date}</strong></td>
+                <td style="font-weight: bold; ${jour.niveau !== 'normal' ? 'color: #d32f2f;' : ''}">
+                    ${jour.valeur.toFixed(2)} V
+                </td>
+                <td>
+                    <span class="badge-batterie" style="${styleCouleur}">
+                        ${etatEmoji} ${jour.message}
+                    </span>
+                </td>
+            </tr>
+        `;
+    });
+    
+    html += `
+                </tbody>
+            </table>
+            
+            <div class="legende-batterie">
+                <h5>Légende :</h5>
+                <ul>
+                    <li><span style="background: #4CAF50; width: 20px; height: 20px; display: inline-block;"></span> &gt; 12.2V : Normal</li>
+                    <li><span style="background: #ffeb3b; width: 20px; height: 20px; display: inline-block;"></span> 11.8V - 12.2V : Bas</li>
+                    <li><span style="background: #ff9800; width: 20px; height: 20px; display: inline-block;"></span> 11.5V - 11.8V : Très bas</li>
+                    <li><span style="background: #f44336; width: 20px; height: 20px; display: inline-block;"></span> &lt; 11.5V : Critique</li>
+                </ul>
+            </div>
+        </div>
+    `;
+    
+    return html;
+}
+function renderVariationsRapides() {
+    if (!database.technicalData?.variationsRapides || database.technicalData.variationsRapides.length === 0) {
+        return '<p>Aucune variation rapide détectée</p>';
+    }
+    
+    const variations = database.technicalData.variationsRapides;
+    
+    let html = `
+        <div class="variations-container">
+            <h4>⚠️ Variations rapides détectées (${database.technicalData.normSystem === '24V' ? '3.5V/h' : '1.5V/h'})</h4>
+            <table class="variations-table">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Période</th>
+                        <th>Variation</th>
+                        <th>Tension</th>
+                        <th>Statut</th>
+                    </tr>
+                </thead>
+                <tbody>
+    `;
+    
+    variations.forEach(v => {
+        const couleur = v.type === 'critique' ? '#f44336' : '#ff9800';
+        html += `
+            <tr>
+                <td><strong>${v.date}</strong></td>
+                <td>${v.heureDebut} → ${v.heureFin}</td>
+                <td style="color: ${couleur}; font-weight: bold;">${v.variation} V</td>
+                <td>${v.tensionDebut}V → ${v.tensionFin}V</td>
+                <td>
+                    <span style="background-color: ${couleur}; color: white; padding: 3px 10px; border-radius: 15px;">
+                        ${v.type === 'critique' ? 'CRITIQUE' : 'Attention'}
+                    </span>
+                </td>
+            </tr>
+        `;
+    });
+    
+    html += `</tbody></table></div>`;
+    return html;
+}
+
+
 
 export function renderCommercialDashboard() {
     const container = document.getElementById('commercialDashboard');
@@ -121,19 +266,23 @@ export function renderCommercialDashboard() {
     }
 
     const data = database.commercialData;
-    
+    // Utiliser l'analyse des recharges si disponible, sinon les clients crédits
+    const rechargeAnalysis = database.rechargeAnalysis;
+    const clients = rechargeAnalysis ? rechargeAnalysis.clients : data.clients;
+    const title = rechargeAnalysis ? '💳 Analyse Recharges Clients' : '💰 Analyse Crédit Clients';
+    const subtitleCount = rechargeAnalysis ? (rechargeAnalysis.summary?.totalClients || 0) : data.clientCount;
+
     let html = `
         <div class="commercial-dashboard">
             <div class="technical-title">
-                <span>💰 Analyse Crédit Clients</span>
-                <span style="font-size:0.7em; opacity:0.8;">${data.clientCount} clients analysés</span>
+                <span>${title}</span>
+                <span style="font-size:0.7em; opacity:0.8;">${subtitleCount} clients analysés</span>
             </div>
-            
-            <!-- Onglets par client -->
+
             <div class="client-tabs-container">
                 <button class="client-tab-nav prev" id="prevClient">◀</button>
                 <div class="client-tabs" id="clientTabs">
-                    ${data.clients.map((client, index) => `
+                    ${clients.map((client, index) => `
                         <button class="client-tab ${index === 0 ? 'active' : ''}" data-client-id="${client.id}" data-index="${index}">
                             Client ${client.id}
                         </button>
@@ -141,17 +290,93 @@ export function renderCommercialDashboard() {
                 </div>
                 <button class="client-tab-nav next" id="nextClient">▶</button>
             </div>
-            
-            <!-- Conteneur pour le client actif -->
+
             <div id="activeClientContainer">
-                ${renderClientCard(data.clients[0])}
+                ${clients.length > 0 ? (rechargeAnalysis ? renderRechargeClientCard(clients[0]) : renderClientCard(clients[0])) : '<div>Aucun client</div>'}
             </div>
         </div>
     `;
-    
+
     container.innerHTML = html;
-    attachClientTabEvents(data.clients);
+    if (rechargeAnalysis) attachRechargeTabEvents(clients); else attachClientTabEvents(clients);
 }
+
+
+function renderRechargeClientCard(client) {
+    const total = client.totalRecharges || 0;
+    const creditTotal = client.creditTotal || 0;
+    const creditMoyen = client.creditMoyen || '0.00';
+    const preferred = client.preferredCredit ?? 'N/A';
+    const preferredPct = client.preferredPercentage ?? '0';
+    const codesUniques = client.codesUniques || 0;
+    const premiere = client.premiereRecharge || 'N/A';
+    const derniere = client.derniereRecharge || 'N/A';
+
+    const creditFreqHtml = client.creditPercentages ? Object.entries(client.creditPercentages).map(([c,p]) => `<div class="credit-freq-item">Crédit ${c}: <strong>${p}%</strong></div>`).join('') : '';
+
+    return `
+        <div class="client-card recharge-client">
+            <div class="client-header-large">
+                <span style="font-size:2em;">💳</span>
+                <div>
+                    <div class="client-name-large">Client ${client.clientId || client.id}</div>
+                    <div class="client-subtitle">Recharges: ${total} — Crédit total: ${creditTotal}</div>
+                </div>
+                <span class="client-badge">Préféré: ${preferred} (${preferredPct}%)</span>
+            </div>
+
+            <div class="client-stats-grid-large">
+                <div class="stat-card-client">
+                    <div class="stat-label">🔁 Total recharges</div>
+                    <div class="stat-value-large">${total}</div>
+                </div>
+                <div class="stat-card-client">
+                    <div class="stat-label">💶 Crédit moyen</div>
+                    <div class="stat-value-large">${creditMoyen} <span class="stat-unit">€</span></div>
+                </div>
+                <div class="stat-card-client">
+                    <div class="stat-label">🔐 Codes uniques</div>
+                    <div class="stat-value-large">${codesUniques}</div>
+                </div>
+            </div>
+
+            <div class="credit-frequency">
+                <h5>Répartition des crédits</h5>
+                ${creditFreqHtml}
+            </div>
+
+            <div class="forfait-history">
+                <h5>Historique forfaits</h5>
+                ${client.forfaitHistory && client.forfaitHistory.length > 0 ? client.forfaitHistory.slice().reverse().map(f => `<div>${new Date(f.date).toLocaleString()} — Forfait: ${f.forfait} — Crédit: ${f.credit}</div>`).join('') : '<div>Aucun historique</div>'}
+            </div>
+
+            <div class="client-meta-info">Première: ${premiere} — Dernière: ${derniere}</div>
+        </div>
+        
+    `;
+}
+
+
+
+function attachRechargeTabEvents(clients) {
+    const tabs = document.querySelectorAll('.client-tab');
+    const container = document.getElementById('activeClientContainer');
+    const prevBtn = document.getElementById('prevClient');
+    const nextBtn = document.getElementById('nextClient');
+    let activeIndex = 0;
+
+    function switchToClient(index) {
+        activeIndex = index;
+        tabs.forEach((tab, i) => tab.classList.toggle('active', i === index));
+        container.innerHTML = renderRechargeClientCard(clients[index]);
+    }
+
+    tabs.forEach((tab, index) => tab.addEventListener('click', () => switchToClient(index)));
+    prevBtn?.addEventListener('click', () => switchToClient(activeIndex > 0 ? activeIndex - 1 : clients.length - 1));
+    nextBtn?.addEventListener('click', () => switchToClient(activeIndex < clients.length - 1 ? activeIndex + 1 : 0));
+}
+
+
 
 function renderClientCard(client) {
     const avgCredit = client.averageCredit.toFixed(2);
@@ -196,7 +421,7 @@ function renderClientCard(client) {
                         client.zeroCreditDates.map(date => `
                             <div class="timeline-item">
                                 <div class="timeline-date">${date}</div>
-                                <div class="timeline-badge">0 crédit</div>
+                                <div class="timeline-badge"> 0 </div>
                             </div>
                         `).join('') 
                         : 
@@ -371,14 +596,4 @@ export function renderByTab() {
         document.getElementById('commercialDashboard').innerHTML = '';
     }
     displayTables(visibleTableIndices);
-}
-
-export function createLegend() {
-    const types = [...new Set(database.tables.map(t => t.type))].sort();
-    let html = '<strong style="margin-right:15px;">Types de données :</strong>';
-    types.forEach(type => {
-        const info = TABLE_TYPES[type] || { name: type, color: '#999', icon: '📋' };
-        html += `<div class="legend-item"><div class="legend-badge type-${type}" style="background:${info.color};">${type}</div><span>${info.icon} ${info.name}</span></div>`;
-    });
-    document.getElementById('typeLegend').innerHTML = html;
 }

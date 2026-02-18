@@ -60,12 +60,108 @@ export function analyzeTechnicalData() {
     const globalAvg = sumAvg / countAvg;
     const clientCount = clientSet.size;
 
+    // Déterminer le système (12V / 24V) pour ajuster la détection des variations rapides
+    let normSystem = '';
+    if (globalAvg >= 22 && globalAvg <= 29) {
+        normSystem = '24V';
+    } else if (globalAvg >= 11 && globalAvg <= 15) {
+        normSystem = '12V';
+    }
+
+    // Détecter les variations rapides en fonction du système
+    const variationsRapides = detecterVariationsRapides(data, normSystem);
+
     database.technicalData = {
         dailyStats: chartData,
         globalMin, globalMax, globalAvg,
         daysCount: dates.length,
-        clientCount: clientCount || 'N/A'
+        clientCount: clientCount || 'N/A',
+        normSystem,
+        variationsRapides
     };
+
+    // Analyser les dépassements 14.2V
+const analyse14V = {};
+const SEUIL_14V = 14.2;
+
+Object.entries(dailyStats).forEach(([date, stats]) => {
+    // Trouver combien de fois on a dépassé 14.2V dans la journée
+    // Note: dailyStats ne contient que les min/max par jour, pas chaque mesure
+    // On va utiliser une approximation basée sur le max
+    const depassement = stats.max;
+    
+    if (!analyse14V[date]) {
+        analyse14V[date] = {
+            date: date,
+            valeur: depassement,
+            niveau: 'normal',
+            couleur: '#4CAF50', // vert
+            message: 'Normal'
+        };
+    }
+    
+    // Déterminer le niveau de gravité
+    if (depassement >= SEUIL_14V) {
+        if (depassement >= 15) {
+            analyse14V[date].niveau = 'critique';
+            analyse14V[date].couleur = '#f44336'; // rouge
+            analyse14V[date].message = 'CRITIQUE - Dangereux pour la batterie';
+        } else if (depassement >= 14.5) {
+            analyse14V[date].niveau = 'eleve';
+            analyse14V[date].couleur = '#ff9800'; // orange
+            analyse14V[date].message = 'Élevé - Risque de surtension';
+        } else {
+            analyse14V[date].niveau = 'attention';
+            analyse14V[date].couleur = '#ffeb3b'; // jaune
+            analyse14V[date].couleurTexte = '#333'; // texte noir pour lisibilité
+            analyse14V[date].message = 'Attention - Seuil 14.2V atteint';
+        }
+    }
+});
+
+
+
+// Ajouter à database.technicalData
+// Calculer l'analyse des sous-tensions (batterie faible)
+const analyseSousTension = {};
+const SEUIL_CRITIQUE = 11.5;
+const SEUIL_TRES_BAS = 10.8;
+const SEUIL_BAS = 14.2;
+
+Object.entries(dailyStats).forEach(([date, stats]) => {
+    const tensionMin = stats.min;
+    analyseSousTension[date] = {
+        date: date,
+        valeur: tensionMin,
+        niveau: 'normal',
+        couleur: '#4CAF50',
+        couleurTexte: 'white',
+        message: 'Normal'
+    };
+
+    if (tensionMin < SEUIL_CRITIQUE) {
+        analyseSousTension[date].niveau = 'critique';
+        analyseSousTension[date].couleur = '#f44336';
+        analyseSousTension[date].message = 'CRITIQUE - Batterie très faible (risque coupure)';
+    } else if (tensionMin < SEUIL_TRES_BAS) {
+        analyseSousTension[date].niveau = 'tres_bas';
+        analyseSousTension[date].couleur = '#ff9800';
+        analyseSousTension[date].message = 'Très bas - Batterie faible';
+    } else if (tensionMin < SEUIL_BAS) {
+        analyseSousTension[date].niveau = 'bas';
+        analyseSousTension[date].couleur = '#ffeb3b';
+        analyseSousTension[date].couleurTexte = '#333';
+        analyseSousTension[date].message = 'Bas - Surveiller la batterie';
+    }
+});
+
+// Ajouter toutes les analyses à database.technicalData
+database.technicalData = {
+    ...database.technicalData,
+    analyse14V: Object.values(analyse14V).sort((a, b) => new Date(b.date) - new Date(a.date)),
+    analyseSousTension: Object.values(analyseSousTension).sort((a, b) => new Date(b.date) - new Date(a.date))
+};
+
 }
 
 export function analyzeCommercialData() {
@@ -121,6 +217,88 @@ export function analyzeCommercialData() {
         clientCount: database.clientCreditData.size,
         clients: Array.from(database.clientCreditData.entries()).map(([id, data]) => ({ id, ...data }))
     };
+
+    // --- Analyser la table des recharges (type 'R') si présente ---
+    const rechargeTable = database.tables.find(t => t.type === 'R');
+    if (rechargeTable && rechargeTable.data && rechargeTable.data.length > 0) {
+        const headers = rechargeTable.header.split(';').map(h => h.trim()).filter(h => h !== '');
+        const parsed = rechargeTable.data.map(line => {
+            const cells = line.split(';');
+            const obj = {};
+            headers.forEach((h, i) => { obj[h] = cells[i] !== undefined ? cells[i] : ''; });
+            return obj;
+        });
+
+        try {
+            const rechargeAnalysis = analyzeRechargeData(parsed);
+            database.rechargeAnalysis = rechargeAnalysis;
+            try {
+                database.rechargeGlobalStats = getGlobalStats(rechargeAnalysis);
+            } catch (e) {
+                database.rechargeGlobalStats = null;
+            }
+        } catch (err) {
+            console.error('Erreur analyse recharges:', err);
+            database.rechargeAnalysis = null;
+            database.rechargeGlobalStats = null;
+        }
+    } else {
+        database.rechargeAnalysis = null;
+        database.rechargeGlobalStats = null;
+    }
+}
+
+function detecterVariationsRapides(data, systeme) {
+    const seuilVariation = systeme === '24V' ? 3.5 : 1.5; // 3.5V/h pour 24V, 1.5V/h pour 12V
+    const variations = [];
+    
+    // Grouper par date
+    const parDate = {};
+    data.forEach(row => {
+        const cells = row.split(';');
+        const timestamp = cells[1];
+        const date = timestamp.split(' ')[0];
+        const heure = timestamp.split(' ')[1]?.substring(0, 5) || '00:00';
+        const tensionMin = parseFloat(cells[3]);
+        const tensionMax = parseFloat(cells[4]);
+        const tensionAvg = (tensionMin + tensionMax) / 2;
+        
+        if (!parDate[date]) {
+            parDate[date] = [];
+        }
+        parDate[date].push({
+            heure,
+            tension: tensionAvg,
+            timestamp: timestamp
+        });
+    });
+    
+    // Analyser chaque journée
+    Object.entries(parDate).forEach(([date, mesures]) => {
+        // Trier par heure
+        mesures.sort((a, b) => a.heure.localeCompare(b.heure));
+        
+        // Chercher les variations rapides
+        for (let i = 1; i < mesures.length; i++) {
+            const variation = Math.abs(mesures[i].tension - mesures[i-1].tension);
+            
+            if (variation >= seuilVariation) {
+                variations.push({
+                    date: date,
+                    heureDebut: mesures[i-1].heure,
+                    heureFin: mesures[i].heure,
+                    duree: "1 heure",
+                    tensionDebut: mesures[i-1].tension.toFixed(2),
+                    tensionFin: mesures[i].tension.toFixed(2),
+                    variation: variation.toFixed(2),
+                    seuil: seuilVariation,
+                    type: variation > seuilVariation ? 'critique' : 'attention'
+                });
+            }
+        }
+    });
+    
+    return variations;
 }
 
 
@@ -199,20 +377,28 @@ export function analyzeRechargeData(data) {
         clients[clientId].totalRecharges++;
     });
     
-    // Calculer les pourcentages pour chaque client
+    // Calculer les pourcentages et synthèses pour chaque client
     Object.keys(clients).forEach(clientId => {
         const client = clients[clientId];
         client.recharges.sort((a, b) => new Date(a.date) - new Date(b.date));
-        
-        // Calcul des fréquences en pourcentage
+
+        // Assurer la présence des compteurs pour toutes les valeurs de crédit
         creditValues.forEach(val => {
-            client.creditFrequency[val] = client.totalRecharges > 0 
-                ? (client.credits[val] / client.totalRecharges * 100).toFixed(1)
-                : 0;
+            if (!client.credits.hasOwnProperty(val)) client.credits[val] = 0;
         });
-        
+
+        // Calcul des fréquences en pourcentage (nombre -> nombre à 1 décimale)
+        const percentages = {};
+        creditValues.forEach(val => {
+            const pct = client.totalRecharges > 0 ? (client.credits[val] / client.totalRecharges * 100) : 0;
+            percentages[val] = parseFloat(pct.toFixed(1));
+            // Garder compatibilité avec l'ancien nom
+            client.creditFrequency[val] = percentages[val];
+        });
+        client.creditPercentages = percentages; // mapping string/number
+
         // Déterminer le crédit préféré
-        let maxCount = 0;
+        let maxCount = -1;
         let preferredCredit = null;
         creditValues.forEach(val => {
             if (client.credits[val] > maxCount) {
@@ -221,19 +407,24 @@ export function analyzeRechargeData(data) {
             }
         });
         client.preferredCredit = preferredCredit;
-        client.preferredCreditPercentage = client.creditFrequency[preferredCredit];
-        
+        client.preferredCreditPercentage = percentages[preferredCredit] ?? 0;
+
         // Déterminer la stabilité du forfait
-        client.hasForfaitChange = client.forfaitChanges.length > 0;
+        client.hasForfaitChange = Array.isArray(client.forfaitChanges) && client.forfaitChanges.length > 0;
         client.forfaitActuel = client.dernierForfait;
         client.forfaitInitial = client.recharges.length > 0 ? client.recharges[0].forfait : null;
         client.isStable = client.forfaitInitial === client.forfaitActuel;
-        
+
         // Statistiques supplémentaires
-        client.creditMoyen = (client.recharges.reduce((sum, r) => sum + r.credit, 0) / client.totalRecharges).toFixed(2);
-        client.creditTotal = client.recharges.reduce((sum, r) => sum + r.credit, 0);
+        const totalCredit = client.recharges.reduce((sum, r) => sum + (parseFloat(r.credit) || 0), 0);
+        const avgCredit = client.totalRecharges > 0 ? totalCredit / client.totalRecharges : 0;
+        client.creditTotal = parseFloat(totalCredit.toFixed(2));
+        client.creditMean = parseFloat(avgCredit.toFixed(2));
+        // Garder champ existant (compatibilité affichage)
+        client.creditMoyen = client.creditMean.toFixed(2);
+
         client.codesUniques = client.codesUtilises.size;
-        
+
         // Période d'activité
         if (client.recharges.length > 0) {
             client.premiereRecharge = client.recharges[0].date;

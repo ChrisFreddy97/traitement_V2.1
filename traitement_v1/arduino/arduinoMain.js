@@ -3,7 +3,7 @@ import { database, showLoader, hideLoader, simulateProgress, showError, hideErro
 import { parseRawTables, buildDatabase } from './arduinoParser.js';
 import { analyzeTechnicalData, analyzeCommercialData, buildEventMap } from './arduinoAnalytics.js';
 import { handleCellClick } from './arduinoEvents.js';
-import { renderByTab, createLegend } from './arduinoRender.js';
+import { renderByTab} from './arduinoRender.js';
 
 // Rendre handleCellClick accessible globalement pour les attributs onclick
 window.handleCellClick = handleCellClick;
@@ -44,7 +44,6 @@ async function handleFileSelect() {
         analyzeCommercialData();
         buildEventMap();
 
-        createLegend();
         renderByTab();
         document.getElementById('infoSection').classList.add('show');
         hideError();
