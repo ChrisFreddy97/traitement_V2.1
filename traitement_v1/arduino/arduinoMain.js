@@ -1,20 +1,19 @@
 // arduinoMain.js
 import { database, showLoader, hideLoader, simulateProgress, showError, hideError, readFileAsync } from './arduinoCore.js';
 import { parseRawTables, buildDatabase } from './arduinoParser.js';
-import { analyzeTechnicalData, analyzeCommercialData, buildEventMap } from './arduinoAnalytics.js';
+import { analyzeTechnicalData } from './analytics/technicalAnalytics.js';
+import { analyzeCommercialData } from './analytics/commercialAnalytics.js';
+import { buildEventMap } from './analytics/eventAnalytics.js';
 import { handleCellClick } from './arduinoEvents.js';
-import { renderByTab} from './arduinoRender.js';
+import { renderByTab } from './arduinoRender.js';
 
-// Rendre handleCellClick accessible globalement pour les attributs onclick
 window.handleCellClick = handleCellClick;
 
-// Éléments DOM
 const fileInput = document.getElementById('fileInput');
 const uploadSection = document.getElementById('uploadSection');
 const fileName = document.getElementById('fileName');
 const nanoreseauValue = document.getElementById('nanoreseauValue');
 
-// ---- Gestionnaire de fichier ----
 async function handleFileSelect() {
     const file = fileInput.files[0];
     if (!file) return;
@@ -40,7 +39,7 @@ async function handleFileSelect() {
         }
 
         buildDatabase(rawTables);
-        analyzeTechnicalData();
+        analyzeTechnicalData(); 
         analyzeCommercialData();
         buildEventMap();
 
@@ -55,7 +54,6 @@ async function handleFileSelect() {
     }
 }
 
-// ---- Écouteurs d'événements ----
 fileInput.addEventListener('change', handleFileSelect);
 
 uploadSection.addEventListener('dragover', (e) => {
@@ -75,7 +73,6 @@ uploadSection.addEventListener('drop', (e) => {
     }
 });
 
-// ---- Onglets ----
 document.querySelectorAll('.tab').forEach(tab => {
     tab.addEventListener('click', () => {
         document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
@@ -84,3 +81,4 @@ document.querySelectorAll('.tab').forEach(tab => {
         document.getElementById('tablesContainer').scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
 });
+
