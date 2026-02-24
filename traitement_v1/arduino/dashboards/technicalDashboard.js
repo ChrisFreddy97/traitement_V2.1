@@ -7,7 +7,6 @@ let tensionChartInstance = null;
 // ===========================================
 // FONCTION PRINCIPALE
 // ===========================================
-
 export function renderTechnicalDashboard() {
     const container = document.getElementById('technicalDashboard');
     if (!database.technicalData || document.querySelector('.tab.active')?.dataset.tab !== 'Technique') {
@@ -16,83 +15,113 @@ export function renderTechnicalDashboard() {
     }
 
     const html = `
-        <div id="techStatsContainer"></div>
-        <div id="techNormsContainer"></div>
-        <div id="extremesSummaryContainer" class="resume-row"></div>
-        <div id="exceedanceContainer"></div>
-        <div id="variationsContainer"></div>
-        <div id="criticalExceedancesContainer"></div>
-        <div id="techChartContainer"></div>
+        <!-- Grand titre -->
+        <div class="section-title">
+            <h2>📊 DONNÉES TECHNIQUES</h2>
+        </div>
+        
+        <!-- Carte Informations (en haut) -->
+        <div id="infoCard" class="card"></div>
+        
+        <!-- Carte Normes Système (en bas) -->
+        <div id="normsCard" class="card"></div>
+        
+        <!-- Graphique principal -->
+        <div id="chartCard" class="card"></div>
+        
+        <!-- Sous-titre Analyse stabilité -->
+        <div class="subsection-title">
+            <h3>📈 ANALYSE DE LA STABILITÉ</h3>
+        </div>
+        
+        <!-- 3 mini-cartes -->
+        <div class="row-3cols">
+            <div id="variationsMiniCard" class="mini-card"></div>
+            <div id="exceedanceMiniCard" class="mini-card"></div>
+            <div id="loadSheddingMiniCard" class="mini-card coming-soon"></div>
+        </div>
+        
+        <!-- Onglets -->
+        <div class="tech-tabs-container">
+            <div class="tech-tabs">
+                <button class="tech-tab active" data-tab="variations">⚡ Variations</button>
+                <button class="tech-tab" data-tab="exceedance">🔋 14.2V</button>
+                <button class="tech-tab" data-tab="loadshed">⚡ Délestage</button>
+            </div>
+            <div id="techTabContent" class="tech-tab-content"></div>
+        </div>
     `;
 
     container.innerHTML = html;
 
-    renderTechStatsCard();
-    renderTechChartCard();
-    renderTechNormsCard();
-    renderExtremesSummaryCard();
-    renderExceedanceCard();
-    renderVariationsCard();
-    renderCriticalExceedancesCard();
+    // Remplir les cartes
+    renderInfoCard();
+    renderNormsCard();
+    renderChartCard();
+    renderVariationsMiniCard();
+    renderExceedanceMiniCard();
+    renderLoadSheddingMiniCard();
+    
+    // Afficher le premier onglet
+    showTechTab('variations');
+    
+    // Gérer les clics sur les onglets
+    document.querySelectorAll('.tech-tab').forEach(tab => {
+        tab.addEventListener('click', (e) => {
+            document.querySelectorAll('.tech-tab').forEach(t => t.classList.remove('active'));
+            e.target.classList.add('active');
+            showTechTab(e.target.dataset.tab);
+        });
+    });
 }
 
 // ===========================================
-// CARTES PRINCIPALES
+// CARTE INFORMATIONS (avec NANORÉSEAU N°)
 // ===========================================
-
-function renderTechStatsCard() {
-    const container = document.getElementById('techStatsContainer');
+function renderInfoCard() {
+    const container = document.getElementById('infoCard');
     if (!container) return;
     
     const data = database.technicalData;
+    const nanoreseau = document.getElementById('nanoreseauValue')?.textContent || 'N/A';
     
     container.innerHTML = `
-        <div class="stats-container">
-            <div class="stat-card">
-                <div class="stat-label">📅 Période</div>
-                <div class="stat-value">${data.daysCount}</div>
-                <div class="stat-unit">jours</div>
-                <div class="stat-sub">du ${data.dailyStats.dates[0]} au ${data.dailyStats.dates[data.dailyStats.dates.length-1]}</div>
+        <h3 class="card-title">📋 Informations</h3>
+        <div class="info-grid">
+            <div class="info-item">
+                <span class="info-label">🔢 NANORÉSEAU N°</span>
+                <span class="info-value">${nanoreseau}</span>
             </div>
-            <div class="stat-card">
-                <div class="stat-label">👥 Nombre de clients</div>
-                <div class="stat-value">${data.clientCount}</div>
-                <div class="stat-sub">clients actifs</div>
+            <div class="info-item">
+                <span class="info-label">📅 Période</span>
+                <span class="info-value">${data.daysCount} jours</span>
+                <span class="info-sub">du ${data.dailyStats.dates[0]} au ${data.dailyStats.dates[data.dailyStats.dates.length-1]}</span>
             </div>
-            <div class="stat-card">
-                <div class="stat-label">📊 Tension moyenne</div>
-                <div class="stat-value">${data.globalAvg.toFixed(2)} V</div>
+            <div class="info-item">
+                <span class="info-label">👥 Clients actifs</span>
+                <span class="info-value">${data.clientCount}</span>
             </div>
-            <div class="stat-card">
-                <div class="stat-label">⬇️ Tension minimale</div>
-                <div class="stat-value" style="color:#64b5f6;">${data.globalMin.toFixed(2)} V</div>
+            <div class="info-item">
+                <span class="info-label">📊 Tension moyenne</span>
+                <span class="info-value">${data.globalAvg.toFixed(2)} V</span>
             </div>
-            <div class="stat-card">
-                <div class="stat-label">⬆️ Tension maximale</div>
-                <div class="stat-value" style="color:#ffb74d;">${data.globalMax.toFixed(2)} V</div>
+            <div class="info-item">
+                <span class="info-label">⬇️ Tension minimale</span>
+                <span class="info-value" style="color:#64b5f6;">${data.globalMin.toFixed(2)} V</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">⬆️ Tension maximale</span>
+                <span class="info-value" style="color:#ffb74d;">${data.globalMax.toFixed(2)} V</span>
             </div>
         </div>
     `;
 }
 
-function renderTechChartCard() {
-    const container = document.getElementById('techChartContainer');
-    if (!container) return;
-    
-    const data = database.technicalData;
-    
-    container.innerHTML = `
-        <div class="chart-container">
-            <div class="chart-title"><span>📈 Évolution journalière des tensions</span></div>
-            <div class="chart-wrapper"><canvas id="tensionChart"></canvas></div>
-        </div>
-    `;
-    
-    createTensionChart(data.dailyStats);
-}
-
-function renderTechNormsCard() {
-    const container = document.getElementById('techNormsContainer');
+// ===========================================
+// CARTE NORMES SYSTÈME
+// ===========================================
+function renderNormsCard() {
+    const container = document.getElementById('normsCard');
     if (!container) return;
     
     const data = database.technicalData;
@@ -108,252 +137,234 @@ function renderTechNormsCard() {
     }
     
     if (!normData) {
-        container.innerHTML = '';
+        container.innerHTML = '<h3 class="card-title">🔋 Normes système</h3><p>Non déterminé</p>';
         return;
     }
     
     container.innerHTML = `
-        <div class="norms-container">
-            <div class="norm-card">
-                <div class="norm-header"><span style="font-size:1.5em;">🔋</span><h3>Normes Système ${normSystem}</h3></div>
-                <div class="norm-grid">
-                    <div class="norm-item"><span class="norm-label">Tension minimale</span><span class="norm-value">${normData.min}V</span></div>
-                    <div class="norm-item"><span class="norm-label">Plage idéale</span><span class="norm-value norm-range">${normData.ideal}V</span></div>
-                    <div class="norm-item"><span class="norm-label">Tension maximale</span><span class="norm-value">${normData.max}V</span></div>
-                    <div class="norm-item"><span class="norm-label">Seuil d'alerte</span><span class="norm-value alert-threshold">${normData.alert}</span></div>
-                </div>
+        <h3 class="card-title">🔋 Normes Système ${normSystem}</h3>
+        <div class="norms-grid">
+            <div class="norm-item">
+                <span class="norm-label">Tension minimale</span>
+                <span class="norm-value">${normData.min}V</span>
+            </div>
+            <div class="norm-item">
+                <span class="norm-label">Plage idéale</span>
+                <span class="norm-value norm-range">${normData.ideal}V</span>
+            </div>
+            <div class="norm-item">
+                <span class="norm-label">Tension maximale</span>
+                <span class="norm-value">${normData.max}V</span>
+            </div>
+            <div class="norm-item">
+                <span class="norm-label">Seuil d'alerte</span>
+                <span class="norm-value alert-threshold">${normData.alert}</span>
             </div>
         </div>
     `;
 }
 
 // ===========================================
-// CARTES DE RÉSUMÉ
+// GRAPHIQUE PRINCIPAL
 // ===========================================
-
-function renderExtremesSummaryCard() {
-    const container = document.getElementById('extremesSummaryContainer');
+function renderChartCard() {
+    const container = document.getElementById('chartCard');
     if (!container) return;
     
-    const data = database.technicalData?.extremesSummary;
-    if (!data || !data.max || !data.min) {
-        container.innerHTML = '';
-        return;
-    }
+    const data = database.technicalData;
     
     container.innerHTML = `
-        <div class="resume-card">
-            <div class="card-header">
-                <span class="card-icon">🏆</span>
-                <h3>Records de la période</h3>
-            </div>
-            <div class="extremes-grid">
-                <div class="extreme-item">
-                    <div class="extreme-label">🔺 Tension maximale</div>
-                    <div class="extreme-value">${data.max.valeur} V</div>
-                    <div class="extreme-detail">${data.max.date} à ${data.max.heure}</div>
-                </div>
-                <div class="extreme-item">
-                    <div class="extreme-label">🔻 Tension minimale</div>
-                    <div class="extreme-value">${data.min.valeur} V</div>
-                    <div class="extreme-detail">${data.min.date} à ${data.min.heure}</div>
-                </div>
-            </div>
+        <h3 class="card-title">📈 Évolution journalière des tensions</h3>
+        <div class="chart-wrapper">
+            <canvas id="tensionChart"></canvas>
         </div>
+    `;
+    
+    createTensionChart(data.dailyStats);
+}
+
+// ===========================================
+// MINI-CARTES (3 en haut des onglets)
+// ===========================================
+function renderVariationsMiniCard() {
+    const container = document.getElementById('variationsMiniCard');
+    if (!container) return;
+    
+    const variations = database.technicalData?.variationsRapides || [];
+    const total = variations.length;
+    const jours = new Set(variations.map(v => v.date)).size;
+    
+    container.innerHTML = `
+        <div class="mini-card-header">⚡ Variations</div>
+        <div class="mini-card-value">${total}</div>
+        <div class="mini-card-label">variations totales</div>
+        <div class="mini-card-sub">${jours} jours concernés</div>
     `;
 }
 
-function renderCriticalExceedancesCard() {
-    const container = document.getElementById('criticalExceedancesContainer');
+function renderExceedanceMiniCard() {
+    const container = document.getElementById('exceedanceMiniCard');
     if (!container) return;
     
-    const data = database.technicalData?.criticalExceedances;
-    const normSystem = database.technicalData?.normSystem;
-    const norms = VOLTAGE_NORMS[normSystem];
+    const data = database.technicalData?.analyse14V || [];
+    const excellent = data.filter(d => d.qualite === 'excellent').length;
     
-    if (!data || (data.surtensions.length === 0 && data.sousTensions.length === 0)) {
-        container.innerHTML = `
-            <div class="card">
-                <div class="card-header">
-                    <span class="card-icon">✅</span>
-                    <h3>Aucun dépassement des seuils critiques</h3>
-                </div>
-                <p>Seuils : ${norms?.min}V - ${norms?.max}V</p>
+    container.innerHTML = `
+        <div class="mini-card-header">🔋 ≥14.2V</div>
+        <div class="mini-card-value">${excellent}</div>
+        <div class="mini-card-label">jours excellents</div>
+        <div class="mini-card-sub">${data.length} jours analysés</div>
+    `;
+}
+
+function renderLoadSheddingMiniCard() {
+    const container = document.getElementById('loadSheddingMiniCard');
+    if (!container) return;
+    
+    container.innerHTML = `
+        <div class="mini-card-header">⚡ Délestage</div>
+        <div class="mini-card-value">🚧</div>
+        <div class="mini-card-label">en cours</div>
+        <div class="mini-card-sub">bientôt disponible</div>
+    `;
+}
+
+// ===========================================
+// GESTION DES ONGLETS
+// ===========================================
+function showTechTab(tabName) {
+    const container = document.getElementById('techTabContent');
+    if (!container) return;
+    
+    switch(tabName) {
+        case 'variations':
+            container.innerHTML = renderVariationsTab();
+            break;
+        case 'exceedance':
+            container.innerHTML = renderExceedanceTab();
+            break;
+        case 'loadshed':
+            container.innerHTML = renderLoadSheddingTab();
+            break;
+        default:
+            container.innerHTML = '';
+    }
+}
+
+// ===========================================
+// ONGLET 1: VARIATIONS RAPIDES (détaillé)
+// ===========================================
+function renderVariationsTab() {
+    const variations = database.technicalData?.variationsRapides || [];
+    const chartData = database.technicalData?.variationsChart;
+    const seuil = database.technicalData?.normSystem === '24V' ? 3.5 : 1.5;
+    
+    if (variations.length === 0) {
+        return `
+            <div class="tab-content">
+                <p class="no-data">Aucune variation détectée (seuil: ${seuil}V/h)</p>
             </div>
         `;
-        return;
     }
-
-    // Stats globales
-    const totalSurtensions = data.stats.totalSurtensions;
-    const totalSousTensions = data.stats.totalSousTensions;
-    const joursSurtension = data.stats.joursAvecSurtension.size;
-    const joursSousTension = data.stats.joursAvecSousTension.size;
-
-    // Tableau combiné des dépassements
-    const allExceedances = [
-        ...data.surtensions.map(e => ({ ...e, type: 'surtension' })),
-        ...data.sousTensions.map(e => ({ ...e, type: 'sousTension' }))
-    ].sort((a, b) => new Date(b.date) - new Date(a.date));
-
-    let tableRows = '';
-    allExceedances.slice(0, 20).forEach(e => {
-        const rowClass = e.type === 'surtension' ? 'row-danger' : 'row-warning';
-        tableRows += `
-            <tr class="${rowClass}">
-                <td>${e.date}</td>
-                <td>${e.heure}</td>
-                <td>${e.type === 'surtension' ? '🔺 Surtension' : '🔻 Sous-tension'}</td>
-                <td>${e.valeur.toFixed(2)}V</td>
-                <td>${e.message}</td>
+    
+    // Grouper par date
+    const parJour = {};
+    variations.forEach(v => {
+        if (!parJour[v.date]) parJour[v.date] = [];
+        parJour[v.date].push(v);
+    });
+    
+    const tableRows = Object.entries(parJour).map(([date, vars]) => {
+        const maxVar = Math.max(...vars.map(v => parseFloat(v.variation)));
+        return `
+            <tr>
+                <td><strong>${date}</strong></td>
+                <td>${vars.length}</td>
+                <td>${maxVar.toFixed(2)} V</td>
+                <td>${vars.map(v => v.heureDebut).slice(0,3).join(', ')}${vars.length > 3 ? '...' : ''}</td>
             </tr>
         `;
-    });
-
-    // Fréquences (pour graphique éventuel)
-    const freqSurtension = data.frequences.surtension;
-    const freqSousTension = data.frequences.sousTension;
-
-    container.innerHTML = `
-        <div class="card">
-            <div class="card-header">
-                <span class="card-icon">⚠️</span>
-                <h3>Dépassements des seuils critiques (${norms?.min}V - ${norms?.max}V)</h3>
+    }).join('');
+    
+    // Construction du HTML avec le graphique
+    let html = `
+        <div class="tab-content">
+            <h4>⚡ Détail des variations</h4>
+    `;
+    
+    if (chartData && chartData.dates && chartData.dates.length > 0) {
+        html += `
+            <div class="chart-container-small" style="margin-bottom: 20px;">
+                <canvas id="variationsChart"></canvas>
             </div>
-            
-            <div class="critical-stats">
-                <div class="stat-critical surtension">
-                    <span class="stat-icon">🔺</span>
-                    <div>
-                        <span class="stat-value">${totalSurtensions}</span>
-                        <span class="stat-label">surtensions</span>
-                        <span class="stat-detail">sur ${joursSurtension} jours</span>
-                    </div>
-                </div>
-                <div class="stat-critical sousTension">
-                    <span class="stat-icon">🔻</span>
-                    <div>
-                        <span class="stat-value">${totalSousTensions}</span>
-                        <span class="stat-label">sous-tensions</span>
-                        <span class="stat-detail">sur ${joursSousTension} jours</span>
-                    </div>
-                </div>
-            </div>
-            
-            ${freqSurtension.length > 0 ? `
-                <div class="frequence-section">
-                    <h4>Fréquence des surtensions par jour</h4>
-                    <div class="frequence-list">
-                        ${freqSurtension.map(f => `
-                            <div class="frequence-item">
-                                <span>${f.date}</span>
-                                <span class="badge">${f.count}x</span>
-                            </div>
-                        `).join('')}
-                    </div>
-                </div>
-            ` : ''}
-            
-            ${freqSousTension.length > 0 ? `
-                <div class="frequence-section">
-                    <h4>Fréquence des sous-tensions par jour</h4>
-                    <div class="frequence-list">
-                        ${freqSousTension.map(f => `
-                            <div class="frequence-item">
-                                <span>${f.date}</span>
-                                <span class="badge">${f.count}x</span>
-                            </div>
-                        `).join('')}
-                    </div>
-                </div>
-            ` : ''}
-            
+        `;
+    }
+    
+    html += `
             <div class="table-wrapper">
                 <table>
                     <thead>
                         <tr>
                             <th>Date</th>
-                            <th>Heure</th>
-                            <th>Type</th>
-                            <th>Valeur</th>
-                            <th>Message</th>
+                            <th>Nombre</th>
+                            <th>Max variation</th>
+                            <th>Heures</th>
                         </tr>
                     </thead>
                     <tbody>${tableRows}</tbody>
                 </table>
-                ${allExceedances.length > 20 ? `<p class="table-note">... et ${allExceedances.length - 20} autres</p>` : ''}
             </div>
         </div>
     `;
-}
-
-// ===========================================
-// CARTE DES DÉPASSEMENTS 14.2V (avec graphique)
-// ===========================================
-
-function renderExceedanceCard() {
-    const container = document.getElementById('exceedanceContainer');
-    if (!container) return;
     
-    const data = database.technicalData?.analyse14V;
+    // Programmer la création du graphique après l'insertion
+    setTimeout(() => {
+        if (chartData) {
+            createVariationsChart(chartData);
+        }
+    }, 100);
+    
+    return html;
+}
+// ===========================================
+// ONGLET 2: DÉPASSEMENTS 14.2V (détaillé)
+// ===========================================
+function renderExceedanceTab() {
+    const data = database.technicalData?.analyse14V || [];
     const chartData = database.technicalData?.chart14V;
     
-    if (!data || data.length === 0) {
-        container.innerHTML = '<p>Aucune donnée de dépassement 14.2V</p>';
-        return;
-    }
-
-    const excellent = data.filter(d => d.qualite === 'excellent').length;
-    const bon = data.filter(d => d.qualite === 'bon').length;
-    const mauvais = data.filter(d => d.qualite === 'mauvais').length;
-    const critique = data.filter(d => d.qualite === 'critique').length;
-
-    let tableRows = '';
-    data.slice(0, 10).forEach(jour => {
-        tableRows += `
-            <tr>
-                <td>${jour.date}</td>
-                <td class="count-${jour.qualite}"><strong>${jour.count}x</strong></td>
-                <td><span class="badge-${jour.qualite}">${jour.message}</span></td>
-            </tr>
+    if (data.length === 0) {
+        return `
+            <div class="tab-content">
+                <p class="no-data">Aucune donnée de dépassement 14.2V</p>
+            </div>
         `;
-    });
-
-    container.innerHTML = `
-        <div class="card">
-            <div class="card-header">
-                <span class="card-icon">⚡</span>
-                <h3>Fréquence d'atteinte de 14.2V (80% charge)</h3>
-            </div>
-            
-            <div class="stats-mini">
-                <div class="stat-mini excellent">
-                    <span class="stat-emoji">🌟</span>
-                    <span class="stat-number">${excellent}</span>
-                    <span class="stat-label">Excellent</span>
-                </div>
-                <div class="stat-mini bon">
-                    <span class="stat-emoji">👍</span>
-                    <span class="stat-number">${bon}</span>
-                    <span class="stat-label">Bon</span>
-                </div>
-                <div class="stat-mini mauvais">
-                    <span class="stat-emoji">⚠️</span>
-                    <span class="stat-number">${mauvais}</span>
-                    <span class="stat-label">Mauvais</span>
-                </div>
-                <div class="stat-mini critique">
-                    <span class="stat-emoji">🔴</span>
-                    <span class="stat-number">${critique}</span>
-                    <span class="stat-label">Critique</span>
-                </div>
-            </div>
-            
-            <div style="height: 200px; margin: 10px 0;">  <!-- ← margin réduit de 20px à 10px -->
+    }
+    
+    const tableRows = data.slice(0, 15).map(jour => `
+        <tr>
+            <td>${jour.date}</td>
+            <td class="count-${jour.qualite}"><strong>${jour.count}x</strong></td>
+            <td><span class="badge-${jour.qualite}">${jour.message}</span></td>
+        </tr>
+    `).join('');
+    
+    // Construction du HTML avec le graphique
+    let html = `
+        <div class="tab-content">
+            <h4>🔋 Détail des dépassements 14.2V</h4>
+    `;
+    
+    if (chartData && chartData.dates && chartData.dates.length > 0) {
+        html += `
+            <div class="chart-container-small" style="margin-bottom: 20px;">
                 <canvas id="chart14V"></canvas>
             </div>
-            
-            <div class="table-wrapper" style="margin-top: 5px;">  <!-- ← margin-top ajouté -->
+        `;
+    }
+    
+    html += `
+            <div class="table-wrapper">
                 <table>
                     <thead>
                         <tr>
@@ -364,90 +375,39 @@ function renderExceedanceCard() {
                     </thead>
                     <tbody>${tableRows}</tbody>
                 </table>
-                ${data.length > 10 ? `<p style="text-align: center; margin-top: 5px; color: #666;">... et ${data.length - 10} autres jours</p>` : ''}
-            </div>
-            
-            <div class="legend-grid" style="margin-top: 10px;">  <!-- ← margin-top réduit -->
-                <div class="legend-item"><span class="legend-color excellent"></span> ≥4 : Excellent</div>
-                <div class="legend-item"><span class="legend-color bon"></span> 2-3 : Bon</div>
-                <div class="legend-item"><span class="legend-color mauvais"></span> 1 : Mauvais</div>
-                <div class="legend-item"><span class="legend-color critique"></span> 0 : Critique</div>
+                ${data.length > 15 ? `<p class="table-note">... et ${data.length - 15} autres jours</p>` : ''}
             </div>
         </div>
     `;
     
-    if (chartData) {
-        setTimeout(() => create14VChart(chartData), 100);
-    }
+    // Programmer la création du graphique après l'insertion
+    setTimeout(() => {
+        if (chartData) {
+            create14VChart(chartData);
+        }
+    }, 100);
+    
+    return html;
 }
+
 // ===========================================
-// CARTE DES VARIATIONS (avec graphique)
+// ONGLET 3: DÉLESTAGE (en cours)
 // ===========================================
-
-function renderVariationsCard() {
-    const container = document.getElementById('variationsContainer');
-    if (!container) return;
-    
-    const variations = database.technicalData?.variationsRapides;
-    const chartData = database.technicalData?.variationsChart;
-    const seuil = database.technicalData?.normSystem === '24V' ? 3.5 : 1.5;
-    
-    if (!variations || variations.length === 0) {
-        container.innerHTML = `
-            <div class="card">
-                <h3>⚡ Variations rapides</h3>
-                <p>Aucune variation détectée (seuil: ${seuil}V/h)</p>
-            </div>
-        `;
-        return;
-    }
-
-    const parJour = database.technicalData?.variationsParJour || {};
-
-    let tableRows = '';
-    Object.entries(parJour).forEach(([date, vars]) => {
-        const maxVar = Math.max(...vars.map(v => v.variation));
-        tableRows += `
-            <tr>
-                <td>${date}</td>
-                <td>${vars.length}</td>
-                <td>${maxVar.toFixed(2)}V</td>
-                <td>${vars.slice(0,2).map(v => v.heureDebut).join(', ')}</td>
-            </tr>
-        `;
-    });
-
-    container.innerHTML = `
-        <div class="card">
-            <div class="card-header">
-                <span class="card-icon">📊</span>
-                <h3>Variations rapides (seuil: ${seuil}V/h)</h3>
-            </div>
-            
-            <div style="height:200px; margin:20px 0;">
-                <canvas id="variationsChart"></canvas>
-            </div>
-            
-            <div class="table-container">
-                <table>
-                    <thead>
-                        <tr><th>Date</th><th>Nombre</th><th>Max</th><th>Heures</th></tr>
-                    </thead>
-                    <tbody>${tableRows}</tbody>
-                </table>
+function renderLoadSheddingTab() {
+    return `
+        <div class="tab-content coming-soon">
+            <h4>⚡ Analyse du délestage</h4>
+            <div class="coming-soon-content">
+                <p>🚧 Fonctionnalité en cours de développement</p>
+                <small>Bientôt disponible</small>
             </div>
         </div>
     `;
-    
-    if (chartData) {
-        createVariationsChart(chartData);
-    }
 }
 
 // ===========================================
-// GRAPHIQUES
+// GRAPHIQUE PRINCIPAL
 // ===========================================
-
 function createTensionChart(dailyStats) {
     const ctx = document.getElementById('tensionChart');
     if (!ctx) return;
@@ -467,33 +427,44 @@ function createTensionChart(dailyStats) {
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            plugins: { legend: { position: 'bottom' } },
-            scales: { y: { beginAtZero: false, title: { display: true, text: 'Tension (V)' } } }
+            plugins: {
+                legend: { position: 'bottom' }
+            },
+            scales: {
+                y: { 
+                    beginAtZero: false, 
+                    title: { display: true, text: 'Tension (V)' }
+                }
+            }
         }
     });
 }
+
+// ===========================================
+// GRAPHIQUES SPÉCIFIQUES
+// ===========================================
 
 function create14VChart(chartData) {
     const ctx = document.getElementById('chart14V');
     if (!ctx) return;
     
     new Chart(ctx, {
-        type: 'line',  // ← Changé de 'bar' à 'line'
+        type: 'line',
         data: {
             labels: chartData.dates,
             datasets: [{
                 label: 'Nombre de fois ≥14.2V',
                 data: chartData.counts,
-                borderColor: '#4CAF50',      // Couleur de la ligne
-                backgroundColor: 'rgba(76, 175, 80, 0.1)', // Remplissage léger
+                borderColor: '#4CAF50',
+                backgroundColor: 'rgba(76, 175, 80, 0.1)',
                 borderWidth: 3,
-                tension: 0.3,                 // Courbe légèrement arrondie
+                tension: 0.3,
                 pointBackgroundColor: chartData.counts.map(c => 
-                    c >= 4 ? '#4CAF50' : c >= 2 ? '#2196F3' : c === 1 ? '#FF9800' : '#F44336'
+                    c >= 4 ? '#4CAF50' : c >= 2 ? '#FFD700' : c === 1 ? '#FF8C00' : '#F44336'
                 ),
                 pointRadius: 5,
                 pointHoverRadius: 8,
-                fill: true                     // Remplir sous la courbe
+                fill: true
             }]
         },
         options: {
@@ -520,6 +491,7 @@ function create14VChart(chartData) {
         }
     });
 }
+
 function createVariationsChart(chartData) {
     const ctx = document.getElementById('variationsChart');
     if (!ctx) return;
