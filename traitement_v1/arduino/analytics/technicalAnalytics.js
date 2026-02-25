@@ -1,5 +1,6 @@
 // analytics/technicalAnalytics.js
 import { database } from '../arduinoCore.js';
+import { VOLTAGE_NORMS } from '../arduinoConstants.js';
 
 // ===========================================
 // 1. FONCTIONS DE BASE (définies en premier)
@@ -266,6 +267,202 @@ function calculateVariationsSummary() {
 }
 
 // ===========================================
+// ANALYSE DE CONFORMITÉ
+// ===========================================
+function calculateConformity() {
+    console.log("📊 Calcul de la conformité...");
+    
+    const tensionTable = database.tables.find(t => t.type === 'T');
+    if (!tensionTable) return;
+    
+    const normSystem = database.technicalData.normSystem;
+    const norms = VOLTAGE_NORMS[normSystem];
+    const seuilVariation = normSystem === '24V' ? 3.5 : 1.5;
+    
+    const conformity = {
+        totalJours: 0,
+        joursConformes: 0,
+        joursNonConformes: 0,
+        pourcentageConformite: 0,
+        causes: {
+            surtension: new Set(),
+            sousTension: new Set(),
+            variation: new Set()
+        },
+        details: {}
+    };
+    
+    // Grouper par date
+    const parDate = {};
+    tensionTable.data.forEach(row => {
+        const cells = row.split(';');
+        const timestamp = cells[1];
+        const date = timestamp.split(' ')[0];
+        const tensionMin = parseFloat(cells[3]);
+        const tensionMax = parseFloat(cells[4]);
+        
+        if (!parDate[date]) {
+            parDate[date] = {
+                min: Infinity,
+                max: -Infinity,
+                conformite: true,
+                problems: []
+            };
+        }
+        
+        parDate[date].min = Math.min(parDate[date].min, tensionMin);
+        parDate[date].max = Math.max(parDate[date].max, tensionMax);
+    });
+    
+    // Analyser chaque jour
+    Object.entries(parDate).forEach(([date, data]) => {
+        conformity.totalJours++;
+        let jourConforme = true;
+        const problems = [];
+        
+        if (data.max > norms.max) {
+            jourConforme = false;
+            problems.push('surtension');
+            conformity.causes.surtension.add(date);
+        }
+        if (data.min < norms.min) {
+            jourConforme = false;
+            problems.push('sous-tension');
+            conformity.causes.sousTension.add(date);
+        }
+        
+        const variationsJour = database.technicalData.variationsRapides?.filter(v => v.date === date) || [];
+        if (variationsJour.length > 0) {
+            const maxVar = Math.max(...variationsJour.map(v => parseFloat(v.variation)));
+            if (maxVar >= seuilVariation) {
+                jourConforme = false;
+                problems.push('variation');
+                conformity.causes.variation.add(date);
+            }
+        }
+        
+        if (jourConforme) {
+            conformity.joursConformes++;
+        } else {
+            conformity.joursNonConformes++;
+        }
+        
+        conformity.details[date] = {
+            conforme: jourConforme,
+            problems: problems,
+            min: data.min,
+            max: data.max
+        };
+    });
+    
+    conformity.pourcentageConformite = (conformity.joursConformes / conformity.totalJours * 100).toFixed(1);
+    conformity.causes.surtension = Array.from(conformity.causes.surtension);
+    conformity.causes.sousTension = Array.from(conformity.causes.sousTension);
+    conformity.causes.variation = Array.from(conformity.causes.variation);
+    
+    database.technicalData.conformity = conformity;
+    console.log("✅ Conformité calculée", conformity);
+}
+
+// ===========================================
+// ANALYSE DES DÉLESTAGES (Événements)
+// ===========================================
+function analyzeLoadShedding() {
+    console.log("⚡ Analyse des délestages...");
+    
+    const eventTable = database.tables.find(t => t.type === 'E');
+    if (!eventTable) return;
+    
+    const loadShedding = {
+        total: 0,
+        parType: {
+            partiel: 0,
+            total: 0
+        },
+        parDate: {},
+        parClient: {},
+        calendrier: {},
+        stats: {
+            joursAvecDelestage: new Set(),
+            clientsImpactes: new Set()
+        }
+    };
+    
+    eventTable.data.forEach(row => {
+        const cells = row.split(';');
+        const timestamp = cells[1];
+        const date = timestamp.split(' ')[0];
+        const eventType = cells[2];
+        const clientId = cells[3];
+        
+        if (eventType.includes('Delestage')) {
+            loadShedding.total++;
+            loadShedding.stats.joursAvecDelestage.add(date);
+            if (clientId && clientId !== '0') {
+                loadShedding.stats.clientsImpactes.add(clientId);
+            }
+            
+            // Par type
+            if (eventType === 'Delestage Partiel') {
+                loadShedding.parType.partiel++;
+            } else if (eventType === 'Delestage Total') {
+                loadShedding.parType.total++;
+            }
+            
+            // Par date
+            if (!loadShedding.parDate[date]) {
+                loadShedding.parDate[date] = {
+                    partiel: 0,
+                    total: 0,
+                    clients: []
+                };
+            }
+            if (eventType === 'Delestage Partiel') {
+                loadShedding.parDate[date].partiel++;
+            } else {
+                loadShedding.parDate[date].total++;
+            }
+            if (clientId && clientId !== '0' && !loadShedding.parDate[date].clients.includes(clientId)) {
+                loadShedding.parDate[date].clients.push(clientId);
+            }
+            
+            // Par client
+            if (!loadShedding.parClient[clientId]) {
+                loadShedding.parClient[clientId] = { partiel: 0, total: 0, dates: [] };
+            }
+            if (eventType === 'Delestage Partiel') {
+                loadShedding.parClient[clientId].partiel++;
+            } else {
+                loadShedding.parClient[clientId].total++;
+            }
+            if (!loadShedding.parClient[clientId].dates.includes(date)) {
+                loadShedding.parClient[clientId].dates.push(date);
+            }
+        }
+    });
+    
+    // Créer le calendrier
+    const dates = Object.keys(loadShedding.parDate).sort();
+    dates.forEach(date => {
+        const [year, month, day] = date.split('-');
+        if (!loadShedding.calendrier[year]) loadShedding.calendrier[year] = {};
+        if (!loadShedding.calendrier[year][month]) loadShedding.calendrier[year][month] = {};
+        
+        loadShedding.calendrier[year][month][parseInt(day)] = {
+            partiel: loadShedding.parDate[date].partiel,
+            total: loadShedding.parDate[date].total,
+            clients: loadShedding.parDate[date].clients.length
+        };
+    });
+    
+    loadShedding.stats.joursAvecDelestage = Array.from(loadShedding.stats.joursAvecDelestage);
+    loadShedding.stats.clientsImpactes = Array.from(loadShedding.stats.clientsImpactes);
+    
+    database.technicalData.loadShedding = loadShedding;
+    console.log("✅ Analyse délestage terminée", loadShedding);
+}
+
+// ===========================================
 // 2. FONCTION PRINCIPALE (appelle toutes les autres)
 // ===========================================
 
@@ -292,7 +489,11 @@ export function analyzeTechnicalData() {
     
     calculateVariationsRapides(tensionTable.data, baseStats.normSystem);
     calculateExceedances14V(baseStats.dailyStats);
+    calculateExtremesSummary(baseStats.globalMin, baseStats.globalMax);
     calculateVariationsSummary();
+    calculateConformity();        
+    analyzeLoadShedding();        
     
     console.log("✅ Analyse technique - Terminé", database.technicalData);
 }
+

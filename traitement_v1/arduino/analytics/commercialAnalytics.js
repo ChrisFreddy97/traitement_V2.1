@@ -1,5 +1,7 @@
 // analytics/commercialAnalytics.js
 import { database } from '../arduinoCore.js';
+import { FORFAIT_NAMES, FORFAIT_LIMITS } from '../arduinoConstants.js'; // ← AJOUTER CET IMPORT
+
 
 // ===========================================
 // FONCTIONS UTILITAIRES
@@ -119,12 +121,13 @@ function analyzeCreditData() {
 // ANALYSE DES RECHARGES (TABLE R)
 // ===========================================
 
-function analyzeRechargeData() {
-    console.log("📊 Analyse des recharges (table R)");
+
+export function analyzeRechargeData() {
+    console.log("💰 Analyse des recharges - Début");
     
     const rechargeTable = database.tables.find(t => t.type === 'R');
     if (!rechargeTable) {
-        console.log("ℹ️ Aucune table de recharges");
+        console.log("ℹ️ Aucune table de recharge");
         return null;
     }
     
@@ -152,7 +155,8 @@ function analyzeRechargeData() {
                 id: clientId,
                 recharges: [],
                 credits: {},
-                totalRecharges: 0
+                totalRecharges: 0,
+                forfaitActuel: forfait
             });
         }
         
@@ -165,6 +169,7 @@ function analyzeRechargeData() {
         });
         client.credits[credit] = (client.credits[credit] || 0) + 1;
         client.totalRecharges++;
+        client.forfaitActuel = forfait; // Mettre à jour le dernier forfait
     });
     
     // Analyser chaque client
@@ -208,6 +213,31 @@ function analyzeRechargeData() {
         // Dernières 5 recharges
         const dernieresRecharges = client.recharges.slice(-5).reverse();
         
+        // Calculer le crédit moyen
+        const creditMoyen = client.recharges.reduce((sum, r) => sum + r.credit, 0) / client.totalRecharges;
+        
+        // ===== NOUVEAU : Ajouter les infos de forfait =====
+        const forfaitName = FORFAIT_NAMES[client.forfaitActuel] || `Forfait ${client.forfaitActuel}`;
+        let consoStatus = '';
+        let consoColor = '#999';
+        
+        const limits = FORFAIT_LIMITS[forfaitName];
+        if (limits) {
+            const ratio = (creditMoyen / limits.max) * 100;
+            
+            if (creditMoyen > limits.max) {
+                consoStatus = '🔴 Dépassement';
+                consoColor = '#f44336';
+            } else if (creditMoyen > limits.max * (1 - limits.tolerance/100)) {
+                consoStatus = '🟠 Limite';
+                consoColor = '#ff9800';
+            } else {
+                consoStatus = '✅ OK';
+                consoColor = '#4CAF50';
+            }
+        }
+        // =================================================
+        
         clients.push({
             id: clientId,
             totalRecharges: client.totalRecharges,
@@ -217,7 +247,13 @@ function analyzeRechargeData() {
             preferredCredit,
             preferredPercentage: creditPercentages[preferredCredit] || '0',
             dernieresRecharges,
-            aChangeForfait: forfaitChanges.length > 0
+            aChangeForfait: forfaitChanges.length > 0,
+            creditMoyen: creditMoyen.toFixed(2),
+            // NOUVEAUX CHAMPS
+            forfaitActuel: client.forfaitActuel,
+            forfaitName: forfaitName,
+            consoStatus: consoStatus,
+            consoColor: consoColor
         });
     });
     
