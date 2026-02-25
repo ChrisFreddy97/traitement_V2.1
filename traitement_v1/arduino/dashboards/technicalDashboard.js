@@ -29,14 +29,14 @@ export function renderTechnicalDashboard() {
         <!-- Graphique principal -->
         <div id="chartCard" class="card"></div>
         
-        <!-- Sous-titre Analyse stabilité -->
-        <div class="subsection-title">
-
-        <!--Je veux que monter ça ici pour faire une sorte de tra>
+        
         <div id="loadSheddingTab" class="card"></div>
 
+        <!-- Sous-titre Analyse stabilité -->
+        <div class="subsection-title">
             <h3>📈 ANALYSE DE LA STABILITÉ</h3>
         </div>
+
         
         <div id="variationsMiniCard" class="card"></div>
         <div id="variationsTab" class="card"></div>
