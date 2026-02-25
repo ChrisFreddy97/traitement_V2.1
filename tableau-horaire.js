@@ -1,4 +1,3 @@
-
 console.log('✅ tableau-horaire.js: Architecture modulaire chargée avec succès');
 console.log('📁 Structure: shared-utils.js → commerciale-tab.js → technique-tab.js → tableau-horaire.js');
 
@@ -817,26 +816,7 @@ async function loadAndDisplayData(nr) {
         const tabParam = urlParams.get('tab');
         
         setTimeout(() => {
-            // Si le paramètre tab=evenement est présent, ouvrir l'onglet ÉVÈNEMENT
-            if (tabParam === 'evenement' && enrFiles.length > 0) {
-                currentMainTab = 'EVENEMENT';
-                const evenementTab = document.querySelector('[data-main-tab="EVENEMENT"]');
-                if (evenementTab) {
-                    console.log('🔀 Ouverture automatique de l\'onglet ÉVÈNEMENT');
-                    if (typeof window.switchMainTab === 'function') {
-                        window.switchMainTab('EVENEMENT', evenementTab);
-                    } else {
-                        evenementTab.click();
-                    }
-                } else {
-                    console.warn('⚠️ Onglet ÉVÈNEMENT non trouvé');
-                    // Fallback vers TECHNIQUE
-                    openDefaultTab();
-                }
-            } else {
-                // Sinon, ouvrir TECHNIQUE par défaut
-                openDefaultTab();
-            }
+            openDefaultTab();
         }, 100);
 
         addBackButton();
@@ -1209,16 +1189,17 @@ function displayClientsTabs() {
             <span class="tab-icon">💼</span>
             <span class="tab-label">COMMERCIALE</span>
         </button>
+        <!-- NOUVEAU : Onglet FRAUDE -->
         <button class="main-tab" 
-                data-main-tab="EVENEMENT" 
-                onclick="switchMainTab('EVENEMENT', this)">
-            <span class="tab-icon">📈</span>
-            <span class="tab-label">ÉVÈNEMENT</span>
+                data-main-tab="FRAUDE" 
+                onclick="switchMainTab('FRAUDE', this)">
+            <span class="tab-icon">🚨</span>
+            <span class="tab-label">FRAUDE</span>
         </button>
     `;
     mainTabsHTML += '</div>';
 
-    // === ONGLETS SECONDAIRES (Clients) ===
+    // === ONGLETS SECONDAIRES ===
     let subTabsHTML = '<div class="sub-tabs-header">';
 
     // Onglet "TOUS LES CLIENTS" (TECHNIQUE)
@@ -1232,21 +1213,9 @@ function displayClientsTabs() {
         </button>
     `;
 
-    // Onglet "ANALYSE ENR" (EVENEMENT)
-    subTabsHTML += `
-        <button class="sub-tab" 
-                data-sub-tab="ENR" 
-                data-main="EVENEMENT"
-                onclick="switchSubTab('ENR', 'EVENEMENT', this)">
-            <span class="tab-icon">📈</span>
-            <span class="tab-label">ANALYSE ENR et EC</span>
-        </button>
-    `;
-
     // Onglets clients individuels (COMMERCIALE)
     sortedClients.forEach((clientId, index) => {
         const clientData = allResultsByClient[clientId];
-        // Format modifié : Client 2(ECO) au lieu de 02-ECO
         const tabLabel = `Client ${parseInt(clientId).toString().padStart(2, '0')}(${clientData.forfait || 'N/A'})`;
 
         subTabsHTML += `
@@ -1260,12 +1229,23 @@ function displayClientsTabs() {
         `;
     });
 
+    // NOUVEAU : Sous-onglet pour FRAUDE (optionnel - si vous voulez des sous-onglets)
+    subTabsHTML += `
+        <button class="sub-tab" 
+                data-sub-tab="DETECTION" 
+                data-main="FRAUDE"
+                onclick="switchSubTab('DETECTION', 'FRAUDE', this)">
+            <span class="tab-icon">🔍</span>
+            <span class="tab-label">DÉTECTION</span>
+        </button>
+    `;
+
     subTabsHTML += '</div>';
 
     // === CONTENU DES ONGLETS ===
     let contentHTML = '';
 
-    // Contenu TECHNIQUE (Tous les clients)
+    // Contenu TECHNIQUE
     contentHTML += `
         <div class="main-content active" id="main-content-TECHNIQUE">
             <div class="sub-content active" id="sub-content-ALL">
@@ -1273,22 +1253,26 @@ function displayClientsTabs() {
         </div>
     `;
 
-    // Contenu COMMERCIALE (Clients individuels)
+    // Contenu COMMERCIALE
     contentHTML += `
         <div class="main-content" id="main-content-COMMERCIALE">
     `;
-
     sortedClients.forEach((clientId, index) => {
         contentHTML += `
             <div class="sub-content" id="sub-content-${clientId}">
             </div>
         `;
     });
-
     contentHTML += '</div>';
+
+    // NOUVEAU : Contenu FRAUDE
     contentHTML += `
-        <div class="main-content" id="main-content-EVENEMENT">
-            <div class="sub-content active" id="sub-content-ENR">
+        <div class="main-content" id="main-content-FRAUDE">
+            <div class="sub-content" id="sub-content-DETECTION">
+                <!-- Le contenu de détection sera ajouté ici plus tard -->
+            </div>
+            <div class="sub-content" id="sub-content-HISTORIQUE">
+                <!-- Le contenu historique sera ajouté ici plus tard -->
             </div>
         </div>
     `;
@@ -1325,8 +1309,7 @@ window.switchMainTab = function (mainTab, tabElement) {
         mainContentElement.classList.add('active');
     }
 
-    // === GÉRER LA VISIBILITÉ DES SOUS-ONGLETS ===
-    // Masquer/Afficher les sous-onglets selon l'onglet principal
+    // Gérer la visibilité des sous-onglets
     document.querySelectorAll('.sub-tab').forEach(tab => {
         const tabMainAttr = tab.getAttribute('data-main');
         if (tabMainAttr === mainTab) {
@@ -1337,13 +1320,12 @@ window.switchMainTab = function (mainTab, tabElement) {
         tab.classList.remove('active');
     });
 
-    // Activer le premier sous-onglet correspondant à cet onglet principal
+    // Activer le premier sous-onglet correspondant
     const firstSubTab = document.querySelector(`.sub-tab[data-main="${mainTab}"]`);
     if (firstSubTab) {
         firstSubTab.classList.add('active');
         const subTabValue = firstSubTab.getAttribute('data-sub-tab');
 
-        // Afficher le contenu du sous-onglet
         document.querySelectorAll('.sub-content').forEach(content => {
             content.classList.remove('active');
         });
@@ -1352,12 +1334,16 @@ window.switchMainTab = function (mainTab, tabElement) {
         if (subContentElement) {
             subContentElement.classList.add('active');
 
-            if (subTabValue === 'ALL') {
+            // Appeler les fonctions d'affichage selon l'onglet
+            if (mainTab === 'TECHNIQUE' && subTabValue === 'ALL') {
                 displayAllClientsTab();
-            } else if (subTabValue === 'ENR') {
-                displayENRAnalysis(); // NOUVELLE FONCTION
-            } else if (allResultsByClient[subTabValue]) {
+            } 
+            else if (mainTab === 'COMMERCIALE' && allResultsByClient[subTabValue]) {
                 displayClientData(subTabValue, allResultsByClient[subTabValue]);
+            }
+            else if (mainTab === 'FRAUDE') {
+                // NOUVEAU : Appeler la fonction d'affichage FRAUDE
+                displayFraudeTab(subTabValue);
             }
         }
     }
@@ -1404,10 +1390,19 @@ function displayClientData(clientId, clientData) {
     const hasEnergy = clientData.energyFiles.length > 0;
 
     const clientTitle = `Client ${parseInt(clientId).toString().padStart(2, '0')}(${clientData.forfait || 'N/A'})`;
+
+    // === NOUVEAU : Analyse commerciale globale en premier ===
+    const commercialGlobalAnalysis = generateCommercialGlobalAnalysis(clientId);
+
+     // === AJOUT DU GRAPHIQUE HORAIRE ICI ===
+    const hourlyChartHTML = createClientHourlyEnergyChart(clientId);
+
     // Générer la section commerciale (phrases analytiques)
     const commercialSectionHTML = generateCommercialSectionHTML(clientId, clientData);
     // Générer la section crédit (analyse comportement crédit)
     const creditSectionHTML = generateCreditBehaviorHTML(clientId, clientData);
+    // === NOUVEAU : Section des événements EC ===
+    const clientEventsHTML = displayClientEventsTab(clientId);
 
     // Générer une synthèse globale (conso + crédit) si possible
     let globalSummaryHTML = '';
@@ -1462,22 +1457,39 @@ function displayClientData(clientId, clientData) {
 
         globalSummaryHTML = `
             <div class="client-global-summary" style="margin:12px 0; padding:12px 16px; border-radius:10px; border:1px solid #cbd5e1; background:linear-gradient(135deg,#eff6ff 0%,#ecfeff 100%); box-shadow:0 2px 6px rgba(15,23,42,0.05);">
+                <h3>Diagnostic globale</h3>
                 <div style="font-weight:700; font-size:14px; color:${summaryColor}; margin-bottom:6px;">🧩 ${summaryTitle}</div>
                 <div style="font-size:13px; color:${summaryColor};">${summaryBody}</div>
             </div>
         `;
     }
 
+    // Construction du HTML avec l'analyse commerciale en PREMIER
     contentElement.innerHTML = `
         <div class="client-header">
             <h3>${clientTitle} - Résumé Journalier</h3>
         </div>
+        
+        ${commercialGlobalAnalysis}  <!-- ANALYSE COMMERCIALE TOUT EN HAUT -->
+        
         ${globalSummaryHTML}
+        ${createClientDashboard(clientId)}
+        ${createClientHourlyContinuousChart(clientId)}
         ${commercialSectionHTML}
         ${creditSectionHTML}
-        <!-- Tableau Journalier -->
+        ${clientEventsHTML}
         ${dailySummary.length > 0 ? displayDailySummaryTable(clientId, dailySummary) : ''}
     `;
+
+    // Initialiser le graphique et les jaux
+    setTimeout(() => {
+        const chartContainer = contentElement.querySelector('.client-hourly-chart-container');
+        if (chartContainer) {
+            const chartId = chartContainer.getAttribute('data-chart-id');
+            setClientContinuousRange(chartId, '7');
+        }
+        drawGauges(clientId);
+    }, 200);
 }
 
 // ======================== ANALYSE COMMERCIALE ========================
@@ -1498,7 +1510,1825 @@ function getLocalForfaitLimits(forfaitName) {
     const key = (forfaitName || 'ECO').toUpperCase();
     return FORFAITS_LOCAL[key] || FORFAITS_LOCAL.ECO;
 }
+// ======================== FONCTION POUR LE GRAPHIQUE HORAIRE CLIENT ========================
+function createClientHourlyEnergyChart(clientId) {
+    const clientData = allResultsByClient[clientId];
+    if (!clientData || !clientData.combinedHourlyData || clientData.combinedHourlyData.length === 0) {
+        return `
+            <div class="no-data-mini" style="text-align:center; padding:20px; background:#f8fafc; border-radius:12px; border:1px dashed #cbd5e1; margin:15px 0;">
+                <span style="font-size:24px; display:block; margin-bottom:8px;">📊</span>
+                <span style="color:#64748b; font-size:13px;">Pas assez de données pour générer le graphique horaire</span>
+            </div>
+        `;
+    }
 
+    // Préparer les données horaires (moyenne par heure sur toute la période)
+    const hourlyAverages = new Array(24).fill(0);
+    const hourlyCounts = new Array(24).fill(0);
+    
+    clientData.combinedHourlyData.forEach(item => {
+        if (item.energie && item.energie > 0 && item.heure) {
+            // Extraire l'heure du format "HHhMM" ou "HH:MM"
+            let hour = parseInt(item.heure.split('h')[0]) || parseInt(item.heure.split(':')[0]);
+            if (!isNaN(hour) && hour >= 0 && hour < 24) {
+                hourlyAverages[hour] += parseFloat(item.energie);
+                hourlyCounts[hour]++;
+            }
+        }
+    });
+
+    // Calculer les moyennes
+    for (let i = 0; i < 24; i++) {
+        if (hourlyCounts[i] > 0) {
+            hourlyAverages[i] = Math.round(hourlyAverages[i] / hourlyCounts[i]);
+        }
+    }
+
+    // Trouver l'heure de pointe
+    const maxEnergy = Math.max(...hourlyAverages);
+    const peakHour = hourlyAverages.indexOf(maxEnergy);
+
+    // Couleurs selon le niveau
+    const barColors = hourlyAverages.map((value, index) => {
+        if (value === 0) return '#94a3b8';
+        if (index === peakHour && value > 0) return '#ef4444';
+        return '#3b82f6';
+    });
+
+    // Créer un ID unique pour ce graphique
+    const chartId = `client-${clientId}-hourly-chart-${Date.now()}`;
+
+    // Retourner le HTML du conteneur avec un data attribute
+    return `
+        <div class="client-hourly-chart-container" data-chart-id="${chartId}" data-client-id="${clientId}" style="background:white; border-radius:16px; border:2px solid #e2e8f0; margin:20px 0; padding:20px; box-shadow:0 8px 20px rgba(0,0,0,0.05);">
+            <div style="display:flex; align-items:center; gap:12px; margin-bottom:15px;">
+                <div style="width:44px; height:44px; background:linear-gradient(135deg, #3b82f6 0%, #1e40af 100%); border-radius:12px; display:flex; align-items:center; justify-content:center;">
+                    <span style="font-size:24px; color:white;">⏰</span>
+                </div>
+                <div>
+                    <h4 style="margin:0; font-size:18px; font-weight:700; color:#0f172a;">Profil Horaire de Consommation</h4>
+                    <div style="font-size:12px; color:#64748b; margin-top:4px;">
+                        Moyenne sur ${clientData.combinedHourlyData.length} points de mesure
+                        ${peakHour > 0 ? ` · Pic à ${peakHour}h (${maxEnergy} Wh)` : ''}
+                    </div>
+                </div>
+            </div>
+            <div style="width:100%; height:250px;">
+                <canvas id="${chartId}"></canvas>
+            </div>
+            <div style="display:flex; justify-content:center; gap:20px; margin-top:15px; padding-top:10px; border-top:1px solid #e2e8f0;">
+                <div style="display:flex; align-items:center; gap:6px;">
+                    <span style="width:12px; height:12px; background:#3b82f6; border-radius:4px;"></span>
+                    <span style="font-size:11px; color:#475569;">Consommation moyenne (Wh)</span>
+                </div>
+                <div style="display:flex; align-items:center; gap:6px;">
+                    <span style="width:12px; height:12px; background:#ef4444; border-radius:4px;"></span>
+                    <span style="font-size:11px; color:#475569;">Heure de pointe</span>
+                </div>
+            </div>
+        </div>
+    `;
+}
+// ======================== GRAPHIQUE HORAIRE CONTINU (COMMERCIAL) ========================
+function createClientHourlyContinuousChart(clientId) {
+    const clientData = allResultsByClient[clientId];
+    if (!clientData || !clientData.combinedHourlyData || clientData.combinedHourlyData.length === 0) {
+        return `
+            <div class="no-data-mini" style="text-align:center; padding:20px; background:#f8fafc; border-radius:12px; border:1px dashed #cbd5e1; margin:15px 0;">
+                <span style="font-size:24px; display:block; margin-bottom:8px;">📊</span>
+                <span style="color:#64748b; font-size:13px;">Pas assez de données pour générer le graphique</span>
+            </div>
+        `;
+    }
+
+    // Récupérer toutes les dates disponibles
+    const allDates = [...new Set(clientData.combinedHourlyData.map(item => item.date))].sort((a, b) => {
+        const [da, ma, ya] = a.split('/');
+        const [db, mb, yb] = b.split('/');
+        return new Date(ya, ma-1, da) - new Date(yb, mb-1, db);
+    });
+
+    // Créer un ID unique
+    const chartId = `client-${clientId}-hourly-continuous-${Date.now()}`;
+
+    return `
+        <div class="client-hourly-chart-container" data-chart-id="${chartId}" data-client-id="${clientId}" style="background:white; border-radius:16px; border:2px solid #e2e8f0; margin:20px 0; padding:20px; box-shadow:0 8px 20px rgba(0,0,0,0.05);">
+            
+            <!-- EN-TÊTE -->
+            <div style="display:flex; align-items:center; gap:12px; margin-bottom:15px;">
+                <div style="width:44px; height:44px; background:linear-gradient(135deg, #3b82f6 0%, #1e40af 100%); border-radius:12px; display:flex; align-items:center; justify-content:center;">
+                    <span style="font-size:24px; color:white;">📈</span>
+                </div>
+                <div style="flex:1;">
+                    <h4 style="margin:0; font-size:18px; font-weight:700; color:#0f172a;">Évolution Continue de la Consommation</h4>
+                    <div style="display:flex; gap:20px; margin-top:4px;">
+                        <span style="font-size:12px; color:#64748b;">
+                            📅 ${allDates.length} jour(s) · Affichage continu
+                        </span>
+                        <span style="font-size:12px; color:#64748b;">
+                            ⏱️ Pas: 1 heure
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- FILTRES RAPIDES -->
+            <div style="background:#f8fafc; border-radius:12px; padding:15px; margin-bottom:15px; border:1px solid #e2e8f0;">
+                <div style="display:flex; align-items:center; gap:15px; flex-wrap:wrap;">
+                    <span style="font-size:12px; font-weight:600; color:#475569;">🔍 Période :</span>
+                    
+                    <div style="display:flex; gap:8px;">
+                        <button class="filter-btn" onclick="setClientContinuousRange('${chartId}', '7')" style="padding:6px 12px; background:#fff; border:1px solid #cbd5e1; border-radius:6px; font-size:11px; cursor:pointer;">7 jours</button>
+                        <button class="filter-btn" onclick="setClientContinuousRange('${chartId}', '15')" style="padding:6px 12px; background:#fff; border:1px solid #cbd5e1; border-radius:6px; font-size:11px; cursor:pointer;">15 jours</button>
+                        <button class="filter-btn" onclick="setClientContinuousRange('${chartId}', '30')" style="padding:6px 12px; background:#fff; border:1px solid #cbd5e1; border-radius:6px; font-size:11px; cursor:pointer;">30 jours</button>
+                        <button class="filter-btn active" onclick="setClientContinuousRange('${chartId}', 'all')" style="padding:6px 12px; background:#3b82f6; color:white; border:1px solid #2563eb; border-radius:6px; font-size:11px; cursor:pointer;">Tout</button>
+                    </div>
+
+                    <div style="margin-left:auto; font-size:11px; background:#e2e8f0; padding:4px 12px; border-radius:20px;" id="${chartId}-date-count">
+                        📅 ${allDates.length} jours
+                    </div>
+                </div>
+            </div>
+            
+            <!-- CANVAS DU GRAPHIQUE -->
+            <div style="width:100%; height:350px; position:relative;">
+                <canvas id="${chartId}"></canvas>
+            </div>
+
+            <!-- LÉGENDE DES MARQUEURS DE JOUR -->
+            <div style="margin-top:10px; padding:8px; background:#f8fafc; border-radius:8px; font-size:10px; color:#64748b; display:flex; gap:10px; flex-wrap:wrap;" id="${chartId}-day-markers">
+                Chargement des repères de jours...
+            </div>
+
+            <!-- STATISTIQUES -->
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:15px; padding-top:10px; border-top:1px solid #e2e8f0;">
+                <div id="${chartId}-stats" style="display:flex; gap:20px; font-size:11px; color:#64748b;">
+                    <span>ENERGIE Client1</span>
+                </div>
+                <div style="font-size:11px; color:#3b82f6; background:#eff6ff; padding:4px 12px; border-radius:20px;">
+                    ⚡ ${clientData.forfait || 'N/A'}
+                </div>
+            </div>
+        </div>
+    `;
+}
+// ======================== MISE À JOUR DU GRAPHIQUE CONTINU ========================
+function updateClientContinuousChart(chartId, clientId, filteredDates) {
+    const canvas = document.getElementById(chartId);
+    if (!canvas) return;
+
+    const clientData = allResultsByClient[clientId];
+    
+    // Préparer les données en continu
+    const continuousData = [];
+    const labels = [];
+    const dayMarkers = [];
+    
+    // Pour chaque date, créer 24 points (un par heure)
+    filteredDates.forEach((date, dateIndex) => {
+        // Initialiser un tableau de 24 heures pour cette date
+        const hourData = new Array(24).fill(null);
+        
+        // Remplir avec les données disponibles
+        clientData.combinedHourlyData.forEach(item => {
+            if (item.date === date && item.energie && item.heure) {
+                let hour = parseInt(item.heure.split('h')[0]) || parseInt(item.heure.split(':')[0]);
+                if (!isNaN(hour) && hour >= 0 && hour < 24) {
+                    hourData[hour] = parseFloat(item.energie);
+                }
+            }
+        });
+        
+        // Ajouter les 24 points au tableau continu
+        hourData.forEach((value, hour) => {
+            continuousData.push(value);
+            
+            // Créer le label pour cette heure
+            if (hour === 0) {
+                // À minuit, on met la date complète
+                labels.push(`${date}\n00h`);
+            } else if (hour === 12) {
+                // À midi, on met juste 12h
+                labels.push(`12h`);
+            } else {
+                // Autres heures, on met juste l'heure
+                labels.push(`${hour}h`);
+            }
+        });
+        
+        // Marquer le début de chaque nouveau jour
+        dayMarkers.push({
+            date: date,
+            index: dateIndex * 24 // Index dans le tableau continu
+        });
+    });
+
+    // Calculer la moyenne mobile (lissage)
+    const smoothedData = continuousData.map((value, index) => {
+        if (value === null || value === 0) return null;
+        
+        // Moyenne sur 3 points (l'heure précédente, actuelle, suivante)
+        let sum = 0;
+        let count = 0;
+        
+        for (let i = -1; i <= 1; i++) {
+            const idx = index + i;
+            if (idx >= 0 && idx < continuousData.length) {
+                const val = continuousData[idx];
+                if (val !== null && val > 0) {
+                    sum += val;
+                    count++;
+                }
+            }
+        }
+        
+        return count > 0 ? Math.round((sum / count) * 10) / 10 : null;
+    });
+
+    // Détruire l'ancien graphique
+    const chartProperty = `chart_${chartId}`;
+    if (window[chartProperty]) {
+        window[chartProperty].destroy();
+    }
+
+    // Créer le graphique
+    try {
+        window[chartProperty] = new Chart(canvas, {
+            type: 'line',
+            data: { 
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'Consommation horaire',
+                        data: continuousData,
+                        borderColor: '#3b82f6',
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        borderWidth: 2,
+                        pointRadius: 2,
+                        pointBackgroundColor: '#3b82f6',
+                        pointBorderColor: '#fff',
+                        pointBorderWidth: 1,
+                        tension: 0.3,
+                        fill: true,
+                        spanGaps: true // Relie les points même s'il y a des trous
+                    },
+                    {
+                        label: 'Moyenne mobile (lissée)',
+                        data: smoothedData,
+                        borderColor: '#ef4444',
+                        backgroundColor: 'transparent',
+                        borderWidth: 2,
+                        borderDash: [5, 5],
+                        pointRadius: 0,
+                        tension: 0.4,
+                        fill: false,
+                        spanGaps: true
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { 
+                    mode: 'index', 
+                    intersect: false 
+                },
+                plugins: {
+                    legend: { 
+                        display: true,
+                        position: 'top',
+                        labels: {
+                            usePointStyle: true,
+                            font: { size: 11 }
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                        padding: 12,
+                        callbacks: {
+                            title: (context) => {
+                                const index = context[0].dataIndex;
+                                const dayIndex = Math.floor(index / 24);
+                                const hour = index % 24;
+                                return `${filteredDates[dayIndex]} - ${hour}h00`;
+                            },
+                            label: (context) => {
+                                const value = context.parsed.y;
+                                if (value === null || value === 0) return 'Pas de données';
+                                return `${context.dataset.label}: ${value} Wh`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: { 
+                            display: true, 
+                            text: 'Énergie (Wh)', 
+                            font: { size: 11, weight: 'bold' } 
+                        },
+                        ticks: { 
+                            callback: (value) => value + ' Wh' 
+                        },
+                        grid: {
+                            color: 'rgba(148, 163, 184, 0.1)'
+                        }
+                    },
+                    x: { 
+                        title: { 
+                            display: true, 
+                            text: 'Heure (continu)', 
+                            font: { size: 11, weight: 'bold' } 
+                        },
+                        ticks: {
+                            maxRotation: 45,
+                            minRotation: 30,
+                            font: { size: 9 },
+                            callback: function(val, index) {
+                                // Afficher un tick sur 4 pour éviter la surcharge
+                                return index % 12 === 0 ? this.getLabelForValue(val) : '';
+                            }
+                        },
+                        grid: {
+                            display: false
+                        }
+                    }
+                }
+            }
+        });
+
+        // Mettre à jour les marqueurs de jours
+        const markersContainer = document.getElementById(`${chartId}-day-markers`);
+        if (markersContainer) {
+            markersContainer.innerHTML = dayMarkers.map(marker => `
+                <div style="display:flex; align-items:center; gap:4px;">
+                    <span style="width:8px; height:8px; background:#3b82f6; border-radius:2px;"></span>
+                    <span style="font-weight:600;">${marker.date}</span>
+                    <span style="color:#94a3b8;">(début)</span>
+                </div>
+            `).join('');
+        }
+
+        // Calculer les statistiques
+        const validValues = continuousData.filter(v => v !== null && v > 0);
+        const maxVal = Math.max(...validValues);
+        const maxIndex = continuousData.indexOf(maxVal);
+        const maxDayIndex = Math.floor(maxIndex / 24);
+        const maxHour = maxIndex % 24;
+        
+        const avgVal = Math.round(validValues.reduce((a,b) => a + b, 0) / validValues.length);
+        const totalConsumption = Math.round(validValues.reduce((a,b) => a + b, 0));
+
+        console.log(`✅ Graphique continu mis à jour: ${filteredDates.length} jours`);
+    } catch (error) {
+        console.error(`❌ Erreur graphique:`, error);
+    }
+}
+// ======================== FONCTIONS DE FILTRAGE ========================
+function setClientContinuousRange(chartId, days) {
+    const container = document.querySelector(`[data-chart-id="${chartId}"]`);
+    if (!container) return;
+    
+    const clientId = container.getAttribute('data-client-id');
+    const clientData = allResultsByClient[clientId];
+    
+    // Récupérer toutes les dates
+    const allDates = [...new Set(clientData.combinedHourlyData.map(item => item.date))].sort((a, b) => {
+        const [da, ma, ya] = a.split('/');
+        const [db, mb, yb] = b.split('/');
+        return new Date(ya, ma-1, da) - new Date(yb, mb-1, db);
+    });
+
+    // Filtrer les dates
+    let filteredDates = allDates;
+    if (days !== 'all') {
+        const numDays = parseInt(days);
+        filteredDates = allDates.slice(-numDays);
+    }
+
+    // Mettre à jour le style des boutons
+    container.querySelectorAll('.filter-btn').forEach(btn => {
+        btn.style.background = '#fff';
+        btn.style.color = '#334155';
+        btn.style.border = '1px solid #cbd5e1';
+    });
+    
+    const activeBtn = Array.from(container.querySelectorAll('.filter-btn')).find(
+        btn => btn.textContent.includes(days === 'all' ? 'Tout' : days)
+    );
+    if (activeBtn) {
+        activeBtn.style.background = '#3b82f6';
+        activeBtn.style.color = 'white';
+        activeBtn.style.border = '1px solid #2563eb';
+    }
+
+    // Mettre à jour le compteur
+    const countSpan = document.getElementById(`${chartId}-date-count`);
+    if (countSpan) {
+        countSpan.textContent = `📅 ${filteredDates.length} jours`;
+    }
+
+    // Mettre à jour le graphique
+    updateClientContinuousChart(chartId, clientId, filteredDates);
+}
+// ======================== TABLEAU DE BORD CLIENT ========================
+function createClientDashboard(clientId) {
+    const clientData = allResultsByClient[clientId];
+    const dailySummary = dailySummaryByClient[clientId] || [];
+    const forfaitName = clientData.forfait || 'ECO';
+    const limits = getLocalForfaitLimits(forfaitName);
+    const forfaitMax = limits.max;
+
+    if (dailySummary.length === 0) {
+        return '';
+    }
+
+    // Calculer les statistiques
+    const energiesMax = dailySummary.map(d => d.energieMax || 0).filter(v => v > 0);
+    const energiesMoyennes = dailySummary.map(d => d.energieMoyenne || 0).filter(v => v > 0);
+    
+    const energieMaxGlobale = Math.max(...energiesMax);
+    const dateEnergieMax = dailySummary.find(d => d.energieMax === energieMaxGlobale)?.date || '-';
+    
+    const energieMoyenne = energiesMoyennes.length > 0 
+        ? Math.round(energiesMoyennes.reduce((a, b) => a + b, 0) / energiesMoyennes.length) 
+        : 0;
+
+    const joursSansConso = dailySummary.filter(d => !d.energieMax || d.energieMax === 0).length;
+    const joursAvecConso = dailySummary.filter(d => d.energieMax && d.energieMax > 0).length;
+
+    // Calculs par rapport au forfait
+    const joursDepasse90 = dailySummary.filter(d => {
+        const energie = d.energieMax || 0;
+        return energie > 0 && energie >= (forfaitMax * 0.9);
+    }).length;
+
+    const joursSous90 = dailySummary.filter(d => {
+        const energie = d.energieMax || 0;
+        return energie > 0 && energie < (forfaitMax * 0.9);
+    }).length;
+
+    // Calculs pour les tolérances
+    const joursDansLimites = dailySummary.filter(d => {
+        const energie = d.energieMax || 0;
+        return energie > 0 && energie <= forfaitMax;
+    }).length;
+
+    const joursDansTolerance = dailySummary.filter(d => {
+        const energie = d.energieMax || 0;
+        return energie > 0 && energie > forfaitMax && energie <= (forfaitMax * 1.2);
+    }).length;
+
+    const joursHorsTolerance = dailySummary.filter(d => {
+        const energie = d.energieMax || 0;
+        return energie > 0 && energie > (forfaitMax * 1.2);
+    }).length;
+
+    const totalJoursAvecConso = joursDansLimites + joursDansTolerance + joursHorsTolerance;
+
+    // Pourcentages
+    const pourcentLimites = totalJoursAvecConso > 0 
+        ? Math.round((joursDansLimites / totalJoursAvecConso) * 100) 
+        : 0;
+    
+    const pourcentTolerance = totalJoursAvecConso > 0 
+        ? Math.round((joursDansTolerance / totalJoursAvecConso) * 100) 
+        : 0;
+    
+    const pourcentHorsTolerance = totalJoursAvecConso > 0 
+        ? Math.round((joursHorsTolerance / totalJoursAvecConso) * 100) 
+        : 0;
+
+    return `
+        <!-- PREMIER CARD : STATISTIQUES GLOBALES -->
+        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius:16px; padding:20px; margin-bottom:20px; color:white; box-shadow:0 10px 25px rgba(102,126,234,0.3);">
+            <div style="display:flex; align-items:center; gap:12px; margin-bottom:15px;">
+                <div style="width:40px; height:40px; background:rgba(255,255,255,0.2); border-radius:10px; display:flex; align-items:center; justify-content:center; backdrop-filter:blur(4px);">
+                    <span style="font-size:22px;">📊</span>
+                </div>
+                <h4 style="margin:0; font-size:16px; font-weight:600;">Tableau de Bord Client</h4>
+                <div style="margin-left:auto; background:rgba(255,255,255,0.2); padding:4px 12px; border-radius:20px; font-size:12px;">
+                    Forfait: ${forfaitName} (${forfaitMax}Wh)
+                </div>
+            </div>
+
+            <!-- Première ligne : 4 indicateurs clés -->
+            <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:15px; margin-bottom:20px;">
+                <div style="background:rgba(255,255,255,0.1); border-radius:12px; padding:15px; text-align:center; backdrop-filter:blur(4px);">
+                    <div style="font-size:28px; font-weight:800;">${energieMaxGlobale}</div>
+                    <div style="font-size:11px; opacity:0.9;">Énergie max (Wh)</div>
+                    <div style="font-size:10px; margin-top:5px; background:rgba(255,255,255,0.2); display:inline-block; padding:2px 8px; border-radius:12px;">${dateEnergieMax}</div>
+                </div>
+                <div style="background:rgba(255,255,255,0.1); border-radius:12px; padding:15px; text-align:center; backdrop-filter:blur(4px);">
+                    <div style="font-size:28px; font-weight:800;">${energieMoyenne}</div>
+                    <div style="font-size:11px; opacity:0.9;">Énergie moyenne (Wh)</div>
+                    <div style="font-size:10px; margin-top:5px;">sur ${energiesMoyennes.length} jours</div>
+                </div>
+                <div style="background:rgba(255,255,255,0.1); border-radius:12px; padding:15px; text-align:center; backdrop-filter:blur(4px);">
+                    <div style="font-size:28px; font-weight:800;">${joursSansConso}</div>
+                    <div style="font-size:11px; opacity:0.9;">Jours sans conso</div>
+                    <div style="font-size:10px; margin-top:5px;">sur ${dailySummary.length} jours</div>
+                </div>
+                <div style="background:rgba(255,255,255,0.1); border-radius:12px; padding:15px; text-align:center; backdrop-filter:blur(4px);">
+                    <div style="font-size:28px; font-weight:800;">${joursAvecConso}</div>
+                    <div style="font-size:11px; opacity:0.9;">Jours avec conso</div>
+                    <div style="font-size:10px; margin-top:5px;">${Math.round((joursAvecConso/dailySummary.length)*100)}% du temps</div>
+                </div>
+            </div>
+
+            <!-- Deuxième ligne : 2 indicateurs forfait -->
+            <div style="display:grid; grid-template-columns:repeat(2,1fr); gap:15px; margin-bottom:15px;">
+                <div style="background:rgba(239,68,68,0.2); border-radius:12px; padding:15px; display:flex; justify-content:space-between; align-items:center; border-left:5px solid #ef4444;">
+                    <div>
+                        <div style="font-size:11px; opacity:0.9;">>90% du forfait</div>
+                        <div style="font-size:24px; font-weight:700;">${joursDepasse90}</div>
+                    </div>
+                    <div style="text-align:right;">
+                        <div style="font-size:20px;">⚡</div>
+                        <div style="font-size:10px;">${Math.round((joursDepasse90/joursAvecConso)*100)}% des jours conso</div>
+                    </div>
+                </div>
+                <div style="background:rgba(34,197,94,0.2); border-radius:12px; padding:15px; display:flex; justify-content:space-between; align-items:center; border-left:5px solid #22c55e;">
+                    <div>
+                        <div style="font-size:11px; opacity:0.9;"><90% du forfait</div>
+                        <div style="font-size:24px; font-weight:700;">${joursSous90}</div>
+                    </div>
+                    <div style="text-align:right;">
+                        <div style="font-size:20px;">✅</div>
+                        <div style="font-size:10px;">${Math.round((joursSous90/joursAvecConso)*100)}% des jours conso</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- DEUXIÈME CARD : POURCENTAGES DE TOLÉRANCE -->
+        <div style="background:white; border-radius:16px; padding:20px; margin-bottom:20px; border:2px solid #e2e8f0; box-shadow:0 5px 15px rgba(0,0,0,0.08);">
+            <div style="display:flex; align-items:center; gap:10px; margin-bottom:15px;">
+                <div style="width:36px; height:36px; background:#f1f5f9; border-radius:8px; display:flex; align-items:center; justify-content:center;">
+                    <span style="font-size:18px;">📈</span>
+                </div>
+                <h5 style="margin:0; font-size:14px; font-weight:600; color:#334155;">Répartition par rapport au forfait (${forfaitMax}Wh)</h5>
+            </div>
+
+            <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:15px; margin-bottom:20px;">
+                <!-- Dans les limites -->
+                <div style="text-align:center;">
+                    <div style="position:relative; width:100px; height:100px; margin:0 auto 10px;">
+                        <canvas id="gauge-${clientId}-limits" width="100" height="100"></canvas>
+                    </div>
+                    <div style="font-size:20px; font-weight:700; color:#22c55e;">${pourcentLimites}%</div>
+                    <div style="font-size:11px; color:#64748b;">Dans les limites</div>
+                    <div style="font-size:10px; color:#94a3b8;">≤ ${forfaitMax}Wh</div>
+                </div>
+
+                <!-- Dans la tolérance -->
+                <div style="text-align:center;">
+                    <div style="position:relative; width:100px; height:100px; margin:0 auto 10px;">
+                        <canvas id="gauge-${clientId}-tolerance" width="100" height="100"></canvas>
+                    </div>
+                    <div style="font-size:20px; font-weight:700; color:#f59e0b;">${pourcentTolerance}%</div>
+                    <div style="font-size:11px; color:#64748b;">Dans la tolérance</div>
+                    <div style="font-size:10px; color:#94a3b8;">${forfaitMax} - ${forfaitMax*1.2}Wh</div>
+                </div>
+
+                <!-- Hors tolérance -->
+                <div style="text-align:center;">
+                    <div style="position:relative; width:100px; height:100px; margin:0 auto 10px;">
+                        <canvas id="gauge-${clientId}-hors" width="100" height="100"></canvas>
+                    </div>
+                    <div style="font-size:20px; font-weight:700; color:#ef4444;">${pourcentHorsTolerance}%</div>
+                    <div style="font-size:11px; color:#64748b;">Hors tolérance</div>
+                    <div style="font-size:10px; color:#94a3b8;">> ${forfaitMax*1.2}Wh</div>
+                </div>
+            </div>
+
+            <!-- Barre de progression globale -->
+            <div style="background:#f1f5f9; border-radius:30px; height:30px; overflow:hidden; display:flex; margin-top:10px;">
+                <div style="width:${pourcentLimites}%; background:#22c55e; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:600; color:white;">
+                    ${pourcentLimites > 5 ? pourcentLimites+'%' : ''}
+                </div>
+                <div style="width:${pourcentTolerance}%; background:#f59e0b; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:600; color:white;">
+                    ${pourcentTolerance > 5 ? pourcentTolerance+'%' : ''}
+                </div>
+                <div style="width:${pourcentHorsTolerance}%; background:#ef4444; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:600; color:white;">
+                    ${pourcentHorsTolerance > 5 ? pourcentHorsTolerance+'%' : ''}
+                </div>
+            </div>
+
+            <div style="display:flex; justify-content:space-between; margin-top:8px; font-size:10px; color:#64748b;">
+                <span>${joursDansLimites} jours</span>
+                <span>${joursDansTolerance} jours</span>
+                <span>${joursHorsTolerance} jours</span>
+            </div>
+        </div>
+    `;
+}
+
+// ======================== FONCTION POUR DESSINER LES JAUX ========================
+function drawGauges(clientId) {
+    const dailySummary = dailySummaryByClient[clientId] || [];
+    const clientData = allResultsByClient[clientId];
+    const forfaitName = clientData.forfait || 'ECO';
+    const limits = getLocalForfaitLimits(forfaitName);
+    const forfaitMax = limits.max;
+
+    if (dailySummary.length === 0) return;
+
+    // Calculer les pourcentages
+    const joursDansLimites = dailySummary.filter(d => {
+        const energie = d.energieMax || 0;
+        return energie > 0 && energie <= forfaitMax;
+    }).length;
+
+    const joursDansTolerance = dailySummary.filter(d => {
+        const energie = d.energieMax || 0;
+        return energie > 0 && energie > forfaitMax && energie <= (forfaitMax * 1.2);
+    }).length;
+
+    const joursHorsTolerance = dailySummary.filter(d => {
+        const energie = d.energieMax || 0;
+        return energie > 0 && energie > (forfaitMax * 1.2);
+    }).length;
+
+    const total = joursDansLimites + joursDansTolerance + joursHorsTolerance;
+
+    const pourcentLimites = total > 0 ? (joursDansLimites / total) * 100 : 0;
+    const pourcentTolerance = total > 0 ? (joursDansTolerance / total) * 100 : 0;
+    const pourcentHorsTolerance = total > 0 ? (joursHorsTolerance / total) * 100 : 0;
+
+    // Dessiner les jaux
+    setTimeout(() => {
+        // Jauge limites (verte)
+        const canvasLimits = document.getElementById(`gauge-${clientId}-limits`);
+        if (canvasLimits) {
+            const ctx = canvasLimits.getContext('2d');
+            const centerX = 50;
+            const centerY = 50;
+            const radius = 40;
+            const startAngle = -Math.PI / 2;
+            const endAngle = startAngle + (pourcentLimites / 100) * 2 * Math.PI;
+
+            // Fond
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
+            ctx.strokeStyle = '#e2e8f0';
+            ctx.lineWidth = 10;
+            ctx.stroke();
+
+            // Progression
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, radius, startAngle, endAngle);
+            ctx.strokeStyle = '#22c55e';
+            ctx.lineWidth = 10;
+            ctx.stroke();
+
+            // Texte
+            ctx.font = 'bold 14px Arial';
+            ctx.fillStyle = '#22c55e';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(Math.round(pourcentLimites) + '%', centerX, centerY);
+        }
+
+        // Jauge tolérance (orange)
+        const canvasTolerance = document.getElementById(`gauge-${clientId}-tolerance`);
+        if (canvasTolerance) {
+            const ctx = canvasTolerance.getContext('2d');
+            const centerX = 50;
+            const centerY = 50;
+            const radius = 40;
+            const startAngle = -Math.PI / 2;
+            const endAngle = startAngle + (pourcentTolerance / 100) * 2 * Math.PI;
+
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
+            ctx.strokeStyle = '#e2e8f0';
+            ctx.lineWidth = 10;
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, radius, startAngle, endAngle);
+            ctx.strokeStyle = '#f59e0b';
+            ctx.lineWidth = 10;
+            ctx.stroke();
+
+            ctx.font = 'bold 14px Arial';
+            ctx.fillStyle = '#f59e0b';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(Math.round(pourcentTolerance) + '%', centerX, centerY);
+        }
+
+        // Jauge hors tolérance (rouge)
+        const canvasHors = document.getElementById(`gauge-${clientId}-hors`);
+        if (canvasHors) {
+            const ctx = canvasHors.getContext('2d');
+            const centerX = 50;
+            const centerY = 50;
+            const radius = 40;
+            const startAngle = -Math.PI / 2;
+            const endAngle = startAngle + (pourcentHorsTolerance / 100) * 2 * Math.PI;
+
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
+            ctx.strokeStyle = '#e2e8f0';
+            ctx.lineWidth = 10;
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, radius, startAngle, endAngle);
+            ctx.strokeStyle = '#ef4444';
+            ctx.lineWidth = 10;
+            ctx.stroke();
+
+            ctx.font = 'bold 14px Arial';
+            ctx.fillStyle = '#ef4444';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(Math.round(pourcentHorsTolerance) + '%', centerX, centerY);
+        }
+    }, 300);
+}
+
+// ======================== INITIALISATION DES GRAPHIQUES CLIENTS ========================
+function initializeClientCharts() {
+    setTimeout(() => {
+        console.log('🔄 Initialisation des graphiques clients...');
+        
+        // Parcourir tous les conteneurs de graphiques
+        document.querySelectorAll('.client-hourly-chart-container').forEach(container => {
+            const chartId = container.getAttribute('data-chart-id');
+            const clientId = container.getAttribute('data-client-id');
+            
+            if (!chartId || !clientId) return;
+            
+            const canvas = document.getElementById(chartId);
+            if (!canvas) return;
+            
+            const clientData = allResultsByClient[clientId];
+            if (!clientData || !clientData.combinedHourlyData) return;
+
+            // Recalculer les données (au cas où)
+            const hourlyAverages = new Array(24).fill(0);
+            const hourlyCounts = new Array(24).fill(0);
+            
+            clientData.combinedHourlyData.forEach(item => {
+                if (item.energie && item.energie > 0 && item.heure) {
+                    let hour = parseInt(item.heure.split('h')[0]) || parseInt(item.heure.split(':')[0]);
+                    if (!isNaN(hour) && hour >= 0 && hour < 24) {
+                        hourlyAverages[hour] += parseFloat(item.energie);
+                        hourlyCounts[hour]++;
+                    }
+                }
+            });
+
+            for (let i = 0; i < 24; i++) {
+                if (hourlyCounts[i] > 0) {
+                    hourlyAverages[i] = Math.round(hourlyAverages[i] / hourlyCounts[i]);
+                }
+            }
+
+            const maxEnergy = Math.max(...hourlyAverages);
+            const peakHour = hourlyAverages.indexOf(maxEnergy);
+
+            const barColors = hourlyAverages.map((value, index) => {
+                if (value === 0) return '#94a3b8';
+                if (index === peakHour && value > 0) return '#ef4444';
+                return '#3b82f6';
+            });
+
+            // Détruire l'ancien graphique s'il existe
+            const chartProperty = `chart_${chartId}`;
+            if (window[chartProperty]) {
+                window[chartProperty].destroy();
+            }
+
+            // Créer le nouveau graphique
+            try {
+                window[chartProperty] = new Chart(canvas, {
+                    type: 'bar',
+                    data: {
+                        labels: Array.from({length: 24}, (_, i) => i + 'h'),
+                        datasets: [{
+                            label: 'Consommation moyenne (Wh)',
+                            data: hourlyAverages,
+                            backgroundColor: barColors,
+                            borderColor: '#1e293b',
+                            borderWidth: 1,
+                            borderRadius: 6,
+                            barPercentage: 0.7
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                callbacks: {
+                                    label: (context) => {
+                                        const value = context.parsed.y;
+                                        return value > 0 ? `${value} Wh` : 'Pas de données';
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                title: {
+                                    display: true,
+                                    text: 'Énergie (Wh)',
+                                    font: { size: 11 }
+                                },
+                                ticks: {
+                                    callback: (value) => value + ' Wh'
+                                }
+                            },
+                            x: {
+                                title: {
+                                    display: true,
+                                    text: 'Heure',
+                                    font: { size: 11 }
+                                }
+                            }
+                        }
+                    }
+                });
+                console.log(`✅ Graphique créé pour client ${clientId}`);
+            } catch (error) {
+                console.error(`❌ Erreur création graphique client ${clientId}:`, error);
+            }
+        });
+    }, 300); // Délai pour laisser le DOM se mettre à jour
+}
+// ======================== AFFICHAGE DES ÉVÉNEMENTS EC PAR CLIENT ========================
+function displayClientEventsTab(clientId) {
+    console.log(`🔍 ===== DÉBUT displayClientEventsTab pour client ${clientId} =====`);
+    
+    const clientEvents = [];
+    
+    // Convertir l'ID client en nombre pour la comparaison
+    const targetClientNum = parseInt(clientId, 10);
+    
+    // 1. Chercher dans les fichiers EC globaux
+    if (window.ecFiles && window.ecFiles.length > 0) {
+        window.ecFiles.forEach(file => {
+            try {
+                const results = analyzeECSimple(file.content);
+                
+                // Filtrer les événements qui appartiennent au client cible
+                const clientSpecificEvents = results.filter(event => {
+                    return event.Client === targetClientNum;
+                });
+                
+                if (clientSpecificEvents.length > 0) {
+                    const enrichedResults = clientSpecificEvents.map(result => ({
+                        ...result,
+                        sourceFile: file.name
+                    }));
+                    
+                    clientEvents.push(...enrichedResults);
+                }
+            } catch (error) {
+                console.error(`❌ Erreur analyse EC pour client ${clientId}:`, error);
+            }
+        });
+    }
+
+    // Si aucun événement trouvé
+    if (clientEvents.length === 0) {
+        return `
+            <div class="client-events-container" style="margin: 20px 0; background: white; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden;">
+                <div style="background: linear-gradient(135deg, #f97316 0%, #ea580c 100%); color: white; padding: 16px 20px;">
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <span style="font-size: 24px;">📊</span>
+                        <h4 style="margin: 0; font-size: 16px; font-weight: 600;">Événements Client ${parseInt(clientId).toString().padStart(2, '0')}</h4>
+                    </div>
+                </div>
+                <div style="padding: 30px; text-align: center; background: #f8fafc;">
+                    <span style="font-size: 48px; display: block; margin-bottom: 15px; color: #94a3b8;">📭</span>
+                    <span style="color: #64748b; font-size: 14px;">Aucun événement EC détecté pour ce client</span>
+                </div>
+            </div>
+        `;
+    }
+
+    // Trier les événements par date/heure
+    clientEvents.sort((a, b) => {
+        const dateA = new Date(a.Date.split('/').reverse().join('-') + 'T' + a.Heure);
+        const dateB = new Date(b.Date.split('/').reverse().join('-') + 'T' + b.Heure);
+        return dateA - dateB;
+    });
+
+    // Grouper les événements par date
+    const eventsByDate = {};
+    clientEvents.forEach(event => {
+        if (!eventsByDate[event.Date]) {
+            eventsByDate[event.Date] = [];
+        }
+        eventsByDate[event.Date].push(event);
+    });
+
+    // Calculer le nombre de JOURS avec délestage (pas le nombre d'événements)
+    const daysWithEvents = Object.keys(eventsByDate).length;
+    
+    // Statistiques par type d'événement (pour le tableau de bord - en JOURS)
+    const eventStatsByDays = {
+        'SURCHARGE': { days: new Set(), color: '#FF6B6B', icon: '⚡' },
+        'CRÉDIT NUL': { days: new Set(), color: '#FFD93D', icon: '💰' },
+        'PUISSANCE DÉPASSÉE': { days: new Set(), color: '#6BCEF5', icon: '📈' },
+        'ÉNERGIE ÉPUISÉE': { days: new Set(), color: '#FF8B94', icon: '🔋' }
+    };
+
+    clientEvents.forEach(event => {
+        const type = event['Analyse État'];
+        if (eventStatsByDays[type]) {
+            eventStatsByDays[type].days.add(event.Date);
+        }
+    });
+
+    // Fonction pour grouper les événements en périodes
+    function groupEventsIntoPeriods(events) {
+        if (events.length === 0) return [];
+        
+        const periods = [];
+        let currentPeriod = {
+            debut: events[0].Heure,
+            fin: events[0].Heure,
+            events: [events[0]]
+        };
+        
+        for (let i = 1; i < events.length; i++) {
+            const currentEvent = events[i];
+            const lastEventTime = convertTimeToMinutes(currentPeriod.fin);
+            const currentEventTime = convertTimeToMinutes(currentEvent.Heure);
+            
+            // Si l'écart est <= 30 minutes, on continue la période
+            if (currentEventTime - lastEventTime <= 30) {
+                currentPeriod.fin = currentEvent.Heure;
+                currentPeriod.events.push(currentEvent);
+            } else {
+                // Nouvelle période
+                periods.push(currentPeriod);
+                currentPeriod = {
+                    debut: currentEvent.Heure,
+                    fin: currentEvent.Heure,
+                    events: [currentEvent]
+                };
+            }
+        }
+        
+        periods.push(currentPeriod);
+        return periods;
+    }
+
+    // Préparer les données pour le tableau
+    const sortedDates = Object.keys(eventsByDate).sort((a, b) => {
+        const dateA = new Date(a.split('/').reverse().join('-'));
+        const dateB = new Date(b.split('/').reverse().join('-'));
+        return dateB - dateA; // Plus récent en premier
+    });
+
+    // Types d'événements dans l'ordre
+    const eventTypes = ['PUISSANCE DÉPASSÉE', 'SURCHARGE', 'CRÉDIT NUL', 'ÉNERGIE ÉPUISÉE'];
+    const typeColors = {
+        'PUISSANCE DÉPASSÉE': '#6BCEF5',
+        'SURCHARGE': '#FF6B6B',
+        'CRÉDIT NUL': '#FFD93D',
+        'ÉNERGIE ÉPUISÉE': '#FF8B94'
+    };
+
+    // Créer les lignes du tableau
+    let tableRows = '';
+    
+    sortedDates.forEach(date => {
+        const dayEvents = eventsByDate[date];
+        
+        // Grouper les événements par type
+        const eventsByType = {};
+        dayEvents.forEach(event => {
+            const type = event['Analyse État'];
+            if (!eventsByType[type]) {
+                eventsByType[type] = [];
+            }
+            eventsByType[type].push(event);
+        });
+
+        // Pour chaque type, créer des périodes
+        const typePeriods = {};
+        eventTypes.forEach(type => {
+            if (eventsByType[type]) {
+                // Trier par heure
+                const sortedTypeEvents = eventsByType[type].sort((a, b) => {
+                    return convertTimeToMinutes(a.Heure) - convertTimeToMinutes(b.Heure);
+                });
+                typePeriods[type] = groupEventsIntoPeriods(sortedTypeEvents);
+            } else {
+                typePeriods[type] = [];
+            }
+        });
+
+        // Déterminer le nombre maximum de périodes pour cette date
+        const maxPeriods = Math.max(...eventTypes.map(type => typePeriods[type].length));
+
+        // Créer les lignes pour cette date
+        for (let i = 0; i < maxPeriods; i++) {
+            let rowHtml = `<tr>`;
+            
+            // Colonne Date (seulement sur la première ligne)
+            if (i === 0) {
+                rowHtml += `<td class="date-cell" rowspan="${maxPeriods}" style="font-weight: bold; background: #f8f9fa; vertical-align: middle;">${date}</td>`;
+            }
+            
+            // Pour chaque type d'événement
+            eventTypes.forEach(type => {
+                const periods = typePeriods[type];
+                const color = typeColors[type];
+                
+                if (i < periods.length) {
+                    const period = periods[i];
+                    const debutMinutes = convertTimeToMinutes(period.debut);
+                    const finMinutes = convertTimeToMinutes(period.fin);
+                    const dureeMinutes = finMinutes - debutMinutes;
+                    const duree = dureeMinutes < 60 ? 
+                        `${dureeMinutes}mn` : 
+                        `${Math.floor(dureeMinutes / 60)}h${(dureeMinutes % 60).toString().padStart(2, '0')}mn`;
+                    
+                    rowHtml += `
+                        <td class="time-cell" style="color: ${color}; font-weight: 600;">${period.debut}</td>
+                        <td class="time-cell" style="color: ${color}; font-weight: 600;">${period.fin}</td>
+                        <td class="duration-cell" style="color: ${color}; font-weight: 600;">${duree}</td>
+                    `;
+                } else {
+                    rowHtml += `
+                        <td class="empty-cell" style="color: #ccc;">-</td>
+                        <td class="empty-cell" style="color: #ccc;">-</td>
+                        <td class="empty-cell" style="color: #ccc;">-</td>
+                    `;
+                }
+            });
+            
+            rowHtml += `</tr>`;
+            tableRows += rowHtml;
+        }
+    });
+
+    return `
+        <div class="client-events-container" style="margin: 20px 0; background: white; border-radius: 16px; border: 2px solid #e2e8f0; overflow: hidden; box-shadow: 0 8px 20px rgba(0,0,0,0.08);">
+            
+            <!-- En-tête -->
+            <div style="background: linear-gradient(135deg, #f97316 0%, #ea580c 100%); color: white; padding: 18px 22px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
+                    <div style="display: flex; align-items: center; gap: 15px;">
+                        <div style="width: 48px; height: 48px; background: rgba(255,255,255,0.2); border-radius: 14px; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(4px);">
+                            <span style="font-size: 28px;">📊</span>
+                        </div>
+                        <div>
+                            <h3 style="margin: 0; font-size: 20px; font-weight: 700;">Événements de Délestage</h3>
+                            <p style="margin: 4px 0 0 0; font-size: 13px; opacity: 0.9;">Client ${parseInt(clientId).toString().padStart(2, '0')}</p>
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 20px; background: rgba(255,255,255,0.15); padding: 10px 20px; border-radius: 40px; font-size: 14px; font-weight: 600; backdrop-filter: blur(4px);">
+                        <span>📅 ${daysWithEvents} jour(s) avec événements</span>
+                        <span>📊 ${clientEvents.length} événement(s) total</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tableau de bord : Nombre de JOURS avec délestage (pas d'événements) -->
+            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; padding: 20px; background: #f8fafc; border-bottom: 2px solid #e2e8f0;">
+                ${Object.entries(eventStatsByDays).map(([type, data]) => `
+                    <div style="text-align: center; padding: 16px; background: white; border-radius: 12px; border-left: 5px solid ${data.color}; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
+                        <div style="font-size: 24px; margin-bottom: 8px;">${data.icon}</div>
+                        <div style="font-size: 28px; font-weight: 800; color: ${data.color};">${data.days.size}</div>
+                        <div style="font-size: 12px; color: #64748b; margin-top: 4px;">${type}</div>
+                        <div style="font-size: 11px; color: #94a3b8; margin-top: 4px;">${data.days.size} jour(s) concerné(s)</div>
+                    </div>
+                `).join('')}
+            </div>
+
+            <!-- Tableau des événements avec sous-colonnes par type -->
+            <div class="table-container" style="overflow-x: auto; padding: 0 20px 20px 20px;">
+                <div class="table-wrapper">
+                    <table class="events-matrix-table" style="width: 100%; border-collapse: collapse; font-size: 13px; min-width: 1000px;">
+                        
+                        <!-- En-tête principal -->
+                        <thead>
+                            <tr>
+                                <th rowspan="2" style="padding: 16px 12px; background: #f1f5f9; border: 1px solid #e2e8f0; font-weight: 700; color: #334155;">📅 Date</th>
+                                <th colspan="3" style="padding: 16px 12px; background: #e0f2fe; border: 1px solid #bae6fd; color: #0369a1; text-align: center; border-bottom: 3px solid #38bdf8;">
+                                    📈 PUISSANCE DÉPASSÉE
+                                </th>
+                                <th colspan="3" style="padding: 16px 12px; background: #fee2e2; border: 1px solid #fecaca; color: #b91c1c; text-align: center; border-bottom: 3px solid #ef4444;">
+                                    ⚡ SURCHARGE
+                                </th>
+                                <th colspan="3" style="padding: 16px 12px; background: #fef9c3; border: 1px solid #fde047; color: #854d0e; text-align: center; border-bottom: 3px solid #eab308;">
+                                    💰 CRÉDIT NUL
+                                </th>
+                                <th colspan="3" style="padding: 16px 12px; background: #fae8ff; border: 1px solid #f5d0fe; color: #86198f; text-align: center; border-bottom: 3px solid #c084fc;">
+                                    🔋 ÉNERGIE ÉPUISÉE
+                                </th>
+                            </tr>
+                            <tr>
+                                <!-- Sous-en-têtes pour chaque type -->
+                                <th style="padding: 12px 8px; background: #f8fafc; border: 1px solid #e2e8f0; font-weight: 600; color: #475569;">Début</th>
+                                <th style="padding: 12px 8px; background: #f8fafc; border: 1px solid #e2e8f0; font-weight: 600; color: #475569;">Fin</th>
+                                <th style="padding: 12px 8px; background: #f8fafc; border: 1px solid #e2e8f0; font-weight: 600; color: #475569;">Durée</th>
+                                
+                                <th style="padding: 12px 8px; background: #f8fafc; border: 1px solid #e2e8f0; font-weight: 600; color: #475569;">Début</th>
+                                <th style="padding: 12px 8px; background: #f8fafc; border: 1px solid #e2e8f0; font-weight: 600; color: #475569;">Fin</th>
+                                <th style="padding: 12px 8px; background: #f8fafc; border: 1px solid #e2e8f0; font-weight: 600; color: #475569;">Durée</th>
+                                
+                                <th style="padding: 12px 8px; background: #f8fafc; border: 1px solid #e2e8f0; font-weight: 600; color: #475569;">Début</th>
+                                <th style="padding: 12px 8px; background: #f8fafc; border: 1px solid #e2e8f0; font-weight: 600; color: #475569;">Fin</th>
+                                <th style="padding: 12px 8px; background: #f8fafc; border: 1px solid #e2e8f0; font-weight: 600; color: #475569;">Durée</th>
+                                
+                                <th style="padding: 12px 8px; background: #f8fafc; border: 1px solid #e2e8f0; font-weight: 600; color: #475569;">Début</th>
+                                <th style="padding: 12px 8px; background: #f8fafc; border: 1px solid #e2e8f0; font-weight: 600; color: #475569;">Fin</th>
+                                <th style="padding: 12px 8px; background: #f8fafc; border: 1px solid #e2e8f0; font-weight: 600; color: #475569;">Durée</th>
+                            </tr>
+                        </thead>
+                        
+                        <tbody>
+                            ${tableRows}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Légende des couleurs -->
+            <div style="display: flex; gap: 30px; padding: 16px 22px; background: #f8fafc; border-top: 2px solid #e2e8f0; font-size: 12px; flex-wrap: wrap;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="width: 16px; height: 16px; background: #e0f2fe; border: 2px solid #38bdf8; border-radius: 4px;"></span>
+                    <span style="color: #334155;">📈 Puissance Dépassée</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="width: 16px; height: 16px; background: #fee2e2; border: 2px solid #ef4444; border-radius: 4px;"></span>
+                    <span style="color: #334155;">⚡ Surcharge</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="width: 16px; height: 16px; background: #fef9c3; border: 2px solid #eab308; border-radius: 4px;"></span>
+                    <span style="color: #334155;">💰 Crédit Nul</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="width: 16px; height: 16px; background: #fae8ff; border: 2px solid #c084fc; border-radius: 4px;"></span>
+                    <span style="color: #334155;">🔋 Énergie Épuisée</span>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+// ======================== ANALYSE COMMERCIALE GLOBALE DU CLIENT ========================
+function generateCommercialGlobalAnalysis(clientId) {
+    const clientData = allResultsByClient[clientId];
+    const dailySummary = dailySummaryByClient[clientId] || [];
+    const creditData = creditResultsByClient[clientId];
+    const clientEvents = collectClientEvents(clientId);
+    
+    if (dailySummary.length === 0) {
+        return `
+            <div class="commercial-global-analysis" style="margin-bottom: 20px; background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%); border-radius: 18px; padding: 20px; border: 1px solid #e2e8f0; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <div style="width: 40px; height: 40px; background: #94a3b8; border-radius: 12px; display: flex; align-items: center; justify-content: center;">
+                        <span style="font-size: 20px; color: white;">📋</span>
+                    </div>
+                    <div>
+                        <h3 style="margin: 0; font-size: 16px; font-weight: 600; color: #1e293b;">Analyse Commerciale</h3>
+                        <p style="margin: 4px 0 0 0; font-size: 13px; color: #64748b;">Données insuffisantes pour ce client</p>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    // Récupérer les informations de base
+    const forfaitName = clientData.forfait || 'ECO';
+    const limits = getLocalForfaitLimits(forfaitName);
+    const forfaitMax = limits.max;
+    
+    // Statistiques de consommation
+    const daysWithData = dailySummary.length;
+    const daysWithConsumption = dailySummary.filter(d => d.energieMax > 0).length;
+    const percentActive = Math.round((daysWithConsumption / daysWithData) * 100);
+    
+    // Analyse des pics de consommation
+    const maxEnergy = Math.max(...dailySummary.map(d => d.energieMax || 0));
+    const avgEnergy = Math.round(dailySummary.reduce((sum, d) => sum + (d.energieMax || 0), 0) / daysWithData);
+    const percentOfForfait = Math.round((avgEnergy / forfaitMax) * 100);
+    
+    // Jours de dépassement
+    const daysOverQuota = dailySummary.filter(d => d.energieMax > forfaitMax).length;
+    const percentOverQuota = daysWithConsumption > 0 ? Math.round((daysOverQuota / daysWithConsumption) * 100) : 0;
+    
+    // Jours proches du forfait (>80%)
+    const daysNearQuota = dailySummary.filter(d => d.energieMax > forfaitMax * 0.8 && d.energieMax <= forfaitMax).length;
+    
+    // === 1. ANALYSE DU CRÉDIT ===
+    let creditText = "Aucune donnée de crédit";
+    let creditStatus = "non défini";
+    let creditColor = "#64748b";
+    let creditDays = 0;
+    let avgCredit = 0;
+    
+    if (creditData && creditData.dailySummary && creditData.dailySummary.length > 0) {
+        const creditDays_data = creditData.dailySummary;
+        creditDays = creditDays_data.length;
+        const zeroCreditDays = creditDays_data.filter(d => d.creditMoyen === 0 || d.creditMoyen === '0').length;
+        avgCredit = Math.round(creditDays_data.reduce((sum, d) => sum + (d.creditMoyen || 0), 0) / creditDays_data.length);
+        const percentZeroCredit = Math.round((zeroCreditDays / creditDays_data.length) * 100);
+        
+        if (percentZeroCredit === 0) {
+            creditStatus = "excellent";
+            creditColor = "#22c55e";
+            creditText = `${avgCredit} jours en moyenne, aucun jour sans crédit`;
+        } else if (percentZeroCredit < 20) {
+            creditStatus = "bon";
+            creditColor = "#3b82f6";
+            creditText = `${avgCredit} jours en moyenne, ${percentZeroCredit}% de jours sans crédit`;
+        } else if (percentZeroCredit < 40) {
+            creditStatus = "moyen";
+            creditColor = "#f59e0b";
+            creditText = `${percentZeroCredit}% des jours sans crédit`;
+        } else {
+            creditStatus = "fragile";
+            creditColor = "#ef4444";
+            creditText = `${percentZeroCredit}% des jours sans crédit - risque d'interruption`;
+        }
+    }
+    
+    // === 2. ANALYSE DES ÉVÉNEMENTS (en jours, pas en points) ===
+    const eventStats = analyzeClientEvents(clientEvents);
+    
+    // === 3. ANALYSE DE LA TENDANCE RÉCENTE (Détection d'arrêt de consommation) ===
+    const last30Days = dailySummary.slice(-30);
+    const last7Days = dailySummary.slice(-7);
+    const previous23Days = dailySummary.slice(-30, -7);
+    
+    // Calcul des moyennes
+    const avgLast7 = last7Days.filter(d => d.energieMax > 0).length / 7 * 100;
+    const avgLast30 = last30Days.filter(d => d.energieMax > 0).length / 30 * 100;
+    const avgPrevious23 = previous23Days.filter(d => d.energieMax > 0).length / 23 * 100;
+    
+    // Détection des tendances
+    let trendStatus = "stable";
+    let trendIcon = "📊";
+    let trendColor = "#3b82f6";
+    let trendMessage = "Consommation stable";
+    
+    // Vérifier si le client ne consomme plus du tout dans les 7 derniers jours
+    const noConsumptionLast7Days = last7Days.filter(d => d.energieMax > 0).length === 0;
+    
+    if (noConsumptionLast7Days) {
+        // Plus aucune consommation depuis au moins 7 jours
+        trendStatus = "alerte";
+        trendIcon = "🔴";
+        trendColor = "#ef4444";
+        trendMessage = "⚠️ PLUS AUCUNE CONSOMMATION DEPUIS 7 JOURS";
+    } 
+    else if (avgLast7 < avgPrevious23 * 0.5 && avgPrevious23 > 20) {
+        // Baisse significative de 50% par rapport à la période précédente
+        trendStatus = "baisse";
+        trendIcon = "📉";
+        trendColor = "#f59e0b";
+        trendMessage = "Baisse d'activité détectée";
+    }
+    else if (avgLast7 > avgPrevious23 * 1.5) {
+        // Hausse significative
+        trendStatus = "hausse";
+        trendIcon = "📈";
+        trendColor = "#22c55e";
+        trendMessage = "Hausse d'activité détectée";
+    }
+    
+    // Compter les jours sans consommation dans la dernière semaine
+    const daysWithoutConsoLast7 = 7 - last7Days.filter(d => d.energieMax > 0).length;
+    
+    // === 4. CALCUL DU SCORE DE SANTÉ CLIENT (0-100) ===
+    let healthScore = 100;
+    
+    // Pénalités basées sur l'activité
+    if (daysWithConsumption === 0) healthScore -= 50;
+    else if (percentActive < 20) healthScore -= 30;
+    else if (percentActive < 50) healthScore -= 15;
+    
+    // Pénalités basées sur les dépassements
+    healthScore -= daysOverQuota * 3;
+    if (percentOverQuota > 30) healthScore -= 10;
+    
+    // Pénalités basées sur le crédit
+    if (creditStatus === "fragile") healthScore -= 25;
+    else if (creditStatus === "moyen") healthScore -= 15;
+    else if (creditStatus === "bon") healthScore -= 5;
+    
+    // Pénalités basées sur les événements
+    healthScore -= eventStats.daysWithEvents * 2;
+    
+    // Pénalité pour baisse d'activité
+    if (trendStatus === "baisse") healthScore -= 10;
+    if (trendStatus === "alerte") healthScore -= 30;
+    
+    // Garder entre 0 et 100
+    healthScore = Math.max(0, Math.min(100, healthScore));
+    const healthColor = healthScore >= 80 ? "#22c55e" : healthScore >= 50 ? "#f59e0b" : "#ef4444";
+    
+    // === 5. CALCUL DU RISQUE DE CHURN (AVEC TERMES SIMPLIFIÉS) ===
+    let churnRisk = "faible";
+    let churnColor = "#22c55e";
+    let churnIcon = "✅";
+    let churnReasons = [];
+
+    if (daysWithConsumption === 0) {
+        churnRisk = "élevé";
+        churnColor = "#ef4444";
+        churnIcon = "🔴";
+        churnReasons.push("N'utilise pas du tout son kit");
+    } else if (percentActive < 20) {
+        churnRisk = "moyen";
+        churnColor = "#f59e0b";
+        churnIcon = "🟠";
+        churnReasons.push("Utilise très rarement son kit");
+    } else if (percentActive < 50) {
+        churnRisk = "moyen";
+        churnColor = "#f59e0b";
+        churnIcon = "🟠";
+        churnReasons.push("Utilisation irrégulière");
+    }
+
+    if (creditStatus === "fragile") {
+        churnRisk = churnRisk === "faible" ? "moyen" : churnRisk;
+        churnColor = churnRisk === "moyen" ? "#f59e0b" : churnColor;
+        churnIcon = churnRisk === "moyen" ? "🟠" : churnIcon;
+        churnReasons.push("Problèmes fréquents de crédit");
+    } else if (creditStatus === "moyen") {
+        if (churnRisk === "faible") {
+            churnRisk = "moyen";
+            churnColor = "#f59e0b";
+            churnIcon = "🟠";
+        }
+        churnReasons.push("Quelques jours sans crédit");
+    }
+
+    if (eventStats.hasCreditNul || eventStats.hasEnergieEpuisee) {
+        if (churnRisk === "faible") {
+            churnRisk = "moyen";
+            churnColor = "#f59e0b";
+            churnIcon = "🟠";
+        }
+        churnReasons.push("A subi des coupures de service");
+    }
+    
+    // === 6. COMPARAISON AVEC LA MOYENNE DU NR ===
+    let totalAvgEnergy = 0;
+    let totalClientsWithData = 0;
+    Object.keys(allResultsByClient).forEach(id => {
+        const summary = dailySummaryByClient[id];
+        if (summary && summary.length > 0) {
+            const clientAvg = Math.round(summary.reduce((sum, d) => sum + (d.energieMax || 0), 0) / summary.length);
+            totalAvgEnergy += clientAvg;
+            totalClientsWithData++;
+        }
+    });
+    const nrAvgEnergy = totalClientsWithData > 0 ? Math.round(totalAvgEnergy / totalClientsWithData) : 0;
+    const comparisonVsNR = avgEnergy - nrAvgEnergy;
+    const comparisonText = comparisonVsNR > 0 ? 
+        `${comparisonVsNR}Wh au-dessus` : 
+        `${Math.abs(comparisonVsNR)}Wh en dessous`;
+    
+    // === 7. TIMELINE DES 7 DERNIERS JOURS ===
+    const last7DaysForTimeline = dailySummary.slice(-7).reverse();
+    let timelineHTML = '';
+    last7DaysForTimeline.forEach((day, index) => {
+        const dateParts = day.date.split('/');
+        const dateObj = new Date(`${dateParts[2]}-${dateParts[1]}-${dateParts[0]}`);
+        const dayName = dateObj.toLocaleDateString('fr-FR', { weekday: 'short' }).replace('.', '');
+        const intensity = day.energieMax > forfaitMax * 0.8 ? '🔴' : day.energieMax > 0 ? '🟢' : '⚪';
+        timelineHTML += `
+            <div style="text-align: center;">
+                <div style="font-size: 9px; color: #64748b; text-transform: uppercase;">${dayName}</div>
+                <div style="font-size: 16px; margin: 2px 0;">${intensity}</div>
+                <div style="font-size: 8px; color: #94a3b8;">${day.energieMax || 0}Wh</div>
+            </div>
+        `;
+    });
+    
+    /* ===== PROFILS CLIENTS ===== */
+    let profileType = "";
+    let profileDescription = "";
+    let profileIcon = "";
+    let profileColor = "";
+    let recommendations = [];
+    let badgeGradient = "";
+    
+    if (daysWithConsumption === 0) {
+        profileType = "Client inactif";
+        profileIcon = "😴";
+        profileColor = "#64748b";
+        badgeGradient = "linear-gradient(135deg, #94a3b8 0%, #64748b 100%)";
+        profileDescription = "Ce client n'a pas consommé d'énergie. Le kit est peut-être éteint ou l'installation pas encore opérationnelle.";
+        recommendations = [
+            "📞 Contacter le client pour comprendre pourquoi il n'utilise pas le service",
+            "🔍 Vérifier si le kit est bien installé et fonctionnel",
+            "💡 Rappeler les avantages du service et les usages possibles",
+            "🛠️ Proposer une assistance à l'installation si nécessaire"
+        ];
+    }
+    else if (percentOfForfait > 70 || percentOverQuota > 15) {
+        profileType = "Gros consommateur";
+        profileIcon = "⚡";
+        profileColor = "#ef4444";
+        badgeGradient = "linear-gradient(135deg, #f87171 0%, #dc2626 100%)";
+        profileDescription = `Fort utilisateur : ${avgEnergy}Wh/jour (${percentOfForfait}% du forfait) avec ${daysOverQuota} dépassement(s).`;
+        recommendations = [
+            "📈 Proposer un forfait supérieur pour plus de confort et éviter les coupures",
+            "💰 Discuter d'un forfait mieux adapté à ses besoins réels",
+            "⚡ Vérifier les appareils utilisés (peut-être trop puissants pour le kit)",
+            "📞 Proposer un appel pour optimiser son utilisation"
+        ];
+    }
+    else if (percentActive >= 60 && percentOfForfait >= 15 && percentOfForfait <= 60) {
+        profileType = "Client régulier";
+        profileIcon = "📱";
+        profileColor = "#22c55e";
+        badgeGradient = "linear-gradient(135deg, #4ade80 0%, #16a34a 100%)";
+        profileDescription = `Utilisation régulière : ${percentActive}% des jours · ${avgEnergy}Wh/jour (${percentOfForfait}% du forfait)`;
+        recommendations = [
+            "📱 Lui proposer de découvrir les nouveaux services et équipements",
+            "🔋 L'informer des accessoires compatibles pour enrichir son expérience",
+            "📧 Lui envoyer des conseils pour optimiser sa consommation",
+            "💡 L'encourager à partager son expérience (témoignage client)"
+        ];
+    }
+    else if (percentActive >= 50 && percentOfForfait < 15) {
+        profileType = "Client économe";
+        profileIcon = "🌱";
+        profileColor = "#10b981";
+        badgeGradient = "linear-gradient(135deg, #34d399 0%, #059669 100%)";
+        profileDescription = `Utilisation régulière mais très modérée : ${avgEnergy}Wh/jour (${percentOfForfait}% du forfait)`;
+        recommendations = [
+            "💡 Féliciter pour sa bonne gestion de l'énergie (exemple à valoriser)",
+            "🔌 Proposer des équipements supplémentaires (lampes, radio, chargeur)",
+            "📱 Lui suggérer d'augmenter son utilisation pour profiter pleinement du service",
+            "⭐ L'encourager à témoigner de son expérience"
+        ];
+    }
+    else if (percentActive >= 20 && percentActive < 60) {
+        profileType = "Client occasionnel";
+        profileIcon = "🌤️";
+        profileColor = "#f59e0b";
+        badgeGradient = "linear-gradient(135deg, #fbbf24 0%, #d97706 100%)";
+        profileDescription = `Utilisation occasionnelle : ${percentActive}% des jours · ${avgEnergy}Wh/jour en moyenne`;
+        recommendations = [
+            "💡 Rappeler les avantages du service (économie, autonomie, écologie)",
+            "📱 Proposer des conseils pour utiliser plus régulièrement",
+            "🔌 Suggérer des équipements simples pour démarrer (lampe, chargeur)",
+            "📞 Prendre des nouvelles pour comprendre ses habitudes"
+        ];
+    }
+    else {
+        profileType = "Client très occasionnel";
+        profileIcon = "🌙";
+        profileColor = "#64748b";
+        badgeGradient = "linear-gradient(135deg, #9ca3af 0%, #4b5563 100%)";
+        profileDescription = `Très peu d'utilisation : ${percentActive}% des jours seulement`;
+        recommendations = [
+            "📞 Contacter pour comprendre pourquoi il n'utilise pas le service",
+            "🛠️ Proposer une démonstration d'utilisation ou un rappel des fonctionnalités",
+            "💡 Vérifier si le forfait actuel est adapté à ses besoins réels",
+            "🔋 Rappeler que le service est disponible quand il en a besoin"
+        ];
+    }
+    
+    // Ajouter recommandations basées sur les événements
+    if (eventStats.hasCreditNul) {
+        recommendations.push("💰 Proposer un rappel automatique par SMS pour éviter les coupures de service");
+    }
+    if (eventStats.hasSurcharge) {
+        recommendations.push("⚡ Éviter de brancher trop d'appareils en même temps pour ne pas surcharger le kit");
+    }
+    if (eventStats.hasPuissanceDep) {
+        recommendations.push("📈 Répartir l'utilisation des appareils sur la journée pour éviter les dépassements");
+    }
+    
+    // Supprimer doublons et limiter à 4 recommandations max
+    recommendations = [...new Set(recommendations)].slice(0, 4);
+    
+    // Compter le nombre total de clients pour le contexte NR
+    const totalClients = Object.keys(allResultsByClient).length;
+    
+    return `
+        <div class="commercial-global-analysis" style="margin-bottom: 20px; background: white; border-radius: 20px; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.08); border: 1px solid #e2e8f0;">
+            
+            <!-- En-tête profil -->
+            <div style="padding: 18px 20px; display: flex; align-items: center; gap: 16px; border-bottom: 1px solid #e2e8f0; background: #f8fafc;">
+                <div style="width: 52px; height: 52px; background: ${badgeGradient}; border-radius: 16px; display: flex; align-items: center; justify-content: center; box-shadow: 0 6px 12px ${profileColor}40;">
+                    <span style="font-size: 28px;">${profileIcon}</span>
+                </div>
+                <div style="flex: 1;">
+                    <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                        <h2 style="margin: 0; font-size: 18px; font-weight: 700; color: #0f172a;">${profileType}</h2>
+                        <span style="background: ${profileColor}15; color: ${profileColor}; padding: 4px 12px; border-radius: 30px; font-size: 11px; font-weight: 600; border: 1px solid ${profileColor}30;">
+                            ${forfaitName} · ${forfaitMax}Wh
+                        </span>
+                    </div>
+                    <p style="margin: 6px 0 0 0; font-size: 13px; color: #475569; line-height: 1.5;">
+                        ${profileDescription}
+                    </p>
+                </div>
+                
+                <!-- Score de santé compact -->
+                <div style="text-align: center; min-width: 70px;">
+                    <div style="font-size: 24px; font-weight: 800; color: ${healthColor};">${healthScore}</div>
+                    <div style="font-size: 9px; color: #64748b; text-transform: uppercase;">Santé</div>
+                    <div style="height: 4px; width: 100%; background: #e2e8f0; border-radius: 10px; margin-top: 4px;">
+                        <div style="width: ${healthScore}%; height: 100%; background: ${healthColor}; border-radius: 10px;"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- KPI Cards compacts (4 colonnes) -->
+            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; padding: 18px 20px; background: white;">
+                
+                <!-- Jours actifs -->
+                <div style="background: #f8fafc; border-radius: 14px; padding: 14px; border: 1px solid #e2e8f0;">
+                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                        <span style="font-size: 18px;">📅</span>
+                        <span style="font-size: 11px; color: #64748b; font-weight: 500;">ACTIVITÉ</span>
+                    </div>
+                    <div style="display: flex; align-items: baseline; gap: 6px;">
+                        <span style="font-size: 24px; font-weight: 700; color: #0f172a;">${daysWithConsumption}</span>
+                        <span style="font-size: 12px; color: #64748b;">/${daysWithData}</span>
+                    </div>
+                    <div style="font-size: 11px; color: #64748b; margin-top: 4px;">${percentActive}% des jours</div>
+                </div>
+                
+                <!-- Consommation -->
+                <div style="background: #f8fafc; border-radius: 14px; padding: 14px; border: 1px solid #e2e8f0;">
+                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                        <span style="font-size: 18px;">⚡</span>
+                        <span style="font-size: 11px; color: #64748b; font-weight: 500;">CONSO.</span>
+                    </div>
+                    <div style="display: flex; align-items: baseline; gap: 6px;">
+                        <span style="font-size: 24px; font-weight: 700; color: #0f172a;">${avgEnergy}</span>
+                        <span style="font-size: 12px; color: #64748b;">Wh</span>
+                    </div>
+                    <div style="font-size: 11px; color: #64748b; margin-top: 4px;">
+                        ${percentOfForfait}% du forfait · ${comparisonText}
+                    </div>
+                </div>
+                
+                <!-- Dépassements -->
+                <div style="background: #f8fafc; border-radius: 14px; padding: 14px; border: 1px solid #e2e8f0;">
+                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                        <span style="font-size: 18px;">📊</span>
+                        <span style="font-size: 11px; color: #64748b; font-weight: 500;">DÉPASS.</span>
+                    </div>
+                    <div style="display: flex; align-items: baseline; gap: 6px;">
+                        <span style="font-size: 24px; font-weight: 700; color: ${daysOverQuota > 0 ? '#ef4444' : '#22c55e'};">${daysOverQuota}</span>
+                    </div>
+                    <div style="font-size: 11px; color: #64748b; margin-top: 4px;">${percentOverQuota}% des jours</div>
+                </div>
+                
+                <!-- Crédit -->
+                <div style="background: #f8fafc; border-radius: 14px; padding: 14px; border: 1px solid #e2e8f0;">
+                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                        <span style="font-size: 18px;">💰</span>
+                        <span style="font-size: 11px; color: #64748b; font-weight: 500;">CRÉDIT</span>
+                    </div>
+                    <div style="font-size: 16px; font-weight: 600; color: ${creditColor}; text-transform: capitalize; margin-bottom: 2px;">
+                        ${creditStatus}
+                    </div>
+                    <div style="font-size: 10px; color: #64748b;">
+                        ${avgCredit > 0 ? avgCredit + ' jours' : ''} ${creditDays > 0 ? '· ' + creditDays + ' jours' : ''}
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Section Points d'attention + Recommandations (2 colonnes) -->
+            <div style="display: grid; grid-template-columns: 1fr 1.2fr; gap: 15px; padding: 0 20px 20px 20px;">
+                
+                <!-- Points d'attention (gauche) -->
+                <div style="background: #f8fafc; border-radius: 16px; padding: 16px; border: 1px solid #e2e8f0;">
+                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 14px;">
+                        <span style="font-size: 18px;">📌</span>
+                        <span style="font-size: 13px; font-weight: 600; color: #1e293b;">Points d'attention</span>
+                    </div>
+                    
+                    <div style="display: flex; flex-direction: column; gap: 12px;">
+                        
+                        <!-- Tendance récente (ALERTE si inactif) -->
+                        ${noConsumptionLast7Days ? `
+                        <div style="background: #fee2e2; border-radius: 10px; padding: 12px; border-left: 4px solid #ef4444; animation: pulse 2s infinite;">
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <span style="font-size: 20px;">🔴</span>
+                                <div>
+                                    <span style="font-size: 13px; font-weight: 700; color: #b91c1c;">ALERTE : Client inactif</span>
+                                    <div style="font-size: 12px; color: #7f1d1d; margin-top: 2px;">Aucune consommation depuis ${daysWithoutConsoLast7} jours</div>
+                                </div>
+                            </div>
+                        </div>
+                        ` : `
+                        <div style="background: ${trendColor}10; border-radius: 10px; padding: 10px; display: flex; align-items: center; gap: 10px; border-left: 3px solid ${trendColor};">
+                            <span style="font-size: 18px;">${trendIcon}</span>
+                            <div>
+                                <span style="font-size: 12px; font-weight: 600; color: ${trendColor};">${trendMessage}</span>
+                                <div style="font-size: 10px; color: #64748b; margin-top: 2px;">
+                                    ${daysWithoutConsoLast7 > 0 ? `${daysWithoutConsoLast7} jour(s) sans conso cette semaine` : 'Activité régulière cette semaine'}
+                                </div>
+                            </div>
+                        </div>
+                        `}
+                        
+                        <!-- Risque de churn -->
+                        <div style="background: ${churnColor}10; border-radius: 10px; padding: 10px; display: flex; align-items: center; gap: 10px;">
+                            <span style="font-size: 16px;">${churnIcon}</span>
+                            <div>
+                                <span style="font-size: 12px; font-weight: 600; color: ${churnColor};">Risque ${churnRisk}</span>
+                                ${churnReasons.length > 0 ? `
+                                <div style="font-size: 10px; color: #64748b; margin-top: 2px;">${churnReasons.join(' · ')}</div>
+                                ` : ''}
+                            </div>
+                        </div>
+                        
+                        <!-- Crédit -->
+                        <div style="display: flex; align-items: flex-start; gap: 10px;">
+                            <span style="font-size: 14px;">💰</span>
+                            <div style="flex: 1;">
+                                <div style="font-size: 12px; font-weight: 600; color: #334155; margin-bottom: 2px;">Crédit ${creditStatus}</div>
+                                <div style="font-size: 11px; color: #64748b; line-height: 1.4;">${creditText}</div>
+                            </div>
+                        </div>
+                        
+                        <!-- Événements (en jours) -->
+                        ${eventStats.summary ? `
+                        <div style="display: flex; align-items: flex-start; gap: 10px;">
+                            <span style="font-size: 14px;">⚠️</span>
+                            <div style="flex: 1;">
+                                <div style="font-size: 12px; font-weight: 600; color: #334155; margin-bottom: 2px;">Événements détectés</div>
+                                <div style="font-size: 11px; color: #64748b; line-height: 1.4;">${eventStats.summary}</div>
+                            </div>
+                        </div>
+                        ` : ''}
+                        
+                        <!-- Forfait proche -->
+                        ${daysNearQuota > 0 ? `
+                        <div style="display: flex; align-items: flex-start; gap: 10px;">
+                            <span style="font-size: 14px;">📈</span>
+                            <div style="flex: 1;">
+                                <div style="font-size: 12px; font-weight: 600; color: #334155; margin-bottom: 2px;">Proche du forfait</div>
+                                <div style="font-size: 11px; color: #64748b; line-height: 1.4;">${daysNearQuota} jour(s) >80% du forfait</div>
+                            </div>
+                        </div>
+                        ` : ''}
+                        
+                        <!-- Mini timeline avec légende -->
+                        <div style="margin-top: 5px; padding-top: 8px; border-top: 1px dashed #e2e8f0;">
+                            <div style="font-size: 11px; font-weight: 600; color: #475569; margin-bottom: 8px;">📊 Activité 7 derniers jours</div>
+                            
+                            <!-- Timeline -->
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                                ${timelineHTML}
+                            </div>
+                            
+                            <!-- Légende compacte -->
+                            <div style="display: flex; justify-content: center; gap: 15px; margin-top: 5px; padding-top: 5px; border-top: 1px solid #e2e8f0;">
+                                <div style="display: flex; align-items: center; gap: 4px;">
+                                    <span style="font-size: 12px;">🟢</span>
+                                    <span style="font-size: 10px; color: #64748b;">Normal</span>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 4px;">
+                                    <span style="font-size: 12px;">🔴</span>
+                                    <span style="font-size: 10px; color: #64748b;">>80% forfait</span>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 4px;">
+                                    <span style="font-size: 12px;">⚪</span>
+                                    <span style="font-size: 10px; color: #64748b;">Pas de conso</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Recommandations (droite) -->
+                <div style="background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); border-radius: 16px; padding: 16px; border: 1px solid #bae6fd;">
+                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 14px;">
+                        <span style="font-size: 18px;">💡</span>
+                        <span style="font-size: 13px; font-weight: 600; color: #0369a1;">Recommandations</span>
+                    </div>
+                    
+                    <div style="display: flex; flex-direction: column; gap: 10px;">
+                        ${recommendations.map(rec => `
+                            <div style="display: flex; align-items: center; gap: 10px; background: white; padding: 10px 12px; border-radius: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
+                                <span style="font-size: 14px; color: #0ea5e9;">•</span>
+                                <span style="font-size: 12px; color: #334155; line-height: 1.4;">${rec}</span>
+                            </div>
+                        `).join('')}
+                        
+                        <!-- Contexte NR discret -->
+                        <div style="display: flex; align-items: center; gap: 10px; background: white; padding: 10px 12px; border-radius: 12px; margin-top: 5px; border-left: 3px solid #3b82f6;">
+                            <span style="font-size: 14px;">🔋</span>
+                            <span style="font-size: 11px; color: #475569; line-height: 1.4;">
+                                <strong>NR (${totalClients} clients)</strong> · La consommation des autres clients du même NR peut influencer la disponibilité
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Footer avec indicateurs -->
+            <div style="padding: 10px 20px; background: #f1f5f9; border-top: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 15px;">
+                    <span style="font-size: 11px; color: #475569;">✓ Analyse basée sur ${daysWithData} jours</span>
+                    <span style="font-size: 11px; color: #475569;">📊 Confiance ${daysWithData > 20 ? 'élevée' : 'moyenne'}</span>
+                </div>
+                <span style="font-size: 11px; color: ${profileColor}; font-weight: 500;">Client ${parseInt(clientId).toString().padStart(2, '0')}/${totalClients}</span>
+            </div>
+        </div>
+    `;
+}
+
+// ======================== FONCTION UTILITAIRE POUR ANALYSER LES ÉVÉNEMENTS ========================
+function collectClientEvents(clientId) {
+    const events = [];
+    const targetClientNum = parseInt(clientId, 10);
+    
+    if (window.ecFiles && window.ecFiles.length > 0) {
+        window.ecFiles.forEach(file => {
+            try {
+                const results = analyzeECSimple(file.content);
+                const clientSpecificEvents = results.filter(event => event.Client === targetClientNum);
+                events.push(...clientSpecificEvents);
+            } catch (error) {
+                // Ignorer les erreurs
+            }
+        });
+    }
+    
+    return events;
+}
+
+// ======================== ANALYSE DES ÉVÉNEMENTS PAR JOUR ========================
+function analyzeClientEvents(events) {
+    if (events.length === 0) {
+        return {
+            hasSurcharge: false,
+            hasCreditNul: false,
+            hasPuissanceDep: false,
+            hasEnergieEpuisee: false,
+            totalEvents: 0,
+            daysWithEvents: 0,  // NOUVEAU : nombre de jours uniques
+            summary: "Aucun événement particulier détecté."
+        };
+    }
+    
+    // Compter les JOURS uniques pour chaque type d'événement
+    const daysWithSurcharge = new Set();
+    const daysWithCreditNul = new Set();
+    const daysWithPuissanceDep = new Set();
+    const daysWithEnergieEpuisee = new Set();
+    const allEventDays = new Set();
+    
+    events.forEach(event => {
+        const date = event.Date;
+        const type = event['Analyse État'];
+        
+        allEventDays.add(date);
+        
+        if (type === 'SURCHARGE') daysWithSurcharge.add(date);
+        if (type === 'CRÉDIT NUL') daysWithCreditNul.add(date);
+        if (type === 'PUISSANCE DÉPASSÉE') daysWithPuissanceDep.add(date);
+        if (type === 'ÉNERGIE ÉPUISÉE') daysWithEnergieEpuisee.add(date);
+    });
+    
+    // Générer un résumé en nombre de JOURS
+    let summaryParts = [];
+    if (daysWithPuissanceDep.size > 0) {
+        summaryParts.push(`📈 ${daysWithPuissanceDep.size} jour(s) avec puissance dépassée`);
+    }
+    if (daysWithSurcharge.size > 0) {
+        summaryParts.push(`⚡ ${daysWithSurcharge.size} jour(s) avec surcharge`);
+    }
+    if (daysWithCreditNul.size > 0) {
+        summaryParts.push(`💰 ${daysWithCreditNul.size} jour(s) avec crédit nul`);
+    }
+    if (daysWithEnergieEpuisee.size > 0) {
+        summaryParts.push(`🔋 ${daysWithEnergieEpuisee.size} jour(s) avec énergie épuisée`);
+    }
+    
+    const summary = summaryParts.length > 0 ? summaryParts.join(' · ') : "Aucun événement particulier détecté.";
+    
+    return {
+        hasSurcharge: daysWithSurcharge.size > 0,
+        hasCreditNul: daysWithCreditNul.size > 0,
+        hasPuissanceDep: daysWithPuissanceDep.size > 0,
+        hasEnergieEpuisee: daysWithEnergieEpuisee.size > 0,
+        totalEvents: events.length,
+        daysWithEvents: allEventDays.size,  // Nombre de jours uniques avec événements
+        summary: summary
+    };
+}
 function generateCommercialSectionHTML(clientId, clientData) {
     const daily = dailySummaryByClient[clientId] || clientData.energyDailyData || [];
     if (!daily || daily.length === 0) return '';
@@ -1600,26 +3430,6 @@ function generateCommercialSectionHTML(clientId, clientData) {
                         <div style="background:rgba(255,255,255,0.2); padding:6px 12px; border-radius:20px; font-size:12px; font-weight:600;">Forfait: ${forfaitName} (${forfaitMax}Wh)</div>
                         <div style="background:rgba(255,255,255,0.2); padding:6px 12px; border-radius:20px; font-size:12px; font-weight:600;">${daysTotal} jours</div>
                     </div>
-                </div>
-            </div>
-
-            <!-- Indicateurs clés -->
-            <div style="padding:16px 20px; background:#f8fafc; border-bottom:1px solid #e2e8f0; display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:12px;">
-                <div style="text-align:center; padding:8px; background:white; border-radius:8px; border-left:4px solid #3b82f6;">
-                    <div style="font-size:24px; font-weight:bold; color:#3b82f6;">${daysAbove70}</div>
-                    <div style="font-size:11px; color:#64748b; margin-top:4px;">Jours >70% du max</div>
-                </div>
-                <div style="text-align:center; padding:8px; background:white; border-radius:8px; border-left:4px solid #ef4444;">
-                    <div style="font-size:24px; font-weight:bold; color:#ef4444;">${daysAbove90}</div>
-                    <div style="font-size:11px; color:#64748b; margin-top:4px;">Jours >90% du max</div>
-                </div>
-                <div style="text-align:center; padding:8px; background:white; border-radius:8px; border-left:4px solid #8b5cf6;">
-                    <div style="font-size:24px; font-weight:bold; color:#8b5cf6;">${avgMax}</div>
-                    <div style="font-size:11px; color:#64748b; margin-top:4px;">Moyenne journalière (Wh)</div>
-                </div>
-                <div style="text-align:center; padding:8px; background:white; border-radius:8px; border-left:4px solid #f97316;">
-                    <div style="font-size:24px; font-weight:bold; color:#f97316;">${overQuotaDays}</div>
-                    <div style="font-size:11px; color:#64748b; margin-top:4px;">Jour(s) avec énergie dépassée(s)</div>
                 </div>
             </div>
 
@@ -4964,27 +6774,204 @@ function displayAllClientsTab() {
         }
     });
 
-    // Fonctions utilitaires pour les couleurs
-    function getConclusionBgColor(percentage) {
-        if (percentage >= 90) return '#f0fdf4';
-        if (percentage >= 75) return '#dbeafe';
-        if (percentage >= 60) return '#fef3c7';
-        return '#fee2e2';
+    // === CALCUL DES STATISTIQUES D'INTENSITÉ ===
+    function calculateIntensityStats() {
+        const intensityData = [];
+        const intensityByHour = {};
+        
+        // Initialiser les stats par heure
+        for (let h = 0; h < 24; h++) {
+            const hour = `${h.toString().padStart(2, '0')}:00`;
+            intensityByHour[hour] = {
+                values: [],
+                total: 0,
+                count: 0,
+                max: -Infinity,
+                min: Infinity
+            };
+        }
+        
+        // Stocker les valeurs précédentes pour le calcul de l'intensité
+        const previousValues = {};
+        allClientsHourlyMatrix.clients.forEach(clientId => {
+            previousValues[clientId] = null;
+        });
+        
+        let previousDate = null;
+        let maxIntensity = { value: 0, date: '', hour: '' };
+        let minIntensity = { value: Infinity, date: '', hour: '' };
+        let totalIntensity = 0;
+        let intensityCount = 0;
+        
+        for (let i = 0; i < datesToUse.length; i++) {
+            const date = datesToUse[i];
+            
+            // Réinitialiser au changement de jour
+            if (previousDate !== null && date !== previousDate) {
+                allClientsHourlyMatrix.clients.forEach(clientId => {
+                    previousValues[clientId] = null;
+                });
+            }
+            
+            for (let j = 0; j < allClientsHourlyMatrix.hours.length; j++) {
+                const hour = allClientsHourlyMatrix.hours[j];
+                const key = `${date}_${hour}`;
+                const rowData = allClientsHourlyMatrix.data[key] || {};
+                
+                const tension = rowData.tension;
+                if (!tension || tension <= 0) continue;
+                
+                // Calculer la consommation horaire
+                let totalConsoHeure = 0;
+                let hasValidData = false;
+                
+                allClientsHourlyMatrix.clients.forEach(clientId => {
+                    const energie = rowData[`client_${clientId}`];
+                    if (energie !== null && energie !== undefined) {
+                        const valeur = parseFloat(energie);
+                        const previous = previousValues[clientId];
+                        if (previous !== null && valeur >= previous) {
+                            totalConsoHeure += (valeur - previous);
+                            hasValidData = true;
+                        }
+                        previousValues[clientId] = valeur;
+                    }
+                });
+                
+                // Calculer l'intensité
+                if (hasValidData && totalConsoHeure > 0) {
+                    const intensity = totalConsoHeure / tension;
+                    
+                    // Statistiques globales
+                    if (intensity > maxIntensity.value) {
+                        maxIntensity = { value: intensity, date, hour };
+                    }
+                    if (intensity < minIntensity.value) {
+                        minIntensity = { value: intensity, date, hour };
+                    }
+                    
+                    totalIntensity += intensity;
+                    intensityCount++;
+                    
+                    // Statistiques par heure
+                    if (intensityByHour[hour]) {
+                        intensityByHour[hour].values.push(intensity);
+                        intensityByHour[hour].total += intensity;
+                        intensityByHour[hour].count++;
+                        intensityByHour[hour].max = Math.max(intensityByHour[hour].max, intensity);
+                        intensityByHour[hour].min = Math.min(intensityByHour[hour].min, intensity);
+                    }
+                    
+                    intensityData.push({
+                        date,
+                        hour,
+                        intensity,
+                        label: `${date} ${hour}`
+                    });
+                }
+            }
+            
+            previousDate = date;
+        }
+        
+        // Calculer les moyennes par heure
+        Object.keys(intensityByHour).forEach(hour => {
+            if (intensityByHour[hour].count > 0) {
+                intensityByHour[hour].avg = intensityByHour[hour].total / intensityByHour[hour].count;
+            } else {
+                intensityByHour[hour].avg = 0;
+            }
+        });
+        
+        const avgIntensity = intensityCount > 0 ? totalIntensity / intensityCount : 0;
+        
+        return {
+            intensityData,
+            intensityByHour,
+            maxIntensity: maxIntensity.value > 0 ? maxIntensity : { value: 0, date: '-', hour: '-' },
+            minIntensity: minIntensity.value < Infinity ? minIntensity : { value: 0, date: '-', hour: '-' },
+            avgIntensity,
+            intensityCount,
+            datesAnalyzed: datesToUse.length
+        };
     }
 
-    function getConclusionBorderColor(percentage) {
-        if (percentage >= 90) return '#22c55e';
-        if (percentage >= 75) return '#3b82f6';
-        if (percentage >= 60) return '#f59e0b';
-        return '#ef4444';
+    // Calculer les statistiques journalières d'intensité
+    function calculateDailyIntensityStats() {
+        const dailyIntensity = {};
+        const previousValues = {};
+        allClientsHourlyMatrix.clients.forEach(clientId => {
+            previousValues[clientId] = null;
+        });
+        
+        let previousDate = null;
+        
+        for (let i = 0; i < datesToUse.length; i++) {
+            const date = datesToUse[i];
+            
+            if (previousDate !== null && date !== previousDate) {
+                allClientsHourlyMatrix.clients.forEach(clientId => {
+                    previousValues[clientId] = null;
+                });
+            }
+            
+            let dailyTotal = 0;
+            let dailyCount = 0;
+            let dailyMax = 0;
+            let dailyMin = Infinity;
+            
+            for (let j = 0; j < allClientsHourlyMatrix.hours.length; j++) {
+                const hour = allClientsHourlyMatrix.hours[j];
+                const key = `${date}_${hour}`;
+                const rowData = allClientsHourlyMatrix.data[key] || {};
+                
+                const tension = rowData.tension;
+                if (!tension || tension <= 0) continue;
+                
+                let totalConsoHeure = 0;
+                let hasValidData = false;
+                
+                allClientsHourlyMatrix.clients.forEach(clientId => {
+                    const energie = rowData[`client_${clientId}`];
+                    if (energie !== null && energie !== undefined) {
+                        const valeur = parseFloat(energie);
+                        const previous = previousValues[clientId];
+                        if (previous !== null && valeur >= previous) {
+                            totalConsoHeure += (valeur - previous);
+                            hasValidData = true;
+                        }
+                        previousValues[clientId] = valeur;
+                    }
+                });
+                
+                if (hasValidData && totalConsoHeure > 0) {
+                    const intensity = totalConsoHeure / tension;
+                    dailyTotal += intensity;
+                    dailyCount++;
+                    dailyMax = Math.max(dailyMax, intensity);
+                    dailyMin = Math.min(dailyMin, intensity);
+                }
+            }
+            
+            previousDate = date;
+            
+            if (dailyCount > 0) {
+                dailyIntensity[date] = {
+                    avg: dailyTotal / dailyCount,
+                    max: dailyMax,
+                    min: dailyMin,
+                    count: dailyCount
+                };
+            }
+        }
+        
+        return dailyIntensity;
     }
 
-    function getConclusionIcon(percentage) {
-        if (percentage >= 90) return '✅';
-        if (percentage >= 75) return '👍';
-        if (percentage >= 60) return '⚠️';
-        return '🔴';
-    }
+
+    const intensityStats = calculateIntensityStats();
+    const dailyIntensityStats = calculateDailyIntensityStats();
+    const dailyDates = Object.keys(dailyIntensityStats).sort();
 
     // === CONSTRUCTION DU HTML ===
     contentElement.innerHTML = `
@@ -5181,7 +7168,7 @@ function displayAllClientsTab() {
 
             <!-- CARTES ÉNERGIE EN COLONNE -->
             
-            <!-- CARTE 1 : Énergie Totale par Jour (Somme des Max Clients) - CORRIGÉ POUR HAUTEUR AUTOMATIQUE -->
+            <!-- CARTE 1 : Énergie Totale par Jour (Somme des Max Clients) -->
             <div style="background: #f8fafc; border-radius: 20px; padding: 20px; margin-bottom: 25px; border: 1px solid #e2e8f0; overflow: visible; height: auto; min-height: auto;">
                 <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 20px;">
                     <div style="width: 44px; height: 44px; background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); border-radius: 12px; display: flex; align-items: center; justify-content: center;">
@@ -5189,11 +7176,9 @@ function displayAllClientsTab() {
                     </div>
                     <h4 style="margin: 0; font-size: 18px; font-weight: 700; color: #1e293b;">Énergie Totale par Jour (Somme des Max Clients)</h4>
                 </div>
-                <!-- Supprimer toute hauteur fixe et laisser le contenu s'ajuster -->
                 <div class="chart-container all-clients-bar-chart-container" style="height: 400px; min-height: 400px; width: 100%; overflow: visible;">
                     <canvas id="allClientsEnergyChart" style="width: 100% !important; height: 100% !important;"></canvas>
                 </div>
-                <!-- Le conteneur du dimensionnement doit être visible sans restriction de hauteur -->
                 <div id="allClientsEnergySummary" style="margin-top: 20px; width: 100%; overflow: visible;"></div>
             </div>
 
@@ -5270,6 +7255,118 @@ function displayAllClientsTab() {
         </div>
         <!-- ===== FIN CARTE PRINCIPALE ÉNERGIE ===== -->
         
+        <!-- ===== DASHBOARD INTENSITÉ ===== -->
+        <div class="intensity-dashboard" style="margin: 25px 0; background: white; border-radius: 20px; padding: 20px; border: 2px solid #e2e8f0; box-shadow: 0 8px 20px rgba(0,0,0,0.08);">
+            
+            <!-- En-tête -->
+            <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 20px;">
+                <div style="width: 50px; height: 50px; background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); border-radius: 14px; display: flex; align-items: center; justify-content: center;">
+                    <span style="font-size: 28px; color: white;">⚡</span>
+                </div>
+                <div>
+                    <h3 style="margin: 0; font-size: 20px; font-weight: 700; color: #0f172a;">
+                        Analyse de l'Intensité
+                    </h3>
+                    <p style="margin: 4px 0 0 0; font-size: 13px; color: #64748b;">
+                        Évolution journalière et horaire
+                    </p>
+                </div>
+            </div>
+            
+            <!-- Cartes statistiques (inchangées) -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 25px;">
+                <!-- Intensité Moyenne -->
+                <div style="background: linear-gradient(135deg, #f0f9ff 0%, #ffffff 100%); border-radius: 16px; padding: 16px; border-left: 5px solid #3b82f6; box-shadow: 0 4px 12px rgba(59,130,246,0.1);">
+                    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+                        <div style="width: 40px; height: 40px; background: #3b82f6; border-radius: 10px; display: flex; align-items: center; justify-content: center;">
+                            <span style="font-size: 20px; color: white;">📊</span>
+                        </div>
+                        <div style="font-size: 13px; color: #1e40af; font-weight: 600;">INTENSITÉ MOYENNE</div>
+                    </div>
+                    <div style="font-size: 32px; font-weight: 800; color: #1e3a8a; margin-bottom: 5px;">
+                        ${intensityStats.avgIntensity.toFixed(2)} A
+                    </div>
+                    <div style="font-size: 12px; color: #64748b;">
+                        Sur ${intensityStats.intensityCount} mesures
+                    </div>
+                </div>
+                
+                <!-- Intensité Maximale -->
+                <div style="background: linear-gradient(135deg, #fef2f2 0%, #ffffff 100%); border-radius: 16px; padding: 16px; border-left: 5px solid #ef4444; box-shadow: 0 4px 12px rgba(239,68,68,0.1);">
+                    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+                        <div style="width: 40px; height: 40px; background: #ef4444; border-radius: 10px; display: flex; align-items: center; justify-content: center;">
+                            <span style="font-size: 20px; color: white;">⬆️</span>
+                        </div>
+                        <div style="font-size: 13px; color: #991b1b; font-weight: 600;">INTENSITÉ MAXIMALE</div>
+                    </div>
+                    <div style="font-size: 32px; font-weight: 800; color: #b91c1c; margin-bottom: 5px;">
+                        ${intensityStats.maxIntensity.value.toFixed(2)} A
+                    </div>
+                    <div style="font-size: 12px; color: #64748b;">
+                        Le ${intensityStats.maxIntensity.date} à ${intensityStats.maxIntensity.hour}
+                    </div>
+                </div>
+                
+                <!-- Intensité Minimale -->
+                <div style="background: linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%); border-radius: 16px; padding: 16px; border-left: 5px solid #22c55e; box-shadow: 0 4px 12px rgba(34,197,94,0.1);">
+                    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+                        <div style="width: 40px; height: 40px; background: #22c55e; border-radius: 10px; display: flex; align-items: center; justify-content: center;">
+                            <span style="font-size: 20px; color: white;">⬇️</span>
+                        </div>
+                        <div style="font-size: 13px; color: #166534; font-weight: 600;">INTENSITÉ MINIMALE</div>
+                    </div>
+                    <div style="font-size: 32px; font-weight: 800; color: #15803d; margin-bottom: 5px;">
+                        ${intensityStats.minIntensity.value.toFixed(2)} A
+                    </div>
+                    <div style="font-size: 12px; color: #64748b;">
+                        Le ${intensityStats.minIntensity.date} à ${intensityStats.minIntensity.hour}
+                    </div>
+                </div>
+                
+                <!-- Jours analysés -->
+                <div style="background: linear-gradient(135deg, #f1f5f9 0%, #ffffff 100%); border-radius: 16px; padding: 16px; border-left: 5px solid #64748b; box-shadow: 0 4px 12px rgba(100,116,139,0.1);">
+                    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+                        <div style="width: 40px; height: 40px; background: #64748b; border-radius: 10px; display: flex; align-items: center; justify-content: center;">
+                            <span style="font-size: 20px; color: white;">📅</span>
+                        </div>
+                        <div style="font-size: 13px; color: #334155; font-weight: 600;">PÉRIODE ANALYSÉE</div>
+                    </div>
+                    <div style="font-size: 32px; font-weight: 800; color: #1e293b; margin-bottom: 5px;">
+                        ${intensityStats.datesAnalyzed} jours
+                    </div>
+                    <div style="font-size: 12px; color: #64748b;">
+                        Du ${datesToUse[0]} au ${datesToUse[datesToUse.length-1]}
+                    </div>
+                </div>
+            </div>
+
+            <!-- GRAPHIQUE JOURNALIER (NOUVEAU) -->
+            <div style="background: #f8fafc; border-radius: 16px; padding: 20px; margin-bottom: 25px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <h4 style="margin: 0; font-size: 16px; font-weight: 600; color: #0f172a;">
+                        📅 Évolution Journalière de l'Intensité
+                    </h4>
+                    <div style="display: flex; gap: 15px; font-size: 12px;">
+                        <span style="display: flex; align-items: center; gap: 4px;">
+                            <span style="width: 12px; height: 12px; background: #3b82f6; border-radius: 3px;"></span>
+                            Moyenne
+                        </span>
+                        <span style="display: flex; align-items: center; gap: 4px;">
+                            <span style="width: 12px; height: 12px; background: #ef4444; border-radius: 3px;"></span>
+                            Max
+                        </span>
+                        <span style="display: flex; align-items: center; gap: 4px;">
+                            <span style="width: 12px; height: 12px; background: #22c55e; border-radius: 3px;"></span>
+                            Min
+                        </span>
+                    </div>
+                </div>
+                <div class="chart-container" style="height: 200px;">
+                    <canvas id="dailyIntensityChart"></canvas>
+                </div>
+            </div>
+        </div>
+
         <div class="table-controls">
             <div class="pagination-controls">
                 <div class="items-per-page">
@@ -5304,8 +7401,8 @@ function displayAllClientsTab() {
                                 return `<th class="client-header" title="Client ${clientLabel}">Énergie ${clientId.padStart(2, '0')}</th>`;
                             }).join('')}
                             <th class="sticky-header tension-header">Tension (V)</th>
-                            <th class="sticky-header energy-sum-header">∑ Énergie (Wh)</th>  <!-- NOUVELLE COLONNE -->
-                            <th class="sticky-header intensity-header">Intensité (A)</th>    <!-- NOUVELLE COLONNE -->
+                            <th class="sticky-header energy-sum-header">∑ Énergie (Wh)</th>
+                            <th class="sticky-header intensity-header">Intensité (A)</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -5376,17 +7473,17 @@ function displayAllClientsTab() {
             }
         });
 
-        // 1. Graphique d'énergie (maintenant dans la carte énergie)
+        // 1. Graphique d'énergie
         createAllClientsEnergyChart(datesToUse, filteredEnergyData, filteredMaxEnergyDate);
         
-        // 2. Graphique de tension min/max par jour (carte 4 tension)
+        // 2. Graphique de tension min/max par jour
         createAllClientsTensionChart(datesToUse, filteredTensionData, systemType, systemLimits);
 
-        // 3. Graphique de stabilité (carte 1 tension)
+        // 3. Graphique de stabilité
         if (stabilityData) {
             createStabilityChart('stability-analysis-container', stabilityData, filteredTensionResults);
             
-            // 4. TABLEAU DES TENSIONS NOMINALES (carte 3 tension)
+            // 4. TABLEAU DES TENSIONS NOMINALES
             setTimeout(() => {
                 const allDatesInPeriod = window.filteredDates || allClientsHourlyMatrix.dates;
                 const nominalTableHTML = createNominalTensionTable(
@@ -5402,22 +7499,142 @@ function displayAllClientsTab() {
             }, 200);
         }
         
-        // 5. Graphique horaire d'énergie (carte 2 énergie)
+        // 5. Graphique horaire d'énergie
         const hourlyChartData = calculateHourlyEnergyData(datesToUse, 15);
         window.hourlyChartData = hourlyChartData;
         createAllClientsHourlyChart(hourlyChartData);
         
-        // 6. Graphique d'évolution de la tension (carte 5 tension)
+        // 6. Graphique d'évolution de la tension
         if (tensionResults && tensionResults.length > 0) {
             setTimeout(() => {
                 createTensionEvolutionChart(datesToUse, tensionResults, systemType);
             }, 300);
         }
 
+            // 8. Graphique journalier d'intensité
+            createDailyIntensityChart(dailyIntensityStats);
+
         console.log(`✅ Onglet TECHNIQUE affiché avec ${datesToUse.length} jour(s)`);
         console.log(`📊 Énergie moyenne: ${averageEnergyValue} Wh sur ${daysWithEnergy} jours`);
+        console.log(`⚡ Intensité moyenne: ${intensityStats.avgIntensity.toFixed(2)} A sur ${intensityStats.intensityCount} mesures`);
     }, 100);
 }
+
+// Fonction pour créer le graphique journalier d'intensité
+function createDailyIntensityChart(dailyIntensityStats) {
+    const chartCanvas = document.getElementById('dailyIntensityChart');
+    if (!chartCanvas) return;
+
+    // Détruire le graphique existant
+    if (window.dailyIntensityChartInstance) {
+        window.dailyIntensityChartInstance.destroy();
+    }
+
+    const dates = Object.keys(dailyIntensityStats).sort();
+    const avgData = dates.map(date => dailyIntensityStats[date].avg || 0);
+    const maxData = dates.map(date => dailyIntensityStats[date].max || null);
+    const minData = dates.map(date => dailyIntensityStats[date].min || null);
+
+    const ctx = chartCanvas.getContext('2d');
+    window.dailyIntensityChartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: dates,
+            datasets: [
+                {
+                    label: 'Intensité Moyenne (A)',
+                    data: avgData,
+                    borderColor: '#3b82f6',
+                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                    borderWidth: 3,
+                    fill: true,
+                    tension: 0.3,
+                    pointRadius: 4,
+                    pointBackgroundColor: '#3b82f6',
+                    pointBorderColor: '#fff',
+                    pointBorderWidth: 2,
+                    pointHoverRadius: 6
+                },
+                {
+                    label: 'Intensité Maximale',
+                    data: maxData,
+                    borderColor: '#ef4444',
+                    backgroundColor: 'transparent',
+                    borderWidth: 2,
+                    borderDash: [5, 5],
+                    fill: false,
+                    tension: 0,
+                    pointRadius: 3,
+                    pointBackgroundColor: '#ef4444',
+                    pointBorderColor: '#fff'
+                },
+                {
+                    label: 'Intensité Minimale',
+                    data: minData,
+                    borderColor: '#22c55e',
+                    backgroundColor: 'transparent',
+                    borderWidth: 2,
+                    borderDash: [5, 5],
+                    fill: false,
+                    tension: 0,
+                    pointRadius: 3,
+                    pointBackgroundColor: '#22c55e',
+                    pointBorderColor: '#fff'
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            interaction: {
+                mode: 'index',
+                intersect: false
+            },
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                    padding: 12,
+                    callbacks: {
+                        title: function(context) {
+                            return context[0].label;
+                        },
+                        label: function(context) {
+                            const value = context.parsed.y;
+                            const datasetLabel = context.dataset.label;
+                            return `${datasetLabel}: ${value ? value.toFixed(2) : '-'} A`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Intensité (A)',
+                        font: { size: 12, weight: 'bold' }
+                    },
+                    ticks: {
+                        callback: function(value) {
+                            return value.toFixed(1) + ' A';
+                        }
+                    }
+                },
+                x: {
+                    ticks: {
+                        maxRotation: 45,
+                        minRotation: 0,
+                        font: { size: 11 }
+                    }
+                }
+            }
+        }
+    });
+}
+
 // ======================== TABLEAU COMBINÉ DP/DT UNIQUEMENT (pour onglet TECHNIQUE) ========================
 function createDPDTOnlyTable(combinedAnalysis) {
     const { dailyEvents, eventTypes } = combinedAnalysis;
@@ -10190,6 +12407,450 @@ function createDimensioningStatsHTML(stats, kitThresholds) {
         </div>
     `;
 }
+
+
+// ======================== ONGLET FRAUDE ========================
+// ======================== ONGLET FRAUDE - ANALYSE TECHNIQUE DES CHUTES DE TENSION ========================
+// ======================== ONGLET FRAUDE - ANALYSE TECHNIQUE DES CHUTES DE TENSION ========================
+let tensionAnalysisData = {
+    voltageDrops: [],
+    stats: {
+        totalDrops: 0,
+        criticalDrops: 0,
+        maxDrop: 0,
+        maxDropDate: '',
+        systemType: '12V',
+        normalTension: 14,
+        criticalThreshold: 4.2,
+        dropsByHour: new Array(24).fill(0),
+        dropsByPeriod: {
+            morning: 0,   // 5h-12h
+            afternoon: 0, // 12h-18h
+            evening: 0,   // 18h-22h
+            night: 0      // 22h-5h
+        }
+    },
+    lastUpdate: '',
+    currentPeriodFilter: 'all' // 'all', 'morning', 'afternoon', 'evening', 'night'
+};
+
+// Fonction d'analyse des chutes de tension
+function analyzeVoltageDrops() {
+    console.log('🔍 Analyse des chutes de tension...');
+    
+    const drops = [];
+    const stats = {
+        totalDrops: 0,
+        criticalDrops: 0,
+        maxDrop: 0,
+        maxDropDate: '',
+        systemType: '12V',
+        normalTension: 14,
+        criticalThreshold: 4.2,
+        dropsByHour: new Array(24).fill(0),
+        dropsByPeriod: {
+            morning: 0,   // 5h-12h
+            afternoon: 0, // 12h-18h
+            evening: 0,   // 18h-22h
+            night: 0      // 22h-5h
+        }
+    };
+    
+    // Seuils de détection
+    const SIGNIFICANT_DROP = 1.5; // Chute significative > 1.5V
+    const CRITICAL_DROP = 4.2;    // Chute critique > 4.2V (30% de 14V)
+    
+    // Utiliser les données de tension existantes
+    if (tensionResults && tensionResults.length > 0) {
+        
+        // Trier par date et heure
+        const sortedTension = [...tensionResults].sort((a, b) => {
+            const dateA = new Date(a.date.split('/').reverse().join('-') + 'T' + a.heure);
+            const dateB = new Date(b.date.split('/').reverse().join('-') + 'T' + b.heure);
+            return dateA - dateB;
+        });
+        
+        // Détecter les chutes entre mesures consécutives
+        for (let i = 1; i < sortedTension.length; i++) {
+            const prev = sortedTension[i-1];
+            const curr = sortedTension[i];
+            
+            // Même date et heures consécutives
+            if (prev.date === curr.date) {
+                const prevHour = parseInt(prev.heure.split('h')[0] || prev.heure.split(':')[0]);
+                const currHour = parseInt(curr.heure.split('h')[0] || curr.heure.split(':')[0]);
+                const prevTension = parseFloat(prev.tension || prev.valeur || 0);
+                const currTension = parseFloat(curr.tension || curr.valeur || 0);
+                
+                // Vérifier si c'est une chute (baisse de tension)
+                if (prevTension > currTension && (currHour - prevHour === 1 || currHour - prevHour === 0)) {
+                    const drop = prevTension - currTension;
+                    
+                    if (drop > SIGNIFICANT_DROP) {
+                        // Déterminer la période de la journée
+                        let period = '';
+                        let periodKey = '';
+                        if (currHour >= 5 && currHour < 12) {
+                            period = '🌅 Matin';
+                            periodKey = 'morning';
+                        } else if (currHour >= 12 && currHour < 18) {
+                            period = '☀️ Après-midi';
+                            periodKey = 'afternoon';
+                        } else if (currHour >= 18 && currHour < 22) {
+                            period = '🌆 Soir';
+                            periodKey = 'evening';
+                        } else {
+                            period = '🌙 Nuit';
+                            periodKey = 'night';
+                        }
+                        
+                        // Compter par heure
+                        stats.dropsByHour[currHour]++;
+                        
+                        // Compter par période
+                        if (periodKey === 'morning') stats.dropsByPeriod.morning++;
+                        else if (periodKey === 'afternoon') stats.dropsByPeriod.afternoon++;
+                        else if (periodKey === 'evening') stats.dropsByPeriod.evening++;
+                        else stats.dropsByPeriod.night++;
+                        
+                        // Déterminer la sévérité
+                        let severity = 'significatif';
+                        let severityColor = '#f59e0b';
+                        if (drop > CRITICAL_DROP) {
+                            severity = 'critique';
+                            severityColor = '#ef4444';
+                            stats.criticalDrops++;
+                        }
+                        
+                        // Mettre à jour la pire chute
+                        if (drop > stats.maxDrop) {
+                            stats.maxDrop = Math.round(drop * 100) / 100;
+                            stats.maxDropDate = curr.date;
+                        }
+                        
+                        drops.push({
+                            date: curr.date,
+                            hour: currHour,
+                            time: curr.heure,
+                            prevTension: Math.round(prevTension * 100) / 100,
+                            currTension: Math.round(currTension * 100) / 100,
+                            drop: Math.round(drop * 100) / 100,
+                            period: period,
+                            periodKey: periodKey,
+                            severity: severity,
+                            severityColor: severityColor,
+                            duration: '60 min', // Par défaut 1h entre mesures
+                            fromTo: `${prevTension.toFixed(2)} → ${currTension.toFixed(2)} V`
+                        });
+                        
+                        stats.totalDrops++;
+                    }
+                }
+            }
+        }
+    }
+    
+    // Déterminer le type de système (basé sur la tension moyenne)
+    if (tensionResults && tensionResults.length > 0) {
+        const avgTension = tensionResults.reduce((sum, t) => sum + parseFloat(t.tension || t.valeur || 0), 0) / tensionResults.length;
+        stats.systemType = avgTension > 20 ? '24V' : '12V';
+        stats.normalTension = stats.systemType === '24V' ? 28 : 14;
+        stats.criticalThreshold = Math.round(stats.normalTension * 0.3 * 10) / 10; // 30% de la tension normale
+    }
+    
+    console.log(`✅ Analyse terminée: ${drops.length} chutes détectées`);
+    
+    return {
+        voltageDrops: drops.sort((a, b) => new Date(b.date) - new Date(a.date)),
+        stats: stats,
+        lastUpdate: new Date().toLocaleString('fr-FR'),
+        currentPeriodFilter: 'all'
+    };
+}
+
+// Fonction pour filtrer les chutes par période
+function filterDropsByPeriod(drops, period) {
+    if (period === 'all') return drops;
+    return drops.filter(drop => drop.periodKey === period);
+}
+
+// Générer le HTML pour l'onglet DÉTECTION
+function generateFraudDetectionHTML() {
+    // Lancer l'analyse si pas encore faite
+    if (!tensionAnalysisData.voltageDrops || tensionAnalysisData.voltageDrops.length === 0) {
+        tensionAnalysisData = analyzeVoltageDrops();
+    }
+    
+    const data = tensionAnalysisData;
+    const stats = data.stats;
+    const allDrops = data.voltageDrops;
+    const currentFilter = data.currentPeriodFilter || 'all';
+    
+    // Filtrer les drops selon la période sélectionnée
+    const filteredDrops = filterDropsByPeriod(allDrops, currentFilter);
+    
+    // Créer la répartition par heure
+    let hourBarsHTML = '';
+    for (let h = 0; h < 24; h++) {
+        const count = stats.dropsByHour[h] || 0;
+        const maxCount = Math.max(...stats.dropsByHour, 1);
+        const barHeight = maxCount > 0 ? (count / maxCount) * 40 : 0;
+        
+        // Déterminer la période pour la couleur de fond
+        let barColor = '#3b82f6';
+        if (h >= 5 && h < 12) barColor = '#fbbf24'; // Matin
+        else if (h >= 12 && h < 18) barColor = '#f97316'; // Après-midi
+        else if (h >= 18 && h < 22) barColor = '#3b82f6'; // Soir
+        else barColor = '#6366f1'; // Nuit
+        
+        hourBarsHTML += `
+            <div style="display: flex; flex-direction: column; align-items: center; width: 100%;">
+                <div style="font-size: 10px; color: #64748b; margin-bottom: 4px;">${count}</div>
+                <div style="height: 50px; width: 100%; display: flex; align-items: flex-end; justify-content: center;">
+                    <div style="width: 70%; height: ${barHeight}px; background: ${barColor}; border-radius: 4px 4px 0 0;"></div>
+                </div>
+                <div style="font-size: 9px; color: #94a3b8; margin-top: 4px;">${h}h</div>
+            </div>
+        `;
+    }
+    
+    // Créer les lignes du tableau des chutes (filtrées)
+    const dropsRows = filteredDrops.map((drop, index) => `
+        <tr style="border-bottom: 1px solid #e2e8f0;">
+            <td style="padding: 12px; font-weight: 500;">${drop.date}</td>
+            <td style="padding: 12px;">
+                <span style="display: flex; align-items: center; gap: 4px;">
+                    ${drop.period}
+                </span>
+            </td>
+            <td style="padding: 12px; font-weight: 700; color: ${drop.severityColor};">${drop.drop} V</td>
+            <td style="padding: 12px; font-family: monospace;">${drop.fromTo}</td>
+            <td style="padding: 12px;">${drop.duration}</td>
+            <td style="padding: 12px; font-family: monospace;">${drop.time}</td>
+            <td style="padding: 12px;">
+                <span style="background: ${drop.severityColor}20; color: ${drop.severityColor}; padding: 4px 8px; border-radius: 12px; font-size: 11px; font-weight: 600;">
+                    ${drop.severity === 'critique' ? 'CRITIQUE' : 'Significatif'}
+                </span>
+            </td>
+        </tr>
+    `).join('');
+    
+    return `
+        <div style="padding: 20px;">
+            
+            <!-- En-tête avec titre -->
+            <div style="margin-bottom: 25px;">
+                <h2 style="margin: 0 0 5px 0; font-size: 24px; color: #0f172a; display: flex; align-items: center; gap: 10px;">
+                    <span>⚡</span> Analyse des Chutes de Tension (24h/24)
+                </h2>
+                <p style="margin: 0; color: #64748b; font-size: 14px;">Détection des baisses de tension anormales pouvant indiquer des surcharges ou du picorage</p>
+            </div>
+            
+            <!-- Cartes KPI -->
+            <div style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 15px; margin-bottom: 25px;">
+                
+                <div style="background: white; border-radius: 12px; padding: 16px; border: 1px solid #e2e8f0; box-shadow: 0 2px 8px rgba(0,0,0,0.02);">
+                    <div style="font-size: 12px; color: #64748b; margin-bottom: 5px;">Chutes détectées</div>
+                    <div style="font-size: 32px; font-weight: 700; color: #0f172a;">${stats.totalDrops}</div>
+                </div>
+                
+                <div style="background: white; border-radius: 12px; padding: 16px; border: 1px solid #e2e8f0;">
+                    <div style="font-size: 12px; color: #64748b; margin-bottom: 5px;">Chutes critiques</div>
+                    <div style="font-size: 32px; font-weight: 700; color: #ef4444;">${stats.criticalDrops}</div>
+                </div>
+                
+                <div style="background: white; border-radius: 12px; padding: 16px; border: 1px solid #e2e8f0;">
+                    <div style="font-size: 12px; color: #64748b; margin-bottom: 5px;">Pire chute</div>
+                    <div style="font-size: 32px; font-weight: 700; color: #f97316;">${stats.maxDrop} V</div>
+                </div>
+                
+                <div style="background: white; border-radius: 12px; padding: 16px; border: 1px solid #e2e8f0;">
+                    <div style="font-size: 12px; color: #64748b; margin-bottom: 5px;">Jour le plus actif</div>
+                    <div style="font-size: 16px; font-weight: 600; color: #0f172a;">${stats.maxDropDate || '-'}</div>
+                </div>
+                
+                <div style="background: white; border-radius: 12px; padding: 16px; border: 1px solid #e2e8f0;">
+                    <div style="font-size: 12px; color: #64748b; margin-bottom: 5px;">Système détecté</div>
+                    <div style="font-size: 24px; font-weight: 700; color: #3b82f6;">${stats.systemType}</div>
+                </div>
+                
+                <div style="background: white; border-radius: 12px; padding: 16px; border: 1px solid #e2e8f0;">
+                    <div style="font-size: 12px; color: #64748b; margin-bottom: 5px;">Période</div>
+                    <div style="font-size: 14px; font-weight: 600; color: #0f172a;">24h/24</div>
+                </div>
+            </div>
+            
+            <!-- Indicateurs de seuils -->
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 25px;">
+                
+                <div style="background: #f0f9ff; border-radius: 10px; padding: 15px; display: flex; align-items: center; gap: 15px; border: 1px solid #bae6fd;">
+                    <div style="width: 40px; height: 40px; background: #3b82f6; border-radius: 10px; display: flex; align-items: center; justify-content: center;">
+                        <span style="font-size: 20px; color: white;">📊</span>
+                    </div>
+                    <div>
+                        <div style="font-size: 11px; color: #64748b;">Tension normale</div>
+                        <div style="font-size: 24px; font-weight: 700; color: #0f172a;">${stats.normalTension} V</div>
+                    </div>
+                </div>
+                
+                <div style="background: #fef3c7; border-radius: 10px; padding: 15px; display: flex; align-items: center; gap: 15px; border: 1px solid #fde68a;">
+                    <div style="width: 40px; height: 40px; background: #f59e0b; border-radius: 10px; display: flex; align-items: center; justify-content: center;">
+                        <span style="font-size: 20px; color: white;">⚠️</span>
+                    </div>
+                    <div>
+                        <div style="font-size: 11px; color: #64748b;">Seuil critique (-30%)</div>
+                        <div style="font-size: 24px; font-weight: 700; color: #f59e0b;">${stats.criticalThreshold} V</div>
+                    </div>
+                </div>
+                
+                <div style="background: #f1f5f9; border-radius: 10px; padding: 15px; display: flex; align-items: center; gap: 15px; border: 1px solid #e2e8f0;">
+                    <div style="width: 40px; height: 40px; background: #64748b; border-radius: 10px; display: flex; align-items: center; justify-content: center;">
+                        <span style="font-size: 20px; color: white;">📅</span>
+                    </div>
+                    <div>
+                        <div style="font-size: 11px; color: #64748b;">Période analysée</div>
+                        <div style="font-size: 16px; font-weight: 600; color: #0f172a;">24h/24</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Graphique de répartition par heure -->
+            <div style="background: white; border-radius: 16px; padding: 20px; margin-bottom: 25px; border: 1px solid #e2e8f0;">
+                <h4 style="margin: 0 0 15px 0; font-size: 16px; display: flex; align-items: center; gap: 8px;">
+                    <span>📊</span> Répartition des chutes par heure
+                </h4>
+                
+                <div style="display: grid; grid-template-columns: repeat(24, 1fr); gap: 2px; margin-bottom: 20px;">
+                    ${hourBarsHTML}
+                </div>
+                
+                <!-- Légende des périodes -->
+                <div style="display: flex; justify-content: space-around; margin-top: 15px; padding-top: 15px; border-top: 1px solid #e2e8f0;">
+                    <div style="display: flex; align-items: center; gap: 8px; cursor: pointer;" onclick="filterFraudTable('morning')">
+                        <span style="width: 12px; height: 12px; background: #fbbf24; border-radius: 3px;"></span>
+                        <span style="font-size: 12px; color: #475569;">Matin (5h-12h): ${stats.dropsByPeriod.morning}</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px; cursor: pointer;" onclick="filterFraudTable('afternoon')">
+                        <span style="width: 12px; height: 12px; background: #f97316; border-radius: 3px;"></span>
+                        <span style="font-size: 12px; color: #475569;">Après-midi (12h-18h): ${stats.dropsByPeriod.afternoon}</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px; cursor: pointer;" onclick="filterFraudTable('evening')">
+                        <span style="width: 12px; height: 12px; background: #3b82f6; border-radius: 3px;"></span>
+                        <span style="font-size: 12px; color: #475569;">Soir (18h-22h): ${stats.dropsByPeriod.evening}</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px; cursor: pointer;" onclick="filterFraudTable('night')">
+                        <span style="width: 12px; height: 12px; background: #6366f1; border-radius: 3px;"></span>
+                        <span style="font-size: 12px; color: #475569;">Nuit (22h-5h): ${stats.dropsByPeriod.night}</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px; cursor: pointer;" onclick="filterFraudTable('all')">
+                        <span style="width: 12px; height: 12px; background: #94a3b8; border-radius: 3px;"></span>
+                        <span style="font-size: 12px; color: #475569;">Tous</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Tableau détaillé des chutes avec onglets -->
+            <div style="background: white; border-radius: 16px; border: 1px solid #e2e8f0; overflow: hidden;">
+                
+                <!-- Onglets du tableau -->
+                <div style="display: flex; border-bottom: 2px solid #e2e8f0; background: #f8fafc;">
+                    <div onclick="filterFraudTable('all')" style="padding: 12px 20px; cursor: pointer; border-bottom: 3px solid ${currentFilter === 'all' ? '#3b82f6' : 'transparent'}; font-weight: ${currentFilter === 'all' ? '700' : '500'}; color: ${currentFilter === 'all' ? '#3b82f6' : '#64748b'};">
+                        📋 Tous (${allDrops.length})
+                    </div>
+                    <div onclick="filterFraudTable('morning')" style="padding: 12px 20px; cursor: pointer; border-bottom: 3px solid ${currentFilter === 'morning' ? '#fbbf24' : 'transparent'}; font-weight: ${currentFilter === 'morning' ? '700' : '500'}; color: ${currentFilter === 'morning' ? '#fbbf24' : '#64748b'};">
+                        🌅 Matin (${stats.dropsByPeriod.morning})
+                    </div>
+                    <div onclick="filterFraudTable('afternoon')" style="padding: 12px 20px; cursor: pointer; border-bottom: 3px solid ${currentFilter === 'afternoon' ? '#f97316' : 'transparent'}; font-weight: ${currentFilter === 'afternoon' ? '700' : '500'}; color: ${currentFilter === 'afternoon' ? '#f97316' : '#64748b'};">
+                        ☀️ Après-midi (${stats.dropsByPeriod.afternoon})
+                    </div>
+                    <div onclick="filterFraudTable('evening')" style="padding: 12px 20px; cursor: pointer; border-bottom: 3px solid ${currentFilter === 'evening' ? '#3b82f6' : 'transparent'}; font-weight: ${currentFilter === 'evening' ? '700' : '500'}; color: ${currentFilter === 'evening' ? '#3b82f6' : '#64748b'};">
+                        🌆 Soir (${stats.dropsByPeriod.evening})
+                    </div>
+                    <div onclick="filterFraudTable('night')" style="padding: 12px 20px; cursor: pointer; border-bottom: 3px solid ${currentFilter === 'night' ? '#6366f1' : 'transparent'}; font-weight: ${currentFilter === 'night' ? '700' : '500'}; color: ${currentFilter === 'night' ? '#6366f1' : '#64748b'};">
+                        🌙 Nuit (${stats.dropsByPeriod.night})
+                    </div>
+                </div>
+                
+                <!-- En-tête du tableau avec titre et compteur -->
+                <div style="padding: 16px 20px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
+                    <h4 style="margin: 0; font-size: 16px; display: flex; align-items: center; gap: 8px;">
+                        <span>📋</span> Détail des chutes de tension
+                    </h4>
+                    <div style="display: flex; gap: 15px;">
+                        <span style="font-size: 12px; background: #fef3c7; padding: 4px 10px; border-radius: 20px;">
+                            ⚠️ Significatif >1.5V
+                        </span>
+                        <span style="font-size: 12px; background: #fee2e2; padding: 4px 10px; border-radius: 20px;">
+                            🔴 Critique >${stats.criticalThreshold}V
+                        </span>
+                        <span style="font-size: 12px; background: #e2e8f0; padding: 4px 10px; border-radius: 20px;">
+                            📊 ${filteredDrops.length} chute(s) affichée(s)
+                        </span>
+                    </div>
+                </div>
+                
+                <div style="overflow-x: auto; max-height: 400px; overflow-y: auto;">
+                    <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+                        <thead style="position: sticky; top: 0; background: #f1f5f9; z-index: 10;">
+                            <tr>
+                                <th style="padding: 12px; text-align: left;">Date</th>
+                                <th style="padding: 12px; text-align: left;">Période</th>
+                                <th style="padding: 12px; text-align: left;">Chute (V)</th>
+                                <th style="padding: 12px; text-align: left;">Tension</th>
+                                <th style="padding: 12px; text-align: left;">Durée</th>
+                                <th style="padding: 12px; text-align: left;">Horaire</th>
+                                <th style="padding: 12px; text-align: left;">Statut</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${dropsRows || '<tr><td colspan="7" style="padding: 30px; text-align: center; color: #64748b;">Aucune chute de tension dans cette période</td></tr>'}
+                        </tbody>
+                    </table>
+                </div>
+                
+                <!-- Légende des seuils -->
+                <div style="padding: 15px 20px; background: #f8fafc; border-top: 1px solid #e2e8f0; font-size: 12px; color: #64748b; display: flex; gap: 20px;">
+                    <span>⚠️ Chute significative (>1.5V en <2h)</span>
+                    <span>🔴 Chute critique (>${stats.criticalThreshold}V)</span>
+                    <span style="margin-left: auto;">Dernière analyse: ${data.lastUpdate}</span>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+// Fonction pour filtrer le tableau
+function filterFraudTable(period) {
+    tensionAnalysisData.currentPeriodFilter = period;
+    
+    // Recharger l'onglet DETECTION
+    const contentElement = document.getElementById('sub-content-DETECTION');
+    if (contentElement) {
+        contentElement.innerHTML = generateFraudDetectionHTML();
+    }
+}
+
+// Rendre la fonction accessible globalement
+window.filterFraudTable = filterFraudTable;
+
+// Mettre à jour la fonction principale
+function displayFraudeTab(subTab) {
+    console.log(`🔍 Affichage onglet FRAUDE - Sous-onglet: ${subTab}`);
+    
+    const contentElement = document.getElementById(`sub-content-${subTab}`);
+    if (!contentElement) return;
+
+    // Lancer l'analyse des chutes de tension
+    tensionAnalysisData = analyzeVoltageDrops();
+
+    if (subTab === 'DETECTION') {
+        contentElement.innerHTML = generateFraudDetectionHTML();
+    } else if (subTab === 'HISTORIQUE') {
+        contentElement.innerHTML = generateFraudHistoryHTML();
+    }
+}
+
+
 // Ajoutez cette fonction pour inclure les styles dynamiques
 function addDynamicKitStyles() {
     if (document.querySelector('#dynamic-kit-styles')) return;
@@ -11426,7 +14087,185 @@ function addNewColumnStyles() {
     
     document.head.appendChild(styles);
 }
+// Ajoutez cette fonction si elle n'existe pas déjà
+function addEventMatrixStyles() {
+    if (document.querySelector('#event-matrix-styles')) return;
+    
+    const styles = document.createElement('style');
+    styles.id = 'event-matrix-styles';
+    styles.textContent = `
+        /* Styles pour le tableau matriciel des événements */
+        .events-matrix-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+            min-width: 1000px;
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        }
 
+        .events-matrix-table th {
+            padding: 16px 12px;
+            font-weight: 700;
+            text-align: center;
+            border: 1px solid #e2e8f0;
+            white-space: nowrap;
+        }
+
+        .events-matrix-table td {
+            padding: 14px 10px;
+            border: 1px solid #e2e8f0;
+            text-align: center;
+            vertical-align: middle;
+            transition: background-color 0.2s;
+        }
+
+        /* Style pour la colonne Date */
+        .events-matrix-table .date-cell {
+            background: #f8fafc;
+            font-weight: 700;
+            color: #1e293b;
+            font-size: 14px;
+            border-right: 2px solid #cbd5e1;
+            box-shadow: 2px 0 5px rgba(0,0,0,0.02);
+        }
+
+        /* Style pour les cellules de temps (début/fin) */
+        .events-matrix-table .time-cell {
+            font-family: 'Courier New', monospace;
+            font-weight: 600;
+            font-size: 13px;
+            background: white;
+        }
+
+        /* Style pour les cellules de durée */
+        .events-matrix-table .duration-cell {
+            font-family: 'Courier New', monospace;
+            font-weight: 700;
+            font-size: 13px;
+            background: white;
+        }
+
+        /* Style pour les cellules vides */
+        .events-matrix-table .empty-cell {
+            color: #cbd5e1;
+            background: #fafafa;
+            font-style: italic;
+        }
+
+        /* Surbrillance au survol */
+        .events-matrix-table tbody tr:hover td {
+            background: #f8fafc !important;
+        }
+
+        .events-matrix-table tbody tr:hover .date-cell {
+            background: #e6f0fa !important;
+        }
+
+        /* Style pour les en-têtes principaux */
+        .events-matrix-table thead tr:first-child th {
+            border-bottom: 3px solid currentColor;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-size: 12px;
+        }
+
+        /* Style pour les sous-en-têtes */
+        .events-matrix-table thead tr:last-child th {
+            background: #f8fafc;
+            color: #475569;
+            font-weight: 600;
+            font-size: 12px;
+            padding: 12px 8px;
+            border-top: none;
+        }
+
+        /* Lignes alternées pour meilleure lisibilité */
+        .events-matrix-table tbody tr:nth-child(even) {
+            background-color: #fafbfc;
+        }
+
+        /* Animation d'apparition */
+        @keyframes fadeInRow {
+            from { 
+                opacity: 0; 
+                transform: translateY(5px); 
+            }
+            to { 
+                opacity: 1; 
+                transform: translateY(0); 
+            }
+        }
+
+        .events-matrix-table tbody tr {
+            animation: fadeInRow 0.3s ease-out;
+        }
+
+        /* Badge pour plusieurs périodes (optionnel) */
+        .period-badge {
+            display: inline-block;
+            background: #f1f5f9;
+            color: #475569;
+            font-size: 10px;
+            padding: 2px 8px;
+            border-radius: 12px;
+            margin-left: 6px;
+            font-weight: 600;
+        }
+
+        /* Style pour les en-têtes colorés */
+        .events-matrix-table th[style*="background: #e0f2fe"] {
+            border-bottom-color: #38bdf8 !important;
+        }
+
+        .events-matrix-table th[style*="background: #fee2e2"] {
+            border-bottom-color: #ef4444 !important;
+        }
+
+        .events-matrix-table th[style*="background: #fef9c3"] {
+            border-bottom-color: #eab308 !important;
+        }
+
+        .events-matrix-table th[style*="background: #fae8ff"] {
+            border-bottom-color: #c084fc !important;
+        }
+
+        /* Responsive */
+        @media (max-width: 1200px) {
+            .events-matrix-table {
+                font-size: 12px;
+            }
+            
+            .events-matrix-table th,
+            .events-matrix-table td {
+                padding: 10px 6px;
+            }
+            
+            .events-matrix-table .time-cell,
+            .events-matrix-table .duration-cell {
+                font-size: 12px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .table-wrapper {
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+            
+            .events-matrix-table {
+                min-width: 900px;
+            }
+        }
+    `;
+    
+    document.head.appendChild(styles);
+}
+
+// Appelez cette fonction au chargement
+document.addEventListener('DOMContentLoaded', addEventMatrixStyles);
 // Fermer le modal quand on clique en dehors
 document.addEventListener('click', (event) => {
     const modal = document.getElementById('tensionHourlyModal');
