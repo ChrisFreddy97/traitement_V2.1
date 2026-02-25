@@ -6,6 +6,7 @@ import { generatePagination, attachPaginationEvents } from './arduinoPagination.
 import { renderTechnicalDashboard } from './dashboards/technicalDashboard.js';
 import { renderCommercialDashboard } from './dashboards/commercialDashboard.js';
 import { renderEventDashboard } from './dashboards/eventDashboard.js';
+import { FORFAIT_NAMES } from './arduinoConstants.js';
 
 // Rendre handleCellClick accessible globalement si nécessaire (déjà fait dans arduinoMain.js)
 // window.handleCellClick = handleCellClick; // déjà fait dans main
@@ -51,11 +52,16 @@ export function displayTables(visibleTableIndices) {
 
         const allHeaders = page.header.split(';').filter(h => h.trim() !== '');
         const headers = allHeaders.slice(1);
+        
+        // Identifier les colonnes clients pour les tables I et S
         const clientColumns = [];
         headers.forEach((header, index) => {
             const match = header.match(/Client (\d+)/i);
             if (match) clientColumns.push({ index, clientId: match[1], headerName: header });
         });
+
+        // Identifier la colonne Forfait pour la table R
+        const forfaitColumnIndex = headers.findIndex(h => h.toLowerCase().includes('forfait'));
 
         const headerHTML = '<tr>' + headers.map(h => `<th>${h.trim()}</th>`).join('') + '</tr>';
         let bodyHTML = '';
@@ -69,7 +75,15 @@ export function displayTables(visibleTableIndices) {
             cellsWithoutFirst.forEach((cell, cellIndex) => {
                 const originalValue = cell.trim();
                 const clientColumn = clientColumns.find(c => c.index === cellIndex);
-                if (clientColumn && (table.type === 'I' || table.type === 'S')) {
+                
+                // Cas spécial : table de type R avec colonne Forfait
+                if (table.type === 'R' && cellIndex === forfaitColumnIndex) {
+                    const forfaitId = parseInt(originalValue);
+                    const forfaitName = FORFAIT_NAMES[forfaitId] || `Forfait ${forfaitId}`;
+                    bodyHTML += `<td><span class="forfait-badge">${forfaitName}</span></td>`;
+                }
+                // Cas tables I et S avec événements
+                else if (clientColumn && (table.type === 'I' || table.type === 'S')) {
                     const key = `${date}_${clientColumn.clientId}`;
                     const event = database.eventMap.get(key);
                     const cellKey = `${table.id}_${clientColumn.clientId}_${timestamp}`;
