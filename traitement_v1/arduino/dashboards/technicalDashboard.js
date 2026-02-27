@@ -444,12 +444,55 @@ function renderConformityCard() {
     const data = database.technicalData?.conformity;
     if (!data) return;
     
+    const joursNonConformes = data.totalJours - data.joursConformes;
+    const pourcentageNonConforme = (100 - parseFloat(data.pourcentageConformite)).toFixed(1);
+    
     container.innerHTML = `
-        <h3>📊 Conformité du système</h3>
-        <p>${data.pourcentageConformite}% de jours conformes (${data.joursConformes}/${data.totalJours})</p>
-        <p>🔴 Surtensions: ${data.causes.surtension.length} jours</p>
-        <p>🔻 Sous-tensions: ${data.causes.sousTension.length} jours</p>
-        <p>⚡ Variations: ${data.causes.variation.length} jours</p>
+        <div class="conformity-card">
+            <h3 class="card-title">📊 Conformité du système</h3>
+            
+            <!-- Indicateurs principaux -->
+            <div class="conformity-stats">
+                <div class="conformity-main">
+                    <div class="conformity-gauge">
+                        <div class="gauge-value" style="color: ${data.pourcentageConformite >= 80 ? '#4CAF50' : '#ff9800'}">
+                            ${data.pourcentageConformite}%
+                        </div>
+                        <div class="gauge-label">Jours conformes</div>
+                        <div class="gauge-detail">${data.joursConformes}/${data.totalJours} jours</div>
+                    </div>
+                    <div class="conformity-gauge">
+                        <div class="gauge-value" style="color: #f44336">
+                            ${pourcentageNonConforme}%
+                        </div>
+                        <div class="gauge-label">Jours non conformes</div>
+                        <div class="gauge-detail">${joursNonConformes}/${data.totalJours} jours</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Détails des causes (petit en bas) -->
+            <div class="conformity-details">
+                <h4>Détail des non-conformités</h4>
+                <div class="details-grid">
+                    <div class="detail-item">
+                        <span class="detail-icon">🔴</span>
+                        <span class="detail-label">Surtensions</span>
+                        <span class="detail-value">${data.causes.surtension.length} jours</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-icon">🔻</span>
+                        <span class="detail-label">Sous-tensions</span>
+                        <span class="detail-value">${data.causes.sousTension.length} jours</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-icon">⚡</span>
+                        <span class="detail-label">Variations</span>
+                        <span class="detail-value">${data.causes.variation.length} jours</span>
+                    </div>
+                </div>
+            </div>
+        </div>
     `;
 }
 
