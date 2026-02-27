@@ -1167,6 +1167,158 @@ function analyzeRechargeData(clientNumber) {
         lastRecharge: clientRecharges[clientRecharges.length - 1]['Date et Heure']
     };
 }
+// ==================== ANALYSE DES JOURS SANS CRÉDIT ====================
+function analyzeDaysWithoutCredit(clientNumber) {
+    if (!combinedSoldeData || combinedSoldeData.length === 0) {
+        return {
+            clientNumber: clientNumber,
+            hasData: false,
+            daysWithoutCredit: [],
+            totalDaysWithoutCredit: 0,
+            consecutiveDays: [],
+            longestStreak: 0,
+            currentStreak: 0,
+            lastCreditDate: null
+        };
+    }
+    
+    const creditKey = `Credit${clientNumber}`;
+    const daysData = [];
+    let previousDate = null;
+    let previousValue = null;
+    let currentStreak = 0;
+    let longestStreak = 0;
+    let currentStreakDates = [];
+    let longestStreakDates = [];
+    
+    // Filtrer et trier les données par date
+    const clientData = combinedSoldeData
+        .filter(row => {
+            const value = row[creditKey];
+            return value && value.toString().trim() !== '' && value.toString().trim() !== '-';
+        })
+        .map(row => ({
+            dateTime: row['Date et Heure'],
+            date: row['Date et Heure'].split(' ')[0],
+            time: row['Date et Heure'].split(' ')[1],
+            value: parseFloat(row[creditKey]) || 0
+        }))
+        .sort((a, b) => new Date(a.dateTime) - new Date(b.dateTime));
+    
+    if (clientData.length === 0) {
+        return {
+            clientNumber: clientNumber,
+            hasData: false,
+            daysWithoutCredit: [],
+            totalDaysWithoutCredit: 0,
+            consecutiveDays: [],
+            longestStreak: 0,
+            currentStreak: 0,
+            lastCreditDate: null
+        };
+    }
+    
+    // Analyser jour par jour pour détecter les jours sans crédit
+    const daysWithoutCredit = [];
+    const consecutiveGroups = [];
+    let currentGroup = [];
+    
+    clientData.forEach((record, index) => {
+        const date = record.date;
+        const value = record.value;
+        
+        // Si c'est un jour sans crédit (valeur = 0)
+        if (value === 0) {
+            daysWithoutCredit.push({
+                date: date,
+                formattedDate: new Date(date).toLocaleDateString('fr-FR', {
+                    day: '2-digit', month: '2-digit', year: 'numeric'
+                }),
+                time: record.time,
+                value: 0
+            });
+            
+            // Gestion des jours consécutifs
+            if (previousDate) {
+                const prevDate = new Date(previousDate);
+                const currDate = new Date(date);
+                const dayDiff = Math.round((currDate - prevDate) / (1000 * 60 * 60 * 24));
+                
+                if (dayDiff === 1) {
+                    // Jour consécutif
+                    currentGroup.push(record);
+                } else {
+                    // Fin d'une série
+                    if (currentGroup.length > 0) {
+                        consecutiveGroups.push([...currentGroup]);
+                        if (currentGroup.length > longestStreak) {
+                            longestStreak = currentGroup.length;
+                            longestStreakDates = [...currentGroup];
+                        }
+                    }
+                    currentGroup = [record];
+                }
+            } else {
+                currentGroup = [record];
+            }
+        }
+        
+        previousDate = date;
+        previousValue = value;
+    });
+    
+    // Ajouter le dernier groupe
+    if (currentGroup.length > 0) {
+        consecutiveGroups.push([...currentGroup]);
+        if (currentGroup.length > longestStreak) {
+            longestStreak = currentGroup.length;
+            longestStreakDates = [...currentGroup];
+        }
+    }
+    
+    // Calculer la série actuelle (en cours)
+    const lastRecord = clientData[clientData.length - 1];
+    let currentStreakDays = 0;
+    let currentStreakStart = null;
+    
+    if (lastRecord && lastRecord.value === 0) {
+        // Vérifier si les derniers jours sont sans crédit
+        const today = new Date().toISOString().split('T')[0];
+        let checkDate = new Date(lastRecord.date);
+        let streakCount = 0;
+        
+        while (streakCount < 30) { // Limiter à 30 jours pour éviter les boucles infinies
+            const dateStr = checkDate.toISOString().split('T')[0];
+            const recordForDate = clientData.find(r => r.date === dateStr);
+            
+            if (recordForDate && recordForDate.value === 0) {
+                streakCount++;
+                if (streakCount === 1) currentStreakStart = dateStr;
+            } else {
+                break;
+            }
+            
+            checkDate.setDate(checkDate.getDate() - 1);
+        }
+        
+        currentStreakDays = streakCount;
+    }
+    
+    return {
+        clientNumber: clientNumber,
+        hasData: daysWithoutCredit.length > 0,
+        daysWithoutCredit: daysWithoutCredit.sort((a, b) => new Date(b.date) - new Date(a.date)),
+        totalDaysWithoutCredit: daysWithoutCredit.length,
+        consecutiveDays: consecutiveGroups,
+        longestStreak: longestStreak,
+        longestStreakDates: longestStreakDates,
+        currentStreak: currentStreakDays,
+        currentStreakStart: currentStreakStart,
+        lastCreditDate: clientData[clientData.length - 1]?.value > 0 ? clientData[clientData.length - 1].date : null,
+        totalDays: clientData.length
+    };
+}
+
 // ==================== FONCTIONS DE FILTRAGE ====================
 function applyDateFilters() {
     console.log('🔍 Application des filtres de date...', {
@@ -1967,7 +2119,7 @@ function displayTensionStabilityAnalysis() {
     const analysisContent = createTensionAnalysisContent();
     if (analysisContent) cardContent.appendChild(analysisContent);
     
-    // ✅ TABLEAU DES DÉPASSEMENTS À 14.2V/28V
+    // ✅ TABLEAU DES DÉPASSEMENTS À 14.0V/28V
     const voltageThresholdContainer = document.createElement('div');
     voltageThresholdContainer.id = 'voltage-threshold-table-container';
     voltageThresholdContainer.style.cssText = `
@@ -2354,27 +2506,6 @@ function createDelestageEventsTable() {
             </div>
             <div style="display: flex; justify-content: space-between; align-items: baseline;">
                 <span style="font-size: 24px; font-weight: 800; color: #991b1b;">${percentTotal}%</span>
-                <span style="font-size: 11px; color: #64748b;">des jours de diagnostic</span>
-            </div>
-        </div>
-        
-        <!-- Les deux types -->
-        <div style="background: white; padding: 15px; border-radius: 12px; border-left: 5px solid #8b5cf6; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                <span style="font-size: 13px; color: #8b5cf6; font-weight: 700;">🔄 LES DEUX TYPES</span>
-                <span style="background: #8b5cf620; color: #8b5cf6; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 700;">${daysWithBoth} jours</span>
-            </div>
-            <div style="margin-bottom: 12px;">
-                <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
-                    <span style="font-size: 12px; color: #64748b;">Jours avec les deux</span>
-                    <span style="font-weight: 700; color: #1e293b;">${daysWithBoth} / ${totalDays}</span>
-                </div>
-                <div style="width: 100%; height: 10px; background: #e2e8f0; border-radius: 6px; overflow: hidden;">
-                    <div style="width: ${percentBoth}%; height: 100%; background: #8b5cf6; border-radius: 6px;"></div>
-                </div>
-            </div>
-            <div style="display: flex; justify-content: space-between; align-items: baseline;">
-                <span style="font-size: 24px; font-weight: 800; color: #8b5cf6;">${percentBoth}%</span>
                 <span style="font-size: 11px; color: #64748b;">des jours de diagnostic</span>
             </div>
         </div>
@@ -3886,8 +4017,46 @@ function createTotalEnergyChart() {
     
     Object.keys(distribution).forEach(kit => percentages[kit] = totalDays > 0 ? Math.round((distribution[kit] / totalDays) * 100) : 0);
     
-    let recommendedKit = null, recommendedKitPercentage = 0, recommendedKitCount = 0, maxCount = 0;
-    Object.keys(distribution).forEach(kit => { if (distribution[kit] > maxCount) { maxCount = distribution[kit]; recommendedKit = kit; recommendedKitPercentage = percentages[kit]; recommendedKitCount = distribution[kit]; } });
+    // ===== NOUVELLE LOGIQUE DE RECOMMANDATION =====
+    let recommendedKit = null;
+    let recommendedKitPercentage = 0;
+    
+    // Trier les kits par leur pourcentage (du plus élevé au plus bas)
+    const sortedKits = Object.entries(distribution)
+        .map(([kit, count]) => ({ 
+            kit, 
+            count, 
+            percentage: totalDays > 0 ? (count / totalDays) * 100 : 0 
+        }))
+        .sort((a, b) => b.percentage - a.percentage);
+    
+    // Trouver le kit le plus gros (celui avec la plus haute valeur seuil) qui dépasse 20%
+    // Trier les kits par valeur seuil (Kit 4+ > Kit 4 > Kit 3 > Kit 2 > Kit 1 > Kit 0)
+    const kitValueOrder = {
+        'Kit 4+': 9999, // Valeur très élevée pour Kit 4+
+        'Kit 4': 1080,
+        'Kit 3': 720,
+        'Kit 2': 540,
+        'Kit 1': 360,
+        'Kit 0': 250
+    };
+    
+    // Filtrer les kits qui ont un pourcentage >= 20%
+    const kitsAbove20 = sortedKits.filter(k => k.percentage >= 20);
+    
+    if (kitsAbove20.length > 0) {
+        // Prendre le plus gros kit (avec la plus haute valeur seuil) parmi ceux >= 20%
+        recommendedKit = kitsAbove20.sort((a, b) => {
+            const valueA = kitValueOrder[a.kit] || 0;
+            const valueB = kitValueOrder[b.kit] || 0;
+            return valueB - valueA; // Tri décroissant
+        })[0].kit;
+        recommendedKitPercentage = percentages[recommendedKit];
+    } else {
+        // Si aucun kit ne dépasse 20%, prendre celui avec le plus grand pourcentage
+        recommendedKit = sortedKits[0].kit;
+        recommendedKitPercentage = percentages[recommendedKit];
+    }
     
     const averageEnergy = totalDays > 0 ? Math.round(totalEnergySum / totalDays) : 0;
     const nonZeroValues = totalEnergyData.filter(v => v && v > 0);
@@ -3919,6 +4088,8 @@ function createTotalEnergyChart() {
     const recommendedKitInfo = recommendedKit ? kitThresholds.find(k => k.label === recommendedKit.replace('+', '')) : null;
     const dominantColor = recommendedKitInfo ? recommendedKitInfo.color : (recommendedKit === 'Kit 4+' ? '#dc2626' : '#667eea');
     
+    // ... (le reste du code pour créer le graphique reste inchangé)
+    
     const chartContainer = document.createElement('div');
     chartContainer.id = 'total-energy-chart-container';
     chartContainer.style.cssText = `background: white; border-radius: 16px; box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08); overflow: hidden; border: 1px solid #e2e8f0;`;
@@ -3946,6 +4117,10 @@ function createTotalEnergyChart() {
     
     const dimHeader = document.createElement('div');
     dimHeader.style.cssText = `background: linear-gradient(135deg, ${dominantColor}10 0%, white 100%); padding: 20px 24px; border-bottom: 3px solid ${dominantColor}; display: flex; align-items: center; gap: 20px;`;
+    
+    // Calculer le nombre de jours pour le kit recommandé
+    const recommendedKitCount = distribution[recommendedKit] || 0;
+    
     dimHeader.innerHTML = `
         <div style="width: 56px; height: 56px; background: ${dominantColor}; border-radius: 16px; display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 16px ${dominantColor}60;"><span style="font-size: 28px; color: white;">🎯</span></div>
         <div style="flex: 1;">
@@ -3996,7 +4171,17 @@ function createTotalEnergyChart() {
     
     const summaryExplanation = document.createElement('div');
     summaryExplanation.style.cssText = `margin: 0 24px 24px 24px; padding: 16px 20px; background: linear-gradient(135deg, #f8fafc 0%, #ffffff 100%); border-radius: 14px; border-left: 6px solid ${dominantColor}; border-right: 1px solid #e2e8f0; border-top: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; font-size: 13.5px;`;
-    summaryExplanation.innerHTML = `<div style="display: flex; align-items: flex-start; gap: 14px;"><span style="font-size: 20px; color: ${dominantColor};">📌</span><div style="flex: 1;"><span style="font-weight: 700; color: ${dominantColor};">En résumé :</span><span style="color: #334155;"> Le <strong style="color: ${dominantColor};">${recommendedKit}</strong> est le meilleur choix car il correspond à <strong style="color: ${dominantColor};">${recommendedKitPercentage}% du temps</strong> (${recommendedKitCount} jours). Le pic à <strong>${Math.round(maxEnergy)} Wh</strong> (${maxKitReached}) n'est présent que <strong>${percentages[maxKitReached] || 0}% du temps</strong>.</span></div></div>`;
+    
+    // Message explicatif personnalisé
+    let explicationMessage = '';
+    if (kitsAbove20.length > 0) {
+        const plusGrosKit = kitsAbove20.sort((a, b) => kitValueOrder[b.kit] - kitValueOrder[a.kit])[0].kit;
+        explicationMessage = `Le <strong style="color: ${dominantColor};">${recommendedKit}</strong> est recommandé car il est le plus gros kit dépassant les 20% (${recommendedKitPercentage}% du temps).`;
+    } else {
+        explicationMessage = `Aucun kit ne dépasse 20% du temps. Le <strong style="color: ${dominantColor};">${recommendedKit}</strong> est recommandé car il a le pourcentage le plus élevé (${recommendedKitPercentage}% du temps).`;
+    }
+    
+    summaryExplanation.innerHTML = `<div style="display: flex; align-items: flex-start; gap: 14px;"><span style="font-size: 20px; color: ${dominantColor};">📌</span><div style="flex: 1;"><span style="font-weight: 700; color: ${dominantColor};">En résumé :</span><span style="color: #334155;"> ${explicationMessage} Le pic à <strong>${Math.round(maxEnergy)} Wh</strong> (${maxKitReached}) n'est présent que <strong>${percentages[maxKitReached] || 0}% du temps</strong>.</span></div></div>`;
     
     dimensioningSection.appendChild(dimHeader);
     dimensioningSection.appendChild(progressBarsContainer);
@@ -7027,6 +7212,458 @@ function getTabGradient(tabName) {
         default: return '#e9ecef';
     }
 }
+
+function generateCommercialSummary(clientNumber) {
+    const energyKey = `Energie${clientNumber}`;
+    const creditKey = `Credit${clientNumber}`;
+    
+    // Récupérer le forfait du client en PREMIER
+    const rechargeAnalysis = analyzeRechargeData(clientNumber);
+    const currentForfait = rechargeAnalysis.currentCode4Name || 'ECO';
+    const forfaitLimits = getForfaitLimits(currentForfait);
+    const forfaitMax = forfaitLimits.max || 500;
+    
+    // Maintenant on peut utiliser forfaitMax
+    const overQuotaData = getOverQuotaDays(clientNumber, forfaitMax);
+    const daysOverQuotaList = overQuotaData.days;
+    const maxOverQuota = overQuotaData.maxOverQuota;
+    const avgOverQuota = overQuotaData.avgOverQuota;
+    
+    // ===== 1. ANALYSE DE LA CONSOMMATION =====
+    let totalDays = 0;
+    let maxConsumption = 0;
+    let daysAbove70Percent = 0;
+    let daysAbove90Percent = 0;
+    let daysOverQuota = 0;
+    let maxEnergyDate = '';
+    
+    // Analyser les données d'énergie - Par JOUR (pas par ligne)
+    const consumptionByDay = {}; // Stocker la conso max par jour
+    const allDates = new Set();
+    
+    if (combinedEnergyData.length > 0) {
+        combinedEnergyData.forEach(row => {
+            if (!row['Date et Heure']) return;
+            const date = row['Date et Heure'].split(' ')[0];
+            allDates.add(date);
+            
+            const value = row[energyKey];
+            if (value && value.toString().trim() !== '' && value.toString().trim() !== '-') {
+                const energyValue = parseFloat(value.toString().replace(',', '.'));
+                if (!isNaN(energyValue) && energyValue > 0) {
+                    if (!consumptionByDay[date] || energyValue > consumptionByDay[date]) {
+                        consumptionByDay[date] = energyValue;
+                    }
+                    
+                    // Mettre à jour le max et sa date
+                    if (energyValue > maxConsumption) {
+                        maxConsumption = energyValue;
+                        maxEnergyDate = date; // Stocker la date du max
+                    }
+                }
+            }
+        });
+    }
+    
+    // Formater la date pour l'affichage
+    const formattedMaxEnergyDate = maxEnergyDate ? new Date(maxEnergyDate.split('/').reverse().join('-')).toLocaleDateString('fr-FR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+    }) : 'N/A';
+    
+    totalDays = allDates.size;
+    const totalDaysWithConsumption = Object.keys(consumptionByDay).length;
+    
+    // Calculer la consommation totale (somme des max par jour)
+    const totalConsumption = Object.values(consumptionByDay).reduce((sum, val) => sum + val, 0);
+    
+    // Calculer les métriques basées sur les JOURS
+    Object.values(consumptionByDay).forEach(energyValue => {
+        if (energyValue > forfaitMax) {
+            daysOverQuota++;
+        }
+        
+        const percentOfForfait = (energyValue / forfaitMax) * 100;
+        if (percentOfForfait > 70) daysAbove70Percent++;
+        if (percentOfForfait > 90) daysAbove90Percent++;
+    });
+    
+    const percentActive = totalDays > 0 ? Math.round((totalDaysWithConsumption / totalDays) * 100) : 0;
+    const avgConsumption = totalDaysWithConsumption > 0 ? 
+        Math.round(totalConsumption / totalDaysWithConsumption) : 0;
+    const percentOfForfait = forfaitMax > 0 ? 
+        Math.round((avgConsumption / forfaitMax) * 100) : 0;
+    
+    // Calcul correct du pourcentage de dépassement
+    const percentDaysOverQuota = totalDaysWithConsumption > 0 ? 
+        Math.round((daysOverQuota / totalDaysWithConsumption) * 100) : 0;
+    
+    // ===== 2. ANALYSE DU CRÉDIT =====
+    let zeroCreditDays = 0;
+    let creditDays = 0;
+    let totalCredit = 0;
+    let creditStatus = 'excellent';
+    let creditColor = '#22c55e';
+    let avgCredit = 0;
+    let creditText = '';
+
+    if (combinedSoldeData.length > 0) {
+        // Analyser par JOUR UNIQUE pour le crédit
+        const creditByDay = {}; // Un objet pour stocker UNE valeur par jour
+        const allCreditDates = new Set(); // Pour compter les jours uniques
+        
+        combinedSoldeData.forEach(row => {
+            if (!row['Date et Heure']) return;
+            const date = row['Date et Heure'].split(' ')[0];
+            allCreditDates.add(date); // Ajouter la date au Set
+            
+            const value = row[creditKey];
+            if (value && value.toString().trim() !== '' && value.toString().trim() !== '-') {
+                const creditValue = parseFloat(value.toString().replace(',', '.'));
+                if (!isNaN(creditValue)) {
+                    // Pour chaque jour, on garde la dernière valeur (ou la plus récente)
+                    // Si plusieurs relevés dans la même journée, on prend le dernier
+                    creditByDay[date] = creditValue;
+                }
+            }
+        });
+        
+        // ✅ ICI : creditDays = nombre de JOURS UNIQUES avec données
+        creditDays = allCreditDates.size;
+        
+        // Calculer les statistiques sur les jours uniques
+        Object.values(creditByDay).forEach(creditValue => {
+            totalCredit += creditValue;
+            if (creditValue === 0) {
+                zeroCreditDays++;
+            }
+        });
+        
+        if (creditDays > 0) {
+            avgCredit = Math.round(totalCredit / creditDays);
+            const zeroPercent = Math.round((zeroCreditDays / creditDays) * 100);
+            
+            if (zeroPercent === 0) {
+                creditStatus = 'excellent';
+                creditColor = '#22c55e';
+                creditText = `${avgCredit} jours en moyenne, aucun jour sans crédit`;
+            } else if (zeroPercent < 10) {
+                creditStatus = 'bon';
+                creditColor = '#3b82f6';
+                creditText = `${avgCredit} jours en moyenne, ${zeroPercent}% de jours sans crédit`;
+            } else if (zeroPercent < 20) {
+                creditStatus = 'moyen';
+                creditColor = '#f59e0b';
+                creditText = `${zeroPercent}% des jours sans crédit`;
+            } else {
+                creditStatus = 'fragile';
+                creditColor = '#ef4444';
+                creditText = `${zeroPercent}% des jours sans crédit - risque d'interruption`;
+            }
+        }
+    }
+    
+    // ===== 3. ANALYSE DES ÉVÉNEMENTS =====
+    let hasSuspensions = false;
+    let hasSurcharge = false;
+    let eventsText = '';
+    
+    if (combinedEventData.length > 0) {
+        const clientEvents = combinedEventData.filter(row => {
+            const code1 = row['Code 1'] || '';
+            return code1.toString().trim() === clientNumber.toString();
+        });
+        
+        hasSuspensions = clientEvents.some(row => {
+            const event = row['Évènements'] || '';
+            return event.includes('SuspendP') || event.includes('SuspendE');
+        });
+        
+        hasSurcharge = clientEvents.some(row => {
+            const event = row['Évènements'] || '';
+            return event.includes('Surcharge');
+        });
+        
+        if (hasSuspensions) eventsText = 'A subi des coupures de service';
+        else if (hasSurcharge) eventsText = 'Surcharges détectées';
+        else eventsText = 'Aucun événement particulier détecté';
+    }
+    
+    // ===== 4. ANALYSE DE LA TENDANCE RÉCENTE (7 derniers jours) =====
+    const last7Days = [];
+    const allDatesArray = Array.from(allDates).sort((a, b) => {
+        const [da, ma, ya] = a.split('/');
+        const [db, mb, yb] = b.split('/');
+        return new Date(ya, ma-1, da) - new Date(yb, mb-1, db);
+    });
+    
+    const last7Dates = allDatesArray.slice(-7);
+    
+    last7Dates.forEach(date => {
+        const energyValue = consumptionByDay[date] || 0;
+        let status = 'inactif';
+        
+        if (energyValue > 0) {
+            status = energyValue > forfaitMax * 0.8 ? 'critique' : 'normal';
+        }
+        
+        last7Days.push({
+            date,
+            value: energyValue,
+            status
+        });
+    });
+    
+    // ===== 5. DÉTERMINATION DU PROFIL =====
+    let profileIcon = '📊';
+    let profileName = 'Client standard';
+    let profileColor = '#6b7280';
+    let profileDesc = '';
+    
+    if (totalDaysWithConsumption === 0) {
+        profileIcon = '😴';
+        profileName = 'Client inactif';
+        profileColor = '#94a3b8';
+        profileDesc = "N'utilise pas du tout son kit";
+    }
+    else if (avgConsumption > forfaitMax * 0.8 || daysOverQuota > 0) {
+        profileIcon = '⚡';
+        profileName = 'Gros consommateur';
+        profileColor = '#ef4444';
+        profileDesc = `Fort utilisateur : ${avgConsumption}Wh/jour (${percentOfForfait}% du forfait) avec ${daysOverQuota} dépassement(s).`;
+    }
+    else if (percentActive >= 60 && percentOfForfait >= 20 && percentOfForfait <= 70) {
+        profileIcon = '📱';
+        profileName = 'Client régulier';
+        profileColor = '#22c55e';
+        profileDesc = `Utilisation régulière : ${percentActive}% des jours · ${avgConsumption}Wh/jour (${percentOfForfait}% du forfait)`;
+    }
+    else if (percentActive >= 50 && percentOfForfait < 20) {
+        profileIcon = '🌱';
+        profileName = 'Client économe';
+        profileColor = '#10b981';
+        profileDesc = `Utilisation régulière mais très modérée : ${avgConsumption}Wh/jour (${percentOfForfait}% du forfait)`;
+    }
+    else if (percentActive >= 20 && percentActive < 60) {
+        profileIcon = '🌤️';
+        profileName = 'Client occasionnel';
+        profileColor = '#f59e0b';
+        profileDesc = `Utilisation occasionnelle : ${percentActive}% des jours · ${avgConsumption}Wh/jour en moyenne`;
+    }
+    else if (percentActive > 0 && percentActive < 20) {
+        profileIcon = '🌙';
+        profileName = 'Client très occasionnel';
+        profileColor = '#64748b';
+        profileDesc = `Très peu d'utilisation : ${percentActive}% des jours seulement`;
+    }
+    
+    // ===== 6. DÉTERMINATION DU RISQUE =====
+    let riskIcon = '✅';
+    let riskLevel = 'FAIBLE';
+    let riskColor = '#22c55e';
+    let riskReasons = [];
+    
+    if (totalDaysWithConsumption === 0) {
+        riskIcon = '🔴';
+        riskLevel = 'ÉLEVÉ';
+        riskColor = '#ef4444';
+        riskReasons.push("N'utilise pas du tout son kit");
+    } else {
+        if (percentActive < 20) {
+            riskIcon = '🟠';
+            riskLevel = 'MOYEN';
+            riskColor = '#f97316';
+            riskReasons.push("Utilise très rarement son kit");
+        } else if (percentActive < 50) {
+            riskIcon = '🟠';
+            riskLevel = 'MOYEN';
+            riskColor = '#f97316';
+            riskReasons.push("Utilisation irrégulière");
+        }
+        
+        if (creditStatus === 'fragile') {
+            riskIcon = '🟠';
+            riskLevel = 'MOYEN';
+            riskColor = '#f97316';
+            riskReasons.push("Problèmes fréquents de crédit");
+        } else if (creditStatus === 'moyen') {
+            riskIcon = '🟠';
+            riskLevel = 'MOYEN';
+            riskColor = '#f97316';
+            riskReasons.push("Quelques jours sans crédit");
+        }
+        
+        if (hasSuspensions) {
+            riskIcon = '🟠';
+            riskLevel = 'MOYEN';
+            riskColor = '#f97316';
+            riskReasons.push("A subi des coupures de service");
+        }
+    }
+    
+    // ===== 7. CONSTRUCTION DU HTML COMPLET =====
+    return `
+        <div class="commercial-summary-card" style="background: white; border-radius: 20px; margin-bottom: 25px; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.08); border: 1px solid #e2e8f0;">
+            
+            <!-- En-tête avec profil -->
+            <div style="background: linear-gradient(135deg, #f8fafc 0%, #ffffff 100%); padding: 20px 25px; border-bottom: 2px solid #e2e8f0;">
+                <div style="display: flex; align-items: center; gap: 20px; flex-wrap: wrap;">
+                    
+                    <!-- Icône profil -->
+                    <div style="width: 70px; height: 70px; background: ${profileColor}20; border-radius: 20px; display: flex; align-items: center; justify-content: center; border: 3px solid ${profileColor};">
+                        <span style="font-size: 36px;">${profileIcon}</span>
+                    </div>
+                    
+                    <!-- Infos client -->
+                    <div style="flex: 1;">
+                        <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap; margin-bottom: 8px;">
+                            <h3 style="margin: 0; font-size: 22px; font-weight: 700; color: #0f172a;">Client ${clientNumber}</h3>
+                            <span style="background: ${profileColor}; color: white; padding: 6px 18px; border-radius: 40px; font-size: 14px; font-weight: 600;">
+                                ${profileName}
+                            </span>
+                            <span style="background: #f1f5f9; color: #475569; padding: 6px 18px; border-radius: 40px; font-size: 14px;">
+                                ${currentForfait} · ${forfaitMax}Wh
+                            </span>
+                        </div>
+                        <p style="margin: 0; color: #475569; font-size: 15px;">
+                            ${profileDesc}
+                        </p>
+                    </div>
+                </div>
+            </div>
+            <!-- Indicateurs supplémentaires (pied de carte) -->
+            <div style="padding: 12px 25px; background: #f1f5f9; border-top: 1px solid #e2e8f0; display: flex; gap: 25px; font-size: 11px; color: #475569; flex-wrap: wrap;">
+                <span><span style="font-weight: 600;">Max atteint:</span> ${maxConsumption} Wh</span>
+                <span><span style="font-weight: 600;">Jours >70%:</span> ${daysAbove70Percent}</span>
+                <span><span style="font-weight: 600;">Jours >90%:</span> ${daysAbove90Percent}</span>
+                <span><span style="font-weight: 600;">Analyse:</span> ${totalDays} jours</span>
+                <span><span style="font-weight: 600;">Événements:</span> ${hasSuspensions ? '🔴' : hasSurcharge ? '🟠' : '✅'}</span>
+            </div>
+        </div>
+    `;
+}
+function getOverQuotaDays(clientNumber, forfaitMax) {
+    const energyKey = `Energie${clientNumber}`;
+    const overQuotaDays = [];
+    let maxOverQuota = 0;
+    let totalOverQuota = 0;
+    
+    if (combinedEnergyData.length > 0) {
+        // Utiliser un objet pour ne garder que le max par jour
+        const dailyMax = {};
+        
+        combinedEnergyData.forEach(row => {
+            if (!row['Date et Heure']) return;
+            const date = row['Date et Heure'].split(' ')[0];
+            const value = row[energyKey];
+            
+            if (value && value.toString().trim() !== '' && value.toString().trim() !== '-') {
+                const energyValue = parseFloat(value.toString().replace(',', '.'));
+                if (!isNaN(energyValue) && energyValue > forfaitMax) {
+                    // Garder la valeur max pour chaque jour
+                    if (!dailyMax[date] || energyValue > dailyMax[date]) {
+                        dailyMax[date] = energyValue;
+                    }
+                }
+            }
+        });
+        
+        // Convertir en tableau et trier
+        Object.entries(dailyMax).forEach(([date, value]) => {
+            const percent = Math.round((value / forfaitMax) * 100);
+            overQuotaDays.push({
+                date: new Date(date.split('/').reverse().join('-')).toLocaleDateString('fr-FR'),
+                consumption: value,
+                percent: percent
+            });
+            
+            if (value > maxOverQuota) maxOverQuota = value;
+            totalOverQuota += value;
+        });
+        
+        // Trier par date (plus récent en premier)
+        overQuotaDays.sort((a, b) => new Date(b.date.split('/').reverse().join('-')) - new Date(a.date.split('/').reverse().join('-')));
+    }
+    
+    return {
+        days: overQuotaDays,
+        maxOverQuota: maxOverQuota,
+        avgOverQuota: overQuotaDays.length > 0 ? Math.round(totalOverQuota / overQuotaDays.length) : 0
+    };
+}
+// Fonction pour calculer la plus longue période sans activité
+function calculateLongestInactiveStreak(clientNumber) {
+    const energyKey = `Energie${clientNumber}`;
+    const activeDays = new Set();
+    const allDates = [];
+    
+    if (combinedEnergyData.length > 0) {
+        combinedEnergyData.forEach(row => {
+            if (!row['Date et Heure']) return;
+            const date = row['Date et Heure'].split(' ')[0];
+            allDates.push(date);
+            
+            const value = row[energyKey];
+            if (value && value.toString().trim() !== '' && value.toString().trim() !== '-') {
+                const energyValue = parseFloat(value.toString().replace(',', '.'));
+                if (!isNaN(energyValue) && energyValue > 0) {
+                    activeDays.add(date);
+                }
+            }
+        });
+    }
+    
+    // Trier les dates
+    const sortedDates = [...new Set(allDates)].sort((a, b) => {
+        const [da, ma, ya] = a.split('/');
+        const [db, mb, yb] = b.split('/');
+        return new Date(ya, ma-1, da) - new Date(yb, mb-1, db);
+    });
+    
+    let longestStreak = 0;
+    let currentStreak = 0;
+    
+    sortedDates.forEach(date => {
+        if (!activeDays.has(date)) {
+            currentStreak++;
+            longestStreak = Math.max(longestStreak, currentStreak);
+        } else {
+            currentStreak = 0;
+        }
+    });
+    
+    return longestStreak;
+}
+
+// Fonction pour déterminer le rythme d'utilisation
+function calculateUsageFrequency(clientNumber, activeDays, totalDays) {
+    if (totalDays === 0) return 'Non défini';
+    
+    const ratio = activeDays / totalDays;
+    
+    if (ratio >= 0.8) return 'Quotidien';
+    if (ratio >= 0.5) return 'Régulier (3-4j/semaine)';
+    if (ratio >= 0.2) return 'Occasionnel (1-2j/semaine)';
+    return 'Sporadique';
+}
+// Fonction utilitaire pour calculer la moyenne de consommation du NR
+function calculateAverageNRConsumption() {
+    let totalAvg = 0;
+    let clientCount = 0;
+    
+    Object.keys(allResultsByClient || {}).forEach(clientId => {
+        const clientData = allResultsByClient[clientId];
+        if (clientData && clientData.energyDailyData && clientData.energyDailyData.length > 0) {
+            const clientAvg = clientData.energyDailyData.reduce((sum, day) => sum + (day.energieMax || 0), 0) / clientData.energyDailyData.length;
+            totalAvg += clientAvg;
+            clientCount++;
+        }
+    });
+    
+    return clientCount > 0 ? Math.round(totalAvg / clientCount) : 0;
+}
+
 function createClientSubTabs() {
     const commercialeContent = document.getElementById('main-tab-content-commerciale');
     if (!commercialeContent) return;
@@ -7211,6 +7848,15 @@ function displayClientCommercialAnalysis(container, clientNumber) {
     `;
     container.appendChild(clientHeader);
     
+    // Récupérer le forfait du client
+    const rechargeAnalysis = analyzeRechargeData(clientNumber);
+    const currentForfait = rechargeAnalysis.currentCode4Name || 'ECO';
+    const forfaitLimits = getForfaitLimits(currentForfait);
+    const forfaitMax = forfaitLimits.max || 50;
+    
+    // === ANALYSE COMMERCIALE SIMPLIFIÉE ===
+    container.innerHTML += generateCommercialSummary(clientNumber);
+    
     // Statistiques rapides du client
     const statsGrid = document.createElement('div');
     statsGrid.style.cssText = `
@@ -7221,151 +7867,566 @@ function displayClientCommercialAnalysis(container, clientNumber) {
     `;
     
     const clientStats = calculateClientStats(clientNumber);
-    
-    statsGrid.innerHTML = `
-        <div style="background: white; padding: 15px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); border-left: 4px solid #48bb78;">
-            <div style="font-size: 12px; color: #718096; margin-bottom: 5px;">⚡ Énergie max</div>
-            <div style="font-size: 24px; font-weight: 700; color: #48bb78;">${clientStats.maxEnergy} Wh</div>
-        </div>
-        <div style="background: white; padding: 15px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); border-left: 4px solid #4299e1;">
-            <div style="font-size: 12px; color: #718096; margin-bottom: 5px;">📊 Énergie moyenne</div>
-            <div style="font-size: 24px; font-weight: 700; color: #4299e1;">${clientStats.avgEnergy} Wh</div>
-        </div>
-        <div style="background: white; padding: 15px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); border-left: 4px solid #ed8936;">
-            <div style="font-size: 12px; color: #718096; margin-bottom: 5px;">💰 Crédit moyen</div>
-            <div style="font-size: 24px; font-weight: 700; color: #ed8936;">${clientStats.avgCredit}</div>
-        </div>
-        <div style="background: white; padding: 15px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); border-left: 4px solid #9f7aea;">
-            <div style="font-size: 12px; color: #718096; margin-bottom: 5px;">🔄 Jours sans crédit</div>
-            <div style="font-size: 24px; font-weight: 700; color: #9f7aea;">${clientStats.zeroCreditDays}</div>
-        </div>
-    `;
     container.appendChild(statsGrid);
     
-    // Analyse de consommation pour ce client (inclut maintenant le tableau des événements)
+    // Analyse de consommation pour ce client
     if (combinedEnergyData.length > 0) {
         const energyAnalysis = createClientEnergyAnalysis(clientNumber);
         container.appendChild(energyAnalysis);
     }
     
+    // ✅ TABLEAU DES ÉVÉNEMENTS (entre consommation et crédit)
+    if (combinedEventData.length > 0 || combinedSoldeData.length > 0) {
+        const eventsTable = createClientEventsTable(clientNumber);
+        container.appendChild(eventsTable);
+    }
+
     // Analyse de crédit avec données de recharge
     if (combinedSoldeData.length > 0 || combinedRechargeData.length > 0) {
         const creditAnalysis = createClientCreditAnalysis(clientNumber);
         container.appendChild(creditAnalysis);
     }
     
-    // Tableau SOLDE filtré par client (avec hauteur fixe)
-    if (combinedSoldeData.length > 0) {
-        const soldeTable = createSoldeTableForClient(clientNumber);
-        container.appendChild(soldeTable);
-    }
     
-    // Tableau RECHARGE
-    if (combinedRechargeData.length > 0) {
-        const rechargeTable = createRechargeTableForClient(clientNumber);
-        container.appendChild(rechargeTable);
-    }
+    setTimeout(() => {
+        drawGauges(clientNumber);
+    }, 200);
 }
-function createClientEventsTable(clientNumber) {
-    const container = document.createElement('div');
-    container.className = 'client-events-table';
-    container.style.cssText = `
-        background: white;
-        border-radius: 12px;
-        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-        margin-bottom: 20px;
-        overflow: hidden;
-    `;
+function drawGauges(clientNumber) {
+    console.log(`🔄 Dessin des jauges pour le client ${clientNumber}`);
     
-    const header = document.createElement('div');
-    header.style.cssText = `
-        background: linear-gradient(135deg, #f39c12 0%, #d35400 100%);
-        color: white;
-        padding: 15px 20px;
-        font-size: 16px;
-        font-weight: 600;
-        display: flex;
-        align-items: center;
-        gap: 10px;
-    `;
-    header.innerHTML = `<span>⚠️ Événements (SuspendP / SuspendE) - Client ${clientNumber}</span>`;
-    container.appendChild(header);
+    // Récupérer les données du client à partir des variables globales disponibles
+    const energyKey = `Energie${clientNumber}`;
+    const forfaitName = 'ECO'; // Valeur par défaut, vous pouvez l'adapter
     
-    const content = document.createElement('div');
-    content.style.cssText = `padding: 20px;`;
-    
-    // Récupérer tous les événements
-    const dailyEvents = analyzeEventsByDay();
-    
-    // Filtrer pour ce client (en utilisant le dernier chiffre)
-    const clientStr = clientNumber.toString();
-    const clientEvents = dailyEvents.filter(event => {
-        // Vérifier si c'est un événement pour ce client
-        if (event.client === clientStr) return true;
-        
-        // Vérifier dans les colonnes SuspendP_clients_str et SuspendE_clients_str
-        if (event.SuspendP_clients_str === clientStr) return true;
-        if (event.SuspendE_clients_str === clientStr) return true;
-        
-        return false;
-    });
-    
-    if (clientEvents.length === 0) {
-        content.innerHTML = `
-            <div style="text-align: center; padding: 30px; color: #94a3b8;">
-                Aucun événement SuspendP ou SuspendE pour ce client
-            </div>
-        `;
-        container.appendChild(content);
-        return container;
+    // Récupérer le forfait du client si possible
+    let forfaitMax = 500; // Valeur par défaut
+    try {
+        const rechargeAnalysis = typeof analyzeRechargeData === 'function' ? 
+            analyzeRechargeData(clientNumber) : null;
+        if (rechargeAnalysis && rechargeAnalysis.currentCode4Name) {
+            const limits = getForfaitLimits(rechargeAnalysis.currentCode4Name);
+            forfaitMax = limits.max || 500;
+        }
+    } catch (e) {
+        console.log('⚠️ Impossible de récupérer le forfait, utilisation de la valeur par défaut');
     }
     
-    // Filtrer pour ne garder que SuspendP et SuspendE
-    const filteredEvents = clientEvents.map(event => ({
-        date: event.date,
-        formattedDate: new Date(event.date).toLocaleDateString('fr-FR', {
-            day: '2-digit', month: '2-digit', year: 'numeric'
-        }),
-        client: event.client,
-        SuspendP: event.SuspendP,
-        SuspendP_start: event.SuspendP_start,
-        SuspendP_end: event.SuspendP_end,
-        SuspendP_duration: event.SuspendP_duration,
-        SuspendE: event.SuspendE,
-        SuspendE_start: event.SuspendE_start,
-        SuspendE_end: event.SuspendE_end,
-        SuspendE_duration: event.SuspendE_duration
-    })).filter(event => event.SuspendP > 0 || event.SuspendE > 0);
+    // Analyser les données d'énergie directement depuis combinedEnergyData
+    const daysWithConsumption = [];
+    const consumptionByDay = {};
     
-    if (filteredEvents.length === 0) {
-        content.innerHTML = `
-            <div style="text-align: center; padding: 30px; color: #94a3b8;">
-                Aucun événement SuspendP ou SuspendE pour ce client
-            </div>
-        `;
-        container.appendChild(content);
-        return container;
-    }
-    
-    // ✅ Calculer le nombre total de jours avec diagnostic pour ce client
-    const totalDiagnosticDays = new Set();
-    
-    // Récupérer tous les jours des données d'énergie pour ce client
-    if (combinedEnergyData.length > 0) {
-        const energyKey = `Energie${clientNumber}`;
+    if (combinedEnergyData && combinedEnergyData.length > 0) {
         combinedEnergyData.forEach(row => {
-            if (row['Date et Heure']) {
-                const value = row[energyKey];
-                // Vérifier si le client a des données ce jour-là
-                if (value && value.toString().trim() !== '' && value.toString().trim() !== '-') {
-                    const date = row['Date et Heure'].split(' ')[0];
-                    totalDiagnosticDays.add(date);
+            if (!row['Date et Heure']) return;
+            const date = row['Date et Heure'].split(' ')[0];
+            const value = row[energyKey];
+            
+            if (value && value.toString().trim() !== '' && value.toString().trim() !== '-') {
+                const energyValue = parseFloat(value.toString().replace(',', '.'));
+                if (!isNaN(energyValue) && energyValue > 0) {
+                    if (!consumptionByDay[date] || energyValue > consumptionByDay[date]) {
+                        consumptionByDay[date] = energyValue;
+                    }
                 }
             }
         });
     }
     
-    // Récupérer tous les jours des données de solde pour ce client
+    // Convertir en tableau pour analyse
+    const dailyValues = Object.values(consumptionByDay);
+    
+    if (dailyValues.length === 0) {
+        console.log('⚠️ Aucune donnée de consommation pour les jauges');
+        return;
+    }
+    
+    // Calculer les pourcentages
+    const joursDansLimites = dailyValues.filter(v => v > 0 && v <= forfaitMax).length;
+    const joursDansTolerance = dailyValues.filter(v => v > forfaitMax && v <= (forfaitMax * 1.2)).length;
+    const joursHorsTolerance = dailyValues.filter(v => v > (forfaitMax * 1.2)).length;
+    
+    const total = joursDansLimites + joursDansTolerance + joursHorsTolerance;
+    
+    const pourcentLimites = total > 0 ? Math.round((joursDansLimites / total) * 100) : 0;
+    const pourcentTolerance = total > 0 ? Math.round((joursDansTolerance / total) * 100) : 0;
+    const pourcentHorsTolerance = total > 0 ? Math.round((joursHorsTolerance / total) * 100) : 0;
+    
+    console.log(`📊 Statistiques pour client ${clientNumber}:`, {
+        total,
+        joursDansLimites,
+        pourcentLimites,
+        joursDansTolerance,
+        pourcentTolerance,
+        joursHorsTolerance,
+        pourcentHorsTolerance
+    });
+
+    // Dessiner les jauges
+    setTimeout(() => {
+        // Jauge limites (verte)
+        const canvasLimits = document.getElementById(`gauge-${clientNumber}-limits`);
+        if (canvasLimits) {
+            const ctx = canvasLimits.getContext('2d');
+            const centerX = 50;
+            const centerY = 50;
+            const radius = 40;
+            const startAngle = -Math.PI / 2;
+            const endAngle = startAngle + (pourcentLimites / 100) * 2 * Math.PI;
+
+            // Effacer le canvas
+            ctx.clearRect(0, 0, 100, 100);
+            
+            // Fond
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
+            ctx.strokeStyle = '#e2e8f0';
+            ctx.lineWidth = 10;
+            ctx.stroke();
+
+            // Progression
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, radius, startAngle, endAngle);
+            ctx.strokeStyle = '#22c55e';
+            ctx.lineWidth = 10;
+            ctx.stroke();
+
+            // Texte
+            ctx.font = 'bold 14px Arial';
+            ctx.fillStyle = '#22c55e';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(pourcentLimites + '%', centerX, centerY);
+        } else {
+            console.log(`⚠️ Canvas gauge-${clientNumber}-limits non trouvé`);
+        }
+
+        // Jauge tolérance (orange)
+        const canvasTolerance = document.getElementById(`gauge-${clientNumber}-tolerance`);
+        if (canvasTolerance) {
+            const ctx = canvasTolerance.getContext('2d');
+            const centerX = 50;
+            const centerY = 50;
+            const radius = 40;
+            const startAngle = -Math.PI / 2;
+            const endAngle = startAngle + (pourcentTolerance / 100) * 2 * Math.PI;
+
+            ctx.clearRect(0, 0, 100, 100);
+            
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
+            ctx.strokeStyle = '#e2e8f0';
+            ctx.lineWidth = 10;
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, radius, startAngle, endAngle);
+            ctx.strokeStyle = '#f59e0b';
+            ctx.lineWidth = 10;
+            ctx.stroke();
+
+            ctx.font = 'bold 14px Arial';
+            ctx.fillStyle = '#f59e0b';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(pourcentTolerance + '%', centerX, centerY);
+        }
+
+        // Jauge hors tolérance (rouge)
+        const canvasHors = document.getElementById(`gauge-${clientNumber}-hors`);
+        if (canvasHors) {
+            const ctx = canvasHors.getContext('2d');
+            const centerX = 50;
+            const centerY = 50;
+            const radius = 40;
+            const startAngle = -Math.PI / 2;
+            const endAngle = startAngle + (pourcentHorsTolerance / 100) * 2 * Math.PI;
+
+            ctx.clearRect(0, 0, 100, 100);
+            
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
+            ctx.strokeStyle = '#e2e8f0';
+            ctx.lineWidth = 10;
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, radius, startAngle, endAngle);
+            ctx.strokeStyle = '#ef4444';
+            ctx.lineWidth = 10;
+            ctx.stroke();
+
+            ctx.font = 'bold 14px Arial';
+            ctx.fillStyle = '#ef4444';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(pourcentHorsTolerance + '%', centerX, centerY);
+        }
+    }, 300);
+}
+function createClientHourlyEnergyChart(clientId) {
+    return `
+        <div class="client-hourly-chart-container" data-chart-id="client-${clientId}" data-client-id="${clientId}" 
+             style="background:white; border-radius:16px; border:2px solid #e2e8f0; margin:20px 0; padding:20px; box-shadow:0 8px 20px rgba(0,0,0,0.05);">
+            <div style="display:flex; align-items:center; gap:12px; margin-bottom:15px;">
+                <div style="width:44px; height:44px; background:linear-gradient(135deg, #3b82f6 0%, #1e40af 100%); border-radius:12px; display:flex; align-items:center; justify-content:center;">
+                    <span style="font-size:24px; color:white;">⏰</span>
+                </div>
+                <div>
+                    <h4 style="margin:0; font-size:18px; font-weight:700; color:#0f172a;">Profil Horaire de Consommation</h4>
+                    <div style="font-size:12px; color:#64748b; margin-top:4px;">
+                        Analyse des habitudes de consommation par heure
+                    </div>
+                </div>
+            </div>
+            <div style="width:100%; height:250px; background: #f8fafc; border-radius: 8px; display: flex; align-items: center; justify-content: center;">
+                <span style="color: #94a3b8;">Graphique en cours de développement</span>
+            </div>
+        </div>
+    `;
+}
+// ==================== TABLEAU DES ÉVÉNEMENTS POUR CLIENT ====================
+// ==================== TABLEAU DES ÉVÉNEMENTS POUR CLIENT (VERSION CORRIGÉE) ====================
+function createClientEventsTable(clientNumber) {
+    const container = document.createElement('div');
+    container.className = 'client-events-table';
+    container.style.cssText = `
+        background: white;
+        border-radius: 16px;
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+        margin-bottom: 25px;
+        overflow: hidden;
+        border: 2px solid #e2e8f0;
+    `;
+    
+    // En-tête
+    const header = document.createElement('div');
+    header.style.cssText = `
+        background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+        color: white;
+        padding: 15px 25px;
+        font-size: 18px;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    `;
+    header.innerHTML = `
+        <span style="font-size: 24px;">⚠️</span>
+        <span>Événements de Délestage - Client ${clientNumber.toString().padStart(2, '0')}</span>
+    `;
+    container.appendChild(header);
+    
+    const content = document.createElement('div');
+    content.style.cssText = `padding: 20px;`;
+    
+    // Calculer le nombre total de jours de diagnostic pour ce client
+    const totalDiagnosticDays = getTotalDiagnosticDaysForClient(clientNumber);
+    
+    // Récupérer les événements pour ce client
+    const eventsByDay = getEventsForClientGroupedByDay(clientNumber);
+    
+    if (eventsByDay.length === 0) {
+        content.innerHTML = `
+            <div style="text-align: center; padding: 40px; color: #94a3b8; background: #f8fafc; border-radius: 12px;">
+                <span style="font-size: 48px; display: block; margin-bottom: 15px;">✅</span>
+                <h3 style="margin: 0 0 10px 0; color: #1e293b;">Aucun événement</h3>
+                <p style="margin: 0; font-size: 14px;">Aucun événement (surcharge, crédit nul, suspend P/E) pour ce client</p>
+                <p style="margin-top: 10px; font-size: 12px; color: #64748b;">Sur ${totalDiagnosticDays} jour(s) de diagnostic</p>
+            </div>
+        `;
+        container.appendChild(content);
+        return container;
+    }
+    
+    // Calculer les statistiques (JOURS, pas nombre d'événements)
+    const daysWithSurcharge = new Set();
+    const daysWithCreditNul = new Set();
+    const daysWithSuspendP = new Set();
+    const daysWithSuspendE = new Set();
+    
+    eventsByDay.forEach(day => {
+        if (day.Surcharge > 0) daysWithSurcharge.add(day.date);
+        if (day.CreditNul > 0) daysWithCreditNul.add(day.date);
+        if (day.SuspendP > 0) daysWithSuspendP.add(day.date);
+        if (day.SuspendE > 0) daysWithSuspendE.add(day.date);
+    });
+    
+    // Calculer les pourcentages
+    const percentSurcharge = totalDiagnosticDays > 0 ? 
+        ((daysWithSurcharge.size / totalDiagnosticDays) * 100).toFixed(1) : 0;
+    const percentCreditNul = totalDiagnosticDays > 0 ? 
+        ((daysWithCreditNul.size / totalDiagnosticDays) * 100).toFixed(1) : 0;
+    const percentSuspendP = totalDiagnosticDays > 0 ? 
+        ((daysWithSuspendP.size / totalDiagnosticDays) * 100).toFixed(1) : 0;
+    const percentSuspendE = totalDiagnosticDays > 0 ? 
+        ((daysWithSuspendE.size / totalDiagnosticDays) * 100).toFixed(1) : 0;
+    
+    const uniqueDays = new Set(eventsByDay.map(d => d.date)).size;
+    
+    // ✅ Carte des statistiques (SANS le card Total événements)
+    const statsGrid = document.createElement('div');
+    statsGrid.style.cssText = `
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 15px;
+        margin-bottom: 25px;
+    `;
+    
+    statsGrid.innerHTML = `
+        <!-- Surcharge -->
+        <div style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); border-radius: 12px; padding: 18px; color: white;">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+                <span style="font-size: 24px;">⚡</span>
+                <span style="font-size: 14px; font-weight: 600; opacity: 0.9;">SURCHARGE</span>
+            </div>
+            <div style="font-size: 36px; font-weight: 800; margin-bottom: 5px;">${daysWithSurcharge.size}</div>
+            <div style="font-size: 13px; opacity: 0.9;">jour(s) concerné(s)</div>
+            <div style="margin-top: 10px; background: rgba(255,255,255,0.2); height: 6px; border-radius: 3px; overflow: hidden;">
+                <div style="width: ${percentSurcharge}%; height: 100%; background: white; border-radius: 3px;"></div>
+            </div>
+            <div style="margin-top: 8px; font-size: 13px; font-weight: 600;">${percentSurcharge}% du temps</div>
+        </div>
+        
+        <!-- Crédit nul -->
+        <div style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); border-radius: 12px; padding: 18px; color: white;">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+                <span style="font-size: 24px;">💰</span>
+                <span style="font-size: 14px; font-weight: 600; opacity: 0.9;">CRÉDIT NUL</span>
+            </div>
+            <div style="font-size: 36px; font-weight: 800; margin-bottom: 5px;">${daysWithCreditNul.size}</div>
+            <div style="font-size: 13px; opacity: 0.9;">jour(s) concerné(s)</div>
+            <div style="margin-top: 10px; background: rgba(255,255,255,0.2); height: 6px; border-radius: 3px; overflow: hidden;">
+                <div style="width: ${percentCreditNul}%; height: 100%; background: white; border-radius: 3px;"></div>
+            </div>
+            <div style="margin-top: 8px; font-size: 13px; font-weight: 600;">${percentCreditNul}% du temps</div>
+        </div>
+        
+        <!-- Puissance dépassée (SuspendP) -->
+        <div style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); border-radius: 12px; padding: 18px; color: white;">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+                <span style="font-size: 24px;">📈</span>
+                <span style="font-size: 14px; font-weight: 600; opacity: 0.9;">PUISSANCE DÉPASSÉE</span>
+            </div>
+            <div style="font-size: 36px; font-weight: 800; margin-bottom: 5px;">${daysWithSuspendP.size}</div>
+            <div style="font-size: 13px; opacity: 0.9;">jour(s) concerné(s)</div>
+            <div style="margin-top: 10px; background: rgba(255,255,255,0.2); height: 6px; border-radius: 3px; overflow: hidden;">
+                <div style="width: ${percentSuspendP}%; height: 100%; background: white; border-radius: 3px;"></div>
+            </div>
+            <div style="margin-top: 8px; font-size: 13px; font-weight: 600;">${percentSuspendP}% du temps</div>
+        </div>
+        
+        <!-- Énergie épuisée (SuspendE) -->
+        <div style="background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%); border-radius: 12px; padding: 18px; color: white;">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+                <span style="font-size: 24px;">🔋</span>
+                <span style="font-size: 14px; font-weight: 600; opacity: 0.9;">ÉNERGIE ÉPUISÉE</span>
+            </div>
+            <div style="font-size: 36px; font-weight: 800; margin-bottom: 5px;">${daysWithSuspendE.size}</div>
+            <div style="font-size: 13px; opacity: 0.9;">jour(s) concerné(s)</div>
+            <div style="margin-top: 10px; background: rgba(255,255,255,0.2); height: 6px; border-radius: 3px; overflow: hidden;">
+                <div style="width: ${percentSuspendE}%; height: 100%; background: white; border-radius: 3px;"></div>
+            </div>
+            <div style="margin-top: 8px; font-size: 13px; font-weight: 600;">${percentSuspendE}% du temps</div>
+        </div>
+    `;
+    
+    content.appendChild(statsGrid);
+    
+    // ✅ Informations sur la période analysée
+    const periodInfo = document.createElement('div');
+    periodInfo.style.cssText = `
+        background: #f8fafc;
+        border-radius: 8px;
+        padding: 12px 15px;
+        margin-bottom: 20px;
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        font-size: 12px;
+        border: 1px solid #e2e8f0;
+    `;
+    periodInfo.innerHTML = `
+        <span style="display: flex; align-items: center; gap: 5px;">
+            <span style="font-size: 16px;">📅</span>
+            <span><strong>${totalDiagnosticDays}</strong> jour(s) de diagnostic analysés</span>
+        </span>
+        <span style="display: flex; align-items: center; gap: 5px;">
+            <span style="font-size: 16px;">📊</span>
+            <span><strong>${uniqueDays}</strong> jour(s) avec événements (${totalDiagnosticDays > 0 ? ((uniqueDays / totalDiagnosticDays) * 100).toFixed(1) : 0}%)</span>
+        </span>
+    `;
+    content.appendChild(periodInfo);
+    
+    // ✅ Tableau avec hauteur fixe et scroll
+    const tableWrapper = document.createElement('div');
+    tableWrapper.style.cssText = `
+        border: 2px solid #e2e8f0;
+        border-radius: 12px;
+        overflow: hidden;
+        margin-top: 20px;
+        max-height: 350px;
+        overflow-y: auto;
+        overflow-x: auto;
+        scrollbar-width: thin;
+        position: relative;
+    `;
+    
+    let tableHTML = `
+        <table style="width: 100%; border-collapse: collapse; font-size: 12px; min-width: 1200px;">
+            <thead style="position: sticky; top: 0; z-index: 10;">
+                <tr>
+                    <th rowspan="2" style="padding: 15px 10px; text-align: left; border-right: 2px solid #cbd5e1; background: #f1f5f9; font-size: 14px; position: sticky; left: 0; z-index: 11;">📅 DATE</th>
+                    <th colspan="3" style="padding: 12px 10px; text-align: center; background: #3b82f6; color: white; border-right: 2px solid #2563eb;">📈 PUISSANCE DÉPASSÉE</th>
+                    <th colspan="3" style="padding: 12px 10px; text-align: center; background: #ef4444; color: white; border-right: 2px solid #dc2626;">⚡ SURCHARGE</th>
+                    <th colspan="3" style="padding: 12px 10px; text-align: center; background: #f59e0b; color: white; border-right: 2px solid #d97706;">💰 CRÉDIT NUL</th>
+                    <th colspan="3" style="padding: 12px 10px; text-align: center; background: #0ea5e9; color: white;">🔋 ÉNERGIE ÉPUISÉE</th>
+                </tr>
+                <tr style="background: #f1f5f9;">
+                    <th style="padding: 10px 8px; text-align: center; border-bottom: 1px solid #cbd5e1;">Début</th>
+                    <th style="padding: 10px 8px; text-align: center; border-bottom: 1px solid #cbd5e1;">Fin</th>
+                    <th style="padding: 10px 8px; text-align: center; border-bottom: 1px solid #cbd5e1; border-right: 2px solid #cbd5e1;">Durée</th>
+                    
+                    <th style="padding: 10px 8px; text-align: center; border-bottom: 1px solid #cbd5e1;">Début</th>
+                    <th style="padding: 10px 8px; text-align: center; border-bottom: 1px solid #cbd5e1;">Fin</th>
+                    <th style="padding: 10px 8px; text-align: center; border-bottom: 1px solid #cbd5e1; border-right: 2px solid #cbd5e1;">Durée</th>
+                    
+                    <th style="padding: 10px 8px; text-align: center; border-bottom: 1px solid #cbd5e1;">Début</th>
+                    <th style="padding: 10px 8px; text-align: center; border-bottom: 1px solid #cbd5e1;">Fin</th>
+                    <th style="padding: 10px 8px; text-align: center; border-bottom: 1px solid #cbd5e1; border-right: 2px solid #cbd5e1;">Durée</th>
+                    
+                    <th style="padding: 10px 8px; text-align: center; border-bottom: 1px solid #cbd5e1;">Début</th>
+                    <th style="padding: 10px 8px; text-align: center; border-bottom: 1px solid #cbd5e1;">Fin</th>
+                    <th style="padding: 10px 8px; text-align: center; border-bottom: 1px solid #cbd5e1;">Durée</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+    
+    // Trier par date décroissante
+    eventsByDay.sort((a, b) => new Date(b.dateObj) - new Date(a.dateObj));
+    
+    eventsByDay.forEach((day, index) => {
+        const bgColor = index % 2 === 0 ? '#ffffff' : '#fafbfc';
+        
+        tableHTML += `
+            <tr style="border-bottom: 1px solid #e2e8f0; background: ${bgColor};">
+                <td style="padding: 12px 10px; font-weight: 600; border-right: 2px solid #e2e8f0; position: sticky; left: 0; background: ${bgColor};">
+                    ${new Date(day.date).toLocaleDateString('fr-FR', {
+                        day: '2-digit', month: '2-digit', year: 'numeric'
+                    })}
+                </td>
+                
+                <!-- SuspendP -->
+                <td style="padding: 10px 8px; text-align: center; ${day.SuspendP > 0 ? 'background: #3b82f610; font-weight: 600; color: #2563eb;' : 'color: #94a3b8;'}">
+                    ${day.SuspendP_start || '-'}
+                </td>
+                <td style="padding: 10px 8px; text-align: center; ${day.SuspendP > 0 ? 'background: #3b82f610; font-weight: 600; color: #2563eb;' : 'color: #94a3b8;'}">
+                    ${day.SuspendP_end || '-'}
+                </td>
+                <td style="padding: 10px 8px; text-align: center; border-right: 2px solid #e2e8f0; ${day.SuspendP > 0 ? 'background: #3b82f620; font-weight: 700; color: #2563eb;' : 'color: #94a3b8;'}">
+                    ${day.SuspendP_duration || '-'}
+                </td>
+                
+                <!-- Surcharge -->
+                <td style="padding: 10px 8px; text-align: center; ${day.Surcharge > 0 ? 'background: #ef444410; font-weight: 600; color: #dc2626;' : 'color: #94a3b8;'}">
+                    ${day.Surcharge_start || '-'}
+                </td>
+                <td style="padding: 10px 8px; text-align: center; ${day.Surcharge > 0 ? 'background: #ef444410; font-weight: 600; color: #dc2626;' : 'color: #94a3b8;'}">
+                    ${day.Surcharge_end || '-'}
+                </td>
+                <td style="padding: 10px 8px; text-align: center; border-right: 2px solid #e2e8f0; ${day.Surcharge > 0 ? 'background: #ef444420; font-weight: 700; color: #dc2626;' : 'color: #94a3b8;'}">
+                    ${day.Surcharge_duration || '-'}
+                </td>
+                
+                <!-- Crédit Nul -->
+                <td style="padding: 10px 8px; text-align: center; ${day.CreditNul > 0 ? 'background: #f59e0b10; font-weight: 600; color: #d97706;' : 'color: #94a3b8;'}">
+                    ${day.CreditNul_start || '-'}
+                </td>
+                <td style="padding: 10px 8px; text-align: center; ${day.CreditNul > 0 ? 'background: #f59e0b10; font-weight: 600; color: #d97706;' : 'color: #94a3b8;'}">
+                    ${day.CreditNul_end || '-'}
+                </td>
+                <td style="padding: 10px 8px; text-align: center; border-right: 2px solid #e2e8f0; ${day.CreditNul > 0 ? 'background: #f59e0b20; font-weight: 700; color: #d97706;' : 'color: #94a3b8;'}">
+                    ${day.CreditNul_duration || '-'}
+                </td>
+                
+                <!-- SuspendE -->
+                <td style="padding: 10px 8px; text-align: center; ${day.SuspendE > 0 ? 'background: #0ea5e910; font-weight: 600; color: #0284c7;' : 'color: #94a3b8;'}">
+                    ${day.SuspendE_start || '-'}
+                </td>
+                <td style="padding: 10px 8px; text-align: center; ${day.SuspendE > 0 ? 'background: #0ea5e910; font-weight: 600; color: #0284c7;' : 'color: #94a3b8;'}">
+                    ${day.SuspendE_end || '-'}
+                </td>
+                <td style="padding: 10px 8px; text-align: center; ${day.SuspendE > 0 ? 'background: #0ea5e920; font-weight: 700; color: #0284c7;' : 'color: #94a3b8;'}">
+                    ${day.SuspendE_duration || '-'}
+                </td>
+            </tr>
+        `;
+    });
+    
+    tableHTML += `</tbody></table>`;
+    tableWrapper.innerHTML = tableHTML;
+    content.appendChild(tableWrapper);
+    
+    // Légende
+    const legend = document.createElement('div');
+    legend.style.cssText = `
+        margin-top: 20px;
+        padding: 15px 20px;
+        background: #f8fafc;
+        border-radius: 12px;
+        border: 1px solid #e2e8f0;
+        display: flex;
+        align-items: center;
+        gap: 25px;
+        flex-wrap: wrap;
+        font-size: 12px;
+    `;
+    
+    legend.innerHTML = `
+        <div style="display: flex; align-items: center; gap: 8px;">
+            <div style="width: 16px; height: 16px; background: #3b82f6; border-radius: 4px;"></div>
+            <span><strong>Puissance dépassée</strong> (SuspendP)</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px;">
+            <div style="width: 16px; height: 16px; background: #ef4444; border-radius: 4px;"></div>
+            <span><strong>Surcharge</strong> (Surcharge)</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px;">
+            <div style="width: 16px; height: 16px; background: #f59e0b; border-radius: 4px;"></div>
+            <span><strong>Crédit nul</strong> (Crédit épuisé)</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px;">
+            <div style="width: 16px; height: 16px; background: #0ea5e9; border-radius: 4px;"></div>
+            <span><strong>Énergie épuisée</strong> (SuspendE)</span>
+        </div>
+    `;
+    
+    content.appendChild(legend);
+    container.appendChild(content);
+    
+    return container;
+}
+
+// Fonction pour calculer le nombre total de jours de diagnostic pour un client
+function getTotalDiagnosticDaysForClient(clientNumber) {
+    const totalDays = new Set();
+    
+    // Jours avec données d'énergie
+    if (combinedEnergyData.length > 0) {
+        const energyKey = `Energie${clientNumber}`;
+        combinedEnergyData.forEach(row => {
+            if (row['Date et Heure']) {
+                const value = row[energyKey];
+                if (value && value.toString().trim() !== '' && value.toString().trim() !== '-') {
+                    const date = row['Date et Heure'].split(' ')[0];
+                    totalDays.add(date);
+                }
+            }
+        });
+    }
+    
+    // Jours avec données de solde
     if (combinedSoldeData.length > 0) {
         const creditKey = `Credit${clientNumber}`;
         combinedSoldeData.forEach(row => {
@@ -7373,295 +8434,172 @@ function createClientEventsTable(clientNumber) {
                 const value = row[creditKey];
                 if (value && value.toString().trim() !== '' && value.toString().trim() !== '-') {
                     const date = row['Date et Heure'].split(' ')[0];
-                    totalDiagnosticDays.add(date);
+                    totalDays.add(date);
                 }
             }
         });
     }
     
-    const totalDays = totalDiagnosticDays.size;
-    
-    // Calculer les statistiques pour les pourcentages
-    const daysWithSuspendP = filteredEvents.filter(e => e.SuspendP > 0).length;
-    const daysWithSuspendE = filteredEvents.filter(e => e.SuspendE > 0).length;
-    const daysWithBoth = filteredEvents.filter(e => e.SuspendP > 0 && e.SuspendE > 0).length;
-    
-    // ✅ POURCENTAGES PAR RAPPORT AU NOMBRE TOTAL DE JOURS DE DIAGNOSTIC
-    const percentSuspendP = totalDays > 0 ? ((daysWithSuspendP / totalDays) * 100).toFixed(1) : 0;
-    const percentSuspendE = totalDays > 0 ? ((daysWithSuspendE / totalDays) * 100).toFixed(1) : 0;
-    const percentBoth = totalDays > 0 ? ((daysWithBoth / totalDays) * 100).toFixed(1) : 0;
-    
-    // Calculer les totaux
-    const totalSuspendP = filteredEvents.reduce((sum, e) => sum + e.SuspendP, 0);
-    const totalSuspendE = filteredEvents.reduce((sum, e) => sum + e.SuspendE, 0);
-    
-    // Calculer la durée totale (si disponible)
-    let totalDurationP = 0;
-    let totalDurationE = 0;
-    
-    filteredEvents.forEach(event => {
-        // Convertir les durées en minutes pour le calcul
-        if (event.SuspendP_duration && event.SuspendP_duration !== '-') {
-            const duration = event.SuspendP_duration;
-            if (duration.includes('h')) {
-                const [hours, mins] = duration.split('h');
-                totalDurationP += parseInt(hours) * 60 + parseInt(mins || 0);
-            } else if (duration.includes('min')) {
-                totalDurationP += parseInt(duration.replace('min', ''));
-            }
-        }
-        if (event.SuspendE_duration && event.SuspendE_duration !== '-') {
-            const duration = event.SuspendE_duration;
-            if (duration.includes('h')) {
-                const [hours, mins] = duration.split('h');
-                totalDurationE += parseInt(hours) * 60 + parseInt(mins || 0);
-            } else if (duration.includes('min')) {
-                totalDurationE += parseInt(duration.replace('min', ''));
-            }
-        }
-    });
-    
-    // Formater les durées totales
-    const formatTotalDuration = (minutes) => {
-        if (minutes === 0) return '-';
-        const hours = Math.floor(minutes / 60);
-        const mins = minutes % 60;
-        return hours > 0 ? `${hours}h${mins > 0 ? mins + 'min' : ''}` : `${mins}min`;
-    };
-    
-    // ✅ CARTES DE POURCENTAGES
-    const statsCards = document.createElement('div');
-    statsCards.style.cssText = `
-        background: #f8fafc;
-        border-radius: 12px;
-        padding: 20px;
-        margin-bottom: 20px;
-        display: grid;
-        grid-template-columns: repeat(4, 1fr);
-        gap: 15px;
-        border: 1px solid #e2e8f0;
-    `;
-    
-    statsCards.innerHTML = `
-        <!-- SuspendP -->
-        <div style="background: white; padding: 15px; border-radius: 10px; border-left: 5px solid #7c3aed; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                <span style="font-size: 13px; color: #7c3aed; font-weight: 700;">⏸️ SUSPEND P</span>
-                <span style="background: #7c3aed20; color: #7c3aed; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 700;">${totalSuspendP} fois</span>
-            </div>
-            <div style="margin-bottom: 12px;">
-                <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
-                    <span style="font-size: 12px; color: #64748b;">Jours concernés</span>
-                    <span style="font-weight: 700; color: #1e293b;">${daysWithSuspendP} / ${totalDays}</span>
-                </div>
-                <div style="width: 100%; height: 10px; background: #e2e8f0; border-radius: 6px; overflow: hidden;">
-                    <div style="width: ${percentSuspendP}%; height: 100%; background: #7c3aed; border-radius: 6px;"></div>
-                </div>
-            </div>
-            <div style="display: flex; justify-content: space-between; align-items: baseline;">
-                <span style="font-size: 24px; font-weight: 800; color: #7c3aed;">${percentSuspendP}%</span>
-                <span style="font-size: 11px; color: #64748b;">des jours de diagnostic</span>
-            </div>
-            ${totalDurationP > 0 ? `<div style="margin-top: 8px; font-size: 11px; color: #475569;">⏱️ Durée totale: <strong>${formatTotalDuration(totalDurationP)}</strong></div>` : ''}
-        </div>
-        
-        <!-- SuspendE -->
-        <div style="background: white; padding: 15px; border-radius: 10px; border-left: 5px solid #0ea5e9; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                <span style="font-size: 13px; color: #0ea5e9; font-weight: 700;">⏸️ SUSPEND E</span>
-                <span style="background: #0ea5e920; color: #0ea5e9; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 700;">${totalSuspendE} fois</span>
-            </div>
-            <div style="margin-bottom: 12px;">
-                <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
-                    <span style="font-size: 12px; color: #64748b;">Jours concernés</span>
-                    <span style="font-weight: 700; color: #1e293b;">${daysWithSuspendE} / ${totalDays}</span>
-                </div>
-                <div style="width: 100%; height: 10px; background: #e2e8f0; border-radius: 6px; overflow: hidden;">
-                    <div style="width: ${percentSuspendE}%; height: 100%; background: #0ea5e9; border-radius: 6px;"></div>
-                </div>
-            </div>
-            <div style="display: flex; justify-content: space-between; align-items: baseline;">
-                <span style="font-size: 24px; font-weight: 800; color: #0ea5e9;">${percentSuspendE}%</span>
-                <span style="font-size: 11px; color: #64748b;">des jours de diagnostic</span>
-            </div>
-            ${totalDurationE > 0 ? `<div style="margin-top: 8px; font-size: 11px; color: #475569;">⏱️ Durée totale: <strong>${formatTotalDuration(totalDurationE)}</strong></div>` : ''}
-        </div>
-        
-        <!-- Les deux ensemble -->
-        <div style="background: white; padding: 15px; border-radius: 10px; border-left: 5px solid #8b5cf6; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                <span style="font-size: 13px; color: #8b5cf6; font-weight: 700;">🔄 LES DEUX TYPES</span>
-                <span style="background: #8b5cf620; color: #8b5cf6; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 700;">${daysWithBoth} jours</span>
-            </div>
-            <div style="margin-bottom: 12px;">
-                <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
-                    <span style="font-size: 12px; color: #64748b;">Jours avec les deux</span>
-                    <span style="font-weight: 700; color: #1e293b;">${daysWithBoth} / ${totalDays}</span>
-                </div>
-                <div style="width: 100%; height: 10px; background: #e2e8f0; border-radius: 6px; overflow: hidden;">
-                    <div style="width: ${percentBoth}%; height: 100%; background: #8b5cf6; border-radius: 6px;"></div>
-                </div>
-            </div>
-            <div style="display: flex; justify-content: space-between; align-items: baseline;">
-                <span style="font-size: 24px; font-weight: 800; color: #8b5cf6;">${percentBoth}%</span>
-                <span style="font-size: 11px; color: #64748b;">des jours de diagnostic</span>
-            </div>
-        </div>
-        
-        <!-- Synthèse -->
-        <div style="background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); padding: 15px; border-radius: 10px; color: white;">
-            <div style="font-size: 13px; font-weight: 700; margin-bottom: 15px; opacity: 0.9;">📊 SYNTHÈSE</div>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-                <div>
-                    <div style="font-size: 11px; opacity: 0.8;">Jours diagnostic</div>
-                    <div style="font-size: 28px; font-weight: 800;">${totalDays}</div>
-                </div>
-                <div>
-                    <div style="font-size: 11px; opacity: 0.8;">Jours avec susp.</div>
-                    <div style="font-size: 28px; font-weight: 800;">${filteredEvents.length}</div>
-                </div>
-                <div>
-                    <div style="font-size: 11px; opacity: 0.8;">Taux d'occurrence</div>
-                    <div style="font-size: 20px; font-weight: 700;">${totalDays > 0 ? ((filteredEvents.length / totalDays) * 100).toFixed(1) : 0}%</div>
-                </div>
-                <div>
-                    <div style="font-size: 11px; opacity: 0.8;">Total susp.</div>
-                    <div style="font-size: 20px; font-weight: 700;">${totalSuspendP + totalSuspendE}</div>
-                </div>
-            </div>
-        </div>
-    `;
-    
-    content.appendChild(statsCards);
-    
-    // Créer le tableau avec hauteur fixe et défilement
-    const tableWrapper = document.createElement('div');
-    tableWrapper.style.cssText = `
-        max-height: 250px;
-        overflow-y: auto;
-        overflow-x: auto;
-        border: 1px solid #e2e8f0;
-        border-radius: 8px;
-        position: relative;
-        scrollbar-width: thin;
-    `;
-    
-    let tableHTML = `
-        <table style="width: 100%; border-collapse: collapse; font-size: 12px; min-width: 900px;">
-            <thead style="position: sticky; top: 0; z-index: 10; background: white;">
-                <tr style="background: #f1f5f9;">
-                    <th colspan="1" style="padding: 10px; text-align: left; border-bottom: 2px solid #cbd5e1;">Date</th>
-                    <th colspan="4" style="padding: 10px; text-align: center; background: #7c3aed20; color: #7c3aed; border-bottom: 2px solid #cbd5e1;">SUSPEND P</th>
-                    <th colspan="4" style="padding: 10px; text-align: center; background: #0ea5e920; color: #0ea5e9; border-bottom: 2px solid #cbd5e1;">SUSPEND E</th>
-                </tr>
-                <tr style="background: #f8fafc;">
-                    <th style="padding: 8px; text-align: left; border-bottom: 1px solid #e2e8f0;"></th>
-                    <th style="padding: 8px; text-align: center; border-bottom: 1px solid #e2e8f0;">Nombre</th>
-                    <th style="padding: 8px; text-align: center; border-bottom: 1px solid #e2e8f0;">Début</th>
-                    <th style="padding: 8px; text-align: center; border-bottom: 1px solid #e2e8f0;">Fin</th>
-                    <th style="padding: 8px; text-align: center; border-bottom: 1px solid #e2e8f0;">Durée</th>
-                    <th style="padding: 8px; text-align: center; border-bottom: 1px solid #e2e8f0;">Nombre</th>
-                    <th style="padding: 8px; text-align: center; border-bottom: 1px solid #e2e8f0;">Début</th>
-                    <th style="padding: 8px; text-align: center; border-bottom: 1px solid #e2e8f0;">Fin</th>
-                    <th style="padding: 8px; text-align: center; border-bottom: 1px solid #e2e8f0;">Durée</th>
-                </tr>
-            </thead>
-            <tbody>
-    `;
-    
-    // Trier par date décroissante (plus récent en premier)
-    filteredEvents.sort((a, b) => new Date(b.date) - new Date(a.date)).forEach((event, index) => {
-        const bgColor = index % 2 === 0 ? '#ffffff' : '#fafbfc';
-        
-        tableHTML += `
-            <tr style="border-bottom: 1px solid #e2e8f0; background: ${bgColor};">
-                <td style="padding: 8px; position: sticky; left: 0; background: ${bgColor};">
-                    <div style="display: flex; flex-direction: column;">
-                        <span style="font-weight: 600;">${event.formattedDate}</span>
-                        <span style="font-size: 9px; color: #64748b;">${event.date}</span>
-                    </div>
-                </td>
-                <td style="padding: 8px; text-align: center; font-weight: 700; color: #7c3aed;">${event.SuspendP}</td>
-                <td style="padding: 8px; text-align: center;">${event.SuspendP_start}</td>
-                <td style="padding: 8px; text-align: center;">${event.SuspendP_end}</td>
-                <td style="padding: 8px; text-align: center; background: #7c3aed10; font-weight: 600;">${event.SuspendP_duration}</td>
-                <td style="padding: 8px; text-align: center; font-weight: 700; color: #0ea5e9;">${event.SuspendE}</td>
-                <td style="padding: 8px; text-align: center;">${event.SuspendE_start}</td>
-                <td style="padding: 8px; text-align: center;">${event.SuspendE_end}</td>
-                <td style="padding: 8px; text-align: center; background: #0ea5e910; font-weight: 600;">${event.SuspendE_duration}</td>
-            </tr>
-        `;
-    });
-    
-    // Ligne de total (collée en bas)
-    tableHTML += `
-        <tr style="background: #f1f5f9; font-weight: 700; position: sticky; bottom: 0; z-index: 5;">
-            <td style="padding: 10px 8px; text-align: left; background: #f1f5f9;">TOTAL</td>
-            <td style="padding: 10px 8px; text-align: center; color: #7c3aed; background: #f1f5f9;">${totalSuspendP}</td>
-            <td style="padding: 10px 8px; text-align: center; background: #f1f5f9;">-</td>
-            <td style="padding: 10px 8px; text-align: center; background: #f1f5f9;">-</td>
-            <td style="padding: 10px 8px; text-align: center; background: #f1f5f9;">${formatTotalDuration(totalDurationP)}</td>
-            <td style="padding: 10px 8px; text-align: center; color: #0ea5e9; background: #f1f5f9;">${totalSuspendE}</td>
-            <td style="padding: 10px 8px; text-align: center; background: #f1f5f9;">-</td>
-            <td style="padding: 10px 8px; text-align: center; background: #f1f5f9;">-</td>
-            <td style="padding: 10px 8px; text-align: center; background: #f1f5f9;">${formatTotalDuration(totalDurationE)}</td>
-        </tr>
-    `;
-    
-    tableHTML += `</tbody></table>`;
-    tableWrapper.innerHTML = tableHTML;
-    content.appendChild(tableWrapper);
-    
-    // Indicateur de nombre de lignes
-    const infoRow = document.createElement('div');
-    infoRow.style.cssText = `
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-top: 10px;
-        font-size: 11px;
-        color: #64748b;
-    `;
-    infoRow.innerHTML = `
-        <span>📋 ${filteredEvents.length} jour(s) avec suspensions sur ${totalDays} jours de diagnostic</span>
-        <span>⬆️ ${totalSuspendP} SuspendP • ⬆️ ${totalSuspendE} SuspendE</span>
-    `;
-    content.appendChild(infoRow);
-    
-    // Légende
-    const legend = document.createElement('div');
-    legend.style.cssText = `
-        margin-top: 15px;
-        padding: 10px;
-        background: #f8fafc;
-        border-radius: 6px;
-        font-size: 11px;
-        color: #475569;
-        display: flex;
-        align-items: center;
-        gap: 20px;
-        flex-wrap: wrap;
-    `;
-    legend.innerHTML = `
-        <div style="display: flex; align-items: center; gap: 5px;">
-            <div style="width: 12px; height: 12px; background: #7c3aed; border-radius: 3px;"></div>
-            <span>SuspendP : Suspension de puissance</span>
-        </div>
-        <div style="display: flex; align-items: center; gap: 5px;">
-            <div style="width: 12px; height: 12px; background: #0ea5e9; border-radius: 3px;"></div>
-            <span>SuspendE : Suspension énergétique</span>
-        </div>
-        <div style="margin-left: auto;">
-            <span style="background: #e2e8f0; padding: 4px 8px; border-radius: 4px;">
-                Client extrait du dernier chiffre du Code 1
-            </span>
-        </div>
-    `;
-    content.appendChild(legend);
-    
-    container.appendChild(content);
-    return container;
+    return totalDays.size;
 }
+// Fonction pour récupérer les événements groupés par jour
+function getEventsForClientGroupedByDay(clientNumber) {
+    const eventsByDay = {};
+    const clientStr = clientNumber.toString();
+    
+    combinedEventData.forEach(row => {
+        if (!row['Date et Heure'] || !row['Évènements']) return;
+        
+        const dateTime = row['Date et Heure'];
+        const [date, time] = dateTime.split(' ');
+        const event = row['Évènements'].trim();
+        const code1 = row['Code 1']?.toString().trim() || '';
+        
+        // Initialiser le jour si nécessaire
+        if (!eventsByDay[date]) {
+            eventsByDay[date] = {
+                date: date,
+                dateObj: new Date(date),
+                SuspendP: 0, SuspendP_start: null, SuspendP_end: null, SuspendP_duration: '-',
+                SuspendE: 0, SuspendE_start: null, SuspendE_end: null, SuspendE_duration: '-',
+                Surcharge: 0, Surcharge_start: null, Surcharge_end: null, Surcharge_duration: '-',
+                CreditNul: 0, CreditNul_start: null, CreditNul_end: null, CreditNul_duration: '-'
+            };
+        }
+        
+        const day = eventsByDay[date];
+        
+        // Déterminer le type d'événement
+        if (event.includes('SuspendP')) {
+            // Vérifier si c'est pour ce client (dernier chiffre du Code 1)
+            if (code1 && code1.slice(-1) === clientStr) {
+                day.SuspendP++;
+                if (!day.SuspendP_start || time < day.SuspendP_start) day.SuspendP_start = time.substring(0, 5);
+                if (!day.SuspendP_end || time > day.SuspendP_end) day.SuspendP_end = time.substring(0, 5);
+            }
+        }
+        else if (event.includes('SuspendE')) {
+            if (code1 && code1.slice(-1) === clientStr) {
+                day.SuspendE++;
+                if (!day.SuspendE_start || time < day.SuspendE_start) day.SuspendE_start = time.substring(0, 5);
+                if (!day.SuspendE_end || time > day.SuspendE_end) day.SuspendE_end = time.substring(0, 5);
+            }
+        }
+        else if (event.includes('Surcharge')) {
+            // La surcharge est système, on l'affiche pour tous les clients
+            day.Surcharge++;
+            if (!day.Surcharge_start || time < day.Surcharge_start) day.Surcharge_start = time.substring(0, 5);
+            if (!day.Surcharge_end || time > day.Surcharge_end) day.Surcharge_end = time.substring(0, 5);
+        }
+    });
+    
+    // Ajouter les données de crédit nul depuis combinedSoldeData
+    if (combinedSoldeData.length > 0) {
+        const creditKey = `Credit${clientNumber}`;
+        
+        combinedSoldeData.forEach(row => {
+            if (!row['Date et Heure']) return;
+            
+            const dateTime = row['Date et Heure'];
+            const [date, time] = dateTime.split(' ');
+            const value = parseFloat(row[creditKey]) || 0;
+            
+            if (value === 0) {
+                if (!eventsByDay[date]) {
+                    eventsByDay[date] = {
+                        date: date,
+                        dateObj: new Date(date),
+                        SuspendP: 0, SuspendP_start: null, SuspendP_end: null, SuspendP_duration: '-',
+                        SuspendE: 0, SuspendE_start: null, SuspendE_end: null, SuspendE_duration: '-',
+                        Surcharge: 0, Surcharge_start: null, Surcharge_end: null, Surcharge_duration: '-',
+                        CreditNul: 0, CreditNul_start: null, CreditNul_end: null, CreditNul_duration: '-'
+                    };
+                }
+                
+                const day = eventsByDay[date];
+                day.CreditNul++;
+                if (!day.CreditNul_start || time < day.CreditNul_start) day.CreditNul_start = time.substring(0, 5);
+                if (!day.CreditNul_end || time > day.CreditNul_end) day.CreditNul_end = time.substring(0, 5);
+            }
+        });
+    }
+    
+    // Calculer les durées pour chaque jour
+    Object.values(eventsByDay).forEach(day => {
+        if (day.SuspendP_start && day.SuspendP_end) {
+            day.SuspendP_duration = calculateDuration(day.SuspendP_start, day.SuspendP_end);
+        }
+        if (day.SuspendE_start && day.SuspendE_end) {
+            day.SuspendE_duration = calculateDuration(day.SuspendE_start, day.SuspendE_end);
+        }
+        if (day.Surcharge_start && day.Surcharge_end) {
+            day.Surcharge_duration = calculateDuration(day.Surcharge_start, day.Surcharge_end);
+        }
+        if (day.CreditNul_start && day.CreditNul_end) {
+            day.CreditNul_duration = calculateDuration(day.CreditNul_start, day.CreditNul_end);
+        }
+    });
+    
+    return Object.values(eventsByDay);
+}
+// Fonction utilitaire pour récupérer les événements d'un client
+function getEventsForClient(clientNumber) {
+    const events = [];
+    const clientStr = clientNumber.toString();
+    
+    combinedEventData.forEach(row => {
+        if (!row['Date et Heure'] || !row['Évènements']) return;
+        
+        const event = row['Évènements'].trim();
+        const code1 = row['Code 1']?.toString().trim() || '';
+        const code2 = row['Code 2']?.toString().trim() || '';
+        const code3 = row['Code 3']?.toString().trim() || '';
+        
+        // Vérifier si c'est un événement qui nous intéresse
+        if (event.includes('SuspendP') || event.includes('SuspendE') || event.includes('Surcharge')) {
+            
+            // Déterminer si cet événement concerne ce client
+            let concerneClient = false;
+            
+            // Pour SuspendP et SuspendE, le client est dans le dernier chiffre du Code 1
+            if (event.includes('SuspendP') || event.includes('SuspendE')) {
+                if (code1 && code1.slice(-1) === clientStr) {
+                    concerneClient = true;
+                }
+            }
+            // Pour Surcharge, c'est système (pas de client spécifique)
+            else if (event.includes('Surcharge')) {
+                // On peut soit l'afficher pour tous les clients, soit pour un client spécifique
+                // Ici on l'affiche pour le client actuel
+                concerneClient = true;
+            }
+            
+            if (concerneClient) {
+                const dateTime = row['Date et Heure'];
+                const [date, time] = dateTime.split(' ');
+                
+                let type = '';
+                if (event.includes('SuspendP')) type = 'SuspendP';
+                else if (event.includes('SuspendE')) type = 'SuspendE';
+                else if (event.includes('Surcharge')) type = 'Surcharge';
+                
+                events.push({
+                    dateTime,
+                    date: new Date(date).toLocaleDateString('fr-FR'),
+                    time: time.substring(0, 5),
+                    rawEvent: event,
+                    type,
+                    code1,
+                    code2,
+                    code3
+                });
+            }
+        }
+    });
+    
+    return events;
+}
+
 function calculateClientStats(clientNumber) {
     const energyKey = `Energie${clientNumber}`;
     const creditKey = `Credit${clientNumber}`;
@@ -7968,470 +8906,437 @@ function createRechargeTableForClient(clientNumber) {
     container.appendChild(content);
     return container;
 }
+
+//=================ANALYSE CONSOMMATION===============================
 function createClientEnergyAnalysis(clientNumber) {
     const analysisDiv = document.createElement('div');
     analysisDiv.style.cssText = `
         background: white;
-        border-radius: 12px;
-        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-        margin-bottom: 20px;
+        border-radius: 20px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        margin-bottom: 25px;
         overflow: hidden;
+        border: 1px solid #e2e8f0;
     `;
     
     const header = document.createElement('div');
     header.style.cssText = `
-        background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+        background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
         color: white;
-        padding: 15px 25px;
-        font-size: 16px;
-        font-weight: 600;
+        padding: 20px 25px;
+        font-size: 20px;
+        font-weight: 700;
         display: flex;
         align-items: center;
-        gap: 10px;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 15px;
     `;
-    header.innerHTML = `📊 Analyse de Consommation avec Forfaits - Client ${clientNumber}`;
+    header.innerHTML = `
+        <div style="display: flex; align-items: center; gap: 15px;">
+            <span style="font-size: 28px;">📊</span>
+            <span>ANALYSE CONSOMMATION DU CLIENT ${clientNumber}</span>
+        </div>
+    `;
     analysisDiv.appendChild(header);
     
     const content = document.createElement('div');
-    content.style.cssText = `padding: 20px;`;
+    content.style.cssText = `padding: 25px;`;
     
-    // Analyser la consommation avec historique des forfaits
+    // Récupérer l'historique des forfaits du client
     const consumptionAnalysis = analyzeConsumptionWithForfaitHistory(clientNumber);
     
     if (!consumptionAnalysis.hasData) {
-        content.innerHTML = `<div style="text-align: center; padding: 30px; color: #94a3b8;">Aucune donnée de consommation ou historique de forfait pour ce client</div>`;
-    } else {
-        // Carte de synthèse
-        const summaryCard = document.createElement('div');
-        summaryCard.style.cssText = `
-            background: linear-gradient(135deg, #f0f9ff 0%, #e6f7ff 100%);
+        content.innerHTML = `<div style="text-align: center; padding: 50px; color: #94a3b8; background: #f8fafc; border-radius: 12px;">Aucune donnée de consommation pour ce client</div>`;
+        analysisDiv.appendChild(content);
+        return analysisDiv;
+    }
+    
+    // Vérifier s'il y a eu des changements de forfait
+    const hasForfaitChanges = consumptionAnalysis.forfaitHistory && consumptionAnalysis.forfaitHistory.length > 1;
+    
+    if (hasForfaitChanges) {
+        // Afficher un message indiquant qu'il y a eu des changements
+        const changeMessage = document.createElement('div');
+        changeMessage.style.cssText = `
+            background: #fef3c7;
+            border: 2px solid #f59e0b;
             border-radius: 12px;
-            padding: 20px;
-            margin-bottom: 20px;
-            border: 1px solid #bae6fd;
+            padding: 15px 20px;
+            margin-bottom: 25px;
             display: flex;
-            justify-content: space-between;
             align-items: center;
+            gap: 15px;
+        `;
+        changeMessage.innerHTML = `
+            <span style="font-size: 28px;">🔄</span>
+            <div>
+                <div style="font-weight: 700; color: #92400e; font-size: 16px;">Changements de forfait détectés</div>
+                <div style="color: #854d0e; font-size: 13px;">Le client a changé de forfait ${consumptionAnalysis.forfaitHistory.length - 1} fois. Analyse séparée par période ci-dessous.</div>
+            </div>
+        `;
+        content.appendChild(changeMessage);
+    }
+    
+    // Analyser chaque forfait séparément
+    const forfaits = consumptionAnalysis.consumptionByForfait;
+    
+    // Trier les forfaits par date de début
+    const sortedForfaits = Object.values(forfaits).sort((a, b) => a.startDate - b.startDate);
+    
+    // Pour chaque forfait, créer une carte d'analyse
+    sortedForfaits.forEach((forfaitStats, index) => {
+        const isCurrent = forfaitStats.forfait === consumptionAnalysis.currentForfait?.forfait;
+        
+        // Calculer les taux de pourcentage
+        const totalDaysWithConsumption = forfaitStats.totalDays;
+        const daysWithoutConso = 0; // À calculer si nécessaire
+
+        // CORRECTION ICI : Recalculer daysBelow90 à partir des données disponibles
+        const daysAbove90 = forfaitStats.daysAbove90 || 0;
+        const daysBelow90 = totalDaysWithConsumption - daysAbove90; // 54 - 19 = 35
+
+        const percentAbove90 = totalDaysWithConsumption > 0 ? 
+            ((daysAbove90 / totalDaysWithConsumption) * 100).toFixed(1) : 0;
+        const percentBelow90 = totalDaysWithConsumption > 0 ? 
+            ((daysBelow90 / totalDaysWithConsumption) * 100).toFixed(1) : 0;
+
+        // Pour la répartition limites/tolérance
+        const daysInTolerance = forfaitStats.daysInTolerance || 0;
+        const daysOutTolerance = forfaitStats.daysAboveTolerance || 0;
+        const daysInLimits = totalDaysWithConsumption - (daysInTolerance + daysOutTolerance);
+
+        const percentInLimits = totalDaysWithConsumption > 0 ? 
+            ((daysInLimits / totalDaysWithConsumption) * 100).toFixed(1) : 0;
+        const percentInTolerance = totalDaysWithConsumption > 0 ? 
+            ((daysInTolerance / totalDaysWithConsumption) * 100).toFixed(1) : 0;
+        const percentOutTolerance = totalDaysWithConsumption > 0 ? 
+            ((daysOutTolerance / totalDaysWithConsumption) * 100).toFixed(1) : 0;
+        
+        // Formater les dates
+        const startDateStr = forfaitStats.startDate.toLocaleDateString('fr-FR', {
+            day: '2-digit', month: '2-digit', year: 'numeric'
+        });
+        const endDateStr = forfaitStats.endDate.toLocaleDateString('fr-FR', {
+            day: '2-digit', month: '2-digit', year: 'numeric'
+        });
+        
+        // Créer la carte pour ce forfait
+        const forfaitCard = document.createElement('div');
+        forfaitCard.style.cssText = `
+            background: white;
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 25px;
+            border: 2px solid ${isCurrent ? '#22c55e' : '#e2e8f0'};
+            box-shadow: ${isCurrent ? '0 8px 20px rgba(34, 197, 94, 0.15)' : '0 4px 12px rgba(0,0,0,0.05)'};
+            position: relative;
+        `;
+        
+        // Badge "ACTUEL" si c'est le forfait courant
+        if (isCurrent) {
+            const currentBadge = document.createElement('div');
+            currentBadge.style.cssText = `
+                position: absolute;
+                top: -10px;
+                right: 20px;
+                background: #22c55e;
+                color: white;
+                padding: 5px 20px;
+                border-radius: 30px;
+                font-weight: 700;
+                font-size: 14px;
+                box-shadow: 0 4px 10px rgba(34, 197, 94, 0.3);
+            `;
+            currentBadge.textContent = '✅ FORFAIT ACTUEL';
+            forfaitCard.appendChild(currentBadge);
+        }
+        
+        // En-tête du forfait
+        const forfaitHeader = document.createElement('div');
+        forfaitHeader.style.cssText = `
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #e2e8f0;
             flex-wrap: wrap;
             gap: 15px;
         `;
         
-        const above90Color = consumptionAnalysis.percentAbove90 >= 50 ? '#ef4444' : 
-                            consumptionAnalysis.percentAbove90 >= 30 ? '#f59e0b' : '#22c55e';
-        
-        summaryCard.innerHTML = `
-            <div>
-                <div style="font-size: 14px; color: #0369a1; margin-bottom: 5px;">📊 Analyse sur ${consumptionAnalysis.totalDays} jours</div>
-                <div style="display: flex; align-items: center; gap: 20px; flex-wrap: wrap;">
-                    <div>
-                        <div style="font-size: 12px; color: #475569;">Jours >90% forfait</div>
-                        <div style="font-size: 28px; font-weight: 700; color: ${above90Color};">${consumptionAnalysis.daysAbove90Percent}</div>
-                    </div>
-                    <div>
-                        <div style="font-size: 12px; color: #475569;">Jours ≤90% forfait</div>
-                        <div style="font-size: 28px; font-weight: 700; color: #22c55e;">${consumptionAnalysis.daysBelow90Percent}</div>
-                    </div>
+        forfaitHeader.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 15px;">
+                <div style="background: ${isCurrent ? '#22c55e' : '#9f7aea'}; width: 50px; height: 50px; border-radius: 12px; display: flex; align-items: center; justify-content: center;">
+                    <span style="font-size: 24px; color: white;">📦</span>
+                </div>
+                <div>
+                    <div style="font-size: 20px; font-weight: 800; color: ${isCurrent ? '#22c55e' : '#9f7aea'};">${forfaitStats.forfait}</div>
+                    <div style="font-size: 13px; color: #64748b;">Code ${forfaitStats.forfaitCode} · Limite: ${forfaitStats.baseMax}Wh · Tolérance: ${forfaitStats.maxWithTolerance}Wh</div>
                 </div>
             </div>
-            <div style="text-align: center;">
-                <div style="font-size: 12px; color: #475569; margin-bottom: 5px;">Taux de dépassement</div>
-                <div style="position: relative; width: 100px; height: 100px;">
-                    <svg viewBox="0 0 36 36" style="width: 100px; height: 100px;">
-                        <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="#e2e8f0" stroke-width="3" />
-                        <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="${above90Color}" stroke-width="3" stroke-dasharray="${consumptionAnalysis.percentAbove90}, 100" />
-                    </svg>
-                    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 18px; font-weight: 700; color: ${above90Color};">${consumptionAnalysis.percentAbove90}%</div>
-                </div>
+            <div style="display: flex; align-items: center; gap: 15px;">
+                <span style="background: #f1f5f9; padding: 8px 16px; border-radius: 30px; font-size: 13px;">
+                    📅 ${startDateStr} → ${endDateStr}
+                </span>
+                <span style="background: #f1f5f9; padding: 8px 16px; border-radius: 30px; font-size: 13px;">
+                    📊 ${forfaitStats.totalDays} jours analysés
+                </span>
             </div>
         `;
-        content.appendChild(summaryCard);
         
-        // Carte de tolérance
-        const toleranceCard = document.createElement('div');
-        toleranceCard.style.cssText = `
-            background: white;
-            border-radius: 10px;
-            padding: 15px;
-            margin-bottom: 20px;
-            border: 1px solid #e2e8f0;
+        forfaitCard.appendChild(forfaitHeader);
+        
+        // Première ligne : 4 indicateurs clés
+        const row1 = document.createElement('div');
+        row1.style.cssText = `
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
+            grid-template-columns: repeat(4, 1fr);
             gap: 15px;
+            margin-bottom: 25px;
         `;
-
-        toleranceCard.innerHTML = `
-            <div style="text-align: center;">
-                <div style="font-size: 12px; color: #64748b; margin-bottom: 5px;">✅ Dans les limites</div>
-                <div style="font-size: 24px; font-weight: 700; color: #22c55e;">${consumptionAnalysis.percentAbove90}%</div>
-                <div style="font-size: 11px; color: #64748b;">${consumptionAnalysis.daysBelow90Percent} jours</div>
+        
+        row1.innerHTML = `
+            <!-- Énergie max -->
+            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 16px; padding: 18px; color: white;">
+                <div style="font-size: 13px; opacity: 0.9; margin-bottom: 8px;">⚡ Énergie max (Wh)</div>
+                <div style="font-size: 32px; font-weight: 800; margin-bottom: 5px;">${forfaitStats.maxConsumption.toFixed(1)}</div>
+                <div style="font-size: 12px; opacity: 0.8;">le ${forfaitStats.endDate.toLocaleDateString('fr-FR')}</div>
             </div>
-            <div style="text-align: center;">
-                <div style="font-size: 12px; color: #64748b; margin-bottom: 5px;">🟡 Dans tolérance 15%</div>
-                <div style="font-size: 24px; font-weight: 700; color: #eab308;">${consumptionAnalysis.percentInTolerance}%</div>
-                <div style="font-size: 11px; color: #64748b;">${consumptionAnalysis.daysInTolerance} jours</div>
+            
+            <!-- Énergie moyenne -->
+            <div style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); border-radius: 16px; padding: 18px; color: white;">
+                <div style="font-size: 13px; opacity: 0.9; margin-bottom: 8px;">📊 Énergie moyenne (Wh)</div>
+                <div style="font-size: 32px; font-weight: 800; margin-bottom: 5px;">${forfaitStats.avgConsumption}</div>
+                <div style="font-size: 12px; opacity: 0.8;">sur ${forfaitStats.totalDays} jours</div>
             </div>
-            <div style="text-align: center;">
-                <div style="font-size: 12px; color: #64748b; margin-bottom: 5px;">🔴 Hors tolérance</div>
-                <div style="font-size: 24px; font-weight: 700; color: #ef4444;">${consumptionAnalysis.percentAboveTolerance}%</div>
-                <div style="font-size: 11px; color: #64748b;">${consumptionAnalysis.daysAboveTolerance} jours</div>
+            
+            <!-- Jours sans conso -->
+            <div style="background: linear-gradient(135deg, #94a3b8 0%, #64748b 100%); border-radius: 16px; padding: 18px; color: white;">
+                <div style="font-size: 13px; opacity: 0.9; margin-bottom: 8px;">⭕ Jours sans conso</div>
+                <div style="font-size: 32px; font-weight: 800; margin-bottom: 5px;">0</div>
+                <div style="font-size: 12px; opacity: 0.8;">Non calculé</div>
+            </div>
+            
+            <!-- Jours avec conso -->
+            <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 16px; padding: 18px; color: white;">
+                <div style="font-size: 13px; opacity: 0.9; margin-bottom: 8px;">✅ Jours avec conso</div>
+                <div style="font-size: 32px; font-weight: 800; margin-bottom: 5px;">${forfaitStats.totalDays}</div>
+                <div style="font-size: 12px; opacity: 0.8;">100% du temps</div>
             </div>
         `;
-        content.appendChild(toleranceCard);
         
-        // ✅ NOUVEAU : TABLEAU DES ÉVÉNEMENTS PAR CLIENT (SuspendP et SuspendE)
-        if (combinedEventData.length > 0) {
-            const eventsTable = createClientEventsTable(clientNumber);
-            content.appendChild(eventsTable);
-        }
+        forfaitCard.appendChild(row1);
         
-        // ✅ ANALYSE DES CHANGEMENTS DE FORFAIT
-        if (consumptionAnalysis.forfaitComparisons && consumptionAnalysis.forfaitComparisons.length > 0) {
-            const comparisonSection = document.createElement('div');
-            comparisonSection.style.cssText = `
-                background: white;
-                border-radius: 12px;
-                padding: 20px;
-                margin-bottom: 20px;
-                border: 2px solid #e2e8f0;
-                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-            `;
-            
-            comparisonSection.innerHTML = `
-                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid #e2e8f0;">
-                    <span style="font-size: 24px;">🔄</span>
-                    <span style="font-weight: 700; color: #1e293b; font-size: 16px;">Impact des changements de forfait</span>
-                </div>
-            `;
-            
-            consumptionAnalysis.forfaitComparisons.forEach((comparison, index) => {
-                const changeDateStr = comparison.changeDate.toLocaleDateString('fr-FR', {
-                    day: '2-digit', month: '2-digit', year: 'numeric'
-                });
-                
-                const card = document.createElement('div');
-                card.style.cssText = `
-                    background: ${comparison.stillProblematic ? '#fef2f2' : '#f0fdf4'};
-                    border-radius: 10px;
-                    padding: 15px;
-                    margin-bottom: 15px;
-                    border-left: 6px solid ${comparison.statusColor};
-                    border: 1px solid ${comparison.statusColor}30;
-                `;
-                
-                card.innerHTML = `
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 10px;">
-                        <div style="display: flex; align-items: center; gap: 15px;">
-                            <span style="background: ${comparison.statusColor}; color: white; padding: 5px 15px; border-radius: 30px; font-size: 13px; font-weight: 600;">
-                                ${comparison.statusIcon} ${changeDateStr}
-                            </span>
-                            <span style="font-weight: 600;">
-                                <span style="color: #f97316;">${comparison.oldForfait}</span> 
-                                <span style="color: #64748b;"> → </span> 
-                                <span style="color: #22c55e;">${comparison.newForfait}</span>
-                            </span>
-                        </div>
-                        <span style="background: ${comparison.statusColor}20; color: ${comparison.statusColor}; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600;">
-                            ${comparison.status}
-                        </span>
-                    </div>
-                    
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 10px;">
-                        <!-- Ancien forfait -->
-                        <div style="background: #fff7ed; padding: 12px; border-radius: 8px;">
-                            <div style="font-size: 12px; color: #9a3412; margin-bottom: 5px;">AVANT - ${comparison.oldForfait}</div>
-                            <div style="font-size: 11px; color: #64748b; margin-bottom: 5px;">
-                                Limite: ${comparison.oldStats.baseMax} Wh | Avec tolérance: ${comparison.oldStats.maxWithTolerance} Wh
-                            </div>
-                            <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
-                                <span style="font-size: 11px; color: #64748b;">Jours >90%:</span>
-                                <span style="font-weight: 700; color: #f97316;">${comparison.oldStats.above90} (${comparison.oldStats.percentAbove90}%)</span>
-                            </div>
-                            <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
-                                <span style="font-size: 11px; color: #64748b;">Dans tolérance:</span>
-                                <span style="font-weight: 700; color: #eab308;">${comparison.oldStats.inTolerance || 0} (${comparison.oldStats.percentInTolerance || 0}%)</span>
-                            </div>
-                            <div style="display: flex; justify-content: space-between;">
-                                <span style="font-size: 11px; color: #64748b;">Hors tolérance:</span>
-                                <span style="font-weight: 700; color: #ef4444;">${comparison.oldStats.aboveTolerance} (${comparison.oldStats.percentAboveTolerance}%)</span>
-                            </div>
-                            <div style="display: flex; justify-content: space-between; margin-top: 5px;">
-                                <span style="font-size: 11px; color: #64748b;">Max atteint:</span>
-                                <span style="font-weight: 700;">${comparison.oldStats.maxConsumption.toFixed(1)} Wh</span>
-                            </div>
-                        </div>
-                        
-                        <!-- Nouveau forfait -->
-                        <div style="background: ${comparison.stillProblematic ? '#fee2e2' : '#f0fdf4'}; padding: 12px; border-radius: 8px;">
-                            <div style="font-size: 12px; color: ${comparison.stillProblematic ? '#991b1b' : '#166534'}; margin-bottom: 5px;">APRÈS - ${comparison.newForfait}</div>
-                            <div style="font-size: 11px; color: #64748b; margin-bottom: 5px;">
-                                Limite: ${comparison.newStats.baseMax} Wh | Avec tolérance: ${comparison.newStats.maxWithTolerance} Wh
-                            </div>
-                            <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
-                                <span style="font-size: 11px; color: #64748b;">Jours >90%:</span>
-                                <span style="font-weight: 700; color: ${comparison.newStats.percentAbove90 > 30 ? '#ef4444' : '#22c55e'};">${comparison.newStats.above90} (${comparison.newStats.percentAbove90}%)</span>
-                            </div>
-                            <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
-                                <span style="font-size: 11px; color: #64748b;">Dans tolérance:</span>
-                                <span style="font-weight: 700; color: #eab308;">${comparison.newStats.inTolerance || 0} (${comparison.newStats.percentInTolerance || 0}%)</span>
-                            </div>
-                            <div style="display: flex; justify-content: space-between;">
-                                <span style="font-size: 11px; color: #64748b;">Hors tolérance:</span>
-                                <span style="font-weight: 700; color: #ef4444;">${comparison.newStats.aboveTolerance} (${comparison.newStats.percentAboveTolerance}%)</span>
-                            </div>
-                            <div style="display: flex; justify-content: space-between; margin-top: 5px;">
-                                <span style="font-size: 11px; color: #64748b;">Max atteint:</span>
-                                <span style="font-weight: 700;">${comparison.newStats.maxConsumption.toFixed(1)} Wh</span>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Conclusion -->
-                    <div style="margin-top: 15px; padding: 10px; background: white; border-radius: 6px; border-left: 4px solid ${comparison.statusColor};">
-                        <div style="display: flex; align-items: center; gap: 8px;">
-                            <span style="font-size: 16px;">${comparison.statusIcon}</span>
-                            <span style="font-size: 12px; color: #334155;">
-                                <strong>Conclusion :</strong> 
-                                ${comparison.improvement ? 
-                                    `Le passage au forfait <strong>${comparison.newForfait}</strong> a <strong style="color: #22c55e;">réduit les dépassements de ${Math.abs(comparison.diffAboveTolerance)} points</strong> (${comparison.percentReduction}%).` : 
-                                    `Le changement de forfait <strong style="color: #ef4444;">n'a pas résolu le problème</strong> de dépassement.`
-                                }
-                                ${parseFloat(comparison.newStats.percentAboveTolerance) > 0 ? 
-                                    ` <span style="color: #ef4444;">⚠️ Le client dépasse encore la tolérance dans ${comparison.newStats.percentAboveTolerance}% des cas.</span>` : 
-                                    ` <span style="color: #22c55e;">✅ Le client ne dépasse jamais la tolérance.</span>`
-                                }
-                            </span>
-                        </div>
-                    </div>
-                `;
-                
-                comparisonSection.appendChild(card);
-            });
-            
-            content.appendChild(comparisonSection);
-        }
-
-        // ✅ SITUATION ACTUELLE
-        if (consumptionAnalysis.currentForfait && consumptionAnalysis.currentStats) {
-            const currentSituationCard = document.createElement('div');
-            currentSituationCard.style.cssText = `
-                background: ${consumptionAnalysis.currentSituationColor}10;
-                border-radius: 10px;
-                padding: 15px;
-                margin-bottom: 20px;
-                border: 2px solid ${consumptionAnalysis.currentSituationColor};
-                display: flex;
-                align-items: center;
-                gap: 15px;
-            `;
-            
-            currentSituationCard.innerHTML = `
-                <div style="background: ${consumptionAnalysis.currentSituationColor}; width: 50px; height: 50px; border-radius: 25px; display: flex; align-items: center; justify-content: center;">
-                    <span style="font-size: 24px; color: white;">
-                        ${consumptionAnalysis.currentSituationColor === '#22c55e' ? '✅' : 
-                        consumptionAnalysis.currentSituationColor === '#eab308' ? '⚠️' : 
-                        consumptionAnalysis.currentSituationColor === '#f97316' ? '🔴' : '⛔'}
-                    </span>
+        // Deuxième ligne : >90% et ≤90%
+        const row2 = document.createElement('div');
+        row2.style.cssText = `
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 25px;
+        `;
+        
+        row2.innerHTML = `
+            <!-- >90% du forfait -->
+            <div style="background: linear-gradient(135deg, #fee2e2 0%, #ffffff 100%); border-radius: 16px; padding: 18px; border: 2px solid #ef4444; display: flex; align-items: center; gap: 15px;">
+                <div style="width: 50px; height: 50px; background: #ef4444; border-radius: 12px; display: flex; align-items: center; justify-content: center;">
+                    <span style="font-size: 24px; color: white;">⚡</span>
                 </div>
                 <div style="flex: 1;">
-                    <div style="font-weight: 700; color: ${consumptionAnalysis.currentSituationColor}; margin-bottom: 5px;">
-                        Situation actuelle avec ${consumptionAnalysis.currentForfait.forfait}
+                    <div style="font-size: 13px; color: #991b1b; font-weight: 600; margin-bottom: 5px;">>90% du forfait</div>
+                    <div style="display: flex; align-items: baseline; gap: 8px;">
+                        <span style="font-size: 28px; font-weight: 800; color: #dc2626;">${forfaitStats.daysAbove90}</span>
+                        <span style="font-size: 16px; color: #64748b;">jours</span>
                     </div>
-                    <div style="color: #334155; font-size: 13px;">
-                        ${consumptionAnalysis.currentSituation}
-                    </div>
-                    <div style="display: flex; gap: 20px; margin-top: 10px;">
-                        <div><span style="color: #64748b;">Jours analysés:</span> <strong>${consumptionAnalysis.currentStats.totalDays}</strong></div>
-                        <div><span style="color: #64748b;">>90%:</span> <strong style="color: ${consumptionAnalysis.currentStats.percentAbove90 > 30 ? '#ef4444' : '#22c55e'};">${consumptionAnalysis.currentStats.percentAbove90}%</strong></div>
-                        <div><span style="color: #64748b;">Max:</span> <strong>${consumptionAnalysis.currentStats.maxConsumption.toFixed(1)} Wh</strong></div>
-                    </div>
+                    <div style="font-size: 12px; color: #b91c1c;">${percentAbove90}% des jours</div>
                 </div>
-            `;
+            </div>
             
-            content.appendChild(currentSituationCard);
-        }
+            <!-- ≤90% du forfait -->
+            <div style="background: linear-gradient(135deg, #dcfce7 0%, #ffffff 100%); border-radius: 16px; padding: 18px; border: 2px solid #22c55e; display: flex; align-items: center; gap: 15px;">
+                <div style="width: 50px; height: 50px; background: #22c55e; border-radius: 12px; display: flex; align-items: center; justify-content: center;">
+                    <span style="font-size: 24px; color: white;">✅</span>
+                </div>
+                <div style="flex: 1;">
+                    <div style="font-size: 13px; color: #166534; font-weight: 600; margin-bottom: 5px;">≤90% du forfait</div>
+                    <div style="display: flex; align-items: baseline; gap: 8px;">
+                        <span style="font-size: 28px; font-weight: 800; color: #16a34a;">${daysBelow90}</span>
+                        <span style="font-size: 16px; color: #64748b;">jours</span>
+                    </div>
+                    <div style="font-size: 12px; color: #15803d;">${percentBelow90}% des jours</div>
+                </div>
+            </div>
+        `;
         
-        // Analyse par forfait
-        if (Object.keys(consumptionAnalysis.consumptionByForfait).length > 0) {
-            const forfaitSection = document.createElement('div');
-            forfaitSection.style.cssText = `
-                background: #f8fafc;
-                border-radius: 10px;
-                padding: 15px;
-                margin-bottom: 20px;
-                border: 1px solid #e2e8f0;
-            `;
-            
-            forfaitSection.innerHTML = `
-                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 15px;">
-                    <span style="font-size: 20px;">📦</span>
-                    <span style="font-weight: 600; color: #334155;">Analyse par forfait</span>
-                </div>
-            `;
-            
-            // Tableau des forfaits
-            const tableHTML = `
-                <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
-                    <thead>
-                        <tr style="background: #f1f5f9;">
-                            <th style="padding: 8px; text-align: left;">Forfait</th>
-                            <th style="padding: 8px; text-align: center;">Jours</th>
-                            <th style="padding: 8px; text-align: center;">>90%</th>
-                            <th style="padding: 8px; text-align: center;">≤90%</th>
-                            <th style="padding: 8px; text-align: center;">Max (Wh)</th>
-                            <th style="padding: 8px; text-align: center;">Moy (Wh)</th>
-                            <th style="padding: 8px; text-align: center;">Limite (Wh)</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${Object.values(consumptionAnalysis.consumptionByForfait).map((stats, index) => {
-                            const exceedPercent = stats.totalDays > 0 ? 
-                                ((stats.daysAbove90 / stats.totalDays) * 100).toFixed(1) : 0;
-                            const exceedColor = exceedPercent >= 50 ? '#ef4444' : 
-                                               exceedPercent >= 30 ? '#f59e0b' : '#22c55e';
-                            
-                            return `
-                                <tr style="border-bottom: 1px solid #e2e8f0; background: ${index % 2 === 0 ? '#ffffff' : '#fafbfc'};">
-                                    <td style="padding: 8px; font-weight: 600; color: #9f7aea;">${stats.forfait}</td>
-                                    <td style="padding: 8px; text-align: center;">${stats.totalDays}</td>
-                                    <td style="padding: 8px; text-align: center; color: ${exceedColor}; font-weight: 600;">${stats.daysAbove90} (${exceedPercent}%)</td>
-                                    <td style="padding: 8px; text-align: center; color: #22c55e;">${stats.daysBelow90}</td>
-                                    <td style="padding: 8px; text-align: center;">${stats.maxConsumption.toFixed(1)}</td>
-                                    <td style="padding: 8px; text-align: center;">${stats.avgConsumption}</td>
-                                    <td style="padding: 8px; text-align: center; background: #f1f5f9; font-weight: 600;">${stats.limits.max}</td>
-                                </tr>
-                            `;
-                        }).join('')}
-                    </tbody>
-                </table>
-            `;
-            
-            forfaitSection.innerHTML += tableHTML;
-            content.appendChild(forfaitSection);
-        }
+        forfaitCard.appendChild(row2);
         
-        // Historique des forfaits
-        if (consumptionAnalysis.forfaitHistory.length > 0) {
-            const historySection = document.createElement('div');
-            historySection.style.cssText = `
-                background: #f8fafc;
-                border-radius: 10px;
-                padding: 15px;
-                margin-bottom: 20px;
-                border: 1px solid #e2e8f0;
-            `;
-            
-            let historyHTML = `
-                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 15px;">
-                    <span style="font-size: 20px;">📅</span>
-                    <span style="font-weight: 600; color: #334155;">Historique des forfaits</span>
-                </div>
-                <div style="display: flex; flex-direction: column; gap: 10px;">
-            `;
-            
-            consumptionAnalysis.forfaitHistory.forEach((forfait, index) => {
-                const startStr = forfait.startDate.toLocaleDateString('fr-FR');
-                const endStr = forfait.endDate ? forfait.endDate.toLocaleDateString('fr-FR') : 'Actuel';
-                const limits = getForfaitLimits(forfait.forfait);
-                
-                historyHTML += `
-                    <div style="display: flex; align-items: center; gap: 10px; padding: 10px; background: white; border-radius: 8px; border-left: 4px solid ${forfait.isCurrent ? '#22c55e' : '#94a3b8'};">
-                        <span style="background: ${forfait.isCurrent ? '#22c55e20' : '#f1f5f9'}; padding: 5px 10px; border-radius: 20px; font-weight: 600; color: ${forfait.isCurrent ? '#22c55e' : '#475569'};">
-                            ${forfait.forfait}
-                        </span>
-                        <span style="color: #64748b; font-size: 11px;">
-                            ${startStr} → ${endStr}
-                        </span>
-                        <span style="margin-left: auto; background: #f1f5f9; padding: 3px 8px; border-radius: 4px; font-size: 11px;">
-                            Max: ${limits.max} Wh
-                        </span>
-                    </div>
-                `;
-            });
-            
-            historyHTML += `</div>`;
-            historySection.innerHTML = historyHTML;
-            content.appendChild(historySection);
-        }
+        // Titre pour la section répartition
+        const repartitionTitle = document.createElement('div');
+        repartitionTitle.style.cssText = `
+            font-size: 16px;
+            font-weight: 700;
+            color: #0f172a;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        `;
+        repartitionTitle.innerHTML = `
+            <span style="font-size: 20px;">📈</span>
+            <span>Répartition par rapport au forfait (${forfaitStats.baseMax}Wh, tolérance ${forfaitStats.tolerancePercent}%)</span>
+        `;
+        forfaitCard.appendChild(repartitionTitle);
         
-        // Derniers jours d'analyse
-        if (consumptionAnalysis.daysAnalysis.length > 0) {
-            const recentDays = document.createElement('div');
-            recentDays.style.cssText = `
-                background: #f8fafc;
-                border-radius: 10px;
-                padding: 15px;
-                border: 1px solid #e2e8f0;
-            `;
+        // Barre de progression horizontale pour la répartition
+        const progressBar = document.createElement('div');
+        progressBar.style.cssText = `
+            margin-top: 15px;
+            margin-bottom: 25px;
+        `;
+
+        progressBar.innerHTML = `
+            <div style="display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 12px; color: #64748b;">
+                <span>Répartition de la consommation (sur les jours avec conso)</span>
+                <span>${forfaitStats.totalDays} jours</span>
+            </div>
             
-            let daysHTML = `
-                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 15px;">
-                    <span style="font-size: 20px;">📋</span>
-                    <span style="font-weight: 600; color: #334155;">30 derniers jours d'analyse</span>
+            <!-- Barre de progression avec 3 segments -->
+            <div style="background: #f1f5f9; border-radius: 30px; height: 40px; overflow: hidden; display: flex; box-shadow: inset 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 15px;">
+                <!-- Dans les limites (vert) -->
+                <div style="width: ${percentInLimits}%; height: 100%; background: #22c55e; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; color: white;">
+                    ${percentInLimits > 5 ? percentInLimits + '%' : ''}
                 </div>
-                <div style="max-height: 200px; overflow-y: auto;">
-                    <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
-                        <thead style="position: sticky; top: 0; background: #f1f5f9;">
-                            <tr>
-                                <th style="padding: 6px; text-align: left;">Date</th>
-                                <th style="padding: 6px; text-align: center;">Forfait</th>
-                                <th style="padding: 6px; text-align: right;">Conso (Wh)</th>
-                                <th style="padding: 6px; text-align: right;">% base</th>
-                                <th style="padding: 6px; text-align: right;">% tolérance</th>
-                                <th style="padding: 6px; text-align: center;">Statut</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-            `;
+                <!-- Dans la tolérance (orange) -->
+                <div style="width: ${percentInTolerance}%; height: 100%; background: #f59e0b; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; color: white;">
+                    ${percentInTolerance > 5 ? percentInTolerance + '%' : ''}
+                </div>
+                <!-- Hors tolérance (rouge) -->
+                <div style="width: ${percentOutTolerance}%; height: 100%; background: #ef4444; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; color: white;">
+                    ${percentOutTolerance > 5 ? percentOutTolerance + '%' : ''}
+                </div>
+            </div>
             
-            consumptionAnalysis.daysAnalysis.forEach((day, index) => {
-                // Déterminer la couleur et le texte du statut
-                let statusColor = '#22c55e';
-                let statusText = 'OK';
-                let statusBg = '#22c55e20';
+            <!-- Légende avec 3 catégories détaillées -->
+            <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 10px;">
+                <!-- Dans les limites -->
+                <div style="display: flex; align-items: center; gap: 8px; background: #f0fdf4; padding: 8px 12px; border-radius: 8px; border-left: 4px solid #22c55e;">
+                    <span style="width: 16px; height: 16px; background: #22c55e; border-radius: 4px;"></span>
+                    <span style="flex: 1; font-size: 13px; color: #166534;">
+                        <strong>${daysInLimits} jours</strong> (≤${forfaitStats.baseMax}Wh) · <strong>${percentInLimits}%</strong> 
+                        <span style="color: #22c55e; font-weight: 600;">(Normal)</span>
+                    </span>
+                </div>
                 
-                if (day.isAboveTolerance) {
-                    statusColor = '#ef4444';
-                    statusText = '>115%';
-                    statusBg = '#ef444420';
-                } else if (day.isInTolerance) {
-                    statusColor = '#eab308';
-                    statusText = '100-115%';
-                    statusBg = '#eab30820';
-                } else if (day.isAbove90) {
-                    statusColor = '#f97316';
-                    statusText = '90-100%';
-                    statusBg = '#f9731620';
-                }
+                <!-- Dans la tolérance -->
+                <div style="display: flex; align-items: center; gap: 8px; background: #fef3c7; padding: 8px 12px; border-radius: 8px; border-left: 4px solid #f59e0b;">
+                    <span style="width: 16px; height: 16px; background: #f59e0b; border-radius: 4px;"></span>
+                    <span style="flex: 1; font-size: 13px; color: #92400e;">
+                        <strong>${daysInTolerance} jours</strong> (${forfaitStats.baseMax}-${forfaitStats.maxWithTolerance}Wh) · <strong>${percentInTolerance}%</strong>
+                        <span style="color: #f59e0b; font-weight: 600;">(Atteint la tolérance)</span>
+                    </span>
+                </div>
                 
-                daysHTML += `
-                    <tr style="border-bottom: 1px solid #e2e8f0; background: ${index % 2 === 0 ? '#ffffff' : '#fafbfc'};">
-                        <td style="padding: 6px;">${new Date(day.date).toLocaleDateString('fr-FR')}</td>
-                        <td style="padding: 6px; text-align: center;">
-                            <span style="background: #9f7aea20; padding: 2px 6px; border-radius: 12px; color: #9f7aea; font-size: 10px;">
-                                ${day.forfait}
-                            </span>
-                        </td>
-                        <td style="padding: 6px; text-align: right;">${day.consumption.toFixed(1)}</td>
-                        <td style="padding: 6px; text-align: right; font-weight: 600;">${day.percentOfBase}%</td>
-                        <td style="padding: 6px; text-align: right; color: #64748b;">${day.percentOfTotal}%</td>
-                        <td style="padding: 6px; text-align: center;">
-                            <span style="background: ${statusBg}; color: ${statusColor}; padding: 2px 8px; border-radius: 12px; font-weight: 600; font-size: 10px;">
-                                ${statusText}
-                            </span>
-                        </td>
-                    </tr>
-                `;
-            });
-            
-            daysHTML += `</tbody></table></div>`;
-            recentDays.innerHTML = daysHTML;
-            content.appendChild(recentDays);
-        }
-    }
+                <!-- Hors tolérance -->
+                <div style="display: flex; align-items: center; gap: 8px; background: #fee2e2; padding: 8px 12px; border-radius: 8px; border-left: 4px solid #ef4444;">
+                    <span style="width: 16px; height: 16px; background: #ef4444; border-radius: 4px;"></span>
+                    <span style="flex: 1; font-size: 13px; color: #991b1b;">
+                        <strong>${daysOutTolerance} jours</strong> (>${forfaitStats.maxWithTolerance}Wh) · <strong>${percentOutTolerance}%</strong>
+                        <span style="color: #ef4444; font-weight: 600;">(Hors tolérance)</span>
+                    </span>
+                </div>
+            </div>
+        `;
+
+        forfaitCard.appendChild(progressBar);
+        
+        content.appendChild(forfaitCard);
+    });
     
     analysisDiv.appendChild(content);
     return analysisDiv;
 }
+// Fonction pour dessiner les cercles de progression
+function drawEnergyGauges(clientNumber, limits, tolerance, out) {
+    // Jauge limites (verte)
+    const canvasLimits = document.getElementById(`gauge-limits-${clientNumber}`);
+    if (canvasLimits) {
+        const ctx = canvasLimits.getContext('2d');
+        const centerX = 60;
+        const centerY = 60;
+        const radius = 50;
+        const startAngle = -Math.PI / 2;
+        const endAngle = startAngle + (limits / 100) * 2 * Math.PI;
+
+        ctx.clearRect(0, 0, 120, 120);
+        
+        // Fond
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
+        ctx.strokeStyle = '#e2e8f0';
+        ctx.lineWidth = 12;
+        ctx.stroke();
+
+        // Progression
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, radius, startAngle, endAngle);
+        ctx.strokeStyle = '#22c55e';
+        ctx.lineWidth = 12;
+        ctx.stroke();
+    }
+
+    // Jauge tolérance (orange)
+    const canvasTolerance = document.getElementById(`gauge-tolerance-${clientNumber}`);
+    if (canvasTolerance) {
+        const ctx = canvasTolerance.getContext('2d');
+        const centerX = 60;
+        const centerY = 60;
+        const radius = 50;
+        const startAngle = -Math.PI / 2;
+        const endAngle = startAngle + (tolerance / 100) * 2 * Math.PI;
+
+        ctx.clearRect(0, 0, 120, 120);
+        
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
+        ctx.strokeStyle = '#e2e8f0';
+        ctx.lineWidth = 12;
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, radius, startAngle, endAngle);
+        ctx.strokeStyle = '#f59e0b';
+        ctx.lineWidth = 12;
+        ctx.stroke();
+    }
+
+    // Jauge hors tolérance (rouge)
+    const canvasOut = document.getElementById(`gauge-out-${clientNumber}`);
+    if (canvasOut) {
+        const ctx = canvasOut.getContext('2d');
+        const centerX = 60;
+        const centerY = 60;
+        const radius = 50;
+        const startAngle = -Math.PI / 2;
+        const endAngle = startAngle + (out / 100) * 2 * Math.PI;
+
+        ctx.clearRect(0, 0, 120, 120);
+        
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
+        ctx.strokeStyle = '#e2e8f0';
+        ctx.lineWidth = 12;
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, radius, startAngle, endAngle);
+        ctx.strokeStyle = '#ef4444';
+        ctx.lineWidth = 12;
+        ctx.stroke();
+    }
+}
+
+//============================ANALYSE CREDIT ET RECHARGE=========================
 function createClientCreditAnalysis(clientNumber) {
     const analysisDiv = document.createElement('div');
     analysisDiv.style.cssText = `
@@ -8458,16 +9363,15 @@ function createClientCreditAnalysis(clientNumber) {
     
     const content = document.createElement('div');
     content.style.cssText = `padding: 20px;`;
-    
+
     // Analyser les données de solde (crédit)
     const creditData = combinedSoldeData.map(row => ({
         date: row['Date et Heure'],
         value: parseFloat(row[`Credit${clientNumber}`]) || 0
-    }));
+    })).filter(d => !isNaN(d.value) && d.value !== null);
     
     const totalDays = new Set(creditData.map(d => d.date.split(' ')[0])).size;
-    const daysWithCredit = creditData.filter(d => d.value > 0).length;
-    const daysWithoutCredit = totalDays - daysWithCredit;
+    const daysWithoutCredit = creditData.filter(d => d.value === 0).length;
     const maxCredit = creditData.length > 0 ? Math.max(...creditData.map(d => d.value)) : 0;
     
     // Analyser les données de recharge
@@ -8476,35 +9380,74 @@ function createClientCreditAnalysis(clientNumber) {
     if (totalDays === 0 && !rechargeAnalysis.hasData) {
         content.innerHTML = `<div style="text-align: center; padding: 30px; color: #94a3b8;">Aucune donnée de crédit ou recharge pour ce client</div>`;
     } else {
-        // Statistiques rapides (3 cards au lieu de 4)
-        const statsGrid = document.createElement('div');
-        statsGrid.style.cssText = `
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 15px;
+        // === SYNTHÈSE COMMERCIALE EN PHRASE (EN PREMIER) ===
+        const syntheseDiv = document.createElement('div');
+        syntheseDiv.style.cssText = `
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 16px;
+            padding: 20px 25px;
             margin-bottom: 25px;
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.3);
+            color: white;
+            font-size: 14px;
+            line-height: 1.6;
+            border: 1px solid rgba(255, 255, 255, 0.2);
         `;
-        
-        statsGrid.innerHTML = `
-            <div style="background: #fed7d7; padding: 15px; border-radius: 8px; text-align: center; border-left: 4px solid #ef4444;">
-                <div style="font-size: 11px; color: #991b1b; margin-bottom: 5px;">🚫 Jours sans crédit</div>
-                <div style="font-size: 28px; font-weight: 700; color: #ef4444;">${daysWithoutCredit}</div>
-                <div style="font-size: 10px; color: #991b1b;">sur ${totalDays} jours</div>
+
+        // Construire la phrase de synthèse commerciale
+        let syntheseText = `
+            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
+                <div style="background: rgba(255, 255, 255, 0.2); width: 40px; height: 40px; border-radius: 12px; display: flex; align-items: center; justify-content: center;">
+                    <span style="font-size: 22px;">📌</span>
+                </div>
+                <div>
+                    <div style="font-size: 12px; opacity: 0.9; margin-bottom: 2px;">Synthèse client</div>
+                    <div style="font-size: 20px; font-weight: 700;">Client ${clientNumber}</div>
+                </div>
             </div>
-            <div style="background: #dbeafe; padding: 15px; border-radius: 8px; text-align: center; border-left: 4px solid #3b82f6;">
-                <div style="font-size: 11px; color: #1e40af; margin-bottom: 5px;">💰 Crédit maximum</div>
-                <div style="font-size: 28px; font-weight: 700; color: #3b82f6;">${maxCredit.toFixed(2)}</div>
-                <div style="font-size: 10px; color: #1e40af;">jours de crédit</div>
-            </div>
-            <div style="background: #f0f9ff; padding: 15px; border-radius: 8px; text-align: center; border-left: 4px solid #0ea5e9;">
-                <div style="font-size: 11px; color: #0369a1; margin-bottom: 5px;">🔄 Total recharges</div>
-                <div style="font-size: 28px; font-weight: 700; color: #0ea5e9;">${rechargeAnalysis.totalRecharges}</div>
-                <div style="font-size: 10px; color: #0369a1;">opérations</div>
-            </div>
+            
+            <div style="font-size: 14px; margin-top: 5px;">
+                <span style="opacity: 0.9;">👉 </span>
+                <span>Ce client a eu <strong style="color: #fcd34d;">${daysWithoutCredit} jour(s) sans crédit</strong> sur ${totalDays} jours analysés, avec un crédit maximum de <strong>${maxCredit.toFixed(2)} jours</strong>.</span>
         `;
-        content.appendChild(statsGrid);
+
+        if (rechargeAnalysis.hasData) {
+            // Calculer l'habitude principale
+            const mainDays = rechargeAnalysis.purchaseDays.reduce((acc, item) => {
+                acc[item.days] = (acc[item.days] || 0) + 1;
+                return acc;
+            }, {});
+            
+            const mainHabit = Object.entries(mainDays)
+                .sort((a, b) => b[1] - a[1])[0];
+            
+            if (mainHabit) {
+                const percentage = (mainHabit[1] / rechargeAnalysis.purchaseDays.length * 100).toFixed(1);
+                syntheseText += `<br><br><span style="opacity: 0.9;">📱 </span>Il recharge généralement pour <strong style="color: #fcd34d;">${mainHabit[0]} jours</strong> (${percentage}% des ${rechargeAnalysis.totalRecharges} recharges).`;
+            }
+            
+            if (rechargeAnalysis.code4ValuesWithNames.length > 0) {
+                const forfaitNames = rechargeAnalysis.code4ValuesWithNames.map(f => f.name).join(' → ');
+                syntheseText += `<br><br><span style="opacity: 0.9;">📦 </span>Forfaits utilisés : <strong>${forfaitNames}</strong>`;
+                if (rechargeAnalysis.currentCode4Name) {
+                    syntheseText += ` (actuel : <strong style="color: #6ee7b7;">${rechargeAnalysis.currentCode4Name}</strong>)`;
+                }
+                syntheseText += `.`;
+            }
+        } else {
+            syntheseText += `<br><br><span style="opacity: 0.9;">⚠️ </span>Aucune donnée de recharge disponible pour ce client.`;
+        }
+
+        syntheseText += `</div>`;
+
+        syntheseDiv.innerHTML = syntheseText;
+        content.appendChild(syntheseDiv);
         
-        // ✅ ANALYSE DES POURCENTAGES DES JOURS ACHETÉS (CODE 3)
+        // === CARTE DES JOURS SANS CRÉDIT ===
+        const daysWithoutCreditCard = createDaysWithoutCreditCard(clientNumber);
+        content.appendChild(daysWithoutCreditCard);
+        
+        // === ANALYSE DES POURCENTAGES DES JOURS ACHETÉS (CODE 3) ===
         if (rechargeAnalysis.hasData && rechargeAnalysis.purchaseDays.length > 0) {
             // Calculer les pourcentages
             const totalPurchases = rechargeAnalysis.purchaseDays.length;
@@ -8587,13 +9530,13 @@ function createClientCreditAnalysis(clientNumber) {
             content.appendChild(percentageSection);
         }
         
-        // Section Code 4 (Forfaits) - Version avec noms
+        // === SECTION FORFAITS UTILISÉS ===
         if (rechargeAnalysis.hasData && rechargeAnalysis.code4ValuesWithNames.length > 0) {
             const code4Section = document.createElement('div');
             code4Section.style.cssText = `
                 background: #f8fafc;
-                border-radius: 10px;
-                padding: 15px;
+                border-radius: 12px;
+                padding: 20px;
                 margin-bottom: 20px;
                 border: 1px solid #e2e8f0;
             `;
@@ -8619,7 +9562,7 @@ function createClientCreditAnalysis(clientNumber) {
             code4Section.innerHTML = `
                 <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 15px;">
                     <span style="font-size: 20px;">📋</span>
-                    <span style="font-weight: 600; color: #334155;">Forfaits utilisés</span>
+                    <span style="font-weight: 700; color: #334155; font-size: 16px;">Forfaits utilisés</span>
                 </div>
                 <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 15px;">
                     ${badgesHtml}
@@ -8643,15 +9586,16 @@ function createClientCreditAnalysis(clientNumber) {
                 
                 let tableHTML = `
                     <div style="font-weight: 600; color: #334155; margin-bottom: 10px;">📅 Historique des changements de forfait :</div>
-                    <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
-                        <thead>
-                            <tr style="background: #f1f5f9;">
-                                <th style="padding: 8px; text-align: left;">Date</th>
-                                <th style="padding: 8px; text-align: center;">Ancien forfait</th>
-                                <th style="padding: 8px; text-align: center;">Nouveau forfait</th>
-                            </tr>
-                        </thead>
-                        <tbody>
+                    <div style="max-height: 200px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 8px;">
+                        <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
+                            <thead style="position: sticky; top: 0; background: #f1f5f9;">
+                                <tr>
+                                    <th style="padding: 8px; text-align: left;">Date</th>
+                                    <th style="padding: 8px; text-align: center;">Ancien forfait</th>
+                                    <th style="padding: 8px; text-align: center;">Nouveau forfait</th>
+                                </tr>
+                            </thead>
+                            <tbody>
                 `;
                 
                 rechargeAnalysis.code4Changes.forEach((change, index) => {
@@ -8674,7 +9618,7 @@ function createClientCreditAnalysis(clientNumber) {
                     }
                 });
                 
-                tableHTML += `</tbody></table>`;
+                tableHTML += `</tbody></table></div>`;
                 changesTable.innerHTML = tableHTML;
                 code4Section.appendChild(changesTable);
             }
@@ -8682,47 +9626,54 @@ function createClientCreditAnalysis(clientNumber) {
             content.appendChild(code4Section);
         }
         
-        // Tableau des recharges
+        // === TABLEAU DES RECHARGES ===
         if (rechargeAnalysis.hasData) {
             const rechargeTable = document.createElement('div');
             rechargeTable.style.cssText = `
-                margin-top: 20px;
+                margin-bottom: 20px;
                 border: 1px solid #e2e8f0;
-                border-radius: 8px;
+                border-radius: 12px;
                 overflow: hidden;
             `;
             
             const tableHeader = document.createElement('div');
             tableHeader.style.cssText = `
-                background: #f1f5f9;
-                padding: 10px 15px;
+                background: linear-gradient(135deg, #9f7aea 0%, #805ad5 100%);
+                color: white;
+                padding: 12px 20px;
                 font-weight: 600;
-                color: #334155;
                 display: flex;
                 justify-content: space-between;
                 align-items: center;
-                border-bottom: 1px solid #e2e8f0;
             `;
             tableHeader.innerHTML = `
-                <span>📋 Historique des recharges</span>
-                <span style="font-size: 11px; color: #64748b;">${rechargeAnalysis.totalRecharges} opération(s)</span>
+                <span style="display: flex; align-items: center; gap: 8px;">
+                    <span style="font-size: 18px;">⚡</span>
+                    Historique des recharges
+                </span>
+                <span style="background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 20px; font-size: 12px;">
+                    ${rechargeAnalysis.totalRecharges} opération(s)
+                </span>
             `;
             
             const tableWrapper = document.createElement('div');
             tableWrapper.style.cssText = `
-                max-height: 250px;
+                max-height: 350px;
                 overflow-y: auto;
+                overflow-x: auto;
+                background: white;
             `;
             
             let tableHTML = `
-                <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
-                    <thead style="position: sticky; top: 0; background: #f8fafc;">
-                        <tr>
-                            <th style="padding: 8px; text-align: left;">Date</th>
-                            <th style="padding: 8px; text-align: center;">Type</th>
-                            <th style="padding: 8px; text-align: center;">Code 3 (jours)</th>
-                            <th style="padding: 8px; text-align: center;">Forfait</th>
-                            <th style="padding: 8px; text-align: center;">Statut</th>
+                <table style="width: 100%; border-collapse: collapse; font-size: 12px; min-width: 900px;">
+                    <thead style="position: sticky; top: 0; background: #f8fafc; z-index: 10;">
+                        <tr style="border-bottom: 2px solid #e2e8f0;">
+                            <th style="padding: 12px 10px; text-align: left;">Date</th>
+                            <th style="padding: 12px 10px; text-align: center;">Code</th>
+                            <th style="padding: 12px 10px; text-align: center;">Type</th>
+                            <th style="padding: 12px 10px; text-align: center;">Code 3 (jours)</th>
+                            <th style="padding: 12px 10px; text-align: center;">Forfait</th>
+                            <th style="padding: 12px 10px; text-align: center;">Statut</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -8758,11 +9709,16 @@ function createClientCreditAnalysis(clientNumber) {
                 
                 tableHTML += `
                     <tr style="border-bottom: 1px solid #e2e8f0; background: ${index % 2 === 0 ? '#ffffff' : '#fafbfc'}; ${isCode4Change ? 'border-left: 3px solid #9f7aea;' : ''}">
-                        <td style="padding: 6px 8px;">${date}</td>
-                        <td style="padding: 6px 8px; text-align: center;">${type}</td>
-                        <td style="padding: 6px 8px; text-align: center; font-weight: 600; color: #f97316;">${code3}</td>
-                        <td style="padding: 6px 8px; text-align: center;">${code4Display}</td>
-                        <td style="padding: 6px 8px; text-align: center; color: ${statusColor};">${status}</td>
+                        <td style="padding: 10px; white-space: nowrap;">${date}</td>
+                        <td style="padding: 10px; text-align: center; font-family: monospace;">${row['Code enregistrer'] || '-'}</td>
+                        <td style="padding: 10px; text-align: center;">${type}</td>
+                        <td style="padding: 10px; text-align: center; font-weight: 600; color: #f97316;">${code3}</td>
+                        <td style="padding: 10px; text-align: center;">${code4Display}</td>
+                        <td style="padding: 10px; text-align: center;">
+                            <span style="background: ${statusColor}20; color: ${statusColor}; padding: 3px 10px; border-radius: 20px; font-weight: 600; font-size: 11px;">
+                                ${status}
+                            </span>
+                        </td>
                     </tr>
                 `;
             });
@@ -8774,54 +9730,285 @@ function createClientCreditAnalysis(clientNumber) {
             content.appendChild(rechargeTable);
         }
         
-        // Conclusion
-        const conclusionDiv = document.createElement('div');
-        conclusionDiv.style.cssText = `
-            margin-top: 20px;
-            padding: 15px;
-            background: #f8fafc;
-            border-radius: 8px;
-            font-size: 12px;
-            color: #475569;
-            border-left: 4px solid #9f7aea;
+        // === TABLEAU DES SOLDES ===
+        const soldeTable = document.createElement('div');
+        soldeTable.style.cssText = `
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            overflow: hidden;
+            margin-bottom: 20px;
         `;
-
-        let conclusionText = `
-            <span style="font-weight: 600;">📌 Synthèse :</span> 
-            Client ${clientNumber} : ${daysWithoutCredit} jour(s) sans crédit sur ${totalDays} jours. 
+        
+        const soldeHeader = document.createElement('div');
+        soldeHeader.style.cssText = `
+            background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+            color: white;
+            padding: 12px 20px;
+            font-weight: 600;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         `;
-
-        if (rechargeAnalysis.hasData) {
-            const mainDays = rechargeAnalysis.purchaseDays.reduce((acc, item) => {
-                acc[item.days] = (acc[item.days] || 0) + 1;
-                return acc;
-            }, {});
+        soldeHeader.innerHTML = `
+            <span style="display: flex; align-items: center; gap: 8px;">
+                <span style="font-size: 18px;">💰</span>
+                Historique des soldes (crédits)
+            </span>
+            <span style="background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 20px; font-size: 12px;">
+                ${creditData.length} relevé(s)
+            </span>
+        `;
+        
+        const soldeWrapper = document.createElement('div');
+        soldeWrapper.style.cssText = `
+            max-height: 350px;
+            overflow-y: auto;
+            overflow-x: auto;
+            background: white;
+        `;
+        
+        // Filtrer les données de solde pour ce client
+        const clientSoldeData = combinedSoldeData
+            .filter(row => {
+                const value = row[`Credit${clientNumber}`];
+                return value && value.toString().trim() !== '' && value.toString().trim() !== '-';
+            })
+            .sort((a, b) => new Date(b['Date et Heure']) - new Date(a['Date et Heure']));
+        
+        let soldeHTML = `
+            <table style="width: 100%; border-collapse: collapse; font-size: 12px; min-width: 400px;">
+                <thead style="position: sticky; top: 0; background: #f8fafc; z-index: 10;">
+                    <tr style="border-bottom: 2px solid #e2e8f0;">
+                        <th style="padding: 12px 10px; text-align: left;">Date</th>
+                        <th style="padding: 12px 10px; text-align: center;">Crédit (jours)</th>
+                        <th style="padding: 12px 10px; text-align: center;">Statut</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+        
+        clientSoldeData.forEach((row, index) => {
+            const date = row['Date et Heure'] || '-';
+            const value = parseFloat(row[`Credit${clientNumber}`]) || 0;
+            const bgColor = index % 2 === 0 ? '#ffffff' : '#fafbfc';
             
-            const mainHabit = Object.entries(mainDays)
-                .sort((a, b) => b[1] - a[1])[0];
-            
-            if (mainHabit) {
-                const percentage = (mainHabit[1] / rechargeAnalysis.purchaseDays.length * 100).toFixed(1);
-                conclusionText += ` Habitude de recharge : <strong>${mainHabit[0]} jours</strong> (${percentage}% des cas).`;
-            }
-        }
-
-        if (rechargeAnalysis.code4ValuesWithNames.length > 0) {
-            const forfaitNames = rechargeAnalysis.code4ValuesWithNames.map(f => f.name).join(', ');
-            conclusionText += ` Forfaits utilisés : ${forfaitNames}.`;
-            if (rechargeAnalysis.currentCode4Name) {
-                conclusionText += ` Forfait actuel : <strong>${rechargeAnalysis.currentCode4Name}</strong>.`;
-            }
-        }
-
-        conclusionDiv.innerHTML = conclusionText;
-        content.appendChild(conclusionDiv);
+            soldeHTML += `
+                <tr style="border-bottom: 1px solid #e2e8f0; background: ${bgColor};">
+                    <td style="padding: 10px; white-space: nowrap;">${date}</td>
+                    <td style="padding: 10px; text-align: center; font-weight: 600; color: ${value === 0 ? '#ef4444' : '#48bb78'};">${value}</td>
+                    <td style="padding: 10px; text-align: center;">
+                        ${value === 0 ? 
+                            '<span style="background: #ef444420; color: #ef4444; padding: 3px 10px; border-radius: 20px; font-size: 11px;">Sans crédit</span>' : 
+                            '<span style="background: #48bb7820; color: #48bb78; padding: 3px 10px; border-radius: 20px; font-size: 11px;">Crédit disponible</span>'}
+                    </td>
+                </tr>
+            `;
+        });
+        
+        soldeHTML += `</tbody></table>`;
+        soldeWrapper.innerHTML = soldeHTML;
+        soldeTable.appendChild(soldeHeader);
+        soldeTable.appendChild(soldeWrapper);
+        content.appendChild(soldeTable);
     }
     
     analysisDiv.appendChild(content);
     return analysisDiv;
 }
-// ==================== ANALYSE DES DÉPASSEMENTS DE TENSION À 14.2V/28V ====================
+// ==================== CARTE DES JOURS SANS CRÉDIT ====================
+function createDaysWithoutCreditCard(clientNumber) {
+    const analysis = analyzeDaysWithoutCredit(clientNumber);
+    
+    const card = document.createElement('div');
+    card.style.cssText = `
+        background: white;
+        border-radius: 16px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+        margin-bottom: 20px;
+        overflow: hidden;
+        border: 1px solid #e2e8f0;
+    `;
+    
+    // En-tête
+    const header = document.createElement('div');
+    header.style.cssText = `
+        background: linear-gradient(135deg, #f43f5e 0%, #e11d48 100%);
+        color: white;
+        padding: 15px 20px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 15px;
+    `;
+    
+    header.innerHTML = `
+        <div style="display: flex; align-items: center; gap: 12px;">
+            <span style="font-size: 24px;">🚫</span>
+            <div>
+                <span style="font-size: 16px; font-weight: 700;">Jours sans crédit</span>
+                <div style="font-size: 12px; opacity: 0.9;">Client ${clientNumber}</div>
+            </div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 15px;">
+            <span style="background: rgba(255,255,255,0.2); padding: 6px 15px; border-radius: 30px; font-size: 13px;">
+                📅 ${analysis.totalDaysWithoutCredit} jour(s) sans crédit
+            </span>
+            ${analysis.longestStreak > 0 ? `
+                <span style="background: rgba(255,255,255,0.2); padding: 6px 15px; border-radius: 30px; font-size: 13px;">
+                    🔴 Série max: ${analysis.longestStreak} jour(s)
+                </span>
+            ` : ''}
+        </div>
+    `;
+    
+    card.appendChild(header);
+    
+    if (!analysis.hasData) {
+        const noData = document.createElement('div');
+        noData.style.cssText = `
+            padding: 40px;
+            text-align: center;
+            color: #64748b;
+            background: #f8fafc;
+        `;
+        noData.innerHTML = `
+            <span style="font-size: 48px; display: block; margin-bottom: 15px;">✅</span>
+            <p style="margin: 0; font-size: 14px;">Aucun jour sans crédit détecté pour ce client</p>
+            <p style="margin-top: 8px; font-size: 12px;">Sur ${analysis.totalDays} jours analysés</p>
+        `;
+        card.appendChild(noData);
+        return card;
+    }
+    
+    const content = document.createElement('div');
+    content.style.cssText = `padding: 20px;`;
+    
+    // === LISTE DES JOURS SANS CRÉDIT ===
+    const tableContainer = document.createElement('div');
+    tableContainer.style.cssText = `
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        overflow: hidden;
+        margin-bottom: 20px;
+    `;
+    
+    const tableHeader = document.createElement('div');
+    tableHeader.style.cssText = `
+        background: #f1f5f9;
+        padding: 12px 15px;
+        font-weight: 600;
+        color: #334155;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-bottom: 1px solid #e2e8f0;
+    `;
+    tableHeader.innerHTML = `
+        <span>📋 Liste des jours sans crédit</span>
+        <span style="font-size: 11px; background: #e2e8f0; padding: 3px 10px; border-radius: 20px;">
+            ${analysis.daysWithoutCredit.length} entrée(s)
+        </span>
+    `;
+    
+    const tableWrapper = document.createElement('div');
+    tableWrapper.style.cssText = `
+        max-height: 250px;
+        overflow-y: auto;
+        overflow-x: auto;
+        background: white;
+    `;
+    
+    let tableHTML = `
+        <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
+            <thead style="position: sticky; top: 0; background: #f8fafc; z-index: 10;">
+                <tr style="border-bottom: 2px solid #e2e8f0;">
+                    <th style="padding: 10px; text-align: left;">Date</th>
+                    <th style="padding: 10px; text-align: center;">Heure</th>
+                    <th style="padding: 10px; text-align: center;">Crédit</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+    
+    analysis.daysWithoutCredit.slice(0, 50).forEach((day, index) => { // Limiter à 50 pour la performance
+        const bgColor = index % 2 === 0 ? '#ffffff' : '#fafbfc';
+        
+        tableHTML += `
+            <tr style="border-bottom: 1px solid #e2e8f0; background: ${bgColor};">
+                <td style="padding: 10px;">
+                    <div style="display: flex; flex-direction: column;">
+                        <span style="font-weight: 500;">${day.formattedDate}</span>
+                        <span style="font-size: 9px; color: #64748b;">${day.date}</span>
+                    </div>
+                </td>
+                <td style="padding: 10px; text-align: center; font-family: monospace;">${day.time}</td>
+                <td style="padding: 10px; text-align: center; font-weight: 700; color: #ef4444;">0</td>
+            </tr>
+        `;
+    });
+    
+    if (analysis.daysWithoutCredit.length > 50) {
+        tableHTML += `
+            <tr style="background: #f1f5f9;">
+                <td colspan="3" style="padding: 10px; text-align: center; font-style: italic; color: #64748b;">
+                    ... et ${analysis.daysWithoutCredit.length - 50} autre(s) jour(s) non affiché(s)
+                </td>
+            </tr>
+        `;
+    }
+    
+    tableHTML += `</tbody></table>`;
+    tableWrapper.innerHTML = tableHTML;
+    tableContainer.appendChild(tableHeader);
+    tableContainer.appendChild(tableWrapper);
+    content.appendChild(tableContainer);
+    
+    // === SÉRIES CONSÉCUTIVES (UNIQUEMENT > 1 JOUR) ===
+    if (analysis.consecutiveDays.length > 0) {
+        const streaksSection = document.createElement('div');
+        streaksSection.style.cssText = `
+            padding: 15px;
+            background: #f8fafc;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+        `;
+        
+        // Filtrer pour garder uniquement les séries > 1 jour
+        const significantStreaks = analysis.consecutiveDays.filter(group => group.length > 1);
+        
+        if (significantStreaks.length > 0) {
+            streaksSection.innerHTML = `
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+                    <span style="font-size: 18px;">🔗</span>
+                    <span style="font-weight: 600; color: #1e293b;">Séries consécutives sans crédit (>1 jour)</span>
+                </div>
+                <div style="display: flex; flex-wrap: wrap; gap: 10px;">
+                    ${significantStreaks.map((group, idx) => {
+                        const start = new Date(group[0].date).toLocaleDateString('fr-FR');
+                        const end = new Date(group[group.length - 1].date).toLocaleDateString('fr-FR');
+                        const isLongest = group.length === analysis.longestStreak;
+                        
+                        return `
+                            <div style="background: white; padding: 10px 15px; border-radius: 8px; border-left: 4px solid ${isLongest ? '#ef4444' : '#f97316'}; min-width: 180px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
+                                <div style="font-size: 11px; color: #64748b; margin-bottom: 4px;">Série ${idx + 1}</div>
+                                <div style="font-weight: 700; color: ${isLongest ? '#ef4444' : '#f97316'}; font-size: 18px;">${group.length} jour(s)</div>
+                                <div style="font-size: 11px; color: #475569; margin: 4px 0;">${start} → ${end}</div>
+                                ${isLongest ? '<span style="background: #ef4444; color: white; padding: 2px 10px; border-radius: 12px; font-size: 10px; display: inline-block; margin-top: 5px;">SÉRIE MAX</span>' : ''}
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            `;
+            
+            content.appendChild(streaksSection);
+        }
+    }
+    
+    card.appendChild(content);
+    return card;
+}
+// ==================== ANALYSE DES DÉPASSEMENTS DE TENSION À 14.0V/28V ====================
 
 function analyzeVoltageThresholdExceedances(tensionData, systemType = null) {
     if (!tensionData || tensionData.length === 0) {
@@ -8834,7 +10021,7 @@ function analyzeVoltageThresholdExceedances(tensionData, systemType = null) {
     }
     
     // Définir le seuil selon le système
-    const threshold = systemType === '24V' ? 28.0 : 14.2;
+    const threshold = systemType === '24V' ? 28.0 : 14.0;
     
     // Organiser les données par jour
     const dailyData = {};
@@ -9521,7 +10708,7 @@ function analyzeVoltageThresholdExceedances(tensionData) {
     const systemType = detectSystemType(tensionData);
     
     // Définir le seuil selon le système
-    const threshold = systemType === '24V' ? 28.0 : 14.2;
+    const threshold = systemType === '24V' ? 28.0 : 14.0;
     
     // Organiser les données par jour
     const dailyData = {};
@@ -9629,7 +10816,7 @@ function createCombinedTables() {
         cardTensionAnalysis.appendChild(cardTensionAnalysisContent);
         techniqueGrid.appendChild(cardTensionAnalysis);
 
-        // ✅ NOUVELLE CARD : TABLEAU DES DÉPASSEMENTS DE TENSION À 14.2V/28V
+        // ✅ NOUVELLE CARD : TABLEAU DES DÉPASSEMENTS DE TENSION À 14.0V/28V
         const cardVoltageThreshold = document.createElement('div');
         cardVoltageThreshold.id = 'card-voltage-threshold';
         cardVoltageThreshold.className = 'dashboard-card';
@@ -10195,7 +11382,53 @@ function displayFraudeAnalysis() {
     fraudeContent.appendChild(fraudeContainer);
 }
 ////////////////////////////////////////////////////////////////////////////
-
+// AJOUTER LES STYLES CSS
+function addCommercialStyles() {
+    if (document.querySelector('#commercial-styles')) return;
+    
+    const styles = document.createElement('style');
+    styles.id = 'commercial-styles';
+    styles.textContent = `
+        .commercial-summary-card {
+            animation: slideIn 0.5s ease;
+        }
+        
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .commercial-summary-card:hover {
+            box-shadow: 0 15px 35px rgba(0,0,0,0.12) !important;
+            transition: box-shadow 0.3s ease;
+        }
+        
+        @media (max-width: 768px) {
+            .commercial-summary-card > div:first-child {
+                flex-direction: column;
+                text-align: center;
+            }
+            
+            .commercial-summary-card > div:nth-child(2) {
+                grid-template-columns: repeat(2, 1fr) !important;
+            }
+            
+            .commercial-summary-card > div:nth-child(3) {
+                grid-template-columns: 1fr !important;
+            }
+        }
+    `;
+    
+    document.head.appendChild(styles);
+}
+// Appeler au chargement
+document.addEventListener('DOMContentLoaded', addCommercialStyles);
 // ==================== ANIMATIONS CSS ====================
 // Ajouter ces styles CSS au début du fichier ou dans la section des styles
 const style = document.createElement('style');

@@ -1466,12 +1466,46 @@ function displayClientData(clientId, clientData) {
 
     // Construction du HTML avec l'analyse commerciale en PREMIER
     contentElement.innerHTML = `
-        <div class="client-header">
-            <h3>${clientTitle} - Résumé Journalier</h3>
+        <!-- EN-TÊTE CLIENT AVEC DÉGRADÉ VIOLET ET EFFETS -->
+        <div class="client-header" style="background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 50%, #4c1d95 100%); border-radius: 20px; padding: 24px 28px; margin-bottom: 25px; box-shadow: 0 15px 30px rgba(109, 40, 217, 0.4); border: 1px solid #c4b5fd; color: white; position: relative; overflow: hidden;">
+            
+            <!-- Éléments décoratifs en arrière-plan -->
+            <div style="position: absolute; top: -20px; right: -20px; width: 150px; height: 150px; background: rgba(255,255,255,0.1); border-radius: 50%;"></div>
+            <div style="position: absolute; bottom: -30px; left: -30px; width: 180px; height: 180px; background: rgba(255,255,255,0.05); border-radius: 50%;"></div>
+            
+            <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 20px; position: relative; z-index: 2;">
+                <div style="display: flex; align-items: center; gap: 18px;">
+                    <div style="width: 64px; height: 64px; background: rgba(255,255,255,0.15); border-radius: 18px; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(8px); border: 2px solid rgba(255,255,255,0.4); box-shadow: 0 8px 16px rgba(0,0,0,0.2);">
+                        <span style="font-size: 32px;">👤</span>
+                    </div>
+                    <div>
+                        <h3 style="margin: 0; font-size: 28px; font-weight: 800; letter-spacing: -0.5px; text-shadow: 0 4px 8px rgba(0,0,0,0.3);">
+                            ${clientTitle}
+                        </h3>
+                        <div style="margin-top: 6px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                            <span style="font-size: 14px; background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 30px; backdrop-filter: blur(4px); display: flex; align-items: center; gap: 6px;">
+                                <span>📊</span> Résumé Journalier
+                            </span>
+                            <span style="font-size: 14px; background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 30px; backdrop-filter: blur(4px); display: flex; align-items: center; gap: 6px;">
+                                <span>⚡</span> Analyse complète
+                            </span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Badge avec le nombre de jours analysés (optionnel) -->
+                <div style="background: rgba(255,255,255,0.2); backdrop-filter: blur(8px); padding: 12px 20px; border-radius: 50px; border: 1px solid rgba(255,255,255,0.4); box-shadow: 0 4px 12px rgba(0,0,0,0.2);">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <span style="font-size: 20px;">📅</span>
+                        <div style="text-align: right;">
+                            <div style="font-size: 20px; font-weight: 800; line-height: 1.2;">${dailySummary.length || 0}</div>
+                            <div style="font-size: 11px; opacity: 0.8;">jours analysés</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
-        
-        ${commercialGlobalAnalysis}  <!-- ANALYSE COMMERCIALE TOUT EN HAUT -->
-        
+        ${commercialGlobalAnalysis}  <!-- CARTE D'ANALYSE DE CONSOMMATION PAR RAPPORT AU FORFAIT -->
         ${globalSummaryHTML}
         ${createClientDashboard(clientId)}
         ${createClientHourlyContinuousChart(clientId)}
@@ -3991,7 +4025,7 @@ function createStabilityChart(containerId, stabilityData, tensionResults) {
                 </div>
                 <div style="background: ${statusColor.bg}; border: 2px solid ${statusColor.border}; color: ${statusColor.text}; padding: 10px 16px; border-radius: 8px; text-align: center;">
                     <div style="font-size: 28px; font-weight: 700;">${stabilityPercentage}%</div>
-                    <div style="font-size: 11px; font-weight: 600; margin-top: 4px;">Stabilité Globale</div>
+                    <div style="font-size: 11px; font-weight: 600; margin-top: 4px;">Conformité Globale</div>
                 </div>
             </div>
 
@@ -4444,7 +4478,7 @@ function createNominalTensionTable(tensionResults, systemType, allDates) {
     }
 
     // Définir la tension nominale cible selon le système
-    const targetTension = systemType === '24V' ? 28.0 : 14.2;
+    const targetTension = systemType === '24V' ? 28.0 : 14.0;
     
     // Utiliser TOUTES les dates de la période filtrée
     const allDatesInPeriod = allDates || [];
@@ -5022,7 +5056,7 @@ function createNominalTensionTable(tensionResults, systemType, allDates) {
                     <div style="display: flex; align-items: center; gap: 8px;">
                         <span style="font-size: 18px;">📈</span>
                         <span style="font-weight: 700; color: #166534; font-size: 14px;">
-                            Évolution quotidienne des atteintes - Courbe de tendance
+                            Évolution quotidienne des atteintes
                         </span>
                     </div>
                     <div style="display: flex; gap: 16px; font-size: 11px;">
@@ -6727,7 +6761,7 @@ function displayAllClientsTab() {
             alertData = calculateAlertDays(filteredTensionResults);
             
             // Calcul des atteintes nominales
-            const targetTension = systemType === '24V' ? 28.0 : 14.2;
+            const targetTension = systemType === '24V' ? 28.0 : 14.0;
             filteredTensionResults.forEach(item => {
                 const tension = parseFloat(item.tension || item.valeur || 0);
                 if (tension >= targetTension) totalNominalHits++;
@@ -7058,7 +7092,7 @@ function displayAllClientsTab() {
                         </span>
                     </h3>
                     <div style="margin-top: 6px; font-size: 14px; color: #475569;">
-                        Analyse complète de la stabilité, des atteintes nominales et de l'évolution temporelle
+                        Analyse complète de la conformité, des atteintes nominales et de l'évolution temporelle
                     </div>
                 </div>
             </div>
@@ -7089,7 +7123,7 @@ function displayAllClientsTab() {
                     <div style="width: 44px; height: 44px; background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); border-radius: 12px; display: flex; align-items: center; justify-content: center;">
                         <span style="font-size: 22px; color: white;">📈</span>
                     </div>
-                    <h4 style="margin: 0; font-size: 18px; font-weight: 700; color: #1e293b;">Évolution quotidienne des atteintes - Courbe de tendance</h4>
+                    <h4 style="margin: 0; font-size: 18px; font-weight: 700; color: #1e293b;">Évolution quotidienne des atteintes</h4>
                 </div>
                 <div id="nominal-tension-table-container"></div>
             </div>
@@ -7100,7 +7134,7 @@ function displayAllClientsTab() {
                     <div style="width: 44px; height: 44px; background: linear-gradient(135deg, #a855f7 0%, #7e22ce 100%); border-radius: 12px; display: flex; align-items: center; justify-content: center;">
                         <span style="font-size: 22px; color: white;">📊</span>
                     </div>
-                    <h4 style="margin: 0; font-size: 18px; font-weight: 700; color: #1e293b;">Tension Min/Max par Jour (Système ${systemType})</h4>
+                    <h4 style="margin: 0; font-size: 18px; font-weight: 700; color: #1e293b;">Tension journalière (Système ${systemType})</h4>
                 </div>
                 <div class="system-info" style="font-size: 12px; color: #64748b; margin-bottom: 15px; display: flex; gap: 20px; flex-wrap: wrap; padding: 10px 0;">
                     <span>🔧 Type: ${systemType} DC</span>
@@ -7255,118 +7289,6 @@ function displayAllClientsTab() {
         </div>
         <!-- ===== FIN CARTE PRINCIPALE ÉNERGIE ===== -->
         
-        <!-- ===== DASHBOARD INTENSITÉ ===== -->
-        <div class="intensity-dashboard" style="margin: 25px 0; background: white; border-radius: 20px; padding: 20px; border: 2px solid #e2e8f0; box-shadow: 0 8px 20px rgba(0,0,0,0.08);">
-            
-            <!-- En-tête -->
-            <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 20px;">
-                <div style="width: 50px; height: 50px; background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); border-radius: 14px; display: flex; align-items: center; justify-content: center;">
-                    <span style="font-size: 28px; color: white;">⚡</span>
-                </div>
-                <div>
-                    <h3 style="margin: 0; font-size: 20px; font-weight: 700; color: #0f172a;">
-                        Analyse de l'Intensité
-                    </h3>
-                    <p style="margin: 4px 0 0 0; font-size: 13px; color: #64748b;">
-                        Évolution journalière et horaire
-                    </p>
-                </div>
-            </div>
-            
-            <!-- Cartes statistiques (inchangées) -->
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 25px;">
-                <!-- Intensité Moyenne -->
-                <div style="background: linear-gradient(135deg, #f0f9ff 0%, #ffffff 100%); border-radius: 16px; padding: 16px; border-left: 5px solid #3b82f6; box-shadow: 0 4px 12px rgba(59,130,246,0.1);">
-                    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
-                        <div style="width: 40px; height: 40px; background: #3b82f6; border-radius: 10px; display: flex; align-items: center; justify-content: center;">
-                            <span style="font-size: 20px; color: white;">📊</span>
-                        </div>
-                        <div style="font-size: 13px; color: #1e40af; font-weight: 600;">INTENSITÉ MOYENNE</div>
-                    </div>
-                    <div style="font-size: 32px; font-weight: 800; color: #1e3a8a; margin-bottom: 5px;">
-                        ${intensityStats.avgIntensity.toFixed(2)} A
-                    </div>
-                    <div style="font-size: 12px; color: #64748b;">
-                        Sur ${intensityStats.intensityCount} mesures
-                    </div>
-                </div>
-                
-                <!-- Intensité Maximale -->
-                <div style="background: linear-gradient(135deg, #fef2f2 0%, #ffffff 100%); border-radius: 16px; padding: 16px; border-left: 5px solid #ef4444; box-shadow: 0 4px 12px rgba(239,68,68,0.1);">
-                    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
-                        <div style="width: 40px; height: 40px; background: #ef4444; border-radius: 10px; display: flex; align-items: center; justify-content: center;">
-                            <span style="font-size: 20px; color: white;">⬆️</span>
-                        </div>
-                        <div style="font-size: 13px; color: #991b1b; font-weight: 600;">INTENSITÉ MAXIMALE</div>
-                    </div>
-                    <div style="font-size: 32px; font-weight: 800; color: #b91c1c; margin-bottom: 5px;">
-                        ${intensityStats.maxIntensity.value.toFixed(2)} A
-                    </div>
-                    <div style="font-size: 12px; color: #64748b;">
-                        Le ${intensityStats.maxIntensity.date} à ${intensityStats.maxIntensity.hour}
-                    </div>
-                </div>
-                
-                <!-- Intensité Minimale -->
-                <div style="background: linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%); border-radius: 16px; padding: 16px; border-left: 5px solid #22c55e; box-shadow: 0 4px 12px rgba(34,197,94,0.1);">
-                    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
-                        <div style="width: 40px; height: 40px; background: #22c55e; border-radius: 10px; display: flex; align-items: center; justify-content: center;">
-                            <span style="font-size: 20px; color: white;">⬇️</span>
-                        </div>
-                        <div style="font-size: 13px; color: #166534; font-weight: 600;">INTENSITÉ MINIMALE</div>
-                    </div>
-                    <div style="font-size: 32px; font-weight: 800; color: #15803d; margin-bottom: 5px;">
-                        ${intensityStats.minIntensity.value.toFixed(2)} A
-                    </div>
-                    <div style="font-size: 12px; color: #64748b;">
-                        Le ${intensityStats.minIntensity.date} à ${intensityStats.minIntensity.hour}
-                    </div>
-                </div>
-                
-                <!-- Jours analysés -->
-                <div style="background: linear-gradient(135deg, #f1f5f9 0%, #ffffff 100%); border-radius: 16px; padding: 16px; border-left: 5px solid #64748b; box-shadow: 0 4px 12px rgba(100,116,139,0.1);">
-                    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
-                        <div style="width: 40px; height: 40px; background: #64748b; border-radius: 10px; display: flex; align-items: center; justify-content: center;">
-                            <span style="font-size: 20px; color: white;">📅</span>
-                        </div>
-                        <div style="font-size: 13px; color: #334155; font-weight: 600;">PÉRIODE ANALYSÉE</div>
-                    </div>
-                    <div style="font-size: 32px; font-weight: 800; color: #1e293b; margin-bottom: 5px;">
-                        ${intensityStats.datesAnalyzed} jours
-                    </div>
-                    <div style="font-size: 12px; color: #64748b;">
-                        Du ${datesToUse[0]} au ${datesToUse[datesToUse.length-1]}
-                    </div>
-                </div>
-            </div>
-
-            <!-- GRAPHIQUE JOURNALIER (NOUVEAU) -->
-            <div style="background: #f8fafc; border-radius: 16px; padding: 20px; margin-bottom: 25px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                    <h4 style="margin: 0; font-size: 16px; font-weight: 600; color: #0f172a;">
-                        📅 Évolution Journalière de l'Intensité
-                    </h4>
-                    <div style="display: flex; gap: 15px; font-size: 12px;">
-                        <span style="display: flex; align-items: center; gap: 4px;">
-                            <span style="width: 12px; height: 12px; background: #3b82f6; border-radius: 3px;"></span>
-                            Moyenne
-                        </span>
-                        <span style="display: flex; align-items: center; gap: 4px;">
-                            <span style="width: 12px; height: 12px; background: #ef4444; border-radius: 3px;"></span>
-                            Max
-                        </span>
-                        <span style="display: flex; align-items: center; gap: 4px;">
-                            <span style="width: 12px; height: 12px; background: #22c55e; border-radius: 3px;"></span>
-                            Min
-                        </span>
-                    </div>
-                </div>
-                <div class="chart-container" style="height: 200px;">
-                    <canvas id="dailyIntensityChart"></canvas>
-                </div>
-            </div>
-        </div>
-
         <div class="table-controls">
             <div class="pagination-controls">
                 <div class="items-per-page">
@@ -8208,28 +8130,6 @@ function createDPDTOnlyTable(combinedAnalysis) {
                     <div class="progress-label">
                         <span>${percentDT}% des jours</span>
                         <span>${daysWithDTCount} jour(s)</span>
-                    </div>
-                </div>
-                
-                <!-- Les deux types -->
-                <div class="dpdt-stat-card both">
-                    <div class="dpdt-stat-header">
-                        <div class="dpdt-stat-icon both">🔄</div>
-                        <div class="dpdt-stat-title">LES DEUX TYPES</div>
-                    </div>
-                    <div class="dpdt-stat-value">${daysWithBothCount} jours</div>
-                    <div class="dpdt-stat-detail">
-                        <span>Jours avec les deux</span>
-                        <span class="dpdt-stat-percent">${daysWithBothCount} / ${diagnosticDays}</span>
-                    </div>
-                    
-                    <!-- Barre de progression -->
-                    <div class="progress-bar-container">
-                        <div class="progress-bar both" style="width: ${percentBothBar}%;"></div>
-                    </div>
-                    <div class="progress-label">
-                        <span>${percentBoth}% des jours</span>
-                        <span>${daysWithBothCount} jour(s)</span>
                     </div>
                 </div>
                 
@@ -12231,6 +12131,7 @@ function calculateDimensioningPercentages(energyData, kitThresholds) {
 }
 
 // ======================== CRÉATION DU HTML DES STATISTIQUES DE DIMENSIONNEMENT ========================
+// ======================== CRÉATION DU HTML DES STATISTIQUES DE DIMENSIONNEMENT ========================
 function createDimensioningStatsHTML(stats, kitThresholds) {
     if (stats.totalDays === 0) {
         return `
@@ -12243,21 +12144,54 @@ function createDimensioningStatsHTML(stats, kitThresholds) {
         `;
     }
 
-    // Kit recommandé = celui avec le PLUS de jours
+    // ===== NOUVELLE LOGIQUE DE RECOMMANDATION =====
     let recommendedKit = null;
     let recommendedKitInfo = null;
+    let recommendedKitPercentage = 0;
     
-    if (stats.recommendedKit) {
-        const cleanLabel = stats.recommendedKit.replace('+', '');
-        recommendedKitInfo = kitThresholds.find(k => k.label === cleanLabel);
-        recommendedKit = {
-            label: stats.recommendedKit,
-            value: recommendedKitInfo ? recommendedKitInfo.value : null
-        };
+    // Trier les kits par leur pourcentage (du plus élevé au plus bas)
+    const sortedKits = Object.entries(stats.percentages)
+        .map(([kit, percentage]) => ({ 
+            kit, 
+            percentage: percentage
+        }))
+        .sort((a, b) => b.percentage - a.percentage);
+    
+    // Filtrer les kits qui ont un pourcentage >= 20%
+    const kitsAbove20 = sortedKits.filter(k => k.percentage >= 20);
+    
+    // Ordre de valeur des kits (du plus petit au plus grand)
+    const kitValueOrder = {
+        'Kit 0': 250,
+        'Kit 1': 360,
+        'Kit 2': 540,
+        'Kit 3': 720,
+        'Kit 4': 1080,
+        'Kit 4+': 9999 // Valeur très élevée pour Kit 4+
+    };
+    
+    if (kitsAbove20.length > 0) {
+        // Si au moins un kit dépasse 20%, prendre le plus gros (avec la plus haute valeur seuil)
+        recommendedKit = kitsAbove20.sort((a, b) => {
+            const valueA = kitValueOrder[a.kit] || 0;
+            const valueB = kitValueOrder[b.kit] || 0;
+            return valueB - valueA; // Tri décroissant (du plus gros au plus petit)
+        })[0].kit;
+        recommendedKitPercentage = stats.percentages[recommendedKit];
+    } else {
+        // Si aucun kit ne dépasse 20%, prendre celui avec le plus grand pourcentage
+        recommendedKit = sortedKits[0].kit;
+        recommendedKitPercentage = stats.percentages[recommendedKit];
     }
     
+    // Récupérer les informations du kit recommandé
+    const cleanLabel = recommendedKit.replace('+', '');
+    recommendedKitInfo = kitThresholds.find(k => k.label === cleanLabel);
+    
     const dominantColor = recommendedKitInfo ? recommendedKitInfo.color : 
-                         (stats.recommendedKit === 'Kit 4+' ? '#dc2626' : '#667eea');
+                         (recommendedKit === 'Kit 4+' ? '#dc2626' : '#667eea');
+    
+    const recommendedKitCount = stats.distribution[recommendedKit] || 0;
 
     // Barres de progression avec pourcentage de temps
     let progressBarsHTML = '';
@@ -12273,7 +12207,7 @@ function createDimensioningStatsHTML(stats, kitThresholds) {
             ? { color: '#dc2626', label: 'Kit 4+' }
             : kitThresholds.find(k => k.label === kitLabel);
         
-        const isRecommended = stats.recommendedKit === kitLabel;
+        const isRecommended = recommendedKit === kitLabel;
         
         progressBarsHTML += `
             <div style="margin-bottom: 14px; ${isRecommended ? 'background: ' + dominantColor + '08; padding: 10px; border-radius: 10px; border-left: 4px solid ' + dominantColor + ';' : ''}">
@@ -12320,6 +12254,17 @@ function createDimensioningStatsHTML(stats, kitThresholds) {
         `;
     });
 
+    // Message explicatif personnalisé
+    let explicationMessage = '';
+    if (kitsAbove20.length > 0) {
+        const plusGrosKit = kitsAbove20.sort((a, b) => 
+            (kitValueOrder[b.kit] || 0) - (kitValueOrder[a.kit] || 0)
+        )[0].kit;
+        explicationMessage = `Le <strong style="color: ${dominantColor};">${recommendedKit}</strong> est recommandé car il est le plus gros kit dépassant les 20% (${recommendedKitPercentage}% du temps).`;
+    } else {
+        explicationMessage = `Aucun kit ne dépasse 20% du temps. Le <strong style="color: ${dominantColor};">${recommendedKit}</strong> est recommandé car il a le pourcentage le plus élevé (${recommendedKitPercentage}% du temps).`;
+    }
+
     return `
         <div style="background: white; border-radius: 16px; border: 1px solid #e2e8f0; margin-top: 25px; 
                     box-shadow: 0 8px 20px rgba(0,0,0,0.06); overflow: hidden;">
@@ -12340,13 +12285,13 @@ function createDimensioningStatsHTML(stats, kitThresholds) {
                             </span>
                             <span style="background: ${dominantColor}20; color: ${dominantColor}; padding: 4px 14px; 
                                       border-radius: 40px; font-size: 12px; font-weight: 700;">
-                                🏆 ${stats.recommendedKitPercentage}% DU TEMPS
+                                🏆 ${recommendedKitPercentage}% DU TEMPS
                             </span>
                         </div>
                         
                         <div style="display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap;">
                             <span style="font-size: 28px; font-weight: 900; color: ${dominantColor}; line-height: 1;">
-                                ${stats.recommendedKit || 'Non déterminé'}
+                                ${recommendedKit || 'Non déterminé'}
                             </span>
                             ${recommendedKitInfo ? `
                                 <span style="font-size: 15px; color: #475569; background: white; 
@@ -12354,7 +12299,7 @@ function createDimensioningStatsHTML(stats, kitThresholds) {
                                           font-weight: 600;">
                                     ⚡ ${recommendedKitInfo.value.toLocaleString('fr-FR')} Wh/jour
                                 </span>
-                            ` : stats.recommendedKit === 'Kit 4+' ? `
+                            ` : recommendedKit === 'Kit 4+' ? `
                                 <span style="font-size: 15px; color: #475569; background: white; 
                                           padding: 6px 18px; border-radius: 40px; border: 2px solid #dc262630;
                                           font-weight: 600;">
@@ -12364,9 +12309,9 @@ function createDimensioningStatsHTML(stats, kitThresholds) {
                         </div>
                         
                         <div style="margin-top: 10px; font-size: 13px; color: #475569;">
-                            <span style="font-weight: 600;">${stats.recommendedKit}</span> est adapté pour 
-                            <span style="font-weight: 800; color: ${dominantColor};">${stats.recommendedKitPercentage}% du temps</span>
-                            (${stats.recommendedKitCount} jours sur ${stats.totalDays})
+                            <span style="font-weight: 600;">${recommendedKit}</span> est adapté pour 
+                            <span style="font-weight: 800; color: ${dominantColor};">${recommendedKitPercentage}% du temps</span>
+                            (${recommendedKitCount} jours sur ${stats.totalDays})
                         </div>
                     </div>
                 </div>
@@ -12387,7 +12332,7 @@ function createDimensioningStatsHTML(stats, kitThresholds) {
                 
                 ${progressBarsHTML}
                 
-                <!-- Explication concise -->
+                <!-- Explication concise avec la nouvelle logique -->
                 <div style="margin-top: 20px; padding: 14px 18px; background: #f8fafc; border-radius: 12px; 
                           border-left: 5px solid ${dominantColor}; font-size: 13px;">
                     <div style="display: flex; align-items: flex-start; gap: 12px;">
@@ -12395,9 +12340,8 @@ function createDimensioningStatsHTML(stats, kitThresholds) {
                         <div style="flex: 1;">
                             <span style="font-weight: 700; color: ${dominantColor};">En résumé :</span>
                             <span style="color: #334155;">
-                                Le <strong style="color: ${dominantColor};">${stats.recommendedKit}</strong> est le meilleur choix car il correspond à 
-                                <strong style="color: ${dominantColor};">${stats.recommendedKitPercentage}% du temps</strong> 
-                                (${stats.recommendedKitCount} jours). Le pic à ${Math.round(stats.maxEnergy)} Wh 
+                                ${explicationMessage}
+                                Le pic à ${Math.round(stats.maxEnergy)} Wh 
                                 (${stats.maxKitReached}) n'est présent que ${stats.percentages[stats.maxKitReached] || 0}% du temps.
                             </span>
                         </div>
@@ -12408,10 +12352,8 @@ function createDimensioningStatsHTML(stats, kitThresholds) {
     `;
 }
 
-
 // ======================== ONGLET FRAUDE ========================
-// ======================== ONGLET FRAUDE - ANALYSE TECHNIQUE DES CHUTES DE TENSION ========================
-// ======================== ONGLET FRAUDE - ANALYSE TECHNIQUE DES CHUTES DE TENSION ========================
+// ======================== ONGLET FRAUDE - ANALYSE DES CHUTES DE TENSION NOCTURNES (18h-6h) ========================
 let tensionAnalysisData = {
     voltageDrops: [],
     stats: {
@@ -12424,19 +12366,17 @@ let tensionAnalysisData = {
         criticalThreshold: 4.2,
         dropsByHour: new Array(24).fill(0),
         dropsByPeriod: {
-            morning: 0,   // 5h-12h
-            afternoon: 0, // 12h-18h
-            evening: 0,   // 18h-22h
-            night: 0      // 22h-5h
+            night: 0,      // 18h-6h (période critique)
+            day: 0         // 6h-18h (période normale)
         }
     },
     lastUpdate: '',
-    currentPeriodFilter: 'all' // 'all', 'morning', 'afternoon', 'evening', 'night'
+    currentPeriodFilter: 'night' // Par défaut, on affiche la nuit
 };
 
-// Fonction d'analyse des chutes de tension
+// Fonction d'analyse des chutes de tension NOCTURNES (18h-6h)
 function analyzeVoltageDrops() {
-    console.log('🔍 Analyse des chutes de tension...');
+    console.log('🔍 Analyse des chutes de tension nocturnes (18h-6h)...');
     
     const drops = [];
     const stats = {
@@ -12449,16 +12389,18 @@ function analyzeVoltageDrops() {
         criticalThreshold: 4.2,
         dropsByHour: new Array(24).fill(0),
         dropsByPeriod: {
-            morning: 0,   // 5h-12h
-            afternoon: 0, // 12h-18h
-            evening: 0,   // 18h-22h
-            night: 0      // 22h-5h
+            night: 0,  // 18h-6h (période critique pour picorage)
+            day: 0     // 6h-18h (période normale)
         }
     };
     
     // Seuils de détection
     const SIGNIFICANT_DROP = 1.5; // Chute significative > 1.5V
     const CRITICAL_DROP = 4.2;    // Chute critique > 4.2V (30% de 14V)
+    
+    // Période nocturne à surveiller (18h - 6h)
+    const NIGHT_START = 18; // 18h
+    const NIGHT_END = 6;    // 6h (le lendemain)
     
     // Utiliser les données de tension existantes
     if (tensionResults && tensionResults.length > 0) {
@@ -12487,31 +12429,19 @@ function analyzeVoltageDrops() {
                     const drop = prevTension - currTension;
                     
                     if (drop > SIGNIFICANT_DROP) {
-                        // Déterminer la période de la journée
-                        let period = '';
-                        let periodKey = '';
-                        if (currHour >= 5 && currHour < 12) {
-                            period = '🌅 Matin';
-                            periodKey = 'morning';
-                        } else if (currHour >= 12 && currHour < 18) {
-                            period = '☀️ Après-midi';
-                            periodKey = 'afternoon';
-                        } else if (currHour >= 18 && currHour < 22) {
-                            period = '🌆 Soir';
-                            periodKey = 'evening';
-                        } else {
-                            period = '🌙 Nuit';
-                            periodKey = 'night';
-                        }
+                        // Déterminer si c'est de nuit (période critique) ou de jour
+                        const isNightTime = (currHour >= NIGHT_START || currHour < NIGHT_END);
+                        const period = isNightTime ? '🌙 Nuit (18h-6h)' : '☀️ Jour (6h-18h)';
                         
                         // Compter par heure
                         stats.dropsByHour[currHour]++;
                         
                         // Compter par période
-                        if (periodKey === 'morning') stats.dropsByPeriod.morning++;
-                        else if (periodKey === 'afternoon') stats.dropsByPeriod.afternoon++;
-                        else if (periodKey === 'evening') stats.dropsByPeriod.evening++;
-                        else stats.dropsByPeriod.night++;
+                        if (isNightTime) {
+                            stats.dropsByPeriod.night++;
+                        } else {
+                            stats.dropsByPeriod.day++;
+                        }
                         
                         // Déterminer la sévérité
                         let severity = 'significatif';
@@ -12536,10 +12466,10 @@ function analyzeVoltageDrops() {
                             currTension: Math.round(currTension * 100) / 100,
                             drop: Math.round(drop * 100) / 100,
                             period: period,
-                            periodKey: periodKey,
+                            isNight: isNightTime,
                             severity: severity,
                             severityColor: severityColor,
-                            duration: '60 min', // Par défaut 1h entre mesures
+                            duration: '60 min',
                             fromTo: `${prevTension.toFixed(2)} → ${currTension.toFixed(2)} V`
                         });
                         
@@ -12558,20 +12488,22 @@ function analyzeVoltageDrops() {
         stats.criticalThreshold = Math.round(stats.normalTension * 0.3 * 10) / 10; // 30% de la tension normale
     }
     
-    console.log(`✅ Analyse terminée: ${drops.length} chutes détectées`);
+    console.log(`✅ Analyse terminée: ${drops.length} chutes détectées (${stats.dropsByPeriod.night} de nuit, ${stats.dropsByPeriod.day} de jour)`);
     
     return {
         voltageDrops: drops.sort((a, b) => new Date(b.date) - new Date(a.date)),
         stats: stats,
         lastUpdate: new Date().toLocaleString('fr-FR'),
-        currentPeriodFilter: 'all'
+        currentPeriodFilter: 'night' // Par défaut, on affiche la nuit
     };
 }
 
 // Fonction pour filtrer les chutes par période
 function filterDropsByPeriod(drops, period) {
     if (period === 'all') return drops;
-    return drops.filter(drop => drop.periodKey === period);
+    if (period === 'night') return drops.filter(drop => drop.isNight === true);
+    if (period === 'day') return drops.filter(drop => drop.isNight === false);
+    return drops;
 }
 
 // Générer le HTML pour l'onglet DÉTECTION
@@ -12584,32 +12516,30 @@ function generateFraudDetectionHTML() {
     const data = tensionAnalysisData;
     const stats = data.stats;
     const allDrops = data.voltageDrops;
-    const currentFilter = data.currentPeriodFilter || 'all';
+    const currentFilter = data.currentPeriodFilter || 'night';
     
     // Filtrer les drops selon la période sélectionnée
     const filteredDrops = filterDropsByPeriod(allDrops, currentFilter);
     
-    // Créer la répartition par heure
+    // Créer la répartition par heure (uniquement les heures de nuit mises en évidence)
     let hourBarsHTML = '';
     for (let h = 0; h < 24; h++) {
         const count = stats.dropsByHour[h] || 0;
         const maxCount = Math.max(...stats.dropsByHour, 1);
         const barHeight = maxCount > 0 ? (count / maxCount) * 40 : 0;
         
-        // Déterminer la période pour la couleur de fond
-        let barColor = '#3b82f6';
-        if (h >= 5 && h < 12) barColor = '#fbbf24'; // Matin
-        else if (h >= 12 && h < 18) barColor = '#f97316'; // Après-midi
-        else if (h >= 18 && h < 22) barColor = '#3b82f6'; // Soir
-        else barColor = '#6366f1'; // Nuit
+        // Mettre en évidence les heures de nuit (18h-6h)
+        const isNightHour = (h >= 18 || h < 6);
+        const barColor = isNightHour ? '#6366f1' : '#94a3b8';
+        const bgOpacity = isNightHour ? '1' : '0.3';
         
         hourBarsHTML += `
             <div style="display: flex; flex-direction: column; align-items: center; width: 100%;">
                 <div style="font-size: 10px; color: #64748b; margin-bottom: 4px;">${count}</div>
                 <div style="height: 50px; width: 100%; display: flex; align-items: flex-end; justify-content: center;">
-                    <div style="width: 70%; height: ${barHeight}px; background: ${barColor}; border-radius: 4px 4px 0 0;"></div>
+                    <div style="width: 70%; height: ${barHeight}px; background: ${barColor}; opacity: ${bgOpacity}; border-radius: 4px 4px 0 0;"></div>
                 </div>
-                <div style="font-size: 9px; color: #94a3b8; margin-top: 4px;">${h}h</div>
+                <div style="font-size: 9px; color: ${isNightHour ? '#6366f1' : '#94a3b8'}; margin-top: 4px; font-weight: ${isNightHour ? '600' : 'normal'};">${h}h</div>
             </div>
         `;
     }
@@ -12619,7 +12549,7 @@ function generateFraudDetectionHTML() {
         <tr style="border-bottom: 1px solid #e2e8f0;">
             <td style="padding: 12px; font-weight: 500;">${drop.date}</td>
             <td style="padding: 12px;">
-                <span style="display: flex; align-items: center; gap: 4px;">
+                <span style="display: flex; align-items: center; gap: 4px; background: ${drop.isNight ? '#6366f120' : 'transparent'}; padding: 4px 8px; border-radius: 12px;">
                     ${drop.period}
                 </span>
             </td>
@@ -12641,17 +12571,22 @@ function generateFraudDetectionHTML() {
             <!-- En-tête avec titre -->
             <div style="margin-bottom: 25px;">
                 <h2 style="margin: 0 0 5px 0; font-size: 24px; color: #0f172a; display: flex; align-items: center; gap: 10px;">
-                    <span>⚡</span> Analyse des Chutes de Tension (24h/24)
+                    <span>🌙</span> Analyse des Chutes de Tension Nocturnes (18h - 6h)
                 </h2>
-                <p style="margin: 0; color: #64748b; font-size: 14px;">Détection des baisses de tension anormales pouvant indiquer des surcharges ou du picorage</p>
+                <p style="margin: 0; color: #64748b; font-size: 14px;">Surveillance des baisses de tension en période critique (suspicion de picorage)</p>
             </div>
             
             <!-- Cartes KPI -->
             <div style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 15px; margin-bottom: 25px;">
                 
-                <div style="background: white; border-radius: 12px; padding: 16px; border: 1px solid #e2e8f0; box-shadow: 0 2px 8px rgba(0,0,0,0.02);">
-                    <div style="font-size: 12px; color: #64748b; margin-bottom: 5px;">Chutes détectées</div>
+                <div style="background: white; border-radius: 12px; padding: 16px; border: 1px solid #e2e8f0;">
+                    <div style="font-size: 12px; color: #64748b; margin-bottom: 5px;">Chutes totales</div>
                     <div style="font-size: 32px; font-weight: 700; color: #0f172a;">${stats.totalDrops}</div>
+                </div>
+                
+                <div style="background: #6366f120; border-radius: 12px; padding: 16px; border: 1px solid #6366f1;">
+                    <div style="font-size: 12px; color: #4f46e5; margin-bottom: 5px;">🌙 Chutes nocturnes</div>
+                    <div style="font-size: 32px; font-weight: 700; color: #4f46e5;">${stats.dropsByPeriod.night}</div>
                 </div>
                 
                 <div style="background: white; border-radius: 12px; padding: 16px; border: 1px solid #e2e8f0;">
@@ -12665,18 +12600,13 @@ function generateFraudDetectionHTML() {
                 </div>
                 
                 <div style="background: white; border-radius: 12px; padding: 16px; border: 1px solid #e2e8f0;">
-                    <div style="font-size: 12px; color: #64748b; margin-bottom: 5px;">Jour le plus actif</div>
-                    <div style="font-size: 16px; font-weight: 600; color: #0f172a;">${stats.maxDropDate || '-'}</div>
-                </div>
-                
-                <div style="background: white; border-radius: 12px; padding: 16px; border: 1px solid #e2e8f0;">
-                    <div style="font-size: 12px; color: #64748b; margin-bottom: 5px;">Système détecté</div>
+                    <div style="font-size: 12px; color: #64748b; margin-bottom: 5px;">Système</div>
                     <div style="font-size: 24px; font-weight: 700; color: #3b82f6;">${stats.systemType}</div>
                 </div>
                 
                 <div style="background: white; border-radius: 12px; padding: 16px; border: 1px solid #e2e8f0;">
-                    <div style="font-size: 12px; color: #64748b; margin-bottom: 5px;">Période</div>
-                    <div style="font-size: 14px; font-weight: 600; color: #0f172a;">24h/24</div>
+                    <div style="font-size: 12px; color: #64748b; margin-bottom: 5px;">Période critique</div>
+                    <div style="font-size: 14px; font-weight: 600; color: #4f46e5;">18h → 6h</div>
                 </div>
             </div>
             
@@ -12703,78 +12633,63 @@ function generateFraudDetectionHTML() {
                     </div>
                 </div>
                 
-                <div style="background: #f1f5f9; border-radius: 10px; padding: 15px; display: flex; align-items: center; gap: 15px; border: 1px solid #e2e8f0;">
-                    <div style="width: 40px; height: 40px; background: #64748b; border-radius: 10px; display: flex; align-items: center; justify-content: center;">
-                        <span style="font-size: 20px; color: white;">📅</span>
+                <div style="background: #6366f120; border-radius: 10px; padding: 15px; display: flex; align-items: center; gap: 15px; border: 1px solid #6366f1;">
+                    <div style="width: 40px; height: 40px; background: #4f46e5; border-radius: 10px; display: flex; align-items: center; justify-content: center;">
+                        <span style="font-size: 20px; color: white;">🌙</span>
                     </div>
                     <div>
-                        <div style="font-size: 11px; color: #64748b;">Période analysée</div>
-                        <div style="font-size: 16px; font-weight: 600; color: #0f172a;">24h/24</div>
+                        <div style="font-size: 11px; color: #4f46e5;">Période surveillée</div>
+                        <div style="font-size: 18px; font-weight: 700; color: #4f46e5;">18h - 6h</div>
                     </div>
                 </div>
             </div>
             
-            <!-- Graphique de répartition par heure -->
+            <!-- Graphique de répartition par heure avec zone nuit surlignée -->
             <div style="background: white; border-radius: 16px; padding: 20px; margin-bottom: 25px; border: 1px solid #e2e8f0;">
                 <h4 style="margin: 0 0 15px 0; font-size: 16px; display: flex; align-items: center; gap: 8px;">
-                    <span>📊</span> Répartition des chutes par heure
+                    <span>📊</span> Répartition des chutes par heure <span style="background: #6366f120; color: #4f46e5; padding: 4px 8px; border-radius: 12px; font-size: 12px; margin-left: 10px;">Zone critique surlignée</span>
                 </h4>
                 
                 <div style="display: grid; grid-template-columns: repeat(24, 1fr); gap: 2px; margin-bottom: 20px;">
                     ${hourBarsHTML}
                 </div>
                 
-                <!-- Légende des périodes -->
-                <div style="display: flex; justify-content: space-around; margin-top: 15px; padding-top: 15px; border-top: 1px solid #e2e8f0;">
-                    <div style="display: flex; align-items: center; gap: 8px; cursor: pointer;" onclick="filterFraudTable('morning')">
-                        <span style="width: 12px; height: 12px; background: #fbbf24; border-radius: 3px;"></span>
-                        <span style="font-size: 12px; color: #475569;">Matin (5h-12h): ${stats.dropsByPeriod.morning}</span>
-                    </div>
-                    <div style="display: flex; align-items: center; gap: 8px; cursor: pointer;" onclick="filterFraudTable('afternoon')">
-                        <span style="width: 12px; height: 12px; background: #f97316; border-radius: 3px;"></span>
-                        <span style="font-size: 12px; color: #475569;">Après-midi (12h-18h): ${stats.dropsByPeriod.afternoon}</span>
-                    </div>
-                    <div style="display: flex; align-items: center; gap: 8px; cursor: pointer;" onclick="filterFraudTable('evening')">
-                        <span style="width: 12px; height: 12px; background: #3b82f6; border-radius: 3px;"></span>
-                        <span style="font-size: 12px; color: #475569;">Soir (18h-22h): ${stats.dropsByPeriod.evening}</span>
-                    </div>
-                    <div style="display: flex; align-items: center; gap: 8px; cursor: pointer;" onclick="filterFraudTable('night')">
-                        <span style="width: 12px; height: 12px; background: #6366f1; border-radius: 3px;"></span>
-                        <span style="font-size: 12px; color: #475569;">Nuit (22h-5h): ${stats.dropsByPeriod.night}</span>
-                    </div>
-                    <div style="display: flex; align-items: center; gap: 8px; cursor: pointer;" onclick="filterFraudTable('all')">
-                        <span style="width: 12px; height: 12px; background: #94a3b8; border-radius: 3px;"></span>
-                        <span style="font-size: 12px; color: #475569;">Tous</span>
-                    </div>
+                <!-- Indicateur de zone nocturne -->
+                <div style="display: flex; justify-content: space-between; margin-top: 5px; padding: 5px 0;">
+                    <div style="width: 25%; text-align: center; font-size: 11px; color: #94a3b8;">0h</div>
+                    <div style="width: 25%; text-align: center; font-size: 11px; color: #94a3b8;">6h</div>
+                    <div style="width: 25%; text-align: center; font-size: 11px; color: #94a3b8;">12h</div>
+                    <div style="width: 25%; text-align: center; font-size: 11px; color: #94a3b8;">18h</div>
+                </div>
+                <div style="height: 6px; background: linear-gradient(90deg, #6366f1 0%, #6366f1 25%, #94a3b8 25%, #94a3b8 75%, #6366f1 75%, #6366f1 100%); border-radius: 3px;"></div>
+                <div style="display: flex; justify-content: space-between; margin-top: 5px;">
+                    <span style="font-size: 10px; color: #4f46e5;">🌙 Nuit (0h-6h)</span>
+                    <span style="font-size: 10px; color: #94a3b8;">☀️ Jour</span>
+                    <span style="font-size: 10px; color: #4f46e5;">🌙 Nuit (18h-24h)</span>
                 </div>
             </div>
             
-            <!-- Tableau détaillé des chutes avec onglets -->
+            <!-- Tableau détaillé des chutes avec focus nuit -->
             <div style="background: white; border-radius: 16px; border: 1px solid #e2e8f0; overflow: hidden;">
                 
                 <!-- Onglets du tableau -->
                 <div style="display: flex; border-bottom: 2px solid #e2e8f0; background: #f8fafc;">
-                    <div onclick="filterFraudTable('all')" style="padding: 12px 20px; cursor: pointer; border-bottom: 3px solid ${currentFilter === 'all' ? '#3b82f6' : 'transparent'}; font-weight: ${currentFilter === 'all' ? '700' : '500'}; color: ${currentFilter === 'all' ? '#3b82f6' : '#64748b'};">
-                        📋 Tous (${allDrops.length})
-                    </div>
-                    <div onclick="filterFraudTable('morning')" style="padding: 12px 20px; cursor: pointer; border-bottom: 3px solid ${currentFilter === 'morning' ? '#fbbf24' : 'transparent'}; font-weight: ${currentFilter === 'morning' ? '700' : '500'}; color: ${currentFilter === 'morning' ? '#fbbf24' : '#64748b'};">
-                        🌅 Matin (${stats.dropsByPeriod.morning})
-                    </div>
-                    <div onclick="filterFraudTable('afternoon')" style="padding: 12px 20px; cursor: pointer; border-bottom: 3px solid ${currentFilter === 'afternoon' ? '#f97316' : 'transparent'}; font-weight: ${currentFilter === 'afternoon' ? '700' : '500'}; color: ${currentFilter === 'afternoon' ? '#f97316' : '#64748b'};">
-                        ☀️ Après-midi (${stats.dropsByPeriod.afternoon})
-                    </div>
-                    <div onclick="filterFraudTable('evening')" style="padding: 12px 20px; cursor: pointer; border-bottom: 3px solid ${currentFilter === 'evening' ? '#3b82f6' : 'transparent'}; font-weight: ${currentFilter === 'evening' ? '700' : '500'}; color: ${currentFilter === 'evening' ? '#3b82f6' : '#64748b'};">
-                        🌆 Soir (${stats.dropsByPeriod.evening})
-                    </div>
-                    <div onclick="filterFraudTable('night')" style="padding: 12px 20px; cursor: pointer; border-bottom: 3px solid ${currentFilter === 'night' ? '#6366f1' : 'transparent'}; font-weight: ${currentFilter === 'night' ? '700' : '500'}; color: ${currentFilter === 'night' ? '#6366f1' : '#64748b'};">
+                    <div onclick="filterFraudTable('night')" style="padding: 12px 20px; cursor: pointer; border-bottom: 3px solid ${currentFilter === 'night' ? '#4f46e5' : 'transparent'}; font-weight: ${currentFilter === 'night' ? '700' : '500'}; color: ${currentFilter === 'night' ? '#4f46e5' : '#64748b'}; background: ${currentFilter === 'night' ? '#6366f110' : 'transparent'};">
                         🌙 Nuit (${stats.dropsByPeriod.night})
+                    </div>
+                    <div onclick="filterFraudTable('day')" style="padding: 12px 20px; cursor: pointer; border-bottom: 3px solid ${currentFilter === 'day' ? '#94a3b8' : 'transparent'}; font-weight: ${currentFilter === 'day' ? '700' : '500'}; color: ${currentFilter === 'day' ? '#475569' : '#64748b'};">
+                        ☀️ Jour (${stats.dropsByPeriod.day})
+                    </div>
+                    <div onclick="filterFraudTable('all')" style="padding: 12px 20px; cursor: pointer; border-bottom: 3px solid ${currentFilter === 'all' ? '#3b82f6' : 'transparent'}; font-weight: ${currentFilter === 'all' ? '700' : '500'}; color: ${currentFilter === 'all' ? '#3b82f6' : '#64748b'};">
+                        📋 Tous (${stats.totalDrops})
                     </div>
                 </div>
                 
-                <!-- En-tête du tableau avec titre et compteur -->
+                <!-- En-tête du tableau -->
                 <div style="padding: 16px 20px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
                     <h4 style="margin: 0; font-size: 16px; display: flex; align-items: center; gap: 8px;">
                         <span>📋</span> Détail des chutes de tension
+                        ${currentFilter === 'night' ? '<span style="background: #6366f1; color: white; padding: 2px 10px; border-radius: 20px; font-size: 11px;">FOCUS NUIT</span>' : ''}
                     </h4>
                     <div style="display: flex; gap: 15px;">
                         <span style="font-size: 12px; background: #fef3c7; padding: 4px 10px; border-radius: 20px;">
@@ -12784,7 +12699,7 @@ function generateFraudDetectionHTML() {
                             🔴 Critique >${stats.criticalThreshold}V
                         </span>
                         <span style="font-size: 12px; background: #e2e8f0; padding: 4px 10px; border-radius: 20px;">
-                            📊 ${filteredDrops.length} chute(s) affichée(s)
+                            📊 ${filteredDrops.length} chute(s)
                         </span>
                     </div>
                 </div>
@@ -12808,13 +12723,31 @@ function generateFraudDetectionHTML() {
                     </table>
                 </div>
                 
-                <!-- Légende des seuils -->
-                <div style="padding: 15px 20px; background: #f8fafc; border-top: 1px solid #e2e8f0; font-size: 12px; color: #64748b; display: flex; gap: 20px;">
-                    <span>⚠️ Chute significative (>1.5V en <2h)</span>
-                    <span>🔴 Chute critique (>${stats.criticalThreshold}V)</span>
-                    <span style="margin-left: auto;">Dernière analyse: ${data.lastUpdate}</span>
+                <!-- Légende et mise à jour -->
+                <div style="padding: 15px 20px; background: #f8fafc; border-top: 1px solid #e2e8f0; font-size: 12px; color: #64748b; display: flex; justify-content: space-between;">
+                    <div style="display: flex; gap: 20px;">
+                        <span>⚠️ Chute significative (>1.5V)</span>
+                        <span>🔴 Chute critique (>${stats.criticalThreshold}V)</span>
+                        <span>🌙 Période surveillée: 18h - 6h</span>
+                    </div>
+                    <span>Dernière analyse: ${data.lastUpdate}</span>
                 </div>
             </div>
+            
+            <!-- Message d'alerte si anomalies nocturnes -->
+            ${stats.dropsByPeriod.night > 0 ? `
+            <div style="margin-top: 20px; background: #6366f110; border: 2px solid #4f46e5; border-radius: 12px; padding: 15px; display: flex; align-items: center; gap: 15px;">
+                <span style="font-size: 24px;">🌙</span>
+                <div>
+                    <span style="font-weight: 700; color: #4f46e5;">${stats.dropsByPeriod.night} chute(s) nocturne(s) détectée(s)</span>
+                    <p style="margin: 5px 0 0 0; font-size: 13px; color: #334155;">
+                        Des baisses de tension anormales ont été détectées entre 18h et 6h. 
+                        Ces créneaux sont critiques car ils peuvent indiquer des branchements sauvages (picorage).
+                        ${stats.dropsByPeriod.night > 3 ? '⚠️ Nombre élevé de suspicions, vérification recommandée.' : ''}
+                    </p>
+                </div>
+            </div>
+            ` : ''}
         </div>
     `;
 }

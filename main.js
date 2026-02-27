@@ -18,7 +18,9 @@ function createWindow() {
     },
     icon: path.join(__dirname, 'img/logo.jpg'),
     title: 'Analyseur V2',
-    show: false
+    show: false,
+    autoHideMenuBar: true,  // Cache automatiquement la barre de menu
+    menu: null              // Supprime complètement le menu
   });
 
   mainWindow.loadFile('index.html');
