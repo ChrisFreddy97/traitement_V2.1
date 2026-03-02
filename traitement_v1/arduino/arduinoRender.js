@@ -3,10 +3,11 @@ import { database } from './arduinoCore.js';
 import { TABLE_TYPES } from './arduinoConstants.js';
 import { getEventColor, handleCellClick } from './arduinoEvents.js';
 import { generatePagination, attachPaginationEvents } from './arduinoPagination.js';
-import { renderTechnicalDashboard } from './dashboards/technicalDashboard.js';
-import { renderCommercialDashboard } from './dashboards/commercialDashboard.js';
+import { renderTechnicalDashboard } from './dashboards/technical/TechnicalDashboard.js';  
+import { renderCommercialDashboard } from './dashboards/commercial/CommercialDashboard.js'; 
 import { renderEventDashboard } from './dashboards/eventDashboard.js';
 import { FORFAIT_NAMES } from './arduinoConstants.js';
+
 
 // Rendre handleCellClick accessible globalement si nécessaire (déjà fait dans arduinoMain.js)
 // window.handleCellClick = handleCellClick; // déjà fait dans main

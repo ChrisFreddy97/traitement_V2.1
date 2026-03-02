@@ -5,19 +5,24 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Analyseur de Données - NANORESEAU</title>
     <link rel="stylesheet" href="arduino.css">
-    <script src="../../chart.js"></script>    <script type="module" src="arduinoMain.js"></script>
+    <link rel="stylesheet" href="technicalDashboard.css">
+    <link rel="stylesheet" href="commercialDashboard.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script type="module" src="arduinoMain.js"></script>
 </head>
 <body>
     <div class="container">
         <div class="header">
             <div style="display: flex; align-items: center; width: 100%;">
-                <a href="../index.html" class="back-button" style="margin-right: auto;">⬅️ Retour</a>
+                <button id="backButton" class="back-button" style="margin-right: auto;">⬅️ Retour</button>
                 <h1 style="margin: 0; flex-grow: 1; text-align: center;">📊 Analyseur de Données NANORESEAU</h1>
                 <div style="width: 100px;"></div> 
             </div>
             <p style="margin-top: 15px;">Importez votre fichier txt pour extraire et visualiser les données multiples</p>
         </div>
+        
         <div class="content">
+            <!-- SECTION UPLOAD -->
             <div class="upload-section" id="uploadSection">
                 <div class="file-input-wrapper">
                     <input type="file" id="fileInput" accept=".txt">
@@ -25,6 +30,8 @@
                 </div>
                 <div class="file-name" id="fileName">Aucun fichier sélectionné</div>
             </div>
+            
+            <!-- LOADER -->
             <div class="loader-container" id="loaderContainer">
                 <div class="spinner"></div>
                 <div class="loader-text" id="loaderText">Analyse du fichier en cours...</div>
@@ -32,20 +39,32 @@
                     <div class="progress-fill" id="progressFill"></div>
                 </div>
             </div>
+            
+            <!-- MESSAGES D'ERREUR -->
             <div class="error-message" id="errorMessage"></div>
+            
+            <!-- SECTION INFO (NANORESEAU) -->
             <div class="info-section" id="infoSection">
                 <h3>🔍 Informations extraites</h3>
-                <div>Numéro NANORESEAU :</div>
+                <div>NANORESEAU N°:</div>
                 <div class="nanoreseau-value" id="nanoreseauValue">-</div>
+                
+                <!-- ONGLETS PRINCIPAUX -->
                 <div class="tabs">
                     <div class="tab active" data-tab="Technique">Technique</div>
                     <div class="tab" data-tab="Commercial">Commercial</div>
                     <div class="tab" data-tab="Evenement">Événement</div>
                 </div>
+                
+                <!-- CONTENEURS DES DASHBOARDS -->
                 <div id="technicalDashboard"></div>
                 <div id="commercialDashboard"></div>
+                <div id="eventDashboard"></div>
+                
                 <div class="type-legend" id="typeLegend"></div>
             </div>
+            
+            <!-- TABLEAUX DÉTAILLÉS -->
             <div class="tables-container" id="tablesContainer"></div>
         </div>
     </div>

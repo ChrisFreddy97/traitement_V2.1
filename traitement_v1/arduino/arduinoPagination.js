@@ -4,6 +4,7 @@ import { database } from './arduinoCore.js';
 
 export function generatePagination(tableIdx, page) {
     if (page.totalPages <= 1) return '';
+    
     return `
         <div class="pagination" data-table-index="${tableIdx}">
             <button class="pagination-button" data-action="first" ${page.pageNumber === 1 ? 'disabled' : ''}>⏮️</button>
@@ -18,16 +19,20 @@ export function generatePagination(tableIdx, page) {
 }
 
 export function attachPaginationEvents(renderCallback) {
+    // Nettoyage et réattachement des événements
     document.querySelectorAll('.pagination-button').forEach(button => {
-        button.removeEventListener('click', handlePaginationClick);
+        button.replaceWith(button.cloneNode(true));
+    });
+    
+    document.querySelectorAll('.pagination-button').forEach(button => {
         button.addEventListener('click', (e) => handlePaginationClick(e, renderCallback));
     });
 
     document.querySelectorAll('.pagination-input').forEach(input => {
-        input.removeEventListener('change', handlePageInputChange);
         input.addEventListener('change', (e) => handlePageInputChange(e, renderCallback));
-        input.removeEventListener('keypress', handlePageInputKeypress);
-        input.addEventListener('keypress', handlePageInputKeypress);
+        input.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') e.target.dispatchEvent(new Event('change'));
+        });
     });
 }
 
@@ -54,6 +59,7 @@ function handlePaginationClick(e, renderCallback) {
     if (newPage !== currentPage) {
         database.currentPages[tableIndex] = newPage;
         renderCallback();
+        
         setTimeout(() => {
             const tableBlock = document.querySelector(`.table-block[data-table-index="${tableIndex}"] .table-wrapper`);
             if (tableBlock) tableBlock.scrollTop = 0;
@@ -76,6 +82,7 @@ function handlePageInputChange(e, renderCallback) {
     if (!isNaN(newPage) && newPage >= 1 && newPage <= totalPages) {
         database.currentPages[tableIndex] = newPage;
         renderCallback();
+        
         setTimeout(() => {
             const tableBlock = document.querySelector(`.table-block[data-table-index="${tableIndex}"] .table-wrapper`);
             if (tableBlock) tableBlock.scrollTop = 0;
@@ -83,8 +90,4 @@ function handlePageInputChange(e, renderCallback) {
     } else {
         input.value = database.currentPages[tableIndex] || 1;
     }
-}
-
-function handlePageInputKeypress(e) {
-    if (e.key === 'Enter') e.currentTarget.dispatchEvent(new Event('change'));
 }
