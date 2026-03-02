@@ -1,21 +1,31 @@
 // arduinoConstants.js
+// ===========================================
+// CONFIGURATION PRINCIPALE
+// ===========================================
 
-// ===========================================
-// TYPES DE TABLES
-// ===========================================
+// Types de tables
 export const TABLE_TYPES = {
     'I': { name: 'Intensité', color: '#4CAF50', icon: '⚡', tab: 'Technique' },
     'T': { name: 'Tension', color: '#9C27B0', icon: '🔋', tab: 'Technique' },
     'R': { name: 'Recharges', color: '#FF9800', icon: '💳', tab: 'Commercial' },
     'S': { name: 'Évolution crédit', color: '#2196F3', icon: '💰', tab: 'Commercial' },
-    'E': { name: 'Événements', color: '#F44336', icon: '🔔', tab: 'Evenement' }
+    'E': { name: 'Événements', color: '#F44336', icon: '🔔', tab: 'Commercial' }
 };
 
-// ===========================================
-// ÉVÉNEMENTS
-// ===========================================
-export const EVENT_TYPES = ['SuspendP', 'SuspendE', 'Surcharge', 'Delestage Partiel', 'Delestage Total'];
+// Normes de tension
+export const VOLTAGE_NORMS = {
+    '24V': { min: 22, ideal: '24-29', max: 31, variationSeuil: 3.5, alert: '3V / Heure' },
+    '12V': { min: 11, ideal: '12-14.5', max: 15, variationSeuil: 1.5, alert: '1.5V / Heure' }
+};
 
+// Seuils pour tension haute
+export const HIGH_VOLTAGE_THRESHOLD = {
+    '24V': 28,
+    '12V': 14.2
+};
+
+// Événements
+export const EVENT_TYPES = ['SuspendP', 'SuspendE', 'Surcharge', 'Delestage Partiel', 'Delestage Total'];
 export const EVENT_COLORS = {
     'SuspendP': '#ff9800',
     'SuspendE': '#9c27b0',
@@ -24,22 +34,7 @@ export const EVENT_COLORS = {
     'Delestage Total': '#000000'
 };
 
-// ===========================================
-// PAGINATION
-// ===========================================
-export const ROWS_PER_PAGE = 50;
-
-// ===========================================
-// NORMES DE TENSION
-// ===========================================
-export const VOLTAGE_NORMS = {
-    '24V': { min: 22, ideal: '24-29', max: 31, alert: '3V / Heure' },
-    '12V': { min: 11, ideal: '12-14.5', max: 15, alert: '1.5V / Heure' }
-};
-
-// ===========================================
-// FORFAITS - Noms commerciaux
-// ===========================================
+// Forfaits
 export const FORFAIT_NAMES = {
     1: "ECO",
     2: "ECLAIRAGE",
@@ -58,11 +53,8 @@ export const FORFAIT_NAMES = {
     34: "CONGEL -10°C"
 };
 
-// ===========================================
-// FORFAITS - Limites de consommation
-// ===========================================
 export const FORFAIT_LIMITS = {
-    "ECO": { max: 50, heures: 5, tolerance: 15 }, // 15% de tolérance
+    "ECO": { max: 50, heures: 5, tolerance: 15 },
     "ECLAIRAGE": { max: 90, heures: 5, tolerance: 15 },
     "ECLAIRAGE +": { max: 150, heures: 5, tolerance: 15 },
     "MULTIMEDIA": { max: 210, heures: 5, tolerance: 15 },
@@ -79,59 +71,53 @@ export const FORFAIT_LIMITS = {
     "CSB Congel": { max: 1250, heures: 24, tolerance: 15 }
 };
 
+// Seuils de consommation (pour I-1 commercial)
+export const CONSUMPTION_THRESHOLDS = {
+    NORMAL_MAX: 90,        // 90% du forfait
+    TOLERANCE_MAX: 114,     // 100% + 14% de tolérance
+    TOLERANCE_RATE: 14      // 14% de tolérance
+};
+
+// Pagination
+export const ROWS_PER_PAGE = 50;
+
 // ===========================================
-// FONCTIONS UTILITAIRES POUR LES FORFAITS
+// FONCTIONS UTILITAIRES
 // ===========================================
 
-/**
- * Retourne le nom commercial d'un forfait à partir de son ID
- */
 export function getForfaitName(forfaitId) {
     return FORFAIT_NAMES[forfaitId] || `Forfait ${forfaitId}`;
 }
 
-/**
- * Retourne les limites d'un forfait à partir de son nom
- */
 export function getForfaitLimits(forfaitName) {
     return FORFAIT_LIMITS[forfaitName] || null;
 }
 
-/**
- * Évalue le statut de consommation d'un client
- * Retourne { status, color, message }
- */
-export function evaluateConsumptionStatus(forfaitId, consommation) {
-    const forfaitName = getForfaitName(forfaitId);
-    const limits = FORFAIT_LIMITS[forfaitName];
+export function getConsumptionStatus(consumption, maxLimit) {
+    if (!maxLimit) return { status: 'unknown', color: '#999', label: 'Inconnu' };
     
-    if (!limits) {
-        return {
-            status: 'unknown',
-            color: '#999',
-            message: 'Forfait non référencé'
+    const ratio = (consumption / maxLimit) * 100;
+    
+    if (ratio > CONSUMPTION_THRESHOLDS.TOLERANCE_MAX) {
+        return { 
+            status: 'depasse', 
+            color: '#f44336', 
+            label: '🔴 Dépassement critique',
+            percent: ratio.toFixed(1)
         };
-    }
-    
-    const ratio = (consommation / limits.max) * 100;
-    
-    if (consommation > limits.max) {
-        return {
-            status: 'depassement',
-            color: '#f44336',
-            message: `🔴 Dépassement (${ratio.toFixed(0)}% de la limite)`
-        };
-    } else if (consommation > limits.max * (1 - limits.tolerance/100)) {
-        return {
-            status: 'limite',
-            color: '#ff9800',
-            message: `🟠 Limite (${ratio.toFixed(0)}% de la limite)`
+    } else if (ratio > CONSUMPTION_THRESHOLDS.NORMAL_MAX) {
+        return { 
+            status: 'tolerance', 
+            color: '#ff9800', 
+            label: '🟠 Zone tolérance',
+            percent: ratio.toFixed(1)
         };
     } else {
-        return {
-            status: 'ok',
-            color: '#4CAF50',
-            message: `✅ OK (${ratio.toFixed(0)}% de la limite)`
+        return { 
+            status: 'normal', 
+            color: '#4CAF50', 
+            label: '✅ Normal',
+            percent: ratio.toFixed(1)
         };
     }
 }

@@ -21,6 +21,15 @@ export function buildEventMap() {
         const nbDep = parseInt(cells[5]) || 1;
 
         const key = `${date}_${clientId}`;
-        database.eventMap.set(key, { type: eventType, valeur, nbDep, timestamp, clientId, date });
+        database.eventMap.set(key, { 
+            type: eventType, 
+            valeur, 
+            nbDep, 
+            timestamp, 
+            clientId, 
+            date 
+        });
     });
+    
+    console.log(`✅ ${database.eventMap.size} événements chargés`);
 }

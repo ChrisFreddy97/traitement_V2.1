@@ -10,6 +10,7 @@ export function handleCellClick(tableId, clientId, timestamp, cellElement, origi
     const date = timestamp.split(' ')[0];
     const key = `${date}_${clientId}`;
     const event = database.eventMap.get(key);
+    
     if (!event) {
         console.log(`⚠️ Aucun événement pour ${key}`);
         return;
