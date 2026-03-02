@@ -44,19 +44,31 @@
                 </div>
             </div>
 
-            <!-- Section Liste des Dossiers uploadés -->
+            <!-- Section Liste des Dossiers uploadés - VERSION SIMPLIFIÉE -->
             <div id="folders-list-section" class="folders-section">
                 <h2>📁 Dossiers Relèves Créés</h2>
-                <div id="folders-list" class="folders-grid">
-                    <!-- Les dossiers seront ajoutés dynamiquement ici -->
+                <div class="table-container">
+                    <table class="folders-table">
+                        <thead>
+                            <tr>
+                                <th>Dossier</th>
+                                <th>Fichiers</th>
+                                <th>Date d'ajout</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="folders-list">
+                            <!-- Les dossiers seront ajoutés dynamiquement ici -->
+                        </tbody>
+                    </table>
                 </div>
                 <div id="no-folders-message" class="no-data">
                     <p>Aucun dossier uploadé pour le moment</p>
-                    <p>Cliquez sur un bouton ci-dessus pour commencer</p>
+                    <p>Cliquez sur "Ajouter un nouveau relève" pour commencer</p>
                 </div>
             </div>
         </main>
-    </div>
+    </div> 
 
     <!-- Modal d'upload de dossier -->
     <div id="upload-folder-modal" class="modal hidden">

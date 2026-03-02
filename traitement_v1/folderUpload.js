@@ -928,9 +928,91 @@ function displayFoldersList() {
     noFoldersMessage.style.display = 'none';
     
     uploadedFolders.forEach((folder) => {
-        const folderCard = createFolderCard(folder);
-        foldersListDiv.appendChild(folderCard);
+        const folderRow = createFolderRow(folder);
+        foldersListDiv.appendChild(folderRow);
     });
+    
+    // Ajouter les écouteurs d'événements APRÈS avoir ajouté les lignes au DOM
+    addTableEventListeners();
+}
+function addTableEventListeners() {
+    // Écouteurs pour les boutons Analyser
+    document.querySelectorAll('.analyze-folder-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const folderId = btn.dataset.folderId;
+            const folder = uploadedFolders.find(f => f.id === folderId);
+            if (folder) {
+                openAnalyzeFolder(folder);
+            } else {
+                console.error('Dossier non trouvé:', folderId);
+                showErrorMessage('Dossier non trouvé');
+            }
+        });
+    });
+    
+    // Écouteurs pour les boutons Supprimer
+    document.querySelectorAll('.delete-folder-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const folderId = btn.dataset.folderId;
+            if (folderId) {
+                confirmDeleteFolder(folderId);
+            } else {
+                console.error('ID de dossier manquant');
+                showErrorMessage('Erreur: ID de dossier manquant');
+            }
+        });
+    });
+}
+function createFolderRow(folder) {
+    const row = document.createElement('tr');
+    row.className = 'folder-row';
+    
+    const nrNumber = folder.name.replace(/NR/i, '');
+    const fileText = folder.totalFiles === 1 ? 'fichier' : 'fichiers';
+    
+    // Formatage de la date
+    let displayDate = folder.date;
+    try {
+        const dateObj = new Date(folder.date);
+        if (!isNaN(dateObj.getTime())) {
+            displayDate = dateObj.toLocaleDateString('fr-FR', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+    } catch (e) {
+        // Garder la date originale en cas d'erreur
+    }
+    
+    row.innerHTML = `
+        <td class="folder-name-cell">
+            <span class="folder-icon">📁</span>
+            <span class="folder-name">NR${nrNumber}</span>
+        </td>
+        <td class="folder-files-cell">
+            ${folder.totalFiles} ${fileText}
+        </td>
+        <td class="folder-date-cell">
+            ${displayDate}
+        </td>
+        <td class="folder-actions-cell">
+            <button class="btn btn-primary btn-small analyze-folder-btn" data-folder-id="${folder.id}" title="Analyser ce dossier">
+                📊 Analyser
+            </button>
+            <button class="btn btn-danger btn-small delete-folder-btn" data-folder-id="${folder.id}" title="Supprimer ce dossier">
+                🗑️ Supprimer
+            </button>
+        </td>
+    `;
+    
+    return row;
 }
 
 function createFolderCard(folder) {
@@ -1045,31 +1127,49 @@ function closeFolderDetailsModal() {
 }
 
 // ==================== SUPPRESSION ====================
-
 function confirmDeleteFolder(folderId) {
-    if (confirm('Êtes-vous sûr de vouloir supprimer ce dossier? Cette action est irréversible.')) {
-        deleteFolder(folderId);
+    console.log('🗑️ Tentative de suppression du dossier:', folderId);
+    
+    // Trouver le dossier pour afficher son nom dans la confirmation
+    const folder = uploadedFolders.find(f => f.id === folderId);
+    const folderName = folder ? folder.name : 'ce dossier';
+    
+    if (confirm(`Êtes-vous sûr de vouloir supprimer ${folderName} ? Cette action est irréversible.`)) {
+        deleteFolderById(folderId);
     }
 }
-
-function deleteFolder() {
-    const folderId = deleteFolderBtn.dataset.folderId;
-    if (!folderId) return;
+// Nouvelle fonction pour supprimer par ID
+function deleteFolderById(folderId) {
+    console.log('🗑️ Suppression du dossier:', folderId);
     
     try {
+        // Supprimer du localStorage
         const key = `upload_folder_${folderId}`;
         localStorage.removeItem(key);
         
-        closeFolderDetailsModal();
+        // Mettre à jour la liste des dossiers
         loadUploadedFolders();
+        
+        // Mettre à jour les statistiques
         updateStats();
         
+        // Fermer le modal de détails s'il est ouvert
+        if (folderDetailsModal && !folderDetailsModal.classList.contains('hidden')) {
+            closeFolderDetailsModal();
+        }
+        
         showSuccessMessage('Dossier supprimé avec succès');
-        console.log('✅ Dossier supprimé:', folderId);
+        console.log('✅ Dossier supprimé avec succès');
         
     } catch (error) {
-        console.error('❌ Erreur suppression:', error);
-        showErrorMessage('Erreur lors de la suppression du dossier');
+        console.error('❌ Erreur lors de la suppression:', error);
+        showErrorMessage('Erreur lors de la suppression du dossier: ' + error.message);
+    }
+}
+function deleteFolder() {
+    const folderId = deleteFolderBtn.dataset.folderId;
+    if (folderId) {
+        deleteFolderById(folderId);
     }
 }
 

@@ -944,3 +944,195 @@ body {
 .mode-badge.arduino {
     background: #00979c;
 }
+/* Styles pour le tableau - VERSION SIMPLIFIÉE */
+.table-container {
+    width: 100%;
+    overflow-x: auto;
+    background: white;
+    border-radius: 6px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    margin-top: 15px;
+}
+
+.folders-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+}
+
+.folders-table thead {
+    background-color: #f8f9fa;
+    border-bottom: 2px solid #dee2e6;
+}
+
+.folders-table th {
+    padding: 12px 10px;
+    text-align: left;
+    font-weight: 600;
+    color: #495057;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.folders-table tbody tr {
+    border-bottom: 1px solid #e9ecef;
+    transition: background-color 0.15s;
+}
+
+.folders-table tbody tr:hover {
+    background-color: #f8f9fa;
+}
+
+.folders-table td {
+    padding: 10px;
+    vertical-align: middle;
+}
+
+/* Colonne Dossier */
+.folder-name-cell {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.folder-icon {
+    font-size: 16px;
+    color: #6c757d;
+}
+
+.folder-name {
+    font-weight: 500;
+    color: #212529;
+}
+
+/* Colonne Nombre de fichiers */
+.folder-files-cell {
+    color: #6c757d;
+    font-size: 13px;
+}
+
+/* Colonne Date */
+.folder-date-cell {
+    color: #6c757d;
+    font-size: 13px;
+    white-space: nowrap;
+}
+
+/* Colonne Actions */
+.folder-actions-cell {
+    display: flex;
+    gap: 5px;
+}
+
+.folder-actions-cell .btn {
+    padding: 4px 8px;
+    font-size: 11px;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: all 0.15s;
+    min-width: 65px;
+    text-align: center;
+}
+
+.folder-actions-cell .btn-primary {
+    background-color: #e7f1ff;
+    color: #0d6efd;
+}
+
+.folder-actions-cell .btn-primary:hover {
+    background-color: #0d6efd;
+    color: white;
+}
+
+.folder-actions-cell .btn-danger {
+    background-color: #f8d7da;
+    color: #dc3545;
+}
+
+.folder-actions-cell .btn-danger:hover {
+    background-color: #dc3545;
+    color: white;
+}
+
+/* Supprimer tous les styles de cartes et coins verts */
+.folder-card, .folder-header, .folder-main-info, 
+.folder-details, .folder-stats, .status-badge,
+.folder-size, .folder-bytes {
+    display: none;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .folders-table {
+        font-size: 13px;
+    }
+    
+    .folders-table th,
+    .folders-table td {
+        padding: 8px 6px;
+    }
+    
+    .folder-actions-cell {
+        flex-direction: column;
+        gap: 3px;
+    }
+    
+    .folder-actions-cell .btn {
+        width: 100%;
+        min-width: auto;
+        padding: 6px 4px;
+    }
+}
+
+@media (max-width: 480px) {
+    .folders-table {
+        font-size: 12px;
+    }
+    
+    .folder-name-cell {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 2px;
+    }
+    
+    .folder-date-cell {
+        white-space: normal;
+        font-size: 11px;
+    }
+}
+
+/* Animation simple */
+.folder-row {
+    animation: fadeIn 0.2s ease-in;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+/* Message aucun dossier */
+.no-data {
+    text-align: center;
+    padding: 40px 20px;
+    color: #6c757d;
+    background: #f8f9fa;
+    border-radius: 6px;
+    margin-top: 20px;
+    font-size: 14px;
+}
+
+.no-data p {
+    margin: 5px 0;
+}
+
+.no-data p:first-child {
+    font-size: 15px;
+    font-weight: 500;
+}

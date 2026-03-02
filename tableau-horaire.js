@@ -525,8 +525,18 @@ async function loadAndDisplayData(nr) {
          // === AJOUT DU BOUTON ANALYSE V2 À CÔTÉ DU TITRE DU DOSSIER ===
         const folderTitle = document.getElementById('folder-title');
         if (folderTitle) {
-            // Créer le contenu avec le bouton
+            // Créer le conteneur flex
             folderTitle.innerHTML = ''; // Vider le contenu existant
+            folderTitle.style.display = 'flex';
+            folderTitle.style.alignItems = 'center';
+            folderTitle.style.justifyContent = 'space-between';
+            folderTitle.style.width = '100%';
+            
+            // Groupe de gauche : NR + ANALYSE V2
+            const leftGroup = document.createElement('div');
+            leftGroup.style.display = 'flex';
+            leftGroup.style.alignItems = 'center';
+            leftGroup.style.gap = '15px';
             
             // Créer le span pour le texte NR
             const nrSpan = document.createElement('span');
@@ -537,20 +547,74 @@ async function loadAndDisplayData(nr) {
             const analyzeButton = document.createElement('span');
             analyzeButton.className = 'analyze-v2-button';
             analyzeButton.textContent = '⚡ ANALYSE V2 ⚡';
+            analyzeButton.style.cursor = 'pointer';
+            analyzeButton.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+            analyzeButton.style.color = 'white';
+            analyzeButton.style.padding = '8px 20px';
+            analyzeButton.style.borderRadius = '30px';
+            analyzeButton.style.fontSize = '16px';
+            analyzeButton.style.fontWeight = '600';
+            analyzeButton.style.boxShadow = '0 4px 12px rgba(102, 126, 234, 0.4)';
+            analyzeButton.style.transition = 'all 0.3s ease';
             
-            // Optionnel : Ajouter une action au clic
+            // Action au clic pour ANALYSE V2
             analyzeButton.addEventListener('click', () => {
                 console.log('⚡ Bouton ANALYSE V2 cliqué');
-                // Scroller vers le haut
                 window.scrollTo({
                     top: 0,
                     behavior: 'smooth'
                 });
             });
             
-            // Ajouter les éléments au titre
-            folderTitle.appendChild(nrSpan);
-            folderTitle.appendChild(analyzeButton);
+            // Ajouter NR et ANALYSE V2 au groupe de gauche
+            leftGroup.appendChild(nrSpan);
+            leftGroup.appendChild(analyzeButton);
+            
+            // Groupe de droite : bouton Retour
+            const rightGroup = document.createElement('div');
+            
+            // Créer le bouton RETOUR
+            const backButton = document.createElement('button');
+            backButton.id = 'back-btn-header';
+            backButton.innerHTML = '↩️ Retour aux dossiers';
+            backButton.style.background = '#f1f5f9';
+            backButton.style.border = '1px solid #cbd5e1';
+            backButton.style.color = '#475569';
+            backButton.style.padding = '8px 20px';
+            backButton.style.borderRadius = '30px';
+            backButton.style.fontSize = '14px';
+            backButton.style.fontWeight = '600';
+            backButton.style.cursor = 'pointer';
+            backButton.style.transition = 'all 0.3s ease';
+            backButton.style.display = 'flex';
+            backButton.style.alignItems = 'center';
+            backButton.style.gap = '8px';
+            
+            // Effet hover
+            backButton.addEventListener('mouseenter', () => {
+                backButton.style.background = '#e2e8f0';
+                backButton.style.borderColor = '#94a3b8';
+                backButton.style.transform = 'translateY(-2px)';
+                backButton.style.boxShadow = '0 4px 8px rgba(0,0,0,0.1)';
+            });
+            
+            backButton.addEventListener('mouseleave', () => {
+                backButton.style.background = '#f1f5f9';
+                backButton.style.borderColor = '#cbd5e1';
+                backButton.style.transform = 'translateY(0)';
+                backButton.style.boxShadow = 'none';
+            });
+            
+            // Action au clic
+            backButton.addEventListener('click', () => {
+                window.location.href = 'files.html';
+            });
+            
+            rightGroup.appendChild(backButton);
+            
+            // Ajouter les deux groupes au titre
+            folderTitle.appendChild(leftGroup);
+            folderTitle.appendChild(rightGroup);
         }
 
         // Filtrer les fichiers par type
@@ -818,8 +882,6 @@ async function loadAndDisplayData(nr) {
         setTimeout(() => {
             openDefaultTab();
         }, 100);
-
-        addBackButton();
 
     } catch (error) {
         console.error('❌ Erreur lors du traitement:', error);
@@ -5563,6 +5625,7 @@ function convertTimeToMinutes(timeStr) {
     return (hours || 0) * 60 + (minutes || 0);
 }
 // ======================== FILTRE GLOBAL PAR DATES ========================
+// ======================== FILTRE GLOBAL PAR DATES ========================
 function createGlobalDateFilter() {
     const allDates = allClientsHourlyMatrix.dates || [];
     if (allDates.length === 0) return null;
@@ -5571,6 +5634,33 @@ function createGlobalDateFilter() {
     const isFilterActive = window.filteredDates && 
                           window.filteredDates.length > 0 && 
                           window.filteredDates.length < allDates.length;
+    
+    // Déterminer la plage de dates à afficher
+    let dateRangeText = '';
+    let fullRangeText = '';
+    
+    // Trier toutes les dates pour référence
+    const sortedAllDates = [...allDates].sort((a, b) => {
+        const [da, ma, ya] = a.split('/');
+        const [db, mb, yb] = b.split('/');
+        return new Date(ya, ma-1, da) - new Date(yb, mb-1, db);
+    });
+    fullRangeText = `${sortedAllDates[0]} → ${sortedAllDates[sortedAllDates.length - 1]}`;
+    
+    if (isFilterActive) {
+        // Trier les dates filtrées
+        const sortedFilteredDates = [...window.filteredDates].sort((a, b) => {
+            const [da, ma, ya] = a.split('/');
+            const [db, mb, yb] = b.split('/');
+            return new Date(ya, ma-1, da) - new Date(yb, mb-1, db);
+        });
+        
+        const firstDate = sortedFilteredDates[0];
+        const lastDate = sortedFilteredDates[sortedFilteredDates.length - 1];
+        dateRangeText = `${firstDate} → ${lastDate}`;
+    } else {
+        dateRangeText = fullRangeText;
+    }
     
     // Déterminer la classe CSS selon l'état
     const containerClass = isFilterActive ? 'global-filter-container filter-active' : 'global-filter-container';
@@ -5585,7 +5675,11 @@ function createGlobalDateFilter() {
                         <div>Filtre Global des Données</div>
                         <div style="font-size: 12px; color: #718096; margin-top: 2px;">
                             ${allDates.length} jour${allDates.length !== 1 ? 's' : ''} disponibles
-                            ${isFilterActive ? ` · ${window.filteredDates.length} sélectionné${window.filteredDates.length !== 1 ? 's' : ''}` : ''}
+                            ${isFilterActive ? ` · <strong>${window.filteredDates.length}</strong> sélectionné${window.filteredDates.length !== 1 ? 's' : ''}` : ''}
+                        </div>
+                        <!-- NOUVEAU : Affichage de la plage de dates -->
+                        <div style="font-size: 13px; color: #2563eb; margin-top: 4px; font-weight: 500; background: #dbeafe; padding: 4px 10px; border-radius: 20px; display: inline-block;">
+                            📅 ${dateRangeText}
                         </div>
                     </div>
                 </div>
@@ -5602,7 +5696,7 @@ function createGlobalDateFilter() {
                 </div>
             </div>
             
-            <!-- Filtres principaux -->
+            <!-- Filtres principaux (conservés intacts) -->
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; margin-bottom: 20px;">
                 <!-- Sélection par période -->
                 <div class="filter-group">
@@ -5674,7 +5768,7 @@ function createGlobalDateFilter() {
                 </div>
             </div>
             
-            <!-- Sélection individuelle de dates - MODIFIÉ POUR HAUTEUR AUTOMATIQUE -->
+            <!-- Sélection individuelle de dates (conservée intacte) -->
             <div class="filter-group" style="overflow: visible;">
                 <div class="filter-group-title">
                     <span>📌</span> Sélection de dates spécifiques
@@ -5708,7 +5802,7 @@ function createGlobalDateFilter() {
                     </button>
                 </div>
                 
-                <!-- Grille des dates - MODIFIÉ POUR HAUTEUR AUTOMATIQUE -->
+                <!-- Grille des dates -->
                 <div class="date-checkbox-container" style="
                     max-height: none;
                     overflow-y: visible;
@@ -5746,7 +5840,7 @@ function createGlobalDateFilter() {
                     border: 1px solid #e2e8f0;
                 ">
                     <span>
-                        📊 <strong>${document.querySelectorAll('.date-checkbox:checked').length}</strong> date(s) sélectionnée(s)
+                        📊 <strong id="selected-count-display">${document.querySelectorAll('.date-checkbox:checked').length}</strong> date(s) sélectionnée(s)
                     </span>
                     <span style="color: #64748b;">
                         Total: ${allDates.length} date(s)
@@ -5754,7 +5848,7 @@ function createGlobalDateFilter() {
                 </div>
             </div>
             
-            <!-- Indicateur de sélection -->
+            <!-- Indicateur de sélection amélioré avec la période -->
             <div id="filter-indicator" class="filter-indicator ${isFilterActive ? 'filtered' : ''}">
                 <span class="filter-indicator-icon">📊</span>
                 <div class="filter-indicator-info">
@@ -5763,7 +5857,8 @@ function createGlobalDateFilter() {
                         jour${(isFilterActive ? window.filteredDates.length : allDates.length) !== 1 ? 's' : ''} sélectionné${(isFilterActive ? window.filteredDates.length : allDates.length) !== 1 ? 's' : ''}
                     </div>
                     <div class="filter-indicator-description">
-                        Le filtre s'applique à tous les graphiques et tableaux de l'onglet TECHNIQUE
+                        Période: <strong>${dateRangeText}</strong>
+                        ${isFilterActive ? `<br><span style="font-size: 11px;">(Total disponible: ${fullRangeText})</span>` : ''}
                     </div>
                 </div>
                 ${isFilterActive ? `
@@ -10309,19 +10404,7 @@ window.changeDailySummaryPage = function (clientId, page) {
     }
 };
 
-function addBackButton() {
-    const controlsContainer = document.getElementById('controls-container');
 
-    controlsContainer.innerHTML = `
-        <div class="action-buttons">
-            <button id="back-btn" class="btn btn-warning" onclick="window.location.href='files.html'">
-                ↩️ Retour aux dossiers
-            </button>
-        </div>
-    `;
-
-    controlsContainer.classList.remove('hidden');
-}
 
 // ======================== FONCTIONS UTILITAIRES ========================
 
@@ -10782,6 +10865,96 @@ function addAllClientsStyles() {
         `;
         document.head.appendChild(style);
     }
+
+    const responsiveHeaderStyles = `
+        /* Styles pour l'en-tête responsive */
+        .header-content {
+            display: flex !important;
+            justify-content: space-between !important;
+            align-items: center !important;
+            width: 100% !important;
+        }
+        
+        #folder-title {
+            display: flex !important;
+            align-items: center !important;
+            justify-content: space-between !important;
+            width: 100% !important;
+            flex-wrap: wrap !important;
+            gap: 15px !important;
+        }
+        
+        .nr-text {
+            font-size: 24px !important;
+            font-weight: 700 !important;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .analyze-v2-button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+            color: white !important;
+            padding: 8px 20px !important;
+            border-radius: 30px !important;
+            font-size: 16px !important;
+            font-weight: 600 !important;
+            cursor: pointer !important;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4) !important;
+            transition: all 0.3s ease !important;
+            white-space: nowrap !important;
+        }
+        
+        .analyze-v2-button:hover {
+            transform: translateY(-2px) !important;
+            box-shadow: 0 6px 16px rgba(102, 126, 234, 0.5) !important;
+        }
+        
+        #back-btn-header {
+            background: #f1f5f9 !important;
+            border: 1px solid #cbd5e1 !important;
+            color: #475569 !important;
+            padding: 8px 20px !important;
+            border-radius: 30px !important;
+            font-size: 14px !important;
+            font-weight: 600 !important;
+            cursor: pointer !important;
+            transition: all 0.3s ease !important;
+            white-space: nowrap !important;
+            display: flex !important;
+            align-items: center !important;
+            gap: 8px !important;
+        }
+        
+        #back-btn-header:hover {
+            background: #e2e8f0 !important;
+            border-color: #94a3b8 !important;
+            transform: translateY(-2px) !important;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1) !important;
+        }
+        
+        @media (max-width: 768px) {
+            #folder-title {
+                flex-direction: column !important;
+                align-items: flex-start !important;
+            }
+            
+            .nr-text {
+                font-size: 20px !important;
+            }
+            
+            .analyze-v2-button {
+                font-size: 14px !important;
+                padding: 6px 16px !important;
+            }
+            
+            #back-btn-header {
+                font-size: 12px !important;
+                padding: 6px 16px !important;
+            }
+        }
+    `;
 }
 
 // NOUVELLE FONCTION : Afficher l'analyse ENR avec les 3 types
