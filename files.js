@@ -252,7 +252,7 @@ function createFolderRow(folder) {
                 🗑️ Supprimer
             </button>
             <button class="btn btn-primary btn-small analyze-folder-btn" data-nr="${folder.nr}" title="Analyser ce dossier" disabled>
-                📊 Analyser
+                ▶️ Analyser 
             </button>
         </td>
     `;

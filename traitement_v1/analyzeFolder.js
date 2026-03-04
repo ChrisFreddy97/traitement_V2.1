@@ -1936,7 +1936,7 @@ function createTechnicalDataCard() {
     
     const cardHeader = document.createElement('div');
     cardHeader.style.cssText = `background: rgba(255, 255, 255, 0.15); color: white; padding: 15px 25px; font-size: 18px; font-weight: 600; display: flex; align-items: center; gap: 10px; backdrop-filter: blur(10px); border-bottom: 1px solid rgba(255, 255, 255, 0.2);`;
-    cardHeader.innerHTML = `👥 DONNÉES TECHNIQUES DU NR-${escapeHtml(currentFolder.name)}`;
+    cardHeader.innerHTML = `👥 DONNÉES TECHNIQUES DU ${escapeHtml(currentFolder.name)}`;
     card.appendChild(cardHeader);
     
     if (filteredEnergyData.length !== combinedEnergyData.length || filteredTensionData.length !== combinedTensionData.length) {
@@ -2753,7 +2753,6 @@ function displayEnergyAnalysis() {
     }, 100);
 }
 // ==================== GRAPHIQUES TENSION ====================
-
 function createTensionChart() {
     const dataToUse = filteredTensionData.length > 0 ? filteredTensionData : combinedTensionData;
     if (dataToUse.length === 0) return;
@@ -2765,6 +2764,19 @@ function createTensionChart() {
     const systemType = detectSystemType(dataToUse);
     const limits = getSystemLimits(systemType);
     
+    // FORCED SCALES - MODIFY THIS SECTION
+    let yMin, yMax;
+    if (systemType === '12V') {
+        // Force scale to 10V - 16V for 12V systems
+        yMin = 10;
+        yMax = 16;
+    } else {
+        // Force scale to 20V - 30V for 24V systems
+        yMin = 20;
+        yMax = 30;
+    }
+    
+    // Rest of the function continues with data processing...
     const dailyData = {};
     const pointsExceedingLimits = { min: [], max: [], avg: [] };
     
@@ -2796,34 +2808,16 @@ function createTensionChart() {
     const maxValues = dates.map(date => dailyData[date].max);
     const avgValues = dates.map(date => dailyData[date].sumMoy / dailyData[date].countMoy);
     
-    const validMinValues = minValues.filter(v => v > 0);
-    const validMaxValues = maxValues.filter(v => v > 0);
-    const dataMin = validMinValues.length > 0 ? Math.min(...validMinValues) : limits.min;
-    const dataMax = validMaxValues.length > 0 ? Math.max(...validMaxValues) : limits.max;
-    
-    let yMin, yMax;
-    if (systemType === '12V') {
-        yMin = Math.max(0, Math.floor(11 - (4 * 0.4)));
-        yMax = Math.ceil(15 + (4 * 0.4));
-        if (dataMin < yMin + 1) yMin = Math.max(0, Math.floor(dataMin - 1.5));
-        if (dataMax > yMax - 1) yMax = Math.ceil(dataMax + 1.5);
-        if ((yMax - yMin) < 8) { const center = (yMin + yMax) / 2; yMin = Math.max(0, Math.floor(center - 4)); yMax = Math.ceil(center + 4); }
-    } else {
-        yMin = Math.max(0, Math.floor(22 - (9 * 0.3)));
-        yMax = Math.ceil(31 + (9 * 0.3));
-        if (dataMin < yMin + 2) yMin = Math.max(0, Math.floor(dataMin - 2.5));
-        if (dataMax > yMax - 2) yMax = Math.ceil(dataMax + 2.5);
-        if ((yMax - yMin) < 15) { const center = (yMin + yMax) / 2; yMin = Math.max(0, Math.floor(center - 7.5)); yMax = Math.ceil(center + 7.5); }
-    }
-    
     const pointBackgroundColorsMin = minValues.map(v => v > 0 && (v < limits.min || v > limits.max) ? '#ef4444' : '#3b82f6');
     const pointBackgroundColorsMax = maxValues.map(v => v > 0 && (v > limits.max || v < limits.min) ? '#ef4444' : '#ef4444');
     const pointBackgroundColorsAvg = avgValues.map(v => v > 0 && (v < limits.min || v > limits.max) ? '#ef4444' : '#10b981');
     
-    const chartContainer = document.createElement('div');
-    chartContainer.style.cssText = `background: white; border-radius: 12px; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1); overflow: hidden;`;
+    // ... (rest of the chart creation code remains the same)
     
     const exceedanceCount = { total: pointsExceedingLimits.min.length + pointsExceedingLimits.max.length + pointsExceedingLimits.avg.length };
+    
+    const chartContainer = document.createElement('div');
+    chartContainer.style.cssText = `background: white; border-radius: 12px; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1); overflow: hidden;`;
     
     const chartHeader = document.createElement('div');
     chartHeader.style.cssText = `background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%); color: white; padding: 15px 25px; font-size: 16px; font-weight: 600; display: flex; justify-content: space-between; align-items: center;`;
@@ -2901,12 +2895,17 @@ function createTensionChart() {
                         x: { title: { display: true, text: 'Date', font: { size: 13, weight: 'bold' } }, ticks: { maxRotation: 45, font: { size: 11 } }, grid: { color: 'rgba(0, 0, 0, 0.05)' } },
                         y: {
                             title: { display: true, text: 'Tension (Volts)', font: { size: 13, weight: 'bold' } },
-                            ticks: { font: { size: 11, weight: '500' }, stepSize: systemType === '12V' ? 1 : 2, callback: function(value) { if (value === 11 || value === 15) return `⚠️ ${value}V`; if (value === 22 || value === 31) return `⚠️ ${value}V`; return value + 'V'; } },
-                            min: yMin, max: yMax,
+                            ticks: { font: { size: 11, weight: '500' }, stepSize: systemType === '12V' ? 1 : 2, callback: function(value) { return value + 'V'; } },
+                            min: yMin, 
+                            max: yMax,
                             grid: {
-                                color: function(context) { const v = context.tick.value; if (v === 11 || v === 15) return 'rgba(249, 115, 22, 0.3)'; if (v === 22 || v === 31) return 'rgba(234, 179, 8, 0.3)'; return 'rgba(0, 0, 0, 0.06)'; },
-                                lineWidth: ctx => [11, 15, 22, 31].includes(ctx.tick.value) ? 2 : 1,
-                                borderDash: ctx => [11, 15, 22, 31].includes(ctx.tick.value) ? [10, 8] : []
+                                color: function(context) { 
+                                    const v = context.tick.value; 
+                                    if (v === limits.min || v === limits.max) return 'rgba(239, 68, 68, 0.3)'; 
+                                    return 'rgba(0, 0, 0, 0.06)'; 
+                                },
+                                lineWidth: ctx => [limits.min, limits.max].includes(ctx.tick.value) ? 2 : 1,
+                                borderDash: ctx => [limits.min, limits.max].includes(ctx.tick.value) ? [8, 6] : []
                             }
                         }
                     }
@@ -2991,6 +2990,18 @@ function createHourlyTensionChart(selectedDate = 'all') {
     // Détecter le système de tension
     const systemType = detectSystemType(filteredData);
     const limits = getSystemLimits(systemType);
+    
+    // ===== FORCER L'ÉCHELLE POUR LE GRAPHIQUE HORAIRE =====
+    let yMin, yMax;
+    if (systemType === '12V') {
+        // Forcer l'échelle à 10V - 16V pour les systèmes 12V
+        yMin = 10;
+        yMax = 16;
+    } else {
+        // Forcer l'échelle à 20V - 30V pour les systèmes 24V
+        yMin = 20;
+        yMax = 30;
+    }
     
     // Grouper les données par heure
     const hourlyData = {};
@@ -3077,13 +3088,6 @@ function createHourlyTensionChart(selectedDate = 'all') {
         t_moy_values: h.t_moy_values,
         t_max_values: h.t_max_values
     }));
-    
-    // Trouver les valeurs min/max pour l'échelle
-    const allValues = hourlyTension.flatMap(h => [h.t_min, h.t_moy, h.t_max]).filter(v => v > 0);
-    const minValue = allValues.length > 0 ? Math.min(...allValues, limits.min - 2) : limits.min - 2;
-    const maxValue = allValues.length > 0 ? Math.max(...allValues, limits.max + 2) : limits.max + 2;
-    const yMin = Math.max(0, Math.floor(minValue * 0.95));
-    const yMax = Math.ceil(maxValue * 1.05);
     
     // Créer le conteneur du graphique
     const chartContainer = document.createElement('div');
@@ -3228,7 +3232,7 @@ function createHourlyTensionChart(selectedDate = 'all') {
                 ${hourlyTension.length} heures
             </span>
             <span style="font-size: 12px; background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 20px;">
-                Système ${systemType}
+                Système ${systemType} • Échelle forcée ${yMin}V-${yMax}V
             </span>
         </div>
     `;
@@ -3504,7 +3508,7 @@ function createHourlyTensionChart(selectedDate = 'all') {
                 }
             });
             
-            console.log(`✅ Graphique tension horaire créé avec ${hourlyTension.length} heures`);
+            console.log(`✅ Graphique tension horaire créé avec ${hourlyTension.length} heures (échelle forcée ${yMin}V-${yMax}V)`);
             
             // Ajouter le résumé statistique
             if (hourlyTension && hourlyTension.length > 0) {

@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Arduino - Relève V1</title>
+    <link rel="stylesheet" href="arduino.css">
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 ANALYSE V1 DU RELEVES ARDUINO</h1>
+
+        <div class="info-upload-row">
+            <div class="info-section">
+                <h3>ℹ️ Import et lecture de fichiers</h3>
+                <p>Importez un fichier texte pour visualiser son contenu. Supporte les fichiers .txt</p>
+            </div>
+
+            <div class="upload-mini-container">
+                <div class="upload-mini-area" id="uploadArea">
+                    <span class="upload-mini-icon">📄</span>
+                    <span class="upload-mini-text">Importer un fichier</span>
+                    <input type="file" id="fileInput" accept=".txt,.log,.csv" style="display: none;">
+                </div>
+                <div class="file-info-mini" id="fileInfo"></div>
+            </div>
+        </div>
+
+        <!-- Barre de progression et spinner -->
+        <div class="loading-container" id="loadingContainer" style="display: none;">
+            <div class="progress-bar-container">
+                <div class="progress-bar" id="progressBar"></div>
+            </div>
+            <div class="spinner-container">
+                <div class="spinner"></div>
+                <span class="loading-text" id="loadingText">Analyse du fichier en cours...</span>
+            </div>
+        </div>
+
+        <div class="content-container" id="contentContainer" style="display: none;">
+            <h3>📝 ANALYSES DU FICHIER</h3>
+            
+            <!-- Affichage du N° Nano Réseau -->
+            <div class="nr-info" id="nrInfo" style="display: none;"></div>
+            
+            <!-- Onglets Technique et Commercial -->
+            <div class="tabs-container" id="tabsContainer" style="display: none;">
+                <div class="tabs-header">
+                    <button class="tab-btn active" id="techTabBtn" onclick="switchTab('tech')">
+                        <span class="tab-icon">🔧</span>
+                        Technique
+                    </button>
+                    <button class="tab-btn" id="comTabBtn" onclick="switchTab('com')">
+                        <span class="tab-icon">💼</span>
+                        Commercial
+                    </button>
+                </div>
+                
+                <div class="tab-content active" id="techTab">
+                    <div id="techContent"></div>
+                </div>
+                
+                <div class="tab-content" id="comTab">
+                    <div id="comContent"></div>
+                </div>
+            </div>
+            
+            <div class="content-display" id="contentDisplay" style="display: none;">
+                <pre id="fileContent" class="file-content"></pre>
+            </div>
+        </div>
+
+        <div class="back-section">
+            <button class="back-btn" onclick="window.location.href='../index.html'">
+                ← Retour à l'Accueil
+            </button>
+        </div>
+    </div>
+    
+    <script src="chart.js"></script>
+    <script src="arduino.js"></script>
+</body>
+</html>
