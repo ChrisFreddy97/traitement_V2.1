@@ -1,93 +1,10 @@
-// arduinoPagination.js
 import { ROWS_PER_PAGE } from './arduinoConstants.js';
 import { database } from './arduinoCore.js';
 
-export function generatePagination(tableIdx, page) {
-    if (page.totalPages <= 1) return '';
-    
-    return `
-        <div class="pagination" data-table-index="${tableIdx}">
-            <button class="pagination-button" data-action="first" ${page.pageNumber === 1 ? 'disabled' : ''}>⏮️</button>
-            <button class="pagination-button" data-action="prev" ${page.pageNumber === 1 ? 'disabled' : ''}>◀️</button>
-            <div class="pagination-info">
-                Page <input type="number" class="pagination-input" value="${page.pageNumber}" min="1" max="${page.totalPages}" data-table-index="${tableIdx}"> / ${page.totalPages}
-            </div>
-            <button class="pagination-button" data-action="next" ${page.pageNumber === page.totalPages ? 'disabled' : ''}>▶️</button>
-            <button class="pagination-button" data-action="last" ${page.pageNumber === page.totalPages ? 'disabled' : ''}>⏭️</button>
-        </div>
-    `;
-}
+export function generatePagination(t,p){if(p.totalPages<=1)return'';return `<div class="pagination" data-table-index="${t}"><button class="pagination-button" data-action="first" ${p.pageNumber===1?'disabled':''}></button><button class="pagination-button" data-action="prev" ${p.pageNumber===1?'disabled':''}></button><div class="pagination-info">Page <input type="number" class="pagination-input" value="${p.pageNumber}" min="1" max="${p.totalPages}" data-table-index="${t}"> / ${p.totalPages}</div><button class="pagination-button" data-action="next" ${p.pageNumber===p.totalPages?'disabled':''}></button><button class="pagination-button" data-action="last" ${p.pageNumber===p.totalPages?'disabled':''}></button></div>`}
 
-export function attachPaginationEvents(renderCallback) {
-    // Nettoyage et réattachement des événements
-    document.querySelectorAll('.pagination-button').forEach(button => {
-        button.replaceWith(button.cloneNode(true));
-    });
-    
-    document.querySelectorAll('.pagination-button').forEach(button => {
-        button.addEventListener('click', (e) => handlePaginationClick(e, renderCallback));
-    });
+export function attachPaginationEvents(r){document.querySelectorAll('.pagination-button').forEach(b=>b.replaceWith(b.cloneNode(!0)));document.querySelectorAll('.pagination-button').forEach(b=>b.addEventListener('click',e=>h(e,r)));document.querySelectorAll('.pagination-input').forEach(i=>{i.addEventListener('change',e=>p(e,r));i.addEventListener('keypress',e=>{if(e.key==='Enter')e.target.dispatchEvent(new Event('change'))})})}
 
-    document.querySelectorAll('.pagination-input').forEach(input => {
-        input.addEventListener('change', (e) => handlePageInputChange(e, renderCallback));
-        input.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') e.target.dispatchEvent(new Event('change'));
-        });
-    });
-}
+function h(e,r){const b=e.currentTarget,div=b.closest('.pagination');if(!div)return;const ti=parseInt(div.dataset.tableIndex),t=database.tables[ti];if(!t)return;const cp=database.currentPages[ti]||1,tp=Math.ceil(t.data.length/ROWS_PER_PAGE);let np=cp;switch(b.dataset.action){case'first':np=1;break;case'prev':np=Math.max(1,cp-1);break;case'next':np=Math.min(tp,cp+1);break;case'last':np=tp}if(np!==cp){database.currentPages[ti]=np;r();setTimeout(()=>{const tb=document.querySelector(`.table-block[data-table-index="${ti}"] .table-wrapper`);if(tb)tb.scrollTop=0},50)}}
 
-function handlePaginationClick(e, renderCallback) {
-    const button = e.currentTarget;
-    const paginationDiv = button.closest('.pagination');
-    if (!paginationDiv) return;
-
-    const tableIndex = parseInt(paginationDiv.dataset.tableIndex);
-    const table = database.tables[tableIndex];
-    if (!table) return;
-
-    const currentPage = database.currentPages[tableIndex] || 1;
-    const totalPages = Math.ceil(table.data.length / ROWS_PER_PAGE);
-    let newPage = currentPage;
-
-    switch (button.dataset.action) {
-        case 'first': newPage = 1; break;
-        case 'prev': newPage = Math.max(1, currentPage - 1); break;
-        case 'next': newPage = Math.min(totalPages, currentPage + 1); break;
-        case 'last': newPage = totalPages; break;
-    }
-
-    if (newPage !== currentPage) {
-        database.currentPages[tableIndex] = newPage;
-        renderCallback();
-        
-        setTimeout(() => {
-            const tableBlock = document.querySelector(`.table-block[data-table-index="${tableIndex}"] .table-wrapper`);
-            if (tableBlock) tableBlock.scrollTop = 0;
-        }, 50);
-    }
-}
-
-function handlePageInputChange(e, renderCallback) {
-    const input = e.currentTarget;
-    const paginationDiv = input.closest('.pagination');
-    if (!paginationDiv) return;
-
-    const tableIndex = parseInt(paginationDiv.dataset.tableIndex);
-    const table = database.tables[tableIndex];
-    if (!table) return;
-
-    const totalPages = Math.ceil(table.data.length / ROWS_PER_PAGE);
-    let newPage = parseInt(input.value);
-
-    if (!isNaN(newPage) && newPage >= 1 && newPage <= totalPages) {
-        database.currentPages[tableIndex] = newPage;
-        renderCallback();
-        
-        setTimeout(() => {
-            const tableBlock = document.querySelector(`.table-block[data-table-index="${tableIndex}"] .table-wrapper`);
-            if (tableBlock) tableBlock.scrollTop = 0;
-        }, 50);
-    } else {
-        input.value = database.currentPages[tableIndex] || 1;
-    }
-}
+function p(e,r){const i=e.currentTarget,div=i.closest('.pagination');if(!div)return;const ti=parseInt(div.dataset.tableIndex),t=database.tables[ti];if(!t)return;const tp=Math.ceil(t.data.length/ROWS_PER_PAGE),np=parseInt(i.value);if(!isNaN(np)&&np>=1&&np<=tp){database.currentPages[ti]=np;r();setTimeout(()=>{const tb=document.querySelector(`.table-block[data-table-index="${ti}"] .table-wrapper`);if(tb)tb.scrollTop=0},50)}else i.value=database.currentPages[ti]||1}
