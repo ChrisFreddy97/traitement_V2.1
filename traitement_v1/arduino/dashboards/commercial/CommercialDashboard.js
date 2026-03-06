@@ -928,11 +928,18 @@ function renderCauseTextSummary(causeResult) {
     const confidence = ((causeResult?.confidence || 0) * 100).toFixed(0);
 
     const causes = {
+        // ===========================================
+        // CLIENTS FANTÔMES
+        // ===========================================
         ghost_client: {
             emoji: '👻',
             name: 'Client fantôme',
-            text: `Client sans données - À vérifier sur le terrain.`
+            text: `Aucune donnée reçue - Vérifier présence installation.`
         },
+
+        // ===========================================
+        // CAUSES COMMERCIALES
+        // ===========================================
         noRecharge: {
             emoji: '📵',
             name: 'Pas de recharge',
@@ -943,11 +950,6 @@ function renderCauseTextSummary(causeResult) {
             name: 'Consommation élevée',
             text: `Client consomme plus que son forfait.`
         },
-        technicalEvent: {
-            emoji: '⚠️',
-            name: 'Interruption technique',
-            text: `Coupure ou maintenance détectée.`
-        },
         insufficientForfait: {
             emoji: '📦',
             name: 'Forfait insuffisant',
@@ -955,23 +957,50 @@ function renderCauseTextSummary(causeResult) {
         },
         payment: {
             emoji: '💳',
-            name: 'Problème de paiement',
-            text: `Recharges échouées. Problème banque/carte.`
+            name: 'Paiement échoué',
+            text: `Recharges échouées - Problème bancaire.`
         },
         overload: {
             emoji: '🔥',
-            name: 'Surcharge anormale',
-            text: `Consommation anormalement élevée sur équipement.`
+            name: 'Surcharge',
+            text: `Consommation anormalement élevée.`
         },
+
+        // ===========================================
+        // CAUSES TECHNIQUES
+        // ===========================================
+        technicalEvent: {
+            emoji: '⚠️',
+            name: 'Incident technique',
+            text: `Coupure ou maintenance détectée.`
+        },
+
+        // ===========================================
+        // CAUSES D'ABSENCE
+        // ===========================================
+        vacances: {
+            emoji: '🏠',
+            name: 'Absence temporaire',
+            text: `Client en vacances - Installation en veille.`
+        },
+        abandon: {
+            emoji: '🚚',
+            name: 'Inactivité prolongée',
+            text: `Aucune activité depuis longtemps - Client peut-être parti.`
+        },
+
+        // ===========================================
+        // AUTRES
+        // ===========================================
         system: {
             emoji: '🔧',
             name: 'Anomalie système',
-            text: `Séquence longue. Possible bug système.`
+            text: `Comportement anormal - À investiguer.`
         },
         noActivity: {
             emoji: '🕳️',
             name: 'Compte inactif',
-            text: `Aucune activité recharge enregistrée.`
+            text: `Aucune activité enregistrée.`
         },
         unknown: {
             emoji: '❓',

@@ -212,25 +212,108 @@ export function analyzeCreditZeroCauses(client, sequenceDates) {
     const seqLength = sequenceDates.length;
 
     // ===========================================
-    // NIVEAU 1: ANALYSE DU PROFIL D'ABSENCE
+    // FONCTION UTILITAIRE INTÉGRÉE
     // ===========================================
-    const absenceProfile = analyzeAbsenceProfile(client);
-    
-    if (absenceProfile.isAbsent) {
+    function hasRecentActivity(client) {
+        const today = new Date();
+        
+        // Dernière recharge (30 jours)
+        const lastRecharge = client.recharges?.slice(-1)[0]?.date;
+        if (lastRecharge) {
+            const days = Math.floor((today - new Date(lastRecharge)) / (1000*60*60*24));
+            if (days < 30) return true;
+        }
+        
+        // Dernière consommation (30 jours)
+        const lastConso = client.consommation?.journaliere?.slice(-1)[0]?.date;
+        if (lastConso) {
+            const days = Math.floor((today - new Date(lastConso)) / (1000*60*60*24));
+            if (days < 30) return true;
+        }
+        
+        // Dernier événement (30 jours)
+        const lastEvent = client.events?.slice(-1)[0]?.date;
+        if (lastEvent) {
+            const days = Math.floor((today - new Date(lastEvent)) / (1000*60*60*24));
+            if (days < 30) return true;
+        }
+        
+        return false;
+    }
+
+    function isGhostClient(client) {
+        const aDesRecharges = (client.recharges?.length > 0);
+        const aDesConso = (client.consommation?.journaliere?.length > 0);
+        const aDesEvents = (client.events?.length > 0);
+        const aDesCredits = (client.credits?.length > 0);
+        
+        if (!aDesRecharges && !aDesConso && !aDesEvents && !aDesCredits) {
+            return true;
+        }
+        
+        const consoToutesNulles = (client.consommation?.journaliere?.every(c => c.valeur === 0) ?? true);
+        const creditsTousNuls = (client.credits?.every(c => c.value === 0) ?? true);
+        
+        return (aDesConso && consoToutesNulles) || (aDesCredits && creditsTousNuls);
+    }
+
+    function getTechnicalContextForDates(sequenceDates) {
+        if (!database.technicalData) {
+            return {
+                hasData: false,
+                loadShedding: { partiel: 0, total: 0, jours: [] },
+                highVoltage: [],
+                variations: [],
+                conformity: { pourcentage: 100 }
+            };
+        }
+
+        const tech = database.technicalData;
+        
+        const loadSheddingJours = (tech.loadShedding?.jours || []).filter(j => 
+            sequenceDates.includes(j)
+        );
+        
+        const highVoltagePendant = (tech.highVoltage || []).filter(h => 
+            sequenceDates.includes(h.date)
+        );
+        
+        const variationsPendant = (tech.variations || []).filter(v => 
+            sequenceDates.includes(v.date)
+        );
+        
         return {
-            mainCause: absenceProfile.type,
-            confidence: absenceProfile.confidence,
-            evidence: absenceProfile.reasons.join(' - ')
+            hasData: true,
+            loadShedding: {
+                partiel: tech.loadShedding?.partiel || 0,
+                total: tech.loadShedding?.total || 0,
+                jours: loadSheddingJours
+            },
+            highVoltage: highVoltagePendant,
+            variations: variationsPendant,
+            conformity: tech.conformity || { pourcentage: 100 }
         };
     }
 
-    // Contexte technique
+    // ===========================================
+    // CONTEXTE TECHNIQUE
+    // ===========================================
     const techContext = getTechnicalContextForDates(sequenceDates);
 
     // ===========================================
-    // NIVEAU 2: PROBLÈMES TECHNIQUES
+    // NIVEAU 1: CLIENT FANTÔME (PAS DE DONNÉES)
     // ===========================================
+    if (isGhostClient(client)) {
+        return {
+            mainCause: 'ghost_client',
+            confidence: 0.99,
+            evidence: 'Aucune donnée - Client inexistant'
+        };
+    }
 
+    // ===========================================
+    // NIVEAU 2: PROBLÈMES TECHNIQUES MAJEURS
+    // ===========================================
     if (techContext.loadShedding.jours.length > 0) {
         return {
             mainCause: 'technicalEvent',
@@ -239,30 +322,10 @@ export function analyzeCreditZeroCauses(client, sequenceDates) {
         };
     }
 
-    const highVoltageCritique = techContext.highVoltage.filter(h => h.qualite === 'critique');
-    if (highVoltageCritique.length > 0) {
-        return {
-            mainCause: 'technicalEvent',
-            confidence: 0.97,
-            evidence: `${highVoltageCritique.length} jour(s) sans haute tension`
-        };
-    }
-
-    const variationsGraves = techContext.variations.filter(v => 
-        v.variation > (database.technicalData?.variationsSeuil * 1.5 || 3)
-    );
-    if (variationsGraves.length > 0) {
-        return {
-            mainCause: 'technicalEvent',
-            confidence: 0.95,
-            evidence: `${variationsGraves.length} variation(s) brutale(s) de tension`
-        };
-    }
-
     const technicalEvents = (client.events || []).filter(e => 
         e.date >= seqStart && e.date <= seqEnd &&
         (e.type.includes('Suspend') || e.type.includes('Delest') || 
-         e.type.includes('Maintenance') || e.type.includes('Coupure') || e.type.includes('Défaut'))
+         e.type.includes('Maintenance') || e.type.includes('Coupure'))
     );
 
     if (technicalEvents.length > 0) {
@@ -273,217 +336,207 @@ export function analyzeCreditZeroCauses(client, sequenceDates) {
         };
     }
 
-    if (techContext.conformity.pourcentage < 70) {
-        return {
-            mainCause: 'technicalEvent',
-            confidence: 0.85,
-            evidence: `Réseau instable - ${techContext.conformity.pourcentage}% de conformité`
-        };
-    }
-
     // ===========================================
-    // NIVEAU 3: PROBLÈMES COMMERCIAUX
+    // NIVEAU 3: CLIENT ACTIF (A DES DONNÉES RÉCENTES)
     // ===========================================
-
-    const rechargesInSeq = (client.recharges || []).filter(r =>
-        r.date >= seqStart && r.date <= seqEnd
-    );
-    const rechargesAfter = (client.recharges || []).filter(r =>
-        new Date(r.date) > new Date(seqEnd)
-    );
-
-    if (rechargesInSeq.length === 0 && rechargesAfter.length > 0) {
-        return {
-            mainCause: 'noRecharge',
-            confidence: 0.95,
-            evidence: `Pas de recharge durant la séquence`
-        };
-    }
-
-    const consumptionInSeq = (client.consommation?.journaliere || []).filter(c =>
-        sequenceDates.includes(c.date)
-    );
-
-    if (consumptionInSeq.length > 0) {
-        const totalConsumed = consumptionInSeq.reduce((s, c) => s + c.valeur, 0);
-        const avgDaily = totalConsumed / consumptionInSeq.length;
-        const forfaitMax = client.consommation?.max || 0;
-
-        if (forfaitMax > 0 && avgDaily > forfaitMax * 0.8) {
+    const clientActif = hasRecentActivity(client);
+    
+    if (clientActif) {
+        // Priorité aux causes commerciales
+        const rechargesInSeq = (client.recharges || []).filter(r =>
+            r.date >= seqStart && r.date <= seqEnd
+        );
+        
+        if (rechargesInSeq.length === 0) {
             return {
-                mainCause: 'highConsumption',
+                mainCause: 'noRecharge',
+                confidence: 0.95,
+                evidence: `Pas de recharge pendant ${seqLength} jour(s)`
+            };
+        }
+        
+        const consumptionInSeq = (client.consommation?.journaliere || []).filter(c =>
+            sequenceDates.includes(c.date)
+        );
+
+        if (consumptionInSeq.length > 0) {
+            const totalConsumed = consumptionInSeq.reduce((s, c) => s + c.valeur, 0);
+            const avgDaily = totalConsumed / consumptionInSeq.length;
+            const forfaitMax = client.consommation?.max || 0;
+
+            if (forfaitMax > 0 && avgDaily > forfaitMax * 0.8) {
+                return {
+                    mainCause: 'highConsumption',
+                    confidence: 0.9,
+                    evidence: `Consommation: ${avgDaily.toFixed(0)} Wh/jour`
+                };
+            }
+        }
+        
+        const failedRecharges = (client.failedRecharges || []).filter(r =>
+            r.date >= seqStart && r.date <= seqEnd
+        );
+
+        if (failedRecharges.length > 0) {
+            return {
+                mainCause: 'payment',
+                confidence: 0.88,
+                evidence: `${failedRecharges.length} recharge(s) échouée(s)`
+            };
+        }
+    }
+
+    // ===========================================
+    // NIVEAU 4: CAUSES D'ABSENCE (CLIENT INACTIF)
+    // ===========================================
+    if (!clientActif) {
+        if (seqLength < 7) {
+            return {
+                mainCause: 'vacances',
+                confidence: 0.7,
+                evidence: `Courte absence: ${seqLength} jours`
+            };
+        }
+        
+        if (seqLength > 30) {
+            return {
+                mainCause: 'abandon',
                 confidence: 0.9,
-                evidence: `Consommation: ${avgDaily.toFixed(0)} Wh/jour`
+                evidence: `Absence prolongée: ${seqLength} jours`
             };
         }
-    }
-
-    const allConsumption = (client.consommation?.journaliere || []);
-    if (allConsumption.length > 0 && client.consommation?.max) {
-        const avgAllTime = allConsumption.reduce((s, c) => s + c.valeur, 0) / allConsumption.length;
-        const forfaitMax = client.consommation.max;
-        const exceedPercent = ((avgAllTime / forfaitMax) - 1) * 100;
-
-        if (exceedPercent > 20) {
-            return {
-                mainCause: 'insufficientForfait',
-                confidence: 0.85,
-                evidence: `Forfait insuffisant: +${exceedPercent.toFixed(0)}%`
-            };
-        }
-    }
-
-    const failedRecharges = (client.failedRecharges || []).filter(r =>
-        r.date >= seqStart && r.date <= seqEnd
-    );
-
-    if (failedRecharges.length > 0) {
+        
         return {
-            mainCause: 'payment',
-            confidence: 0.88,
-            evidence: `${failedRecharges.length} recharge(s) échouée(s)`
+            mainCause: 'vacances',
+            confidence: 0.8,
+            evidence: `Absence de ${seqLength} jours`
         };
     }
 
-    if (consumptionInSeq.length > 0) {
-        const maxDailyConsumption = Math.max(...consumptionInSeq.map(c => c.valeur));
-        const avgDaily = consumptionInSeq.reduce((s, c) => s + c.valeur, 0) / consumptionInSeq.length;
-
-        if (maxDailyConsumption > avgDaily * 3) {
-            return {
-                mainCause: 'overload',
-                confidence: 0.80,
-                evidence: `Pic anormal: ${maxDailyConsumption.toFixed(0)} Wh`
-            };
-        }
-    }
-
-    if (seqLength > 14) {
-        return {
-            mainCause: 'system',
-            confidence: 0.72,
-            evidence: `Séquence anormale: ${seqLength} jours`
-        };
-    }
-
-    if ((client.recharges || []).length === 0 && seqLength === 1) {
-        return {
-            mainCause: 'noActivity',
-            confidence: 0.60,
-            evidence: `Compte inactif`
-        };
-    }
-
+    // Fallback
     return {
         mainCause: 'unknown',
-        confidence: 0.40,
+        confidence: 0.4,
         evidence: 'Cause non déterminée'
     };
 }
-
 // ===========================================
 // RECOMMANDATIONS (AVEC PROFILS D'ABSENCE)
 // ===========================================
 
 export function generateSequenceRecommendation(client, sequence, causeResult) {
     const cause = causeResult?.mainCause || 'unknown';
-    const techContext = getTechnicalContextForDates(sequence.dates);
+    const seqLength = sequence.duration;
+    
+    function hasRecentActivity(client) {
+        const today = new Date();
+        
+        const lastRecharge = client.recharges?.slice(-1)[0]?.date;
+        if (lastRecharge) {
+            const days = Math.floor((today - new Date(lastRecharge)) / (1000*60*60*24));
+            if (days < 30) return true;
+        }
+        
+        const lastConso = client.consommation?.journaliere?.slice(-1)[0]?.date;
+        if (lastConso) {
+            const days = Math.floor((today - new Date(lastConso)) / (1000*60*60*24));
+            if (days < 30) return true;
+        }
+        
+        return false;
+    }
+    
+    const clientActif = hasRecentActivity(client);
 
     const recommendations = {
-        // Profils d'absence
-        vacances: {
-            priority: 'info',
-            action: '🏠 Vérifier absence',
-            message: `Client可能在 en vacances (${causeResult?.evidence || 'inactivité'})`
-        },
-        vacances_prepaye: {
-            priority: 'info',
-            action: '🏠 Contacter client',
-            message: `Crédit rechargé mais non consommé - Client可能在 en vacances`
-        },
-        abandon: {
-            priority: 'moyenne',
-            action: '🚚 Vérifier installation',
-            message: `Aucune activité depuis longtemps - Client可能在 déménagé`
-        },
-        compteur_muet: {
-            priority: 'haute',
-            action: '🔧 Diagnostiquer compteur',
-            message: `Compteur fonctionnel mais consommation nulle - Vérifier installation`
-        },
-        faible_utilisation: {
-            priority: 'basse',
-            action: '👴 Vérifier besoins',
-            message: `Consommation anormalement faible - Adapter forfait si nécessaire`
-        },
-        
-        // Causes techniques
-        technicalEvent: {
-            priority: (() => {
-                if (techContext.loadShedding.jours.length > 0) return 'urgente';
-                if (techContext.highVoltage.some(h => h.qualite === 'critique')) return 'haute';
-                return 'moyenne';
-            })(),
-            action: (() => {
-                if (techContext.loadShedding.jours.length > 0) return '⚡ Délestage détecté';
-                if (techContext.highVoltage.some(h => h.qualite === 'critique')) return '🔋 Surtension critique';
-                return '⚡ Escalader tech';
-            })(),
-            message: (() => {
-                const messages = [];
-                if (techContext.loadShedding.jours.length > 0) {
-                    messages.push(`${techContext.loadShedding.jours.length} délestage(s)`);
-                }
-                if (techContext.highVoltage.length > 0) {
-                    const critique = techContext.highVoltage.filter(h => h.qualite === 'critique').length;
-                    if (critique > 0) messages.push(`${critique} jour(s) sans tension`);
-                }
-                return messages.join(' - ') || 'Interruption technique';
-            })()
-        },
-        
-        // Causes commerciales
+        // ===========================================
+        // CAUSES COMMERCIALES (POUR CLIENTS ACTIFS)
+        // ===========================================
         noRecharge: {
-            priority: sequence.duration > 3 ? 'urgente' : 'haute',
+            priority: seqLength > 3 ? 'urgente' : 'haute',
             action: '📞 Appeler client',
-            message: `N'a pas rechargé depuis ${sequence.duration}j.`
+            message: `N'a pas rechargé depuis ${seqLength}j - Proposer une recharge`
         },
         highConsumption: {
             priority: 'haute',
-            action: '💬 Proposer upgrade',
-            message: `Consommation > forfait.`
+            action: '💬 Proposer upgrade forfait',
+            message: `Consommation supérieure au forfait - Adapter le forfait`
         },
         insufficientForfait: {
             priority: 'haute',
-            action: '📈 Upgrade forfait',
-            message: `Forfait insuffisant.`
+            action: '📈 Augmenter forfait',
+            message: `Forfait insuffisant pour la consommation réelle`
         },
         payment: {
             priority: 'haute',
-            action: '💳 Vérifier paiement',
-            message: `Recharges échouées.`
+            action: '💳 Mettre à jour paiement',
+            message: `Recharges échouées - Vérifier moyen de paiement`
         },
         overload: {
             priority: 'moyenne',
             action: '⚠️ Vérifier équipement',
-            message: `Consommation anormale.`
+            message: `Consommation anormalement élevée - Diagnostic technique`
+        },
+
+        // ===========================================
+        // CAUSES TECHNIQUES
+        // ===========================================
+        technicalEvent: {
+            priority: (() => {
+                if (seqLength > 3) return 'urgente';
+                return 'haute';
+            })(),
+            action: '⚡ Escalader équipe technique',
+            message: `Problème technique détecté - Vérifier installation`
+        },
+
+        // ===========================================
+        // CAUSES D'ABSENCE (POUR CLIENTS INACTIFS)
+        // ===========================================
+        vacances: {
+            priority: 'info',
+            action: '🏠 Aucune action',
+            message: `Client en vacances - Pas de consommation`
+        },
+        abandon: {
+            priority: 'moyenne',
+            action: '🚚 Vérifier présence client',
+            message: `Inactivité prolongée - Risque de déménagement ou abandon`
+        },
+
+        // ===========================================
+        // CAS PARTICULIERS
+        // ===========================================
+        ghost_client: {
+            priority: 'info',
+            action: '👻 Visite terrain',
+            message: `Client sans données - Vérifier existence du compteur`
         },
         system: {
             priority: 'basse',
             action: '🔧 À investiguer',
-            message: `Anomalie système.`
+            message: `Anomalie système - Log à analyser`
         },
         noActivity: {
             priority: 'basse',
-            action: '📱 Relancer',
-            message: `Compte inactif.`
+            action: '📱 Relancer client',
+            message: `Compte inactif - Proposer activation`
         },
         unknown: {
             priority: 'moyenne',
-            action: '🔍 Analyser',
-            message: `Cause incertaine.`
+            action: '🔍 Analyser dossier',
+            message: `Cause incertaine - Investigation nécessaire`
         }
     };
+
+    // Ajustement pour clients actifs avec courte absence
+    if (clientActif && cause === 'vacances') {
+        return {
+            priority: 'basse',
+            action: '📱 SMS de rappel',
+            message: `Client actif mais inactif depuis ${seqLength}j - Relance légère`
+        };
+    }
 
     return recommendations[cause] || recommendations.unknown;
 }
