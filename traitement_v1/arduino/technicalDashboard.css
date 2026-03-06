@@ -567,3 +567,167 @@ tr:nth-child(even) {
         grid-template-columns: 1fr;
     }
 }
+/* ============================================
+   STYLES POUR LA CARTE DE DÉLESTAGES AMÉLIORÉE
+   ============================================ */
+
+.days-grid {
+    scrollbar-width: thin;
+    scrollbar-color: var(--primary) var(--gray-800);
+    max-height: 250px;
+    overflow-y: auto;
+    padding: 0.75rem;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: var(--radius-md);
+}
+
+.days-grid::-webkit-scrollbar {
+    width: 6px;
+}
+
+.days-grid::-webkit-scrollbar-track {
+    background: var(--gray-800);
+    border-radius: 3px;
+}
+
+.days-grid::-webkit-scrollbar-thumb {
+    background: var(--primary);
+    border-radius: 3px;
+}
+
+.day-card {
+    transition: all 0.2s ease;
+    cursor: help;
+}
+
+.day-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+    border-color: var(--primary) !important;
+}
+
+.severity-indicator {
+    transition: all 0.3s ease;
+}
+
+.severity-indicator:hover {
+    transform: translateX(4px);
+}
+
+.interpretation-box {
+    border-left: 4px solid var(--primary);
+    background: linear-gradient(145deg, rgba(255,255,255,0.02), rgba(255,255,255,0.05));
+}
+
+/* Amélioration des progress bars */
+.progress-bar {
+    height: 12px;
+    background: var(--gray-800);
+    border-radius: 6px;
+    overflow: hidden;
+    box-shadow: inset 0 1px 3px rgba(0,0,0,0.3);
+}
+
+.progress-fill {
+    height: 100%;
+    border-radius: 6px;
+    transition: width 0.5s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.progress-fill::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+    animation: shimmer 2s infinite;
+}
+
+.progress-fill.warning { background: linear-gradient(90deg, #ff9800, #f57c00); }
+.progress-fill.danger { background: linear-gradient(90deg, #f44336, #d32f2f); }
+.progress-fill.success { background: linear-gradient(90deg, #4caf50, #2e7d32); }
+
+/* ============================================
+   STYLES POUR LA CARTE DE DÉLESTAGES - VERSION ÉLÉGANTE
+   ============================================ */
+
+.load-shedding-card {
+    background: linear-gradient(145deg, #ffffff, #fafafa);
+    border: 1px solid #eaeef2;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.02);
+}
+
+.stat-box {
+    background: white;
+    transition: all 0.2s ease;
+}
+
+.stat-box:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+}
+
+/* Style du tableau */
+.load-shedding-card table {
+    font-size: 0.9rem;
+}
+
+.load-shedding-card th {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.load-shedding-card tbody tr:hover {
+    background: white;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+}
+
+/* Scrollbar élégante */
+.load-shedding-card div[style*="max-height: 300px"] {
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e0 #f1f5f9;
+}
+
+.load-shedding-card div[style*="max-height: 300px"]::-webkit-scrollbar {
+    width: 6px;
+}
+
+.load-shedding-card div[style*="max-height: 300px"]::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 3px;
+}
+
+.load-shedding-card div[style*="max-height: 300px"]::-webkit-scrollbar-thumb {
+    background: #cbd5e0;
+    border-radius: 3px;
+}
+
+.load-shedding-card div[style*="max-height: 300px"]::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+
+/* Badge de sévérité */
+.severity-badge {
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+/* Animation douce */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.load-shedding-card {
+    animation: fadeInUp 0.5s ease;
+}

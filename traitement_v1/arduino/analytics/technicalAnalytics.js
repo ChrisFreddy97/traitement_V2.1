@@ -216,25 +216,32 @@ function analyzeLoadShedding() {
     const loadShedding = {
         partiel: 0,
         total: 0,
-        jours: []
+        jours: [],
+        parDate: {}  // ← NOUVEAU : comptage par date
     };
     
     eventTable.data.forEach(row => {
         const cells = row.split(';');
-        
-        // ✅ Vérifie que c'est bien le format attendu
         if (cells.length < 4) return;
         
-        const eventType = cells[2];  // ✅ L'événement est à l'index 2
-        const date = cells[1].split(' ')[0];  // ✅ La date dans le timestamp
+        const eventType = cells[2];
+        const date = cells[1].split(' ')[0];
         
-        if (eventType === 'Delestage Partiel') {
+        // Initialiser le compteur pour cette date si nécessaire
+        if (!loadShedding.parDate[date]) {
+            loadShedding.parDate[date] = { partiel: 0, total: 0 };
+        }
+        
+        // Compter les événements
+        if (eventType === 'DelestagePartiel' || eventType === 'Delestage Partiel') {
             loadShedding.partiel++;
+            loadShedding.parDate[date].partiel++;
             if (!loadShedding.jours.includes(date)) {
                 loadShedding.jours.push(date);
             }
-        } else if (eventType === 'Delestage Total') {
+        } else if (eventType === 'DelestageTotal' || eventType === 'Delestage Total') {
             loadShedding.total++;
+            loadShedding.parDate[date].total++;
             if (!loadShedding.jours.includes(date)) {
                 loadShedding.jours.push(date);
             }
