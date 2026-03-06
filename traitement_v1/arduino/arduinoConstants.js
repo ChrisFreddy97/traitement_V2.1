@@ -21,7 +21,7 @@ export const VOLTAGE_NORMS = {
 // Seuils pour tension haute
 export const HIGH_VOLTAGE_THRESHOLD = {
     '24V': 28,
-    '12V': 14.2
+    '12V': 14
 };
 
 // Événements
