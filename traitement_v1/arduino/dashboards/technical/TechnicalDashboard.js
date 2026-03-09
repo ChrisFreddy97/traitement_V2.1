@@ -267,7 +267,7 @@ function renderLoadSheddingBoard() {
                 </span>
             </div>
             
-            <!-- Indicateur global élégant -->
+            <!-- Indicateur global -->
             <div class="global-stats" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 2rem;">
                 <div class="stat-box" style="background: ${severityBg}; padding: 1rem; border-radius: var(--radius-lg); text-align: center; border: 1px solid ${severityColor}30;">
                     <div style="font-size: 0.8rem; color: var(--gray-600); text-transform: uppercase; letter-spacing: 0.5px;">Jours touchés</div>
@@ -288,87 +288,85 @@ function renderLoadSheddingBoard() {
                 </div>
             </div>
             
-            <!-- Répartition partiel/total -->
+            <!-- Répartition partiel/total (simplifiée) -->
             <div style="margin-bottom: 2rem;">
                 <h4 style="margin-bottom: 1rem; color: var(--dark); font-size: 1rem;">🔸 Répartition des événements</h4>
-                <div style="display: flex; gap: 2rem; align-items: center;">
+                <div style="display: flex; gap: 1rem; align-items: center;">
                     <div style="flex: 1;">
-                        <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem;">
-                            <span style="color: #ff9800;">🔸 Délestage partiel</span>
-                            <span style="font-weight: 600;">${data.partiel} (${((data.partiel/totalEvenements)*100).toFixed(1)}%)</span>
+                        <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+                            <span style="width: 12px; height: 12px; background: #ff9800; border-radius: 3px;"></span>
+                            <span style="flex: 1;">Délestages partiels</span>
+                            <span style="font-weight: 600;">${data.partiel}</span>
+                            <span style="color: var(--gray-500);">(${((data.partiel/totalEvenements)*100).toFixed(1)}%)</span>
                         </div>
-                        <div style="height: 8px; background: var(--gray-200); border-radius: 100px; overflow: hidden; margin-bottom: 1rem;">
-                            <div style="width: ${(data.partiel/totalEvenements)*100}%; height: 100%; background: linear-gradient(90deg, #ff9800, #f57c00);"></div>
-                        </div>
-                        
-                        <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem;">
-                            <span style="color: #f44336;">🔴 Délestage total</span>
-                            <span style="font-weight: 600;">${data.total} (${((data.total/totalEvenements)*100).toFixed(1)}%)</span>
-                        </div>
-                        <div style="height: 8px; background: var(--gray-200); border-radius: 100px; overflow: hidden;">
-                            <div style="width: ${(data.total/totalEvenements)*100}%; height: 100%; background: linear-gradient(90deg, #f44336, #d32f2f);"></div>
+                        <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem;">
+                            <span style="width: 12px; height: 12px; background: #f44336; border-radius: 3px;"></span>
+                            <span style="flex: 1;">Délestages totaux</span>
+                            <span style="font-weight: 600;">${data.total}</span>
+                            <span style="color: var(--gray-500);">(${((data.total/totalEvenements)*100).toFixed(1)}%)</span>
                         </div>
                     </div>
                     
-                    <div style="width: 120px; height: 120px; position: relative;">
-                        <canvas id="loadSheddingDonut" width="120" height="120"></canvas>
+                    <div style="width: 100px; height: 100px;">
+                        <canvas id="loadSheddingDonut" width="100" height="100"></canvas>
                     </div>
                 </div>
             </div>
             
-            <!-- Liste des jours avec DÉTAIL -->
+            <!-- TABLEAU : Jour / Fréquence / Heures -->
             <div style="margin-top: 1.5rem;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                    <h4 style="color: var(--dark); font-size: 1rem; margin: 0;">📅 Jours avec délestage</h4>
+                    <h4 style="color: var(--dark); font-size: 1rem; margin: 0;">📋 DÉTAIL DES DÉLESTAGES PAR JOUR</h4>
                     <span style="background: ${severityBg}; color: ${severityColor}; padding: 0.25rem 0.75rem; border-radius: 100px; font-size: 0.8rem; font-weight: 600;">
                         ${joursAvecDelestage} jour(s)
                     </span>
                 </div>
                 
                 ${joursAvecDelestage > 0 ? `
-                    <div style="max-height: 300px; overflow-y: auto; border-radius: var(--radius-lg); background: var(--gray-50); padding: 1rem;">
-                        <table style="width: 100%; border-collapse: collapse;">
-                            <thead style="position: sticky; top: 0; background: var(--gray-50);">
+                    <div style="max-height: 400px; overflow-y: auto; border-radius: var(--radius-lg); border: 1px solid var(--gray-200);">
+                        <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
+                            <thead style="position: sticky; top: 0; background: var(--gray-100); z-index: 1;">
                                 <tr>
-                                    <th style="text-align: left; padding: 0.5rem; color: var(--gray-600); font-weight: 600;">Date</th>
-                                    <th style="text-align: center; padding: 0.5rem; color: var(--gray-600); font-weight: 600;">Partiels</th>
-                                    <th style="text-align: center; padding: 0.5rem; color: var(--gray-600); font-weight: 600;">Totaux</th>
-                                    <th style="text-align: center; padding: 0.5rem; color: var(--gray-600); font-weight: 600;">Total</th>
-                                    <th style="text-align: left; padding: 0.5rem; color: var(--gray-600); font-weight: 600;">Intensité</th>
+                                    <th style="padding: 0.75rem 1rem; text-align: left; font-weight: 600; color: var(--gray-700);">Date</th>
+                                    <th style="padding: 0.75rem 1rem; text-align: center; font-weight: 600; color: var(--gray-700);">Partiels</th>
+                                    <th style="padding: 0.75rem 1rem; text-align: center; font-weight: 600; color: var(--gray-700);">Totaux</th>
+                                    <th style="padding: 0.75rem 1rem; text-align: center; font-weight: 600; color: var(--gray-700);">Fréquence</th>
+                                    <th style="padding: 0.75rem 1rem; text-align: left; font-weight: 600; color: var(--gray-700);">Heures de délestage</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 ${joursTries.map(date => {
-                                    const partielJour = data.parDate?.[date]?.partiel || 0;
-                                    const totalJour = data.parDate?.[date]?.total || 0;
+                                    const jourData = data.parDate?.[date] || { partiel: 0, total: 0, evenements: [] };
+                                    const partielJour = jourData.partiel || 0;
+                                    const totalJour = jourData.total || 0;
                                     const totalEvJour = partielJour + totalJour;
                                     
-                                    let intensityColor = '';
-                                    let intensityText = '';
-                                    if (totalEvJour > 20) {
-                                        intensityColor = '#f72585';
-                                        intensityText = '🔴 Critique';
-                                    } else if (totalEvJour > 10) {
-                                        intensityColor = '#f44336';
-                                        intensityText = '🟠 Élevée';
-                                    } else if (totalEvJour > 5) {
-                                        intensityColor = '#ff9800';
-                                        intensityText = '🟡 Moyenne';
-                                    } else {
-                                        intensityColor = '#4caf50';
-                                        intensityText = '🟢 Faible';
-                                    }
+                                    // ✅ Récupérer TOUTES les heures et les formater
+                                    const heures = jourData.evenements?.map(e => {
+                                        const [hour, minute] = e.time.split(':');
+                                        return `${hour}h${minute}`;
+                                    }) || [];
+                                    
+                                    // Trier les heures chronologiquement
+                                    heures.sort();
+                                    
+                                    // Afficher TOUTES les heures séparées par un point
+                                    const heuresTexte = heures.length > 0 ? heures.join(' · ') : '—';
+                                    
+                                    // Couleur de fond selon l'intensité
+                                    let bgColor = '';
+                                    if (totalEvJour > 20) bgColor = 'rgba(247, 37, 133, 0.05)';
+                                    else if (totalEvJour > 10) bgColor = 'rgba(244, 67, 54, 0.05)';
+                                    else if (totalEvJour > 5) bgColor = 'rgba(255, 152, 0, 0.05)';
                                     
                                     return `
-                                        <tr style="border-bottom: 1px solid var(--gray-200);">
-                                            <td style="padding: 0.75rem 0.5rem; font-weight: 600;">${date}</td>
-                                            <td style="padding: 0.75rem 0.5rem; text-align: center; color: #ff9800;">${partielJour}</td>
-                                            <td style="padding: 0.75rem 0.5rem; text-align: center; color: #f44336;">${totalJour}</td>
-                                            <td style="padding: 0.75rem 0.5rem; text-align: center; font-weight: 700;">${totalEvJour}</td>
-                                            <td style="padding: 0.75rem 0.5rem;">
-                                                <span style="background: ${intensityColor}20; color: ${intensityColor}; padding: 0.25rem 0.75rem; border-radius: 100px; font-size: 0.8rem; font-weight: 600;">
-                                                    ${intensityText}
-                                                </span>
+                                        <tr style="border-bottom: 1px solid var(--gray-200); ${bgColor ? 'background:' + bgColor : ''}">
+                                            <td style="padding: 0.75rem 1rem; font-weight: 600;">${date}</td>
+                                            <td style="padding: 0.75rem 1rem; text-align: center; color: #ff9800;">${partielJour}</td>
+                                            <td style="padding: 0.75rem 1rem; text-align: center; color: #f44336;">${totalJour}</td>
+                                            <td style="padding: 0.75rem 1rem; text-align: center; font-weight: 600;">${totalEvJour}</td>
+                                            <td style="padding: 0.75rem 1rem; text-align: left; color: var(--gray-600); font-size: 0.85rem; line-height: 1.6;">
+                                                ${heuresTexte}
                                             </td>
                                         </tr>
                                     `;
@@ -378,23 +376,10 @@ function renderLoadSheddingBoard() {
                     </div>
                 ` : '<p style="text-align: center; padding: 2rem; color: var(--gray-400);">Aucun délestage détecté</p>'}
             </div>
-            
-            <!-- Interprétation -->
-            <div style="margin-top: 2rem; padding: 1.5rem; background: linear-gradient(145deg, var(--gray-50), white); border-radius: var(--radius-lg); border-left: 4px solid ${severityColor};">
-                <div style="display: flex; gap: 1rem; align-items: flex-start;">
-                    <span style="font-size: 2rem;">${severityLevel === 'critical' ? '🔴' : severityLevel === 'high' ? '🟠' : severityLevel === 'medium' ? '🟡' : '🟢'}</span>
-                    <div>
-                        <h4 style="margin: 0 0 0.5rem 0; color: ${severityColor};">Analyse de la situation</h4>
-                        <p style="margin: 0; color: var(--gray-700); line-height: 1.6;">
-                            ${getInterpretationMessage(pourcentageJours, moyenneParJour, data.partiel, data.total)}
-                        </p>
-                    </div>
-                </div>
-            </div>
         </div>
     `;
     
-    // Petit graphique donut (optionnel)
+    // Graphique donut
     createLoadSheddingDonut(data.partiel, data.total);
 }
 
@@ -456,23 +441,6 @@ function createLoadSheddingDonut(partiel, total) {
     }, 100);
 }
 
-function getInterpretationMessage(pourcentageJours, moyenneParJour, partiel, total) {
-    if (pourcentageJours >= 30) {
-        return `Le réseau est très instable avec ${pourcentageJours}% des jours touchés. 
-                En moyenne ${moyenneParJour} délestages par jour (${total} totaux, ${partiel} partiels). 
-                Une intervention technique urgente est nécessaire pour rétablir la qualité de service.`;
-    } else if (pourcentageJours >= 15) {
-        return `Les délestages sont fréquents (${pourcentageJours}% des jours). 
-                Avec ${moyenneParJour} événements par jour en moyenne, le réseau montre des signes de fragilité.
-                Une analyse technique est recommandée.`;
-    } else if (pourcentageJours >= 5) {
-        return `Quelques délestages ont été détectés (${pourcentageJours}% des jours).
-                C'est acceptable mais à surveiller. La moyenne de ${moyenneParJour} événements par jour reste modérée.`;
-    } else {
-        return `Le réseau est stable avec seulement ${pourcentageJours}% des jours touchés.
-                La qualité de service est bonne. Continuer la surveillance.`;
-    }
-}
 // ===========================================
 // II-5) HIGH VOLTAGE BOARD
 // ===========================================
@@ -613,36 +581,151 @@ function renderHourlyChart(selectedDate = null) {
     if (!container) return;
 
     const table = database.tables?.find(t=>t.type==='T');
-    if (!table) { container.innerHTML='<p class="no-data">Données horaires indisponibles</p>'; return; }
+    if (!table) { 
+        container.innerHTML='<p class="no-data">Données horaires indisponibles</p>'; 
+        return; 
+    }
 
-    const day = selectedDate || table.data[0]?.split(';')[1].split(' ')[0];
-    const dayData = table.data.filter(r=>r.split(';')[1].startsWith(day));
-    if (dayData.length===0) { container.innerHTML='<p class="no-data">Aucune donnée pour ce jour</p>'; return; }
+    // ===========================================
+    // RÉCUPÉRATION DE TOUTES LES DATES DISPONIBLES
+    // ===========================================
+    const allDates = [...new Set(table.data.map(r => r.split(';')[1].split(' ')[0]))].sort();
+    
+    if (allDates.length === 0) {
+        container.innerHTML='<p class="no-data">Aucune date disponible</p>';
+        return;
+    }
+    
+    // Déterminer la date à afficher
+    const currentDate = selectedDate || allDates[0];
+    
+    // Filtrer les données pour la date sélectionnée
+    const dayData = table.data.filter(r => r.split(';')[1].startsWith(currentDate));
+    
+    if (dayData.length === 0) { 
+        container.innerHTML='<p class="no-data">Aucune donnée pour ce jour</p>'; 
+        return; 
+    }
 
-    const hours = dayData.map(r=>r.split(';')[1].split(' ')[1].substring(0,5));
-    const tensions = dayData.map(r=>parseFloat(r.split(';')[4]));
-    const norms = VOLTAGE_NORMS[database.technicalData.normSystem || '12V'];
+    // Extraire les heures et tensions
+    const hours = dayData.map(r => r.split(';')[1].split(' ')[1].substring(0,5));
+    const tensions = dayData.map(r => parseFloat(r.split(';')[4]));
+    const norms = VOLTAGE_NORMS[database.technicalData?.normSystem || '12V'];
 
-    container.innerHTML = `<h3 class="card-title">⏱ TENSIONS HORAIRES - ${day}</h3><div style="height:300px;width:100%"><canvas id="hourlyTensionChart"></canvas></div>`;
+    // ===========================================
+    // CONSTRUCTION DU HTML AVEC FILTRE DE DATES
+    // ===========================================
+    container.innerHTML = `
+        <div class="chart-header-with-filter">
+            <h3 class="card-title">⏱ TENSIONS HORAIRES</h3>
+            <div class="date-filter">
+                <label for="hourlyDateSelect">📅 Date :</label>
+                <select id="hourlyDateSelect" class="date-select">
+                    ${allDates.map(date => `
+                        <option value="${date}" ${date === currentDate ? 'selected' : ''}>
+                            ${date}
+                        </option>
+                    `).join('')}
+                </select>
+            </div>
+        </div>
+        <div style="height:300px;width:100%">
+            <canvas id="hourlyTensionChart"></canvas>
+        </div>
+    `;
 
+    // ===========================================
+    // ATTACHER L'ÉVÉNEMENT DE CHANGEMENT DE DATE
+    // ===========================================
+    const dateSelect = document.getElementById('hourlyDateSelect');
+    if (dateSelect) {
+        // Remplacer l'ancien écouteur s'il existe
+        const newSelect = dateSelect.cloneNode(true);
+        dateSelect.parentNode.replaceChild(newSelect, dateSelect);
+        
+        newSelect.addEventListener('change', (e) => {
+            renderHourlyChart(e.target.value);
+        });
+    }
+
+    // ===========================================
+    // CRÉATION DU GRAPHIQUE
+    // ===========================================
     chartManager.destroy('hourlyTensionChart');
-    requestAnimationFrame(()=>{
-        chartManager.create('hourlyTensionChart',{
-            type:'line',
-            data:{
-                labels:hours,
-                datasets:[
-                    { label:`Tension - ${day}`, data:tensions, borderColor:'#ff9800', fill:true, pointRadius:5 },
-                    { label:'Seuil min', data:Array(hours.length).fill(norms.min), borderColor:'#f44336', borderDash:[5,5], pointRadius:0, fill:false },
-                    { label:'Seuil max', data:Array(hours.length).fill(norms.max), borderColor:'#ff9800', borderDash:[5,5], pointRadius:0, fill:false },
-                    { label:'Plage idéale', data:Array(hours.length).fill((norms.min+norms.max)/2), borderColor:'#4CAF50', borderDash:[3,3], pointRadius:0, fill:false }
+    requestAnimationFrame(() => {
+        chartManager.create('hourlyTensionChart', {
+            type: 'line',
+            data: {
+                labels: hours,
+                datasets: [
+                    { 
+                        label: `Tension - ${currentDate}`, 
+                        data: tensions, 
+                        borderColor: '#ff9800', 
+                        backgroundColor: 'rgba(255, 152, 0, 0.1)',
+                        fill: true, 
+                        pointRadius: 5,
+                        pointHoverRadius: 8,
+                        tension: 0.3
+                    },
+                    { 
+                        label: 'Seuil min', 
+                        data: Array(hours.length).fill(norms.min), 
+                        borderColor: '#f44336', 
+                        borderDash: [5, 5], 
+                        pointRadius: 0, 
+                        fill: false 
+                    },
+                    { 
+                        label: 'Seuil max', 
+                        data: Array(hours.length).fill(norms.max), 
+                        borderColor: '#ff9800', 
+                        borderDash: [5, 5], 
+                        pointRadius: 0, 
+                        fill: false 
+                    },
+                    { 
+                        label: 'Plage idéale', 
+                        data: Array(hours.length).fill((norms.min + norms.max) / 2), 
+                        borderColor: '#4CAF50', 
+                        borderDash: [3, 3], 
+                        pointRadius: 0, 
+                        fill: false 
+                    }
                 ]
             },
-            options:{responsive:true,maintainAspectRatio:false}
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false
+                    },
+                    legend: {
+                        display: true,
+                        position: 'top'
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: false,
+                        title: {
+                            display: true,
+                            text: 'Tension (V)'
+                        }
+                    },
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Heure'
+                        }
+                    }
+                }
+            }
         });
     });
 }
-
 // ===========================================
 // III) ÉNERGIE
 // ===========================================
@@ -660,50 +743,112 @@ function renderCombinedEnergyTable() {
         return;
     }
     
-    // 2. Parser les données
+    // 2. Parser les données (comme avant)
     const tensions = parseTensionForTable(tensionTable);
     const intensites = parseIntensiteForTable(intensiteTable);
     
-    // 3. Aligner par timestamp
+    // 3. Aligner par timestamp (comme avant)
     const combinedData = alignData(tensions, intensites);
     
-    // 4. Générer le HTML
-    let html = '<h3 class="card-title">📋 TABLEAU COMBINÉ ÉNERGIE</h3>';
-    html += '<div class="table-wrapper"><table><thead><tr>';
-    html += '<th>Date</th><th>Heure</th><th>Tension inst</th>';
+    if (!combinedData || combinedData.length === 0) {
+        container.innerHTML = '<p class="no-data">Aucune donnée combinée</p>';
+        return;
+    }
     
-    // En-têtes pour chaque client
-    const clientIds = Object.keys(intensites[0]?.parClient || {});
-    clientIds.forEach(id => {
-        html += `<th>Client ${id}</th>`;
+    // 4. AGGRÉGER PAR JOUR
+    const dailyEnergy = {};      // { date: { total: 0, clients: { id: energie } } }
+    const clientIds = new Set();
+    
+    combinedData.forEach(row => {
+        const date = row.date;
+        
+        if (!dailyEnergy[date]) {
+            dailyEnergy[date] = {
+                total: 0,
+                clients: {}
+            };
+        }
+        
+        // Même tension pour tous les clients
+        const tension = row.tension;
+        
+        // Calculer l'énergie pour chaque client
+        Object.entries(row.intensites).forEach(([clientId, intensite]) => {
+            if (intensite === 0) return;
+            
+            clientIds.add(clientId);
+            
+            // Énergie (Wh) = Tension (V) × Intensité (A) × 1 heure
+            const energieHeure = tension * intensite * 1;
+            
+            if (!dailyEnergy[date].clients[clientId]) {
+                dailyEnergy[date].clients[clientId] = 0;
+            }
+            dailyEnergy[date].clients[clientId] += energieHeure;
+            
+            dailyEnergy[date].total += energieHeure;
+        });
     });
     
-    html += '<th>Somme I</th><th>Énergie totale (Wh)</th>';
+    // 5. Trier les clients
+    const sortedClients = Array.from(clientIds).sort((a, b) => parseInt(a) - parseInt(b));
+    
+    // 6. Trier les dates (plus récentes d'abord)
+    const sortedDates = Object.keys(dailyEnergy).sort((a, b) => new Date(b) - new Date(a));
+    
+    // 7. Générer le HTML
+    let html = '<h3 class="card-title">📊 CONSOMMATION JOURNALIÈRE PAR CLIENT</h3>';
+    html += `<div style="margin-bottom: 0.5rem; font-size:0.8rem; color:var(--gray-500);">${sortedDates.length} jours analysés</div>`;
+    html += '<div class="table-wrapper"><table><thead><tr>';
+    html += '<th>Date</th>';
+    
+    sortedClients.forEach(id => {
+        html += `<th>Client ${id}<br><span style="font-weight:normal;font-size:0.7rem;">Wh</span></th>`;
+    });
+    
+    html += '<th>Total<br><span style="font-weight:normal;font-size:0.7rem;">Wh</span></th>';
     html += '</tr></thead><tbody>';
     
-    // Lignes de données
-    combinedData.slice(-50).forEach(row => { // 50 dernières lignes
+    sortedDates.forEach(date => {
+        const jour = dailyEnergy[date];
         html += '<tr>';
-        html += `<td>${row.date}</td>`;
-        html += `<td>${row.time}</td>`;
-        html += `<td>${row.tension.toFixed(2)}</td>`;
+        html += `<td style="font-weight: 600;">${date}</td>`;
         
-        let sommeI = 0;
-        clientIds.forEach(id => {
-            const val = row.intensites[id] || 0;
-            sommeI += val;
-            html += `<td>${val.toFixed(2)}</td>`;
+        let sommeJour = 0;
+        sortedClients.forEach(id => {
+            const val = jour.clients[id] || 0;
+            sommeJour += val;
+            html += `<td style="text-align: right;">${val.toFixed(0)}</td>`;
         });
         
-        html += `<td>${sommeI.toFixed(2)}</td>`;
-        html += `<td>${row.energie.toFixed(2)}</td>`;
+        html += `<td style="text-align: right; font-weight: 700; background: var(--gray-100);">${sommeJour.toFixed(0)}</td>`;
         html += '</tr>';
     });
     
+    // Ligne de moyenne
+    if (sortedDates.length > 0) {
+        html += '<tr style="border-top: 2px solid var(--gray-400); background: var(--gray-50);">';
+        html += '<td style="font-weight: 600;">MOYENNE</td>';
+        
+        let moyenneTotale = 0;
+        sortedClients.forEach(id => {
+            let sommeClient = 0;
+            sortedDates.forEach(date => {
+                sommeClient += dailyEnergy[date].clients[id] || 0;
+            });
+            const moyenneClient = sommeClient / sortedDates.length;
+            moyenneTotale += moyenneClient;
+            html += `<td style="text-align: right; font-weight: 600;">${moyenneClient.toFixed(0)}</td>`;
+        });
+        
+        html += `<td style="text-align: right; font-weight: 700;">${moyenneTotale.toFixed(0)}</td>`;
+        html += '</tr>';
+    }
+    
     html += '</tbody></table></div>';
+    
     container.innerHTML = html;
 }
-
 function renderEnergyBoard() {
     const container = document.getElementById('energyBoard');
     if (!container) return;

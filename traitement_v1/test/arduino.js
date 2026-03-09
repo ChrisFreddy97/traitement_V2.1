@@ -5,14 +5,12 @@ class FileReaderModule {
             nrNumber: null,
             tables: []
         };
-        this.currentPages = {}; // Stocker la page courante pour chaque tableau
-        this.rowsPerPage = 10; // 10 lignes par page
-        this.activeTab = 'tech'; // Onglet actif par défaut
+        this.currentPages = {};
+        this.rowsPerPage = 10;
+        this.activeTab = 'tech';
         
-        // Nouveau : système détecté (12V ou 24V)
         this.detectedSystem = null;
         
-        // Nouveau : normes des systèmes
         this.systemNorms = {
             '12V': {
                 min: 11,
@@ -41,7 +39,6 @@ class FileReaderModule {
         this.contentDisplay = document.getElementById('contentDisplay');
         this.fileContent = document.getElementById('fileContent');
         
-        // Nouveaux éléments
         this.loadingContainer = document.getElementById('loadingContainer');
         this.progressBar = document.getElementById('progressBar');
         this.loadingText = document.getElementById('loadingText');
@@ -56,7 +53,6 @@ class FileReaderModule {
 
         this.bindEvents();
         
-        // Exposer les fonctions globalement
         window.fileReader = this;
         window.switchTab = (tab) => this.switchTab(tab);
         window.changePage = (tableId, direction) => this.changePage(tableId, direction);
@@ -65,10 +61,8 @@ class FileReaderModule {
     }
 
     bindEvents() {
-        // Click pour sélectionner un fichier
         this.uploadArea.addEventListener('click', () => this.fileInput.click());
 
-        // Drag & Drop events
         this.uploadArea.addEventListener('dragover', (e) => {
             e.preventDefault();
             this.uploadArea.classList.add('dragover');
@@ -85,7 +79,6 @@ class FileReaderModule {
             if (file) this.processFile(file);
         });
 
-        // File input event
         this.fileInput.addEventListener('change', (e) => {
             const file = e.target.files[0];
             if (file) this.processFile(file);
@@ -96,13 +89,8 @@ class FileReaderModule {
         this.currentFile = file;
         this.fileInfo.textContent = `📄 ${file.name}`;
         
-        // Afficher le loading
         this.showLoading();
-        
-        // Simuler une progression
         await this.simulateProgress();
-        
-        // Lire le fichier
         await this.readFile(file);
     }
 
@@ -135,17 +123,13 @@ class FileReaderModule {
             reader.onload = (e) => {
                 const content = e.target.result;
                 
-                // Compléter la progression
                 this.progressBar.style.width = '100%';
                 this.loadingText.textContent = 'Organisation des données...';
                 
                 setTimeout(() => {
                     this.parseContent(content);
-                    
-                    // Détecter automatiquement le type de montage
                     this.detectSystemType();
                     
-                    // Initialiser les pages pour chaque tableau
                     this.parsedData.tables.forEach((table, index) => {
                         const tableId = `table_${index}`;
                         this.currentPages[tableId] = 1;
@@ -163,7 +147,6 @@ class FileReaderModule {
                 resolve();
             };
 
-            // Lecture en UTF-8 par défaut
             reader.readAsText(file, 'UTF-8');
         });
     }
@@ -181,7 +164,6 @@ class FileReaderModule {
             const line = lines[i].trim();
             if (line === '') continue;
 
-            // Extraire le numéro NR
             if (line.includes('<#NANORESEAU:')) {
                 const match = line.match(/<#NANORESEAU:(\d+)>/);
                 if (match) {
@@ -190,17 +172,13 @@ class FileReaderModule {
                 continue;
             }
 
-            // Ignorer les lignes sans point-virgule
             if (!line.includes(';')) continue;
 
-            // Détection d'un en-tête de tableau
             if (line.includes('Type') || line.includes('TimeStamp') || line.includes('Client') || line.includes('Tension')) {
-                // Sauvegarder le tableau précédent s'il existe
                 if (currentTable && currentTable.rows.length > 0) {
                     this.parsedData.tables.push(currentTable);
                 }
 
-                // Créer un nouveau tableau
                 const headerCells = line.split(';').filter(cell => cell.trim() !== '');
                 currentTable = {
                     header: headerCells,
@@ -210,17 +188,13 @@ class FileReaderModule {
                 continue;
             }
 
-            // Si on a un tableau en cours et que la ligne contient des ';'
             if (currentTable && line.includes(';')) {
                 const cells = line.split(';').filter(cell => cell.trim() !== '');
                 
-                // Vérifier si c'est une ligne de données
                 if (cells.length > 0 && cells[0].length <= 3 && cells.length >= 3) {
-                    // Éviter les lignes d'en-tête
                     if (!cells[0].includes('Type') && !cells[0].includes('TimeStamp')) {
                         currentTable.rows.push(cells);
                         
-                        // Capturer le type depuis la première colonne
                         if (cells[0] && cells[0].match(/^[A-Z]$/)) {
                             currentTable.types.add(cells[0]);
                         }
@@ -229,20 +203,18 @@ class FileReaderModule {
             }
         }
 
-        // Ajouter le dernier tableau
         if (currentTable && currentTable.rows.length > 0) {
             this.parsedData.tables.push(currentTable);
         }
     }
 
-    // Nouvelle méthode : Détection automatique du type de système
     detectSystemType() {
         const tensionTables = this.parsedData.tables.filter(table => 
             Array.from(table.types).includes('T')
         );
         
         if (tensionTables.length === 0) {
-            this.detectedSystem = '24V'; // Par défaut
+            this.detectedSystem = '24V';
             return;
         }
         
@@ -272,19 +244,18 @@ class FileReaderModule {
         });
         
         if (allTensions.length === 0) {
-            this.detectedSystem = '24V'; // Par défaut
+            this.detectedSystem = '24V';
             return;
         }
         
-        // Calculer la tension moyenne
         const avgTension = allTensions.reduce((a, b) => a + b, 0) / allTensions.length;
-        
-        // Déterminer le système basé sur la tension moyenne
-        // Si la moyenne est > 18V, c'est probablement du 24V, sinon du 12V
         this.detectedSystem = avgTension > 18 ? '24V' : '12V';
     }
 
-    // ✅ NOUVELLE MÉTHODE : Analyse complète de conformité
+    // ==============================================
+    // ANALYSE DE CONFORMITÉ
+    // ==============================================
+
     analyzeConformity() {
         if (!this.detectedSystem) return null;
         
@@ -295,11 +266,9 @@ class FileReaderModule {
         
         if (tensionTables.length === 0) return null;
         
-        // Structure pour stocker les données quotidiennes
         let dailyData = {};
         let allDays = new Set();
         
-        // Collecter toutes les données par jour
         tensionTables.forEach(table => {
             const dateIndex = table.header.findIndex(h => 
                 h.includes('TimeStamp') || h.includes('Date') || h.includes('DATE')
@@ -335,7 +304,6 @@ class FileReaderModule {
                 dailyData[date].min = Math.min(dailyData[date].min, tension);
                 dailyData[date].max = Math.max(dailyData[date].max, tension);
                 
-                // Calculer la variation horaire
                 if (dailyData[date].previousValue !== null) {
                     const variation = Math.abs(tension - dailyData[date].previousValue);
                     dailyData[date].maxVariation = Math.max(dailyData[date].maxVariation, variation);
@@ -344,7 +312,6 @@ class FileReaderModule {
             });
         });
         
-        // Analyser chaque jour
         let conformingDays = 0;
         let nonConformingDays = 0;
         let criticalDays = 0;
@@ -358,7 +325,6 @@ class FileReaderModule {
             let severity = 'conforming';
             let violations = [];
             
-            // ✅ CRITÈRE 1 : Tension minimale
             if (dayData.min < norms.min) {
                 isConforming = false;
                 severity = 'critical';
@@ -369,7 +335,6 @@ class FileReaderModule {
                 });
             }
             
-            // ✅ CRITÈRE 2 : Tension maximale
             if (dayData.max > norms.max) {
                 isConforming = false;
                 severity = 'critical';
@@ -380,7 +345,6 @@ class FileReaderModule {
                 });
             }
             
-            // ✅ CRITÈRE 3 : Variation journalière
             if (dayData.maxVariation > norms.variationMax) {
                 isConforming = false;
                 if (severity !== 'critical') severity = 'warning';
@@ -391,9 +355,7 @@ class FileReaderModule {
                 });
             }
             
-            // ✅ CRITÈRE 4 : Hors plage idéale (warning seulement)
             if (avgTension < norms.idealMin || avgTension > norms.idealMax) {
-                // Ne rend pas le jour non conforme, mais ajoute un warning
                 if (isConforming) {
                     violations.push({
                         type: 'ideal',
@@ -403,7 +365,6 @@ class FileReaderModule {
                 }
             }
             
-            // Compter les jours
             if (!isConforming) {
                 nonConformingDays++;
                 if (severity === 'critical') criticalDays++;
@@ -438,7 +399,6 @@ class FileReaderModule {
         };
     }
 
-    // ✅ NOUVELLE MÉTHODE : Générer l'affichage des stats de conformité
     generateConformityStatsHTML(conformityData) {
         if (!conformityData || conformityData.totalDays === 0) {
             return `
@@ -455,17 +415,17 @@ class FileReaderModule {
         }
         
         const rate = conformityData.conformityRate;
-        let rateColor = '#22c55e'; // Vert
+        let rateColor = '#22c55e';
         let rateIcon = '✅';
         
         if (rate < 60) {
-            rateColor = '#ef4444'; // Rouge
+            rateColor = '#ef4444';
             rateIcon = '🔴';
         } else if (rate < 80) {
-            rateColor = '#f59e0b'; // Orange
+            rateColor = '#f59e0b';
             rateIcon = '🟠';
         } else if (rate < 90) {
-            rateColor = '#eab308'; // Jaune
+            rateColor = '#eab308';
             rateIcon = '🟡';
         }
         
@@ -479,7 +439,6 @@ class FileReaderModule {
                 </span>
             </div>
             
-            <!-- Carte principale avec le taux de conformité -->
             <div class="conformity-main-card" style="background: linear-gradient(135deg, ${rateColor}10, white); border-left: 6px solid ${rateColor};">
                 <div class="conformity-rate">
                     <span class="rate-icon">${rateIcon}</span>
@@ -508,7 +467,6 @@ class FileReaderModule {
                     </div>
                 </div>
                 
-                <!-- Barre de progression -->
                 <div class="conformity-progress">
                     <div class="progress-bar-bg">
                         <div class="progress-bar-fill" style="width: ${rate}%; background: ${rateColor};"></div>
@@ -520,7 +478,6 @@ class FileReaderModule {
                 </div>
             </div>
             
-            <!-- Tableau détaillé des jours non conformes -->
             <div class="nonconforming-days-section">
                 <h5>📋 Détail des jours non conformes (${conformityData.nonConformingDays})</h5>
                 
@@ -566,7 +523,6 @@ class FileReaderModule {
                 </div>
             </div>
             
-            <!-- Légende -->
             <div class="conformity-legend">
                 <span class="legend-item"><span class="legend-color" style="background: #22c55e;"></span> Jour conforme</span>
                 <span class="legend-item"><span class="legend-color" style="background: #f59e0b;"></span> Non conforme (warning)</span>
@@ -576,7 +532,10 @@ class FileReaderModule {
         `;
     }
 
-    // Nouvelle méthode : Analyser les dépassements de seuils (existante)
+    // ==============================================
+    // ANALYSE DES DÉPASSEMENTS DE SEUILS
+    // ==============================================
+
     analyzeThresholdViolations() {
         if (!this.detectedSystem) return [];
         
@@ -602,7 +561,7 @@ class FileReaderModule {
                 const dateStr = row[dateIndex];
                 if (!dateStr) return;
                 
-                const date = dateStr.split(' ')[0]; // Prendre seulement la date
+                const date = dateStr.split(' ')[0];
                 const tension = parseFloat(row[tensionInstIndex]);
                 
                 if (isNaN(tension)) return;
@@ -621,7 +580,6 @@ class FileReaderModule {
                 dailyData[date].min = Math.min(dailyData[date].min, tension);
                 dailyData[date].max = Math.max(dailyData[date].max, tension);
                 
-                // Calculer la variation horaire si on a une valeur précédente
                 if (dailyData[date].previousValue !== null) {
                     const variation = Math.abs(tension - dailyData[date].previousValue);
                     dailyData[date].maxVariation = Math.max(dailyData[date].maxVariation, variation);
@@ -630,14 +588,12 @@ class FileReaderModule {
             });
         });
         
-        // Analyser chaque jour pour détecter les violations
         Object.keys(dailyData).forEach(date => {
             const dayData = dailyData[date];
             const avgTension = dayData.values.reduce((a, b) => a + b, 0) / dayData.values.length;
             
             let violationsForDay = [];
             
-            // Vérifier la tension minimale
             if (dayData.min < norms.min) {
                 violationsForDay.push({
                     type: 'min',
@@ -647,7 +603,6 @@ class FileReaderModule {
                 });
             }
             
-            // Vérifier la tension maximale
             if (dayData.max > norms.max) {
                 violationsForDay.push({
                     type: 'max',
@@ -657,7 +612,6 @@ class FileReaderModule {
                 });
             }
             
-            // Vérifier la plage idéale
             if (avgTension < norms.idealMin || avgTension > norms.idealMax) {
                 violationsForDay.push({
                     type: 'ideal',
@@ -667,7 +621,6 @@ class FileReaderModule {
                 });
             }
             
-            // Vérifier la variation maximale
             if (dayData.maxVariation > norms.variationMax) {
                 violationsForDay.push({
                     type: 'variation',
@@ -694,303 +647,6 @@ class FileReaderModule {
         return violations.sort((a, b) => new Date(b.date) - new Date(a.date));
     }
 
-    getTableType(types) {
-        if (!types || types.size === 0) return 'Données';
-        
-        const typeArray = Array.from(types).sort();
-        if (typeArray.length === 1) {
-            return this.getTypeLabel(typeArray[0]);
-        }
-        return typeArray.map(t => this.getTypeLabel(t)).join(', ');
-    }
-
-    getTypeLabel(type) {
-        const labels = {
-            'S': 'SOLDE',
-            'I': 'INTENSITÉ',
-            'R': 'RECHARGE',
-            'E': 'ÉVÈNEMENT',
-            'T': 'TENSION',
-            'C': 'ÉNERGIE'
-        };
-        return labels[type] || type;
-    }
-
-    getTypeColor(type) {
-        const colors = {
-            'S': '#9F7AEA', // Violet pour SOLDE
-            'I': '#4299E1', // Bleu pour INTENSITÉ
-            'R': '#48BB78', // Vert pour RECHARGE
-            'E': '#F56565', // Rouge pour ÉVÈNEMENT
-            'T': '#ED8936', // Orange pour TENSION
-            'C': '#FBBF24'  // Jaune pour ÉNERGIE
-        };
-        
-        if (type.includes(',')) {
-            return '#718096';
-        }
-        return colors[type] || '#718096';
-    }
-
-    getTypeIcon(type) {
-        const icons = {
-            'S': '💰', // SOLDE
-            'I': '⚡', // INTENSITÉ
-            'R': '💳', // RECHARGE
-            'E': '⚠️', // ÉVÈNEMENT
-            'T': '📊', // TENSION
-            'C': '🔋'  // ÉNERGIE
-        };
-        return icons[type] || '📋';
-    }
-
-    // Analyse des données de tension (existante)
-    analyzeTensionData(tables) {
-        const tensionTables = tables.filter(table => 
-            Array.from(table.types).includes('T')
-        );
-        
-        if (tensionTables.length === 0) return null;
-        
-        let allTensions = [];
-        let tensionData = [];
-        
-        // Parcourir tous les tableaux de tension
-        tensionTables.forEach(table => {
-            table.rows.forEach(row => {
-                // Chercher les colonnes de tension
-                const tensionInstIndex = table.header.findIndex(h => 
-                    h.includes('Tension Inst') || h.includes('Tension')
-                );
-                const tensionMinIndex = table.header.findIndex(h => h.includes('Tension Min'));
-                const tensionMaxIndex = table.header.findIndex(h => h.includes('Tension Max'));
-                const dateIndex = table.header.findIndex(h => 
-                    h.includes('TimeStamp') || h.includes('Date') || h.includes('DATE')
-                );
-                
-                if (tensionInstIndex !== -1) {
-                    const value = parseFloat(row[tensionInstIndex]);
-                    if (!isNaN(value)) {
-                        allTensions.push(value);
-                        if (dateIndex !== -1) {
-                            tensionData.push({
-                                value: value,
-                                date: row[dateIndex],
-                                type: 'inst'
-                            });
-                        }
-                    }
-                }
-                
-                if (tensionMinIndex !== -1) {
-                    const value = parseFloat(row[tensionMinIndex]);
-                    if (!isNaN(value)) {
-                        allTensions.push(value);
-                        if (dateIndex !== -1) {
-                            tensionData.push({
-                                value: value,
-                                date: row[dateIndex],
-                                type: 'min'
-                            });
-                        }
-                    }
-                }
-                
-                if (tensionMaxIndex !== -1) {
-                    const value = parseFloat(row[tensionMaxIndex]);
-                    if (!isNaN(value)) {
-                        allTensions.push(value);
-                        if (dateIndex !== -1) {
-                            tensionData.push({
-                                value: value,
-                                date: row[dateIndex],
-                                type: 'max'
-                            });
-                        }
-                    }
-                }
-            });
-        });
-        
-        if (allTensions.length === 0) return null;
-        
-        // Calculer les statistiques
-        const tensionMoyenne = allTensions.reduce((a, b) => a + b, 0) / allTensions.length;
-        const tensionMin = Math.min(...allTensions);
-        const tensionMax = Math.max(...allTensions);
-        
-        // Trouver les dates correspondantes
-        const minData = tensionData.find(d => d.value === tensionMin);
-        const maxData = tensionData.find(d => d.value === tensionMax);
-        
-        // Calculer la variation max par jour
-        let variationParJour = [];
-        const tensionsParJour = {};
-        
-        tensionData.forEach(d => {
-            if (d.date) {
-                const date = d.date.split(' ')[0];
-                if (!tensionsParJour[date]) {
-                    tensionsParJour[date] = [];
-                }
-                tensionsParJour[date].push(d.value);
-            }
-        });
-        
-        Object.keys(tensionsParJour).forEach(date => {
-            const valeurs = tensionsParJour[date];
-            if (valeurs.length > 1) {
-                const min = Math.min(...valeurs);
-                const max = Math.max(...valeurs);
-                variationParJour.push({
-                    date: date,
-                    variation: max - min
-                });
-            }
-        });
-        
-        const maxVariation = variationParJour.length > 0 
-            ? variationParJour.reduce((max, v) => v.variation > max.variation ? v : max, variationParJour[0])
-            : null;
-        
-        return {
-            moyenne: tensionMoyenne.toFixed(2),
-            minimale: tensionMin.toFixed(2),
-            minimaleDate: minData ? minData.date : 'N/A',
-            maximale: tensionMax.toFixed(2),
-            maximaleDate: maxData ? maxData.date : 'N/A',
-            variationMax: maxVariation ? maxVariation.variation.toFixed(2) : '0.00',
-            variationDate: maxVariation ? maxVariation.date : 'N/A',
-            count: allTensions.length
-        };
-    }
-
-    // Fonction pour changer de page
-    changePage(tableId, direction) {
-        if (!this.currentPages[tableId]) {
-            this.currentPages[tableId] = 1;
-        }
-        
-        const totalRows = this.getTableRowsCount(tableId);
-        const totalPages = Math.ceil(totalRows / this.rowsPerPage);
-        
-        let newPage = this.currentPages[tableId];
-        
-        if (direction === 'prev' && newPage > 1) {
-            newPage--;
-        } else if (direction === 'next' && newPage < totalPages) {
-            newPage++;
-        } else if (typeof direction === 'number') {
-            newPage = Math.min(Math.max(1, direction), totalPages);
-        }
-        
-        if (newPage !== this.currentPages[tableId]) {
-            this.currentPages[tableId] = newPage;
-            
-            // Recharger uniquement les tableaux sans changer d'onglet
-            this.refreshTables();
-        }
-    }
-
-    // Rafraîchir uniquement les tableaux sans changer l'onglet
-    refreshTables() {
-        // Compter les tableaux par catégorie
-        let techTables = [];
-        let comTables = [];
-        
-        this.parsedData.tables.forEach((table, index) => {
-            const types = Array.from(table.types);
-            const tableId = `table_${index}`;
-            
-            if (types.some(t => ['I', 'E', 'T'].includes(t))) {
-                techTables.push({...table, tableId, originalIndex: index});
-            }
-            if (types.some(t => ['S', 'R'].includes(t))) {
-                comTables.push({...table, tableId, originalIndex: index});
-            }
-        });
-
-        // Mettre à jour les dates dans l'en-tête
-        this.updateReleveDates();
-
-        // Analyser les données de tension pour les statistiques
-        const tensionStats = this.analyzeTensionData(techTables);
-        
-        // Analyser les dépassements de seuils
-        const thresholdViolations = this.analyzeThresholdViolations();
-        
-        // ✅ Analyser la conformité
-        const conformityData = this.analyzeConformity();
-        
-        // Générer le HTML pour l'onglet technique avec statistiques
-        let techHTML = '';
-        
-        // Ajouter les statistiques de conformité en premier
-        if (conformityData) {
-            techHTML += this.generateConformityStatsHTML(conformityData);
-        }
-        
-        // Ajouter les statistiques de tension si disponibles
-        if (tensionStats) {
-            techHTML += this.generateTensionStatsHTML(tensionStats);
-        }
-        
-        // Ajouter le tableau des dépassements
-        techHTML += this.generateViolationsTableHTML(thresholdViolations);
-        
-        // Ajouter les tableaux techniques
-        techHTML += this.generateTablesHTML(techTables);
-        
-        // Mettre à jour le contenu des onglets
-        this.techContent.innerHTML = techHTML;
-        this.comContent.innerHTML = `<h4 class="tab-subtitle">📈 Données Commerciales (S, R)</h4>` + this.generateTablesHTML(comTables);
-        
-        // Restaurer l'onglet actif
-        this.switchTab(this.activeTab, false);
-    }
-    
-    // Nouvelle méthode pour mettre à jour les dates dans l'en-tête
-    updateReleveDates() {
-        if (!this.parsedData.nrNumber) return;
-        
-        const { firstDate, lastDate } = this.getReleveDates();
-        
-        if (firstDate && lastDate) {
-            const nrInfoElement = document.getElementById('nrInfo');
-            if (nrInfoElement) {
-                // Chercher si l'élément dates existe déjà
-                let datesElement = nrInfoElement.querySelector('.nr-dates');
-                
-                const formatDate = (date) => {
-                    if (date.includes('-')) {
-                        const [year, month, day] = date.split('-');
-                        return `${day}/${month}/${year}`;
-                    }
-                    return date;
-                };
-                
-                const datesHTML = `
-                    <span class="nr-dates">
-                        <span class="nr-date-icon">📅</span>
-                        <span class="nr-date-text">${formatDate(firstDate)} - ${formatDate(lastDate)}</span>
-                    </span>
-                `;
-                
-                if (datesElement) {
-                    // Remplacer le contenu existant
-                    datesElement.outerHTML = datesHTML;
-                } else {
-                    // Insérer après le nr-info-text
-                    const infoText = nrInfoElement.querySelector('.nr-info-text');
-                    if (infoText) {
-                        infoText.insertAdjacentHTML('afterend', datesHTML);
-                    }
-                }
-            }
-        }
-    }
-
-    // Générer le tableau des dépassements (existante améliorée)
     generateViolationsTableHTML(violations) {
         if (violations.length === 0) {
             return `
@@ -1066,7 +722,125 @@ class FileReaderModule {
         return html;
     }
 
-    // Générer le HTML des statistiques de tension (existante)
+    // ==============================================
+    // ANALYSE DES DONNÉES DE TENSION
+    // ==============================================
+
+    analyzeTensionData(tables) {
+        const tensionTables = tables.filter(table => 
+            Array.from(table.types).includes('T')
+        );
+        
+        if (tensionTables.length === 0) return null;
+        
+        let allTensions = [];
+        let tensionData = [];
+        
+        tensionTables.forEach(table => {
+            table.rows.forEach(row => {
+                const tensionInstIndex = table.header.findIndex(h => 
+                    h.includes('Tension Inst') || h.includes('Tension')
+                );
+                const tensionMinIndex = table.header.findIndex(h => h.includes('Tension Min'));
+                const tensionMaxIndex = table.header.findIndex(h => h.includes('Tension Max'));
+                const dateIndex = table.header.findIndex(h => 
+                    h.includes('TimeStamp') || h.includes('Date') || h.includes('DATE')
+                );
+                
+                if (tensionInstIndex !== -1) {
+                    const value = parseFloat(row[tensionInstIndex]);
+                    if (!isNaN(value)) {
+                        allTensions.push(value);
+                        if (dateIndex !== -1) {
+                            tensionData.push({
+                                value: value,
+                                date: row[dateIndex],
+                                type: 'inst'
+                            });
+                        }
+                    }
+                }
+                
+                if (tensionMinIndex !== -1) {
+                    const value = parseFloat(row[tensionMinIndex]);
+                    if (!isNaN(value)) {
+                        allTensions.push(value);
+                        if (dateIndex !== -1) {
+                            tensionData.push({
+                                value: value,
+                                date: row[dateIndex],
+                                type: 'min'
+                            });
+                        }
+                    }
+                }
+                
+                if (tensionMaxIndex !== -1) {
+                    const value = parseFloat(row[tensionMaxIndex]);
+                    if (!isNaN(value)) {
+                        allTensions.push(value);
+                        if (dateIndex !== -1) {
+                            tensionData.push({
+                                value: value,
+                                date: row[dateIndex],
+                                type: 'max'
+                            });
+                        }
+                    }
+                }
+            });
+        });
+        
+        if (allTensions.length === 0) return null;
+        
+        const tensionMoyenne = allTensions.reduce((a, b) => a + b, 0) / allTensions.length;
+        const tensionMin = Math.min(...allTensions);
+        const tensionMax = Math.max(...allTensions);
+        
+        const minData = tensionData.find(d => d.value === tensionMin);
+        const maxData = tensionData.find(d => d.value === tensionMax);
+        
+        let variationParJour = [];
+        const tensionsParJour = {};
+        
+        tensionData.forEach(d => {
+            if (d.date) {
+                const date = d.date.split(' ')[0];
+                if (!tensionsParJour[date]) {
+                    tensionsParJour[date] = [];
+                }
+                tensionsParJour[date].push(d.value);
+            }
+        });
+        
+        Object.keys(tensionsParJour).forEach(date => {
+            const valeurs = tensionsParJour[date];
+            if (valeurs.length > 1) {
+                const min = Math.min(...valeurs);
+                const max = Math.max(...valeurs);
+                variationParJour.push({
+                    date: date,
+                    variation: max - min
+                });
+            }
+        });
+        
+        const maxVariation = variationParJour.length > 0 
+            ? variationParJour.reduce((max, v) => v.variation > max.variation ? v : max, variationParJour[0])
+            : null;
+        
+        return {
+            moyenne: tensionMoyenne.toFixed(2),
+            minimale: tensionMin.toFixed(2),
+            minimaleDate: minData ? minData.date : 'N/A',
+            maximale: tensionMax.toFixed(2),
+            maximaleDate: maxData ? maxData.date : 'N/A',
+            variationMax: maxVariation ? maxVariation.variation.toFixed(2) : '0.00',
+            variationDate: maxVariation ? maxVariation.date : 'N/A',
+            count: allTensions.length
+        };
+    }
+
     generateTensionStatsHTML(stats) {
         const systemNorms = this.systemNorms[this.detectedSystem];
         
@@ -1121,58 +895,161 @@ class FileReaderModule {
         `;
     }
 
-    // Obtenir le nombre de lignes pour un tableau
-    getTableRowsCount(tableId) {
-        const index = parseInt(tableId.replace('table_', ''));
-        if (this.parsedData.tables[index]) {
-            return this.parsedData.tables[index].rows.length;
+    // ==============================================
+    // UTILITAIRES
+    // ==============================================
+
+    getTableType(types) {
+        if (!types || types.size === 0) return 'Données';
+        
+        const typeArray = Array.from(types).sort();
+        if (typeArray.length === 1) {
+            return this.getTypeLabel(typeArray[0]);
         }
-        return 0;
+        return typeArray.map(t => this.getTypeLabel(t)).join(', ');
     }
 
-    // Obtenir les lignes paginées pour un tableau
-    getPaginatedRows(table, tableId) {
-        const currentPage = this.currentPages[tableId] || 1;
-        const start = (currentPage - 1) * this.rowsPerPage;
-        const end = start + this.rowsPerPage;
-        return table.rows.slice(start, end);
+    getTypeLabel(type) {
+        const labels = {
+            'S': 'SOLDE',
+            'I': 'INTENSITÉ',
+            'R': 'RECHARGE',
+            'E': 'ÉVÈNEMENT',
+            'T': 'TENSION',
+            'C': 'ÉNERGIE'
+        };
+        return labels[type] || type;
     }
 
-    getReleveDates() {
-        let firstDate = null;
-        let lastDate = null;
+    getTypeColor(type) {
+        const colors = {
+            'S': '#9F7AEA',
+            'I': '#4299E1',
+            'R': '#48BB78',
+            'E': '#F56565',
+            'T': '#ED8936',
+            'C': '#FBBF24'
+        };
         
-        // Parcourir tous les tableaux de tension
-        const tensionTables = this.parsedData.tables.filter(table => 
-            Array.from(table.types).includes('T')
-        );
+        if (type.includes(',')) {
+            return '#718096';
+        }
+        return colors[type] || '#718096';
+    }
+
+    getTypeIcon(type) {
+        const icons = {
+            'S': '💰',
+            'I': '⚡',
+            'R': '💳',
+            'E': '⚠️',
+            'T': '📊',
+            'C': '🔋'
+        };
+        return icons[type] || '📋';
+    }
+
+    changePage(tableId, direction) {
+        if (!this.currentPages[tableId]) {
+            this.currentPages[tableId] = 1;
+        }
         
-        if (tensionTables.length === 0) return { firstDate: null, lastDate: null };
+        const totalRows = this.getTableRowsCount(tableId);
         
-        tensionTables.forEach(table => {
-            const dateIndex = table.header.findIndex(h => 
-                h.includes('TimeStamp') || h.includes('Date') || h.includes('DATE')
-            );
+        if (totalRows === 0) return;
+        
+        const totalPages = Math.ceil(totalRows / this.rowsPerPage);
+        
+        let newPage = this.currentPages[tableId];
+        
+        if (direction === 'prev' && newPage > 1) {
+            newPage--;
+        } else if (direction === 'next' && newPage < totalPages) {
+            newPage++;
+        } else if (typeof direction === 'number') {
+            newPage = Math.min(Math.max(1, direction), totalPages);
+        }
+        
+        if (newPage !== this.currentPages[tableId]) {
+            this.currentPages[tableId] = newPage;
+            this.refreshTables();
+        }
+    }
+
+    refreshTables() {
+        let techTables = [];
+        let comTables = [];
+        
+        this.parsedData.tables.forEach((table, index) => {
+            const types = Array.from(table.types);
+            const tableId = `table_${index}`;
             
-            if (dateIndex === -1) return;
-            
-            table.rows.forEach(row => {
-                const dateStr = row[dateIndex];
-                if (!dateStr) return;
-                
-                // Extraire la date (supprimer l'heure si présente)
-                const date = dateStr.split(' ')[0];
-                
-                if (!firstDate || date < firstDate) {
-                    firstDate = date;
-                }
-                if (!lastDate || date > lastDate) {
-                    lastDate = date;
-                }
-            });
+            if (types.some(t => ['I', 'E', 'T'].includes(t))) {
+                techTables.push({...table, tableId, originalIndex: index});
+            }
+            if (types.some(t => ['S', 'R'].includes(t))) {
+                comTables.push({...table, tableId, originalIndex: index});
+            }
         });
+
+        this.updateReleveDates();
+
+        const tensionStats = this.analyzeTensionData(techTables);
+        const thresholdViolations = this.analyzeThresholdViolations();
+        const conformityData = this.analyzeConformity();
+        const nominalHitsData = this.analyzeNominalTensionHits();
+        const dailyChartData = this.prepareDailyTensionChartData();
+        const hourlyChartData = this.prepareHourlyTensionData();
+        const eventAnalysis = this.analyzeEventTypes();
+        const delestageData = this.analyzeDelestageEvents();
         
-        return { firstDate, lastDate };
+        let techHTML = this.buildTechHTML(tensionStats, conformityData, thresholdViolations, 
+                                          nominalHitsData, dailyChartData, hourlyChartData, 
+                                          eventAnalysis, techTables, delestageData);
+        
+        let comHTML = this.buildComHTML(eventAnalysis, comTables);
+        
+        this.techContent.innerHTML = techHTML;
+        this.comContent.innerHTML = comHTML;
+        
+        this.switchTab(this.activeTab, false);
+    }
+    
+    updateReleveDates() {
+        if (!this.parsedData.nrNumber) return;
+        
+        const { firstDate, lastDate } = this.getReleveDates();
+        
+        if (firstDate && lastDate) {
+            const nrInfoElement = document.getElementById('nrInfo');
+            if (nrInfoElement) {
+                let datesElement = nrInfoElement.querySelector('.nr-dates');
+                
+                const formatDate = (date) => {
+                    if (date.includes('-')) {
+                        const [year, month, day] = date.split('-');
+                        return `${day}/${month}/${year}`;
+                    }
+                    return date;
+                };
+                
+                const datesHTML = `
+                    <span class="nr-dates">
+                        <span class="nr-date-icon">📅</span>
+                        <span class="nr-date-text">${formatDate(firstDate)} - ${formatDate(lastDate)}</span>
+                    </span>
+                `;
+                
+                if (datesElement) {
+                    datesElement.outerHTML = datesHTML;
+                } else {
+                    const infoText = nrInfoElement.querySelector('.nr-info-text');
+                    if (infoText) {
+                        infoText.insertAdjacentHTML('afterend', datesHTML);
+                    }
+                }
+            }
+        }
     }
 
     // ==============================================
@@ -1189,7 +1066,6 @@ class FileReaderModule {
         
         if (tensionTables.length === 0) return null;
         
-        // Structure pour stocker les données quotidiennes
         let dailyData = {};
         let allDays = new Set();
         
@@ -1220,7 +1096,6 @@ class FileReaderModule {
                     };
                 }
                 
-                // Vérifier si la tension atteint ou dépasse la cible
                 if (tension >= targetTension) {
                     dailyData[date].hits.push({
                         time: dateStr.split(' ')[1] || '00:00',
@@ -1231,21 +1106,19 @@ class FileReaderModule {
             });
         });
         
-        // Trier les dates et préparer les données
         const sortedDates = Object.keys(dailyData).sort((a, b) => {
-            return new Date(b) - new Date(a); // Plus récent en premier
+            return new Date(b) - new Date(a);
         });
         
         const daysWithData = Object.keys(dailyData).length;
         const totalDays = allDays.size;
         
-        // Compter les jours par catégorie
-        let daysWith4Plus = 0;  // ≥4 atteintes
-        let daysWith3 = 0;       // 3 atteintes
-        let daysWith2 = 0;       // 2 atteintes
-        let daysWith1 = 0;       // 1 atteinte
-        let daysWith0 = 0;       // 0 atteinte (mais avec données)
-        let daysWithoutData = totalDays - daysWithData; // Jours sans données
+        let daysWith4Plus = 0;
+        let daysWith3 = 0;
+        let daysWith2 = 0;
+        let daysWith1 = 0;
+        let daysWith0 = 0;
+        let daysWithoutData = totalDays - daysWithData;
         
         Object.values(dailyData).forEach(day => {
             if (day.count >= 4) daysWith4Plus++;
@@ -1255,7 +1128,6 @@ class FileReaderModule {
             else daysWith0++;
         });
         
-        // Calculer les pourcentages (basés sur les jours avec données)
         const percent4Plus = daysWithData > 0 ? ((daysWith4Plus / daysWithData) * 100).toFixed(1) : 0;
         const percent3 = daysWithData > 0 ? ((daysWith3 / daysWithData) * 100).toFixed(1) : 0;
         const percent2 = daysWithData > 0 ? ((daysWith2 / daysWithData) * 100).toFixed(1) : 0;
@@ -1293,20 +1165,18 @@ class FileReaderModule {
                 <div class="nominal-header">
                     <span class="nominal-icon">⚡</span>
                     <h4>Analyse des atteintes de tension nominale</h4>
-                    <span class="system-badge ${data.systemType === '12V' ? 'system-12v' : 'system-24v'}">
-                        ⚡ Système ${data.systemType} · Cible: ${data.targetTension}V
+                    <span class="system-badge ${data?.systemType === '12V' ? 'system-12v' : 'system-24v'}">
+                        ⚡ Système ${data?.systemType || this.detectedSystem} · Cible: ${data?.targetTension || (this.detectedSystem === '24V' ? 28 : 14)}V
                     </span>
                 </div>
                 <div class="no-data-message">Aucune donnée de tension disponible</div>
             </div>`;
         }
         
-        // Créer les lignes du tableau
         let tableRows = '';
         data.sortedDates.forEach(date => {
             const day = data.dailyData[date];
             
-            // Déterminer la couleur du badge selon le nombre d'atteintes
             let badgeColor = '#64748b';
             let bgColor = '#ffffff';
             
@@ -1327,14 +1197,11 @@ class FileReaderModule {
                 bgColor = '#fee2e2';
             }
             
-            // Formater les heures d'atteinte
             let hitsHTML = '';
             if (day.hits.length > 0) {
-                // Trier les hits par heure
                 const sortedHits = [...day.hits].sort((a, b) => a.time.localeCompare(b.time));
                 
                 hitsHTML = sortedHits.map(hit => {
-                    // Formater l'heure (supprimer les secondes si présentes)
                     const time = hit.time.length > 5 ? hit.time.substring(0, 5) : hit.time;
                     return `<span class="hit-time-badge" style="border-color: ${badgeColor}; color: ${badgeColor};">
                         ${time} → ${hit.value.toFixed(1)}V
@@ -1357,10 +1224,8 @@ class FileReaderModule {
             `;
         });
         
-        // Créer les cartes de pourcentages
         const cardsHTML = `
             <div class="nominal-cards-grid">
-                <!-- ≥4 atteintes (Vert) -->
                 <div class="nominal-card" style="border-left: 6px solid #22c55e; background: linear-gradient(135deg, #f0fdf4, white);">
                     <div class="card-header">
                         <span class="card-badge" style="background: #22c55e;">⭐</span>
@@ -1378,7 +1243,6 @@ class FileReaderModule {
                     </div>
                 </div>
                 
-                <!-- 3 atteintes (Jaune) -->
                 <div class="nominal-card" style="border-left: 6px solid #eab308; background: linear-gradient(135deg, #fef9c3, white);">
                     <div class="card-header">
                         <span class="card-badge" style="background: #eab308;">👍</span>
@@ -1396,7 +1260,6 @@ class FileReaderModule {
                     </div>
                 </div>
                 
-                <!-- 2 atteintes (Orange) -->
                 <div class="nominal-card" style="border-left: 6px solid #f59e0b; background: linear-gradient(135deg, #fff7ed, white);">
                     <div class="card-header">
                         <span class="card-badge" style="background: #f59e0b;">🟡</span>
@@ -1414,7 +1277,6 @@ class FileReaderModule {
                     </div>
                 </div>
                 
-                <!-- 1 atteinte (Orange clair) -->
                 <div class="nominal-card" style="border-left: 6px solid #f97316; background: linear-gradient(135deg, #ffedd5, white);">
                     <div class="card-header">
                         <span class="card-badge" style="background: #f97316;">⚠️</span>
@@ -1432,7 +1294,6 @@ class FileReaderModule {
                     </div>
                 </div>
                 
-                <!-- 0 atteinte (Rouge) -->
                 <div class="nominal-card" style="border-left: 6px solid #ef4444; background: linear-gradient(135deg, #fee2e2, white);">
                     <div class="card-header">
                         <span class="card-badge" style="background: #ef4444;">🔴</span>
@@ -1461,8 +1322,7 @@ class FileReaderModule {
             ` : ''}
         `;
         
-        // Tableau principal
-        const tableHTML = `
+        return `
             <div class="nominal-container">
                 <div class="nominal-header">
                     <span class="nominal-icon">⚡</span>
@@ -1476,10 +1336,8 @@ class FileReaderModule {
                     </div>
                 </div>
                 
-                <!-- Cartes de pourcentages -->
                 ${cardsHTML}
                 
-                <!-- Tableau détaillé -->
                 <div class="nominal-table-wrapper">
                     <table class="nominal-table">
                         <thead>
@@ -1495,7 +1353,6 @@ class FileReaderModule {
                     </table>
                 </div>
                 
-                <!-- Légende -->
                 <div class="nominal-legend">
                     <span class="legend-item"><span class="legend-color" style="background: #22c55e;"></span> ≥4 (Excellente)</span>
                     <span class="legend-item"><span class="legend-color" style="background: #eab308;"></span> 3 (Très bien)</span>
@@ -1506,12 +1363,10 @@ class FileReaderModule {
                 </div>
             </div>
         `;
-        
-        return tableHTML;
     }
 
     // ==============================================
-    // GRAPHIQUE JOURNALIER DE TENSION (MIN, MAX, MOYENNE)
+    // GRAPHIQUE JOURNALIER DE TENSION
     // ==============================================
 
     prepareDailyTensionChartData() {
@@ -1524,7 +1379,6 @@ class FileReaderModule {
         
         if (tensionTables.length === 0) return null;
         
-        // Structure pour stocker les données quotidiennes
         let dailyData = {};
         let allDates = [];
         
@@ -1563,9 +1417,8 @@ class FileReaderModule {
             });
         });
         
-        // Calculer les moyennes et préparer les données pour le graphique
         const dates = Object.keys(dailyData).sort((a, b) => {
-            return new Date(a) - new Date(b); // Ordre chronologique
+            return new Date(a) - new Date(b);
         });
         
         const chartData = {
@@ -1607,10 +1460,8 @@ class FileReaderModule {
             </div>`;
         }
         
-        // Créer un ID unique pour le canvas
         const chartId = `tension-chart-${Date.now()}`;
         
-        // Stocker les données pour une utilisation ultérieure (pour Chart.js)
         setTimeout(() => {
             this.renderDailyTensionChart(chartId, data);
         }, 100);
@@ -1674,12 +1525,10 @@ class FileReaderModule {
         const chartData = data.chartData;
         const norms = data.norms;
         
-        // Détruire le graphique existant s'il y en a un
         if (window[`chart_${chartId}`]) {
             window[`chart_${chartId}`].destroy();
         }
         
-        // Configuration du graphique
         window[`chart_${chartId}`] = new Chart(ctx, {
             type: 'line',
             data: {
@@ -1731,9 +1580,7 @@ class FileReaderModule {
                     intersect: false
                 },
                 plugins: {
-                    legend: {
-                        display: false
-                    },
+                    legend: { display: false },
                     tooltip: {
                         backgroundColor: 'rgba(15, 23, 42, 0.95)',
                         padding: 12,
@@ -1763,9 +1610,7 @@ class FileReaderModule {
                             },
                             font: { size: 11 }
                         },
-                        grid: {
-                            color: 'rgba(148, 163, 184, 0.1)'
-                        }
+                        grid: { color: 'rgba(148, 163, 184, 0.1)' }
                     },
                     x: {
                         title: {
@@ -1780,61 +1625,55 @@ class FileReaderModule {
                             font: { size: 10 },
                             maxTicksLimit: 10
                         },
-                        grid: {
-                            display: false
-                        }
+                        grid: { display: false }
                     }
                 }
             },
-            plugins: [
-                {
-                    id: 'thresholdLines',
-                    afterDatasetsDraw(chart) {
-                        const ctx = chart.ctx;
-                        const yScale = chart.scales.y;
-                        const chartArea = chart.chartArea;
-                        
-                        // Ligne de limite minimale
-                        const minLimitY = yScale.getPixelForValue(norms.min);
-                        ctx.save();
-                        ctx.strokeStyle = '#ef4444';
-                        ctx.lineWidth = 2;
-                        ctx.setLineDash([5, 5]);
-                        ctx.beginPath();
-                        ctx.moveTo(chartArea.left, minLimitY);
-                        ctx.lineTo(chartArea.right, minLimitY);
-                        ctx.stroke();
-                        
-                        // Ligne de limite maximale
-                        const maxLimitY = yScale.getPixelForValue(norms.max);
-                        ctx.strokeStyle = '#ef4444';
-                        ctx.lineWidth = 2;
-                        ctx.setLineDash([5, 5]);
-                        ctx.beginPath();
-                        ctx.moveTo(chartArea.left, maxLimitY);
-                        ctx.lineTo(chartArea.right, maxLimitY);
-                        ctx.stroke();
-                        
-                        // Zone de plage idéale
-                        const idealMinY = yScale.getPixelForValue(norms.idealMin);
-                        const idealMaxY = yScale.getPixelForValue(norms.idealMax);
-                        ctx.fillStyle = 'rgba(34, 197, 94, 0.1)';
-                        ctx.fillRect(
-                            chartArea.left,
-                            idealMaxY,
-                            chartArea.right - chartArea.left,
-                            idealMinY - idealMaxY
-                        );
-                        
-                        ctx.setLineDash([]);
-                        ctx.restore();
-                    }
+            plugins: [{
+                id: 'thresholdLines',
+                afterDatasetsDraw(chart) {
+                    const ctx = chart.ctx;
+                    const yScale = chart.scales.y;
+                    const chartArea = chart.chartArea;
+                    
+                    const minLimitY = yScale.getPixelForValue(norms.min);
+                    ctx.save();
+                    ctx.strokeStyle = '#ef4444';
+                    ctx.lineWidth = 2;
+                    ctx.setLineDash([5, 5]);
+                    ctx.beginPath();
+                    ctx.moveTo(chartArea.left, minLimitY);
+                    ctx.lineTo(chartArea.right, minLimitY);
+                    ctx.stroke();
+                    
+                    const maxLimitY = yScale.getPixelForValue(norms.max);
+                    ctx.strokeStyle = '#ef4444';
+                    ctx.lineWidth = 2;
+                    ctx.setLineDash([5, 5]);
+                    ctx.beginPath();
+                    ctx.moveTo(chartArea.left, maxLimitY);
+                    ctx.lineTo(chartArea.right, maxLimitY);
+                    ctx.stroke();
+                    
+                    const idealMinY = yScale.getPixelForValue(norms.idealMin);
+                    const idealMaxY = yScale.getPixelForValue(norms.idealMax);
+                    ctx.fillStyle = 'rgba(34, 197, 94, 0.1)';
+                    ctx.fillRect(
+                        chartArea.left,
+                        idealMaxY,
+                        chartArea.right - chartArea.left,
+                        idealMinY - idealMaxY
+                    );
+                    
+                    ctx.setLineDash([]);
+                    ctx.restore();
                 }
-            ]
+            }]
         });
     }
+
     // ==============================================
-    // GRAPHIQUE HORAIRE DE TENSION (Tens Inst, Min, Max)
+    // GRAPHIQUE HORAIRE DE TENSION
     // ==============================================
 
     prepareHourlyTensionData() {
@@ -1846,7 +1685,6 @@ class FileReaderModule {
         
         if (tensionTables.length === 0) return null;
         
-        // Structure pour stocker les données par date et heure
         let hourlyData = {};
         let availableDates = new Set();
         
@@ -1868,7 +1706,7 @@ class FileReaderModule {
                 
                 const date = dateStr.split(' ')[0];
                 const time = dateStr.split(' ')[1] || '00:00';
-                const hour = time.substring(0, 5); // Format HH:MM
+                const hour = time.substring(0, 5);
                 
                 const tensionInst = parseFloat(row[tensionInstIndex]);
                 const tensionMin = tensionMinIndex !== -1 ? parseFloat(row[tensionMinIndex]) : null;
@@ -1896,8 +1734,7 @@ class FileReaderModule {
             });
         });
         
-        // Pour chaque date et heure, calculer les moyennes
-        const processedData = {};
+        let processedData = {};
         const sortedDates = Array.from(availableDates).sort((a, b) => {
             return new Date(a) - new Date(b);
         });
@@ -1906,7 +1743,6 @@ class FileReaderModule {
             processedData[date] = {};
             const hours = hourlyData[date] || {};
             
-            // Pour chaque heure de 00:00 à 23:00
             for (let h = 0; h < 24; h++) {
                 const hourKey = `${h.toString().padStart(2, '0')}:00`;
                 const values = hours[hourKey] || { inst: [], min: [], max: [] };
@@ -1931,7 +1767,6 @@ class FileReaderModule {
             }
         });
         
-        // Déterminer la dernière date disponible
         const lastDate = sortedDates.length > 0 ? sortedDates[sortedDates.length - 1] : null;
         
         return {
@@ -1958,21 +1793,17 @@ class FileReaderModule {
             </div>`;
         }
         
-        // Créer un ID unique pour le canvas
         const chartId = `hourly-chart-${Date.now()}`;
         const selectId = `date-selector-${Date.now()}`;
         
-        // Stocker les données globalement pour le sélecteur
         window.hourlyTensionData = data;
         window.currentChartId = chartId;
         
-        // Rendre le graphique après le rendu HTML
         setTimeout(() => {
             this.renderHourlyTensionChart(chartId, data.lastDate);
             this.populateDateSelector(selectId, data);
         }, 100);
         
-        // Générer les options du sélecteur
         const optionsHTML = data.dates.map(date => {
             const selected = date === data.lastDate ? 'selected' : '';
             return `<option value="${date}" ${selected}>${date}</option>`;
@@ -1991,7 +1822,6 @@ class FileReaderModule {
                 </div>
             </div>
             
-            <!-- Sélecteur de date -->
             <div class="date-selector-wrapper">
                 <div class="date-selector-label">
                     <span class="selector-icon">📅</span>
@@ -2005,12 +1835,10 @@ class FileReaderModule {
                 </button>
             </div>
             
-            <!-- Graphique avec 3 courbes -->
             <div class="chart-wrapper">
                 <canvas id="${chartId}" width="800" height="400"></canvas>
             </div>
             
-            <!-- Limites et légende -->
             <div class="chart-limits-info">
                 <div class="limit-item">
                     <span class="limit-color" style="background: #ef4444;"></span>
@@ -2026,7 +1854,6 @@ class FileReaderModule {
                 </div>
             </div>
             
-            <!-- Légende des courbes -->
             <div class="hourly-legend">
                 <div class="legend-item">
                     <span class="legend-line" style="background: #8b5cf6; height: 3px;"></span>
@@ -2042,7 +1869,6 @@ class FileReaderModule {
                 </div>
             </div>
             
-            <!-- Statistiques -->
             <div class="hourly-stats" id="hourly-stats-${chartId}">
                 Chargement...
             </div>
@@ -2058,10 +1884,8 @@ class FileReaderModule {
         const ctx = canvas.getContext('2d');
         const norms = data.norms;
         
-        // Récupérer les données pour la date sélectionnée
         const dayData = data.data[selectedDate] || {};
         
-        // Préparer les labels (heures) et les données
         const hours = [];
         const instData = [];
         const minData = [];
@@ -2077,7 +1901,6 @@ class FileReaderModule {
             maxData.push(values.max);
         }
         
-        // Calculer les statistiques
         const validInst = instData.filter(t => t !== null);
         const validMin = minData.filter(t => t !== null);
         const validMax = maxData.filter(t => t !== null);
@@ -2088,7 +1911,6 @@ class FileReaderModule {
             ? (validInst.reduce((a, b) => a + b, 0) / validInst.length).toFixed(2) 
             : null;
         
-        // Mettre à jour les statistiques
         const statsElement = document.getElementById(`hourly-stats-${chartId}`);
         if (statsElement) {
             statsElement.innerHTML = `
@@ -2111,12 +1933,10 @@ class FileReaderModule {
             `;
         }
         
-        // Détruire le graphique existant s'il y en a un
         if (window[`hourlyChart_${chartId}`]) {
             window[`hourlyChart_${chartId}`].destroy();
         }
         
-        // Créer le graphique avec 3 courbes
         window[`hourlyChart_${chartId}`] = new Chart(ctx, {
             type: 'line',
             data: {
@@ -2179,9 +1999,7 @@ class FileReaderModule {
                     intersect: false
                 },
                 plugins: {
-                    legend: {
-                        display: false
-                    },
+                    legend: { display: false },
                     tooltip: {
                         backgroundColor: 'rgba(15, 23, 42, 0.95)',
                         padding: 12,
@@ -2214,9 +2032,7 @@ class FileReaderModule {
                             },
                             font: { size: 11 }
                         },
-                        grid: {
-                            color: 'rgba(148, 163, 184, 0.1)'
-                        }
+                        grid: { color: 'rgba(148, 163, 184, 0.1)' }
                     },
                     x: {
                         title: {
@@ -2231,57 +2047,50 @@ class FileReaderModule {
                             font: { size: 10 },
                             maxTicksLimit: 12
                         },
-                        grid: {
-                            display: false
-                        }
+                        grid: { display: false }
                     }
                 }
             },
-            plugins: [
-                {
-                    id: 'hourlyThresholds',
-                    afterDatasetsDraw(chart) {
-                        const ctx = chart.ctx;
-                        const yScale = chart.scales.y;
-                        const chartArea = chart.chartArea;
-                        
-                        // Ligne de limite minimale
-                        const minLimitY = yScale.getPixelForValue(norms.min);
-                        ctx.save();
-                        ctx.strokeStyle = '#ef4444';
-                        ctx.lineWidth = 2;
-                        ctx.setLineDash([5, 5]);
-                        ctx.beginPath();
-                        ctx.moveTo(chartArea.left, minLimitY);
-                        ctx.lineTo(chartArea.right, minLimitY);
-                        ctx.stroke();
-                        
-                        // Ligne de limite maximale
-                        const maxLimitY = yScale.getPixelForValue(norms.max);
-                        ctx.strokeStyle = '#ef4444';
-                        ctx.lineWidth = 2;
-                        ctx.setLineDash([5, 5]);
-                        ctx.beginPath();
-                        ctx.moveTo(chartArea.left, maxLimitY);
-                        ctx.lineTo(chartArea.right, maxLimitY);
-                        ctx.stroke();
-                        
-                        // Zone de plage idéale
-                        const idealMinY = yScale.getPixelForValue(norms.idealMin);
-                        const idealMaxY = yScale.getPixelForValue(norms.idealMax);
-                        ctx.fillStyle = 'rgba(34, 197, 94, 0.1)';
-                        ctx.fillRect(
-                            chartArea.left,
-                            idealMaxY,
-                            chartArea.right - chartArea.left,
-                            idealMinY - idealMaxY
-                        );
-                        
-                        ctx.setLineDash([]);
-                        ctx.restore();
-                    }
+            plugins: [{
+                id: 'hourlyThresholds',
+                afterDatasetsDraw(chart) {
+                    const ctx = chart.ctx;
+                    const yScale = chart.scales.y;
+                    const chartArea = chart.chartArea;
+                    
+                    const minLimitY = yScale.getPixelForValue(norms.min);
+                    ctx.save();
+                    ctx.strokeStyle = '#ef4444';
+                    ctx.lineWidth = 2;
+                    ctx.setLineDash([5, 5]);
+                    ctx.beginPath();
+                    ctx.moveTo(chartArea.left, minLimitY);
+                    ctx.lineTo(chartArea.right, minLimitY);
+                    ctx.stroke();
+                    
+                    const maxLimitY = yScale.getPixelForValue(norms.max);
+                    ctx.strokeStyle = '#ef4444';
+                    ctx.lineWidth = 2;
+                    ctx.setLineDash([5, 5]);
+                    ctx.beginPath();
+                    ctx.moveTo(chartArea.left, maxLimitY);
+                    ctx.lineTo(chartArea.right, maxLimitY);
+                    ctx.stroke();
+                    
+                    const idealMinY = yScale.getPixelForValue(norms.idealMin);
+                    const idealMaxY = yScale.getPixelForValue(norms.idealMax);
+                    ctx.fillStyle = 'rgba(34, 197, 94, 0.1)';
+                    ctx.fillRect(
+                        chartArea.left,
+                        idealMaxY,
+                        chartArea.right - chartArea.left,
+                        idealMinY - idealMaxY
+                    );
+                    
+                    ctx.setLineDash([]);
+                    ctx.restore();
                 }
-            ]
+            }]
         });
     }
 
@@ -2289,7 +2098,6 @@ class FileReaderModule {
         const selector = document.getElementById(selectId);
         if (!selector) return;
         
-        // Ajouter l'événement change
         selector.addEventListener('change', (e) => {
             this.updateHourlyChart(e.target.value);
         });
@@ -2303,24 +2111,636 @@ class FileReaderModule {
     refreshHourlyChart() {
         if (!window.hourlyTensionData || !window.currentChartId) return;
         
-        // Recharger avec la dernière date
         this.renderHourlyTensionChart(window.currentChartId, window.hourlyTensionData.lastDate);
         
-        // Mettre à jour le sélecteur
         const selector = document.querySelector('.date-selector');
         if (selector) {
             selector.value = window.hourlyTensionData.lastDate;
         }
     }
-    
-    //================Fonction pour afficher le contenu après le parsing================
+
+    // ==============================================
+    // ANALYSE DES ÉVÉNEMENTS PAR TYPE
+    // ==============================================
+
+    analyzeEventTypes() {
+        const eventTables = this.parsedData.tables.filter(table => 
+            Array.from(table.types).includes('E')
+        );
+        
+        if (eventTables.length === 0) {
+            return {
+                techEvents: [],
+                commercialEvents: [],
+                hasTechEvents: false,
+                hasCommercialEvents: false
+            };
+        }
+        
+        const techEventTypes = ['DelestagePartiel', 'DelestageTotal', 'DP', 'DT'];
+        const commercialEventTypes = ['SuspenP', 'SuspenE', 'CreditNul', 'EnergieEpuisee', 'Surcharge', 'PuissanceDepassee'];
+        
+        let techEvents = [];
+        let commercialEvents = [];
+        
+        eventTables.forEach(table => {
+            const clientIndex = table.header.findIndex(h => 
+                h.includes('CL') || h.includes('Client') || h.includes('Type')
+            );
+            
+            if (clientIndex === -1) return;
+            
+            const techRows = table.rows.filter(row => {
+                const eventType = row[clientIndex] || '';
+                return techEventTypes.some(type => eventType.includes(type));
+            });
+            
+            const commercialRows = table.rows.filter(row => {
+                const eventType = row[clientIndex] || '';
+                return commercialEventTypes.some(type => eventType.includes(type));
+            });
+            
+            if (techRows.length > 0) {
+                techEvents.push({
+                    ...table,
+                    rows: techRows,
+                    originalTable: table,
+                    eventCount: techRows.length
+                });
+            }
+            
+            if (commercialRows.length > 0) {
+                commercialEvents.push({
+                    ...table,
+                    rows: commercialRows,
+                    originalTable: table,
+                    eventCount: commercialRows.length
+                });
+            }
+        });
+        
+        return {
+            techEvents: techEvents,
+            commercialEvents: commercialEvents,
+            hasTechEvents: techEvents.length > 0,
+            hasCommercialEvents: commercialEvents.length > 0
+        };
+    }
+
+    // ==============================================
+    // ANALYSE DÉTAILLÉE DES ÉVÉNEMENTS DE DÉLESTAGE
+    // ==============================================
+
+    analyzeDelestageEvents() {
+        const eventTables = this.parsedData.tables.filter(table => 
+            Array.from(table.types).includes('E')
+        );
+        
+        if (eventTables.length === 0) {
+            return {
+                totalDays: 0,
+                partielCount: 0,
+                totalCount: 0,
+                daysWithPartiel: 0,
+                daysWithTotal: 0,
+                daysWithEvents: 0,
+                lastEventDate: null,
+                dailyEvents: {},
+                hasData: false
+            };
+        }
+        
+        const techEventTypes = ['DelestagePartiel', 'DelestageTotal', 'DP', 'DT'];
+        let partielCount = 0;
+        let totalCount = 0;
+        let daysWithPartiel = new Set();
+        let daysWithTotal = new Set();
+        let daysWithEvents = new Set();
+        let dailyEvents = {};
+        let lastEventDate = null;
+        let allDates = new Set();
+        
+        const tensionTables = this.parsedData.tables.filter(table => 
+            Array.from(table.types).includes('T')
+        );
+        
+        tensionTables.forEach(table => {
+            const dateIndex = table.header.findIndex(h => 
+                h.includes('TimeStamp') || h.includes('Date') || h.includes('DATE')
+            );
+            
+            if (dateIndex === -1) return;
+            
+            table.rows.forEach(row => {
+                const dateStr = row[dateIndex];
+                if (!dateStr) return;
+                const date = dateStr.split(' ')[0];
+                allDates.add(date);
+            });
+        });
+        
+        const totalDays = allDates.size;
+        
+        eventTables.forEach(table => {
+            const dateIndex = table.header.findIndex(h => 
+                h.includes('TimeStamp') || h.includes('Date') || h.includes('DATE')
+            );
+            const clientIndex = table.header.findIndex(h => 
+                h.includes('CL') || h.includes('Client') || h.includes('Type')
+            );
+            const timeIndex = table.header.findIndex(h => 
+                h.includes('Heure') || h.includes('TIME') || h.includes('Hour')
+            );
+            
+            if (dateIndex === -1 || clientIndex === -1) return;
+            
+            table.rows.forEach(row => {
+                const eventType = row[clientIndex] || '';
+                const dateStr = row[dateIndex];
+                if (!dateStr) return;
+                
+                const date = dateStr.split(' ')[0];
+                const time = timeIndex !== -1 ? (row[timeIndex] || '00:00') : '00:00';
+                
+                if (techEventTypes.some(type => eventType.includes(type))) {
+                    daysWithEvents.add(date);
+                    
+                    if (!dailyEvents[date]) {
+                        dailyEvents[date] = {
+                            partiel: [],
+                            total: []
+                        };
+                    }
+                    
+                    if (eventType.includes('DelestagePartiel') || eventType.includes('DP')) {
+                        partielCount++;
+                        daysWithPartiel.add(date);
+                        dailyEvents[date].partiel.push({
+                            time: time,
+                            type: 'partiel'
+                        });
+                    }
+                    
+                    if (eventType.includes('DelestageTotal') || eventType.includes('DT')) {
+                        totalCount++;
+                        daysWithTotal.add(date);
+                        dailyEvents[date].total.push({
+                            time: time,
+                            type: 'total'
+                        });
+                    }
+                    
+                    const currentDate = new Date(date.split('/').reverse().join('-'));
+                    if (!lastEventDate || currentDate > new Date(lastEventDate.split('/').reverse().join('-'))) {
+                        lastEventDate = date;
+                    }
+                }
+            });
+        });
+        
+        const sortedDates = Object.keys(dailyEvents).sort((a, b) => {
+            const dateA = new Date(a.split('/').reverse().join('-'));
+            const dateB = new Date(b.split('/').reverse().join('-'));
+            return dateB - dateA;
+        });
+        
+        const detailedEvents = {};
+        sortedDates.forEach(date => {
+            const events = dailyEvents[date];
+            detailedEvents[date] = {
+                partiel: this.groupEventsByPeriod(events.partiel),
+                total: this.groupEventsByPeriod(events.total)
+            };
+        });
+        
+        return {
+            totalDays: totalDays,
+            partielCount: partielCount,
+            totalCount: totalCount,
+            daysWithPartiel: daysWithPartiel.size,
+            daysWithTotal: daysWithTotal.size,
+            daysWithEvents: daysWithEvents.size,
+            lastEventDate: lastEventDate,
+            detailedEvents: detailedEvents,
+            sortedDates: sortedDates,
+            hasData: partielCount > 0 || totalCount > 0
+        };
+    }
+
+    groupEventsByPeriod(events) {
+        if (!events || events.length === 0) return [];
+        
+        const sortedEvents = [...events].sort((a, b) => a.time.localeCompare(b.time));
+        
+        const periods = [];
+        let currentPeriod = {
+            debut: sortedEvents[0].time,
+            fin: sortedEvents[0].time,
+            count: 1,
+            events: [sortedEvents[0]]
+        };
+        
+        for (let i = 1; i < sortedEvents.length; i++) {
+            const currentTime = this.convertTimeToMinutes(sortedEvents[i].time);
+            const lastTime = this.convertTimeToMinutes(currentPeriod.fin);
+            
+            if (currentTime - lastTime <= 30) {
+                currentPeriod.fin = sortedEvents[i].time;
+                currentPeriod.count++;
+                currentPeriod.events.push(sortedEvents[i]);
+            } else {
+                periods.push(currentPeriod);
+                currentPeriod = {
+                    debut: sortedEvents[i].time,
+                    fin: sortedEvents[i].time,
+                    count: 1,
+                    events: [sortedEvents[i]]
+                };
+            }
+        }
+        periods.push(currentPeriod);
+        
+        return periods;
+    }
+
+    convertTimeToMinutes(timeStr) {
+        if (!timeStr) return 0;
+        const [hours, minutes] = timeStr.split(':').map(Number);
+        return (hours || 0) * 60 + (minutes || 0);
+    }
+
+    formatDuration(debut, fin) {
+        const debutMinutes = this.convertTimeToMinutes(debut);
+        const finMinutes = this.convertTimeToMinutes(fin);
+        const duree = finMinutes - debutMinutes;
+        
+        if (duree < 60) {
+            return `${duree}mn`;
+        } else {
+            const heures = Math.floor(duree / 60);
+            const minutes = duree % 60;
+            return minutes > 0 ? `${heures}h${minutes}mn` : `${heures}h`;
+        }
+    }
+
+    // ==============================================
+    // GÉNÉRATION DES TABLEAUX D'ÉVÉNEMENTS
+    // ==============================================
+
+    generateCommercialEventsHTML(commercialEvents) {
+        if (commercialEvents.length === 0) {
+            return `
+            <div class="commercial-events-container">
+                <div class="events-header" style="background: linear-gradient(135deg, #f59e0b, #d97706);">
+                    <span class="events-icon">💰</span>
+                    <h4>Événements Commerciaux</h4>
+                    <span class="events-count">Aucun événement</span>
+                </div>
+                <div class="no-data-message">Aucun événement commercial détecté</div>
+            </div>`;
+        }
+        
+        let html = '';
+        
+        commercialEvents.forEach((table, idx) => {
+            const eventCount = table.rows.length;
+            
+            const eventStats = {};
+            table.rows.forEach(row => {
+                const eventType = row[0] || 'Inconnu';
+                eventStats[eventType] = (eventStats[eventType] || 0) + 1;
+            });
+            
+            const statsHTML = Object.entries(eventStats).map(([type, count]) => `
+                <span class="event-stat-badge" style="background: ${this.getEventTypeColor(type)}20; color: ${this.getEventTypeColor(type)}; border-left: 3px solid ${this.getEventTypeColor(type)};">
+                    ${this.getEventTypeIcon(type)} ${type}: ${count}
+                </span>
+            `).join('');
+            
+            html += `
+            <div class="commercial-events-container">
+                <div class="events-header" style="background: linear-gradient(135deg, #f59e0b, #d97706);">
+                    <span class="events-icon">💰</span>
+                    <h4>Événements Commerciaux</h4>
+                    <span class="events-count">${eventCount} événement(s)</span>
+                </div>
+                
+                <div class="events-stats-mini">
+                    ${statsHTML}
+                </div>
+                
+                <div class="table-wrapper" style="border-left: 4px solid #f59e0b; margin-top: 15px;">
+                    <div class="table-header" style="background: linear-gradient(135deg, #f59e0b, #d97706);">
+                        <span class="table-icon">💰</span>
+                        <span class="table-title">ÉVÉNEMENTS COMMERCIAUX</span>
+                        <span class="table-type-badge">${table.originalTable ? this.getTableType(table.originalTable.types) : 'E'}</span>
+                    </div>
+                    
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    ${table.header.map(h => `<th>${h.toUpperCase()}</th>`).join('')}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${table.rows.map(row => {
+                                    return `<tr>
+                                        ${row.map((cell, cellIndex) => {
+                                            let cellClass = '';
+                                            let customStyle = '';
+                                            
+                                            if (cellIndex === 0) {
+                                                const eventType = cell;
+                                                const typeColor = this.getEventTypeColor(eventType);
+                                                customStyle = `style="background: ${typeColor}15; font-weight: 700; color: ${typeColor}; border-left: 4px solid ${typeColor};"`;
+                                            }
+                                            
+                                            if (cell === 'Erreur' || cell.includes('Erreur')) {
+                                                cellClass = 'cell-error';
+                                            } else if (cell === 'Ok') {
+                                                cellClass = 'cell-ok';
+                                            } else if (cell === 'Recharge Reussie') {
+                                                cellClass = 'cell-success';
+                                            } else if (!isNaN(cell) && cell !== '' && !cell.includes(':')) {
+                                                cellClass = 'cell-number';
+                                            }
+                                            
+                                            return `<td ${customStyle} class="${cellClass}">${cell}</td>`;
+                                        }).join('')}
+                                    </tr>`;
+                                }).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            `;
+        });
+        
+        return html;
+    }
+
+    getEventTypeColor(type) {
+        const colors = {
+            'SuspenP': '#ef4444',
+            'SuspenE': '#ef4444',
+            'CreditNul': '#f59e0b',
+            'EnergieEpuisee': '#8b5cf6',
+            'Surcharge': '#eab308',
+            'PuissanceDepassee': '#3b82f6',
+            'DelestagePartiel': '#f97316',
+            'DelestageTotal': '#dc2626',
+            'DP': '#f97316',
+            'DT': '#dc2626'
+        };
+        return colors[type] || '#64748b';
+    }
+
+    getEventTypeIcon(type) {
+        const icons = {
+            'SuspenP': '🔴',
+            'SuspenE': '🔴',
+            'CreditNul': '💰',
+            'EnergieEpuisee': '🔋',
+            'Surcharge': '⚡',
+            'PuissanceDepassee': '📈',
+            'DelestagePartiel': '⚠️',
+            'DelestageTotal': '🚨',
+            'DP': '⚠️',
+            'DT': '🚨'
+        };
+        return icons[type] || '📋';
+    }
+
+    generateTechEventsHTML(techEvents) {
+        if (techEvents.length === 0) {
+            return `
+            <div class="tech-events-container">
+                <div class="events-header" style="background: linear-gradient(135deg, #3b82f6, #1e40af);">
+                    <span class="events-icon">⚙️</span>
+                    <h4>Événements Techniques (Délestage)</h4>
+                    <span class="events-count">Aucun événement</span>
+                </div>
+                <div class="no-data-message">Aucun événement de délestage détecté</div>
+            </div>`;
+        }
+        
+        let html = '';
+        
+        techEvents.forEach((table, idx) => {
+            const eventCount = table.rows.length;
+            
+            const eventStats = {};
+            table.rows.forEach(row => {
+                const eventType = row[0] || 'Inconnu';
+                eventStats[eventType] = (eventStats[eventType] || 0) + 1;
+            });
+            
+            const statsHTML = Object.entries(eventStats).map(([type, count]) => `
+                <span class="event-stat-badge" style="background: ${this.getEventTypeColor(type)}20; color: ${this.getEventTypeColor(type)}; border-left: 3px solid ${this.getEventTypeColor(type)};">
+                    ${this.getEventTypeIcon(type)} ${type}: ${count}
+                </span>
+            `).join('');
+            
+            html += `
+            <div class="tech-events-container">
+                <div class="events-header" style="background: linear-gradient(135deg, #3b82f6, #1e40af);">
+                    <span class="events-icon">⚙️</span>
+                    <h4>Événements Techniques (Délestage)</h4>
+                    <span class="events-count">${eventCount} événement(s)</span>
+                </div>
+                
+                <div class="events-stats-mini">
+                    ${statsHTML}
+                </div>
+                
+                <div class="table-wrapper" style="border-left: 4px solid #3b82f6; margin-top: 15px;">
+                    <div class="table-header" style="background: linear-gradient(135deg, #3b82f6, #1e40af);">
+                        <span class="table-icon">⚙️</span>
+                        <span class="table-title">ÉVÉNEMENTS DE DÉLESTAGE</span>
+                        <span class="table-type-badge">${table.originalTable ? this.getTableType(table.originalTable.types) : 'E'}</span>
+                    </div>
+                    
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    ${table.header.map(h => `<th>${h.toUpperCase()}</th>`).join('')}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${table.rows.map(row => {
+                                    return `<tr>
+                                        ${row.map((cell, cellIndex) => {
+                                            let cellClass = '';
+                                            let customStyle = '';
+                                            
+                                            if (cellIndex === 0) {
+                                                const eventType = cell;
+                                                const typeColor = this.getEventTypeColor(eventType);
+                                                customStyle = `style="background: ${typeColor}15; font-weight: 700; color: ${typeColor}; border-left: 4px solid ${typeColor};"`;
+                                            }
+                                            
+                                            if (cell === 'Erreur' || cell.includes('Erreur')) {
+                                                cellClass = 'cell-error';
+                                            } else if (cell === 'Ok') {
+                                                cellClass = 'cell-ok';
+                                            } else if (!isNaN(cell) && cell !== '' && !cell.includes(':')) {
+                                                cellClass = 'cell-number';
+                                            }
+                                            
+                                            return `<td ${customStyle} class="${cellClass}">${cell}</td>`;
+                                        }).join('')}
+                                    </tr>`;
+                                }).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            `;
+        });
+        
+        return html;
+    }
+
+    buildTechHTML(tensionStats, conformityData, thresholdViolations, nominalHitsData, 
+              dailyChartData, hourlyChartData, eventAnalysis, techTables, delestageData) {
+
+        let techHTML = '';
+        
+        // 1. Statistiques techniques
+        if (tensionStats) {
+            techHTML += this.generateTensionStatsHTML(tensionStats);
+        }
+        
+        // 2. Analyse de conformité
+        if (conformityData) {
+            techHTML += this.generateConformityStatsHTML(conformityData);
+        }
+        
+        // 3. Tableau des dépassements
+        techHTML += this.generateViolationsTableHTML(thresholdViolations);
+        
+        // 4. Atteintes nominales
+        if (nominalHitsData) {
+            techHTML += this.generateNominalTensionTableHTML(nominalHitsData);
+        }
+        
+        // 5. Graphiques
+        if (dailyChartData) {
+            techHTML += this.generateDailyTensionChartHTML(dailyChartData);
+        }
+        
+        if (hourlyChartData) {
+            techHTML += this.generateHourlyTensionChartHTML(hourlyChartData);
+        }
+
+        // 6. Événements techniques (délestage)
+        if (eventAnalysis.hasTechEvents) {
+            techHTML += this.generateTechEventsHTML(eventAnalysis.techEvents);
+        }
+        
+        // 7. Tableaux d'événements standards
+        const eventTables = techTables.filter(table => Array.from(table.types).includes('E'));
+        if (eventTables.length > 0) {
+            techHTML += `<h4 class="tab-subtitle" style="margin-top: 30px;">⚠️ Événements (standards)</h4>`;
+            techHTML += this.generateTablesHTML(eventTables);
+        }
+        
+        // 8. Intensité
+        const intensityTables = techTables.filter(table => Array.from(table.types).includes('I'));
+        if (intensityTables.length > 0) {
+            techHTML += `<h4 class="tab-subtitle" style="margin-top: 30px;">⚡ Intensité</h4>`;
+            techHTML += this.generateTablesHTML(intensityTables);
+        }
+        
+        // 9. Tension
+        const tensionTables = techTables.filter(table => Array.from(table.types).includes('T'));
+        if (tensionTables.length > 0) {
+            techHTML += `<h4 class="tab-subtitle" style="margin-top: 30px;">📊 Tension</h4>`;
+            techHTML += this.generateTablesHTML(tensionTables);
+        }
+        
+        // 10. Autres tableaux techniques
+        const otherTechTables = techTables.filter(table => {
+            const types = Array.from(table.types);
+            return !types.includes('E') && !types.includes('I') && !types.includes('T');
+        });
+        if (otherTechTables.length > 0) {
+            techHTML += `<h4 class="tab-subtitle" style="margin-top: 30px;">📋 Autres données techniques</h4>`;
+            techHTML += this.generateTablesHTML(otherTechTables);
+        }
+        
+        return techHTML;
+    }
+
+    buildComHTML(eventAnalysis, comTables) {
+        let comHTML = '';
+        
+        // 1. Événements commerciaux spécifiques
+        if (eventAnalysis.hasCommercialEvents) {
+            comHTML += this.generateCommercialEventsHTML(eventAnalysis.commercialEvents);
+        }
+        
+        // 2. Tableaux d'événements standards avec des IDs uniques
+        const eventTables = this.parsedData.tables.filter(table => 
+            Array.from(table.types).includes('E')
+        );
+        
+        if (eventTables.length > 0) {
+            comHTML += `<h4 class="tab-subtitle" style="margin-top: 30px;">⚠️ Événements</h4>`;
+            
+            const eventTablesWithIds = eventTables.map((table, index) => ({
+                ...table,
+                tableId: `com_event_table_${index}`,
+                originalIndex: index
+            }));
+            
+            comHTML += this.generateTablesHTML(eventTablesWithIds);
+        }
+        
+        // 3. Crédit/Solde
+        const creditTables = comTables.filter(table => Array.from(table.types).includes('S'));
+        if (creditTables.length > 0) {
+            comHTML += `<h4 class="tab-subtitle" style="margin-top: 30px;">💰 Soldes / Crédit</h4>`;
+            comHTML += this.generateTablesHTML(creditTables);
+        }
+        
+        // 4. Recharges
+        const rechargeTables = comTables.filter(table => Array.from(table.types).includes('R'));
+        if (rechargeTables.length > 0) {
+            comHTML += `<h4 class="tab-subtitle" style="margin-top: 30px;">💳 Recharges</h4>`;
+            comHTML += this.generateTablesHTML(rechargeTables);
+        }
+        
+        // 5. Autres données commerciales
+        const otherComTables = comTables.filter(table => {
+            const types = Array.from(table.types);
+            return !types.includes('S') && !types.includes('R');
+        });
+        if (otherComTables.length > 0) {
+            comHTML += `<h4 class="tab-subtitle" style="margin-top: 30px;">📋 Autres données commerciales</h4>`;
+            comHTML += this.generateTablesHTML(otherComTables);
+        }
+        
+        if (comTables.length === 0 && eventTables.length === 0 && !eventAnalysis.hasCommercialEvents) {
+            comHTML = '<div class="no-data-message">Aucune donnée commerciale trouvée</div>';
+        }
+        
+        return comHTML;
+    }
+
+    // ==============================================
+    // AFFICHAGE PRINCIPAL
+    // ==============================================
+
     displayContent() {
         this.contentContainer.style.display = 'block';
         
-        // Obtenir les dates de début et fin de la relève
         const { firstDate, lastDate } = this.getReleveDates();
         
-        // Afficher le N° Nano Réseau
         if (this.parsedData.nrNumber) {
             this.nrInfo.style.display = 'flex';
             
@@ -2354,11 +2774,11 @@ class FileReaderModule {
             this.nrInfo.style.display = 'none';
         }
 
-        // Compter les tableaux par catégorie
+        this.currentPages = {};
+        
         let techTables = [];
         let comTables = [];
         
-        // Séparer les tableaux pour l'onglet technique
         this.parsedData.tables.forEach((table, index) => {
             const types = Array.from(table.types);
             const tableId = `table_${index}`;
@@ -2369,101 +2789,45 @@ class FileReaderModule {
             if (types.some(t => ['S', 'R'].includes(t))) {
                 comTables.push({...table, tableId, originalIndex: index});
             }
+            
+            this.currentPages[tableId] = 1;
         });
 
-        // ========== ANALYSES DES DONNÉES ==========
+        const eventTables = this.parsedData.tables.filter(table => 
+            Array.from(table.types).includes('E')
+        );
         
-        // Analyser les données de tension pour les statistiques
+        eventTables.forEach((table, index) => {
+            const comEventTableId = `com_event_table_${index}`;
+            this.currentPages[comEventTableId] = 1;
+        });
+
         const tensionStats = this.analyzeTensionData(techTables);
-        
-        // Analyser les dépassements de seuils
         const thresholdViolations = this.analyzeThresholdViolations();
-        
-        // Analyser la conformité
         const conformityData = this.analyzeConformity();
-        
-        // Analyser les atteintes nominales
         const nominalHitsData = this.analyzeNominalTensionHits();
-        
-        // Préparer les données pour le graphique journalier
         const dailyChartData = this.prepareDailyTensionChartData();
-        
-        // Préparer les données pour le graphique horaire
         const hourlyChartData = this.prepareHourlyTensionData();
+        const eventAnalysis = this.analyzeEventTypes();
+        const delestageData = this.analyzeDelestageEvents();
         
-        // ========== GÉNÉRATION DU HTML ==========
+        const techHTML = this.buildTechHTML(
+            tensionStats, 
+            conformityData, 
+            thresholdViolations, 
+            nominalHitsData, 
+            dailyChartData, 
+            hourlyChartData, 
+            eventAnalysis, 
+            techTables, 
+            delestageData
+        );
         
-        // Générer le HTML pour l'onglet technique
-        let techHTML = '';
+        const comHTML = this.buildComHTML(eventAnalysis, comTables);
         
-        // 1. Données techniques du NR (statistiques tension)
-        if (tensionStats) {
-            techHTML += this.generateTensionStatsHTML(tensionStats);
-        }
-        
-        // 2. Analyse de conformité
-        if (conformityData) {
-            techHTML += this.generateConformityStatsHTML(conformityData);
-        }
-        
-        // 3. Tableau des dépassements de seuils
-        techHTML += this.generateViolationsTableHTML(thresholdViolations);
-        
-        // 4. Analyse des atteintes nominales
-        if (nominalHitsData) {
-            techHTML += this.generateNominalTensionTableHTML(nominalHitsData);
-        }
-        
-        // 5. GRAPHIQUE JOURNALIER (min, max, moyenne)
-        if (dailyChartData) {
-            techHTML += this.generateDailyTensionChartHTML(dailyChartData);
-        }
-        
-        // 6. GRAPHIQUE HORAIRE (avec sélecteur de date)
-        if (hourlyChartData) {
-            techHTML += this.generateHourlyTensionChartHTML(hourlyChartData);
-        }
-        
-        // ========== TABLEAUX TECHNIQUES AVEC ORDRE SPÉCIFIQUE ==========
-        
-        // Séparer les tableaux techniques par type
-        const eventTables = techTables.filter(table => Array.from(table.types).includes('E'));
-        const intensityTables = techTables.filter(table => Array.from(table.types).includes('I'));
-        const tensionTables = techTables.filter(table => Array.from(table.types).includes('T'));
-        const otherTechTables = techTables.filter(table => {
-            const types = Array.from(table.types);
-            return !types.includes('E') && !types.includes('I') && !types.includes('T');
-        });
-        
-        // 7. D'ABORD : Tableaux d'événements (type E)
-        if (eventTables.length > 0) {
-            techHTML += `<h4 class="tab-subtitle" style="margin-top: 30px;">⚠️ Événements</h4>`;
-            techHTML += this.generateTablesHTML(eventTables);
-        }
-        
-        // 8. ENSUITE : Tableaux d'intensité (type I)
-        if (intensityTables.length > 0) {
-            techHTML += `<h4 class="tab-subtitle" style="margin-top: 30px;">⚡ Intensité</h4>`;
-            techHTML += this.generateTablesHTML(intensityTables);
-        }
-        
-        // 9. PUIS : Tableaux de tension (type T)
-        if (tensionTables.length > 0) {
-            techHTML += `<h4 class="tab-subtitle" style="margin-top: 30px;">📊 Tension</h4>`;
-            techHTML += this.generateTablesHTML(tensionTables);
-        }
-        
-        // 10. ENFIN : Autres tableaux techniques
-        if (otherTechTables.length > 0) {
-            techHTML += `<h4 class="tab-subtitle" style="margin-top: 30px;">📋 Autres données</h4>`;
-            techHTML += this.generateTablesHTML(otherTechTables);
-        }
-        
-        // Mettre à jour le contenu des onglets
         this.techContent.innerHTML = techHTML;
-        this.comContent.innerHTML = `<h4 class="tab-subtitle">📈 Données Commerciales (S, R)</h4>` + this.generateTablesHTML(comTables);
+        this.comContent.innerHTML = comHTML;
 
-        // Afficher les onglets si au moins un tableau
         if (this.parsedData.tables.length > 0) {
             this.tabsContainer.style.display = 'block';
             this.contentDisplay.style.display = 'none';
@@ -2475,6 +2839,71 @@ class FileReaderModule {
         }
     }
 
+    // ==============================================
+    // UTILITAIRES DE TABLEAU
+    // ==============================================
+
+    getTableRowsCount(tableId) {
+        if (tableId.startsWith('com_event_table_')) {
+            const index = parseInt(tableId.replace('com_event_table_', ''));
+            const eventTables = this.parsedData.tables.filter(table => 
+                Array.from(table.types).includes('E')
+            );
+            if (eventTables[index]) {
+                return eventTables[index].rows.length;
+            }
+            return 0;
+        } else {
+            const index = parseInt(tableId.replace('table_', ''));
+            if (this.parsedData.tables[index]) {
+                return this.parsedData.tables[index].rows.length;
+            }
+            return 0;
+        }
+    }
+
+    getPaginatedRows(table, tableId) {
+        const currentPage = this.currentPages[tableId] || 1;
+        const start = (currentPage - 1) * this.rowsPerPage;
+        const end = start + this.rowsPerPage;
+        return table.rows.slice(start, end);
+    }
+
+    getReleveDates() {
+        let firstDate = null;
+        let lastDate = null;
+        
+        const tensionTables = this.parsedData.tables.filter(table => 
+            Array.from(table.types).includes('T')
+        );
+        
+        if (tensionTables.length === 0) return { firstDate: null, lastDate: null };
+        
+        tensionTables.forEach(table => {
+            const dateIndex = table.header.findIndex(h => 
+                h.includes('TimeStamp') || h.includes('Date') || h.includes('DATE')
+            );
+            
+            if (dateIndex === -1) return;
+            
+            table.rows.forEach(row => {
+                const dateStr = row[dateIndex];
+                if (!dateStr) return;
+                
+                const date = dateStr.split(' ')[0];
+                
+                if (!firstDate || date < firstDate) {
+                    firstDate = date;
+                }
+                if (!lastDate || date > lastDate) {
+                    lastDate = date;
+                }
+            });
+        });
+        
+        return { firstDate, lastDate };
+    }
+
     generateTablesHTML(tables) {
         if (tables.length === 0) {
             return '<div class="no-data-message">Aucune donnée dans cette catégorie.</div>';
@@ -2483,12 +2912,20 @@ class FileReaderModule {
         let html = '';
         
         tables.forEach((table) => {
+            if (!table.tableId) {
+                console.warn('Table sans tableId:', table);
+                return;
+            }
+            
+            if (!this.currentPages[table.tableId]) {
+                this.currentPages[table.tableId] = 1;
+            }
+            
             const mainType = Array.from(table.types)[0] || 'S';
             const tableType = this.getTableType(table.types);
             const typeColor = this.getTypeColor(mainType);
             const typeIcon = this.getTypeIcon(mainType);
             
-            // Déterminer le titre du tableau en fonction du type
             let tableTitle = 'TABLEAU';
             if (mainType === 'T') tableTitle = 'TABLEAU DE LA TENSION';
             else if (mainType === 'I') tableTitle = "TABLEAU DE L'INTENSITÉ";
@@ -2497,7 +2934,6 @@ class FileReaderModule {
             else if (mainType === 'R') tableTitle = 'TABLEAU DES RECHARGES';
             else if (mainType === 'C') tableTitle = "TABLEAU DE L'ÉNERGIE";
             
-            // Obtenir les lignes paginées
             const paginatedRows = this.getPaginatedRows(table, table.tableId);
             const totalRows = table.rows.length;
             const totalPages = Math.ceil(totalRows / this.rowsPerPage);
@@ -2505,7 +2941,6 @@ class FileReaderModule {
             
             html += `<div class="table-wrapper" style="border-left: 4px solid ${typeColor};">`;
             
-            // En-tête du tableau avec titre personnalisé
             html += `<div class="table-header" style="background: linear-gradient(135deg, ${typeColor}, ${this.adjustColor(typeColor, -20)});">`;
             html += `<span class="table-icon">${typeIcon}</span>`;
             html += `<span class="table-title">${tableTitle}</span>`;
@@ -2515,7 +2950,6 @@ class FileReaderModule {
             html += `<div class="table-container">`;
             html += `<table>`;
             
-            // En-tête du tableau
             html += `<thead><tr>`;
             table.header.forEach(header => {
                 let formattedHeader = header.trim();
@@ -2527,7 +2961,6 @@ class FileReaderModule {
             });
             html += `</tr></thead>`;
 
-            // Corps du tableau avec lignes paginées
             html += `<tbody>`;
             paginatedRows.forEach(row => {
                 html += `<tr>`;
@@ -2562,37 +2995,29 @@ class FileReaderModule {
             
             html += `</table>`;
             
-            // Pagination avec style Premier Prev X/Y Next Dernier
             if (totalPages > 1) {
                 html += `<div class="pagination-container">`;
                 
-                // Informations de pagination
                 html += `<div class="pagination-info-compact">`;
                 html += `Page <strong>${currentPage}</strong> sur <strong>${totalPages}</strong>`;
                 html += `</div>`;
                 
-                // Contrôles de pagination
                 html += `<div class="pagination-controls-compact">`;
                 
-                // Bouton Premier
                 html += `<button class="pagination-btn-compact" onclick="window.fileReader.changePage('${table.tableId}', 1)" ${currentPage === 1 ? 'disabled' : ''} title="Première page">`;
                 html += `Premier`;
                 html += `</button>`;
                 
-                // Bouton Précédent
                 html += `<button class="pagination-btn-compact" onclick="window.fileReader.changePage('${table.tableId}', 'prev')" ${currentPage === 1 ? 'disabled' : ''} title="Page précédente">`;
                 html += `Prev`;
                 html += `</button>`;
                 
-                // Indicateur de page
                 html += `<span class="pagination-current">${currentPage}/${totalPages}</span>`;
                 
-                // Bouton Suivant
                 html += `<button class="pagination-btn-compact" onclick="window.fileReader.changePage('${table.tableId}', 'next')" ${currentPage === totalPages ? 'disabled' : ''} title="Page suivante">`;
                 html += `Next`;
                 html += `</button>`;
                 
-                // Bouton Dernier
                 html += `<button class="pagination-btn-compact" onclick="window.fileReader.changePage('${table.tableId}', ${totalPages})" ${currentPage === totalPages ? 'disabled' : ''} title="Dernière page">`;
                 html += `Dernier`;
                 html += `</button>`;
@@ -2601,13 +3026,16 @@ class FileReaderModule {
                 html += `</div>`;
             }
             
-            html += `</div>`; // Fin table-container
-            html += `</div>`; // Fin table-wrapper
+            html += `</div>`;
+            html += `</div>`;
         });
 
         return html;
     }
 
+    // ==============================================
+    // GESTION DES ONGLETS
+    // ==============================================
 
     switchTab(tab, updateActiveTab = true) {
         if (updateActiveTab) {
@@ -2628,15 +3056,14 @@ class FileReaderModule {
     }
 
     adjustColor(color, percent) {
-        // Fonction simple pour assombrir/éclaircir une couleur hex
         if (color.startsWith('#')) {
-            return color; // Simplifié pour l'exemple
+            return color;
         }
         return color;
     }
 }
 
-// Initialiser l'application quand le DOM est chargé
+// Initialisation
 document.addEventListener('DOMContentLoaded', () => {
     new FileReaderModule();
 });

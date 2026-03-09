@@ -36,16 +36,16 @@ export function renderCommercialDashboard() {
             </div>
         </div>
         
-        <div class="section-title"><h2>💰 I) ANALYSE DE CONSOMMATION</h2></div>
+        <div class="section-title"><h2>💰 ANALYSE DE CONSOMMATION</h2></div>
         <div id="consumptionBoard" class="card"></div>
         <div id="commercialEventsBoard" class="card"></div>
         <div id="forfaitChangesBoard" class="card"></div>
         
-        <div class="section-title"><h2>💳 II) ANALYSE CRÉDIT ET RECHARGE</h2></div>
+        <div class="section-title"><h2>💳 ANALYSE CRÉDIT ET RECHARGE</h2></div>
         <div id="creditBoard" class="card"></div>
         <div id="rechargeHabitsBoard" class="card"></div>
         
-        <div class="section-title"><h2>📊 III) SOLDE ET RECHARGE</h2></div>
+        <div class="section-title"><h2>📊 SOLDE ET RECHARGE</h2></div>
         <div id="balanceBoard" class="card"></div>
     `;
     
@@ -1141,6 +1141,9 @@ function renderBalanceClient(client) {
     else if (riskScore >= 30) riskLevel = 'medium';
     else riskLevel = 'low';
     
+    // Vérifier s'il y a des délestages dans les données techniques
+    const hasTechnicalIssues = database.technicalData?.loadShedding?.jours?.length > 0;
+    
     // MESSAGES AVEC LEURS PROPRES NIVEAUX DE RISQUE
     const messages = [];
     
@@ -1162,11 +1165,30 @@ function renderBalanceClient(client) {
         messages.push({ text: `📱 Il recharge régulièrement (${totalRecharges} fois).`, class: 'success' });
     }
     
-    // Message 3: Crédit préféré
+    // ===========================================
+    // Message 3: Crédit préféré (AVEC DÉTECTION DES RECHARGES TECHNIQUES)
+    // ===========================================
     const creditPrefere = client.preferredCredit || "non déterminé";
     const pourcentagePref = client.preferredPercentage || 0;
+    
     if (creditPrefere !== "non déterminé") {
-        messages.push({ text: `📊 Il recharge généralement pour ${creditPrefere} jour(s) (${pourcentagePref}% des recharges).`, class: 'info' });
+        // Vérifier si c'est une recharge technique (2, 3 ou 4 jours)
+        const isTechnicalRefund = ['2', '3', '4'].includes(creditPrefere.toString());
+        
+        let messageClass = 'info';
+        let messageText = `📊 Il recharge généralement pour ${creditPrefere} jour(s) (${pourcentagePref}% des recharges).`;
+        
+        if (isTechnicalRefund) {
+            if (hasTechnicalIssues) {
+                messageClass = 'warning';
+                messageText = `⚠️ Recharges techniques (${creditPrefere}j) liées à des délestages - À surveiller`;
+            } else {
+                messageClass = 'danger';
+                messageText = `🔴 RECHARGES TECHNIQUES INJUSTIFIÉES (${creditPrefere}j) - Vérifier installation`;
+            }
+        }
+        
+        messages.push({ text: messageText, class: messageClass });
     }
     
     // Message 4: Forfaits

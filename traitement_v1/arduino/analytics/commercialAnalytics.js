@@ -11,9 +11,9 @@ import {
 // ===========================================
 
 export function analyzeCommercialData() {
-    console.log("💰 Analyse commerciale - Début");
+    console.time("💰 Analyse commerciale");
     
-    // Initialiser la structure principale
+    // Initialisation
     database.commercialData = { 
         clients: new Map(),
         events: { 
@@ -23,752 +23,321 @@ export function analyzeCommercialData() {
             creditNul: { total: 0, jours: new Set(), pourcentage: 0 } 
         },
         recharges: { parMontant: {}, total: 0 },
-        consommation: { globale: { max: 0, min: 0, moyenne: 0, joursSans: 0 } }
+        consommation: { globale: { max: 0, min: 0, moyenne: 0, joursSans: 0 } },
+        recommendations: []
     };
     
-    // Analyses
-    analyzeCreditData();
-    analyzeRechargeData();
-    analyzeCommercialEvents();
-    analyzeTechnicalRefunds();
-    analyzeConsumptionVsForfait();
-    calculateClientScore();
-    generateRecommendations();
-    prepareAllClients();
-    calculateConsumptionStats();
+    const tables = database.tables;
+    const commercialData = database.commercialData;
+    const nanoreseau = document.getElementById('nanoreseauValue')?.textContent;
     
-    console.log("💰 Analyse commerciale terminée");
+    if (!tables) {
+        console.timeEnd("💰 Analyse commerciale");
+        return;
+    }
+    
+    // Récupération des tables (une seule fois)
+    const creditTable = tables.find(t => t.type === 'S');
+    const rechargeTable = tables.find(t => t.type === 'R');
+    const eventTable = tables.find(t => t.type === 'E');
+    
+    // Analyses
+    if (creditTable) analyzeCreditData(creditTable, commercialData, nanoreseau);
+    if (rechargeTable) analyzeRechargeData(rechargeTable, commercialData, nanoreseau);
+    if (eventTable) analyzeCommercialEvents(eventTable, commercialData, nanoreseau);
+    
+    // Post-traitement unique
+    postProcessClients(commercialData.clients, commercialData);
+    
+    console.timeEnd("💰 Analyse commerciale");
 }
 
 // ===========================================
 // ANALYSE DES CRÉDITS (Table S)
 // ===========================================
 
-function analyzeCreditData() {
-    console.log("📊 Analyse des crédits (table S)");
+function analyzeCreditData(creditTable, commercialData, nanoreseau) {
+    const clients = commercialData.clients;
+    const events = commercialData.events;
     
-    const nanoreseau = document.getElementById('nanoreseauValue')?.textContent;
-    const clients = database.commercialData.clients;
-
-    const creditTable = database.tables.find(t => t.type === 'S');
-    if (!creditTable) {
-        console.log("ℹ️ Aucune table de crédits");
-        return;
-    }
-
+    // ✅ Transformation en tableau
     const headers = creditTable.header.split(';').filter(h => h.trim() !== '');
     const clientColumns = [];
-
-    headers.forEach((header, index) => {
-        const match = header.match(/Client (\d+)/i);
+    
+    // Identification des colonnes clients
+    for (let i = 0; i < headers.length; i++) {
+        const match = headers[i]?.match(/Client (\d+)/i);
         if (match) {
             const fullId = match[1];
             const vraiId = extractClientId(fullId, nanoreseau);
-            clientColumns.push({ 
-                index, 
-                fullId: fullId,
-                clientId: vraiId 
-            });
+            clientColumns.push({ index: i, fullId, clientId: vraiId });
+            
+            if (!clients.has(vraiId)) {
+                clients.set(vraiId, createEmptyClient(vraiId, fullId));
+            }
         }
-    });
-
-    // Initialiser les données clients
-    clientColumns.forEach(col => {
-        if (!clients.has(col.clientId)) {
-            clients.set(col.clientId, {
-                id: col.clientId,
-                fullId: col.fullId,
-                credits: [],
-                zeroCreditDates: [],
-                totalCredit: 0,
-                count: 0,
-                maxCredit: 0,
-                recharges: [],
-                forfaitChanges: [],
-                events: []
-            });
-        }
-    });
-
-    // Parcourir les lignes
-    creditTable.data.forEach(row => {
-        const cells = row.split(';');
-        const timestamp = cells[1];
-        const date = timestamp.split(' ')[0];
-
-        clientColumns.forEach(col => {
-            const creditValue = parseFloat(cells[col.index]);
+    }
+    
+    if (clientColumns.length === 0) return;
+    
+    const rows = creditTable.data;
+    const rowCount = rows.length;
+    const colCount = clientColumns.length;
+    
+    // Cache pour accès rapide
+    const clientCache = [];
+    for (let c = 0; c < colCount; c++) {
+        clientCache.push(clients.get(clientColumns[c].clientId));
+    }
+    
+    // Parcours unique des données
+    for (let r = 0; r < rowCount; r++) {
+        const cells = rows[r].split(';');
+        const date = cells[1]?.split(' ')[0] || '';
+        
+        for (let c = 0; c < colCount; c++) {
+            const creditValue = parseFloat(cells[clientColumns[c].index]);
+            
             if (!isNaN(creditValue)) {
-                const client = clients.get(col.clientId);
-                if (client) {
-                    client.credits.push({ date, value: creditValue });
-                    client.totalCredit += creditValue;
-                    client.count++;
-                    client.maxCredit = Math.max(client.maxCredit, creditValue);
-                    
-                    if (creditValue === 0) {
-                        client.zeroCreditDates.push(date);
-                        database.commercialData.events.creditNul.total++;
-                        database.commercialData.events.creditNul.jours.add(date);
-                    }
+                const client = clientCache[c];
+                
+                client.credits.push({ date, value: creditValue });
+                client.totalCredit += creditValue;
+                client.maxCredit = Math.max(client.maxCredit, creditValue);
+                
+                if (creditValue === 0) {
+                    client.zeroCreditDates.push(date);
+                    events.creditNul.total++;
+                    events.creditNul.jours.add(date);
                 }
             }
-        });
-    });
-
-    // Post-traitement
-    clients.forEach(client => {
-        client.averageCredit = client.count > 0 ? (client.totalCredit / client.count).toFixed(2) : 0;
+        }
+    }
+    
+    // Mise à jour des moyennes
+    for (let c = 0; c < colCount; c++) {
+        const client = clientCache[c];
+        const count = client.credits.length;
+        client.count = count;
+        client.averageCredit = count > 0 ? (client.totalCredit / count).toFixed(2) : 0;
         client.zeroCreditDates.sort();
-        client.zeroCreditPercentage = client.count > 0 
-            ? ((client.zeroCreditDates.length / client.count) * 100).toFixed(1) 
+        client.zeroCreditPercentage = count > 0 
+            ? ((client.zeroCreditDates.length / count) * 100).toFixed(1) 
             : 0;
-    });
-
-    database.commercialData.events.creditNul.pourcentage = 
-        ((database.commercialData.events.creditNul.total / (clientColumns.length * creditTable.data.length)) * 100).toFixed(1);
+    }
+    
+    const totalCells = colCount * rowCount;
+    events.creditNul.pourcentage = totalCells > 0 
+        ? ((events.creditNul.total / totalCells) * 100).toFixed(1) 
+        : 0;
 }
 
 // ===========================================
 // ANALYSE DES RECHARGES (Table R)
 // ===========================================
 
-function analyzeRechargeData() {
-    console.log("💰 Analyse des recharges - Début");
+function analyzeRechargeData(rechargeTable, commercialData, nanoreseau) {
+    const clients = commercialData.clients;
     
-    const nanoreseau = document.getElementById('nanoreseauValue')?.textContent;
-    const clients = database.commercialData.clients;
+    // ✅ Transformation en tableau (CORRIGÉ)
+    const headers = rechargeTable.header.split(';').filter(h => h.trim() !== '');
     
-    const rechargeTable = database.tables.find(t => t.type === 'R');
-    if (!rechargeTable) {
-        console.log("ℹ️ Aucune table de recharge");
-        return;
-    }
+    const idxClient = headers.findIndex(h => h.includes('Numero Client'));
+    const idxCredit = headers.findIndex(h => h.includes('Credit'));
+    const idxForfait = headers.findIndex(h => h.includes('Forfait'));
+    const idxMessage = headers.findIndex(h => h.includes('Message'));
+    const idxTimestamp = 1;
     
-    const headers = rechargeTable.header.split(';');
-    const clientIdx = headers.findIndex(h => h.includes('Numero Client'));
-    const creditIdx = headers.findIndex(h => h.includes('Credit'));
-    const forfaitIdx = headers.findIndex(h => h.includes('Forfait'));
-    const messageIdx = headers.findIndex(h => h.includes('Message'));
-    const timestampIdx = 1;
+    if (idxClient === -1) return;
     
-    const validRecharges = [];
-    const failedRecharges = [];
+    const rows = rechargeTable.data;
+    const rowCount = rows.length;
     
-    rechargeTable.data.forEach(row => {
-        const cells = row.split(';');
-        const message = cells[messageIdx];
+    // Maps temporaires
+    const rechargesParClient = new Map();
+    const echecsParClient = new Map();
+    const statsMontants = {};
+    let totalReussies = 0;
+    
+    for (let r = 0; r < rowCount; r++) {
+        const cells = rows[r].split(';');
+        const fullClientId = cells[idxClient];
         
-        const fullClientId = cells[clientIdx];
-        if (!fullClientId || fullClientId === '0') return;
+        if (!fullClientId || fullClientId === '0') continue;
         
         const vraiClientId = extractClientId(fullClientId, nanoreseau);
-        const rechargeData = {
-            clientId: vraiClientId,
-            fullClientId,
-            credit: parseFloat(cells[creditIdx]) || 0,
-            forfait: parseFloat(cells[forfaitIdx]) || 0,
-            timestamp: cells[timestampIdx],
-            date: cells[timestampIdx].split(' ')[0],
-            message: message
-        };
+        const credit = parseFloat(cells[idxCredit]) || 0;
+        const forfait = parseFloat(cells[idxForfait]) || 0;
+        const message = cells[idxMessage];
+        const date = cells[idxTimestamp]?.split(' ')[0] || '';
+        
+        statsMontants[credit] = (statsMontants[credit] || 0) + 1;
         
         if (message === 'Recharge Reussie') {
-            validRecharges.push(rechargeData);
+            totalReussies++;
+            
+            if (!rechargesParClient.has(vraiClientId)) {
+                rechargesParClient.set(vraiClientId, {
+                    recharges: [],
+                    credits: {},
+                    totalRecharges: 0,
+                    forfaitActuel: forfait
+                });
+            }
+            
+            const clientData = rechargesParClient.get(vraiClientId);
+            clientData.recharges.push({ 
+                timestamp: cells[idxTimestamp], 
+                date, 
+                credit, 
+                forfait 
+            });
+            clientData.credits[credit] = (clientData.credits[credit] || 0) + 1;
+            clientData.totalRecharges++;
+            clientData.forfaitActuel = forfait;
+            
         } else {
-            // Capturer les recharges échouées
-            failedRecharges.push(rechargeData);
-        }
-    });
-    
-    // Grouper par client
-    const rechargesParClient = new Map();
-    const rechargesEcheesParClient = new Map();
-    
-    validRecharges.forEach(recharge => {
-        const clientId = recharge.clientId;
-        
-        if (!rechargesParClient.has(clientId)) {
-            rechargesParClient.set(clientId, {
-                recharges: [],
-                credits: {},
-                totalRecharges: 0,
-                forfaitActuel: recharge.forfait
+            if (!echecsParClient.has(vraiClientId)) {
+                echecsParClient.set(vraiClientId, []);
+            }
+            echecsParClient.get(vraiClientId).push({ 
+                date, 
+                timestamp: cells[idxTimestamp], 
+                message 
             });
         }
-        
-        const clientData = rechargesParClient.get(clientId);
-        clientData.recharges.push({
-            timestamp: recharge.timestamp,
-            date: recharge.date,
-            credit: recharge.credit,
-            forfait: recharge.forfait
-        });
-        clientData.credits[recharge.credit] = (clientData.credits[recharge.credit] || 0) + 1;
-        clientData.totalRecharges++;
-        clientData.forfaitActuel = recharge.forfait;
-    });
-
-    // Grouper les recharges échouées par client
-    failedRecharges.forEach(recharge => {
-        const clientId = recharge.clientId;
-        
-        if (!rechargesEcheesParClient.has(clientId)) {
-            rechargesEcheesParClient.set(clientId, []);
-        }
-        
-        rechargesEcheesParClient.get(clientId).push({
-            date: recharge.date,
-            timestamp: recharge.timestamp,
-            message: recharge.message
-        });
-    });
+    }
     
-    // Transférer aux clients principaux
+    // Intégration aux clients
     rechargesParClient.forEach((data, clientId) => {
-        if (!clients.has(clientId)) {
-            clients.set(clientId, {
-                id: clientId,
-                recharges: [],
-                credits: [],
-                zeroCreditDates: [],
-                events: []
-            });
+        let client = clients.get(clientId);
+        if (!client) {
+            client = createEmptyClient(clientId, null);
+            clients.set(clientId, client);
         }
         
-        const client = clients.get(clientId);
+        // Tri
+        data.recharges.sort((a, b) => a.timestamp.localeCompare(b.timestamp));
         
-        // Trier par date
-        data.recharges.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
-        
-        // Détecter les changements de forfait
+        // Détection changements de forfait
         const forfaitChanges = [];
         let dernierForfait = null;
         
-        data.recharges.forEach(recharge => {
-            if (dernierForfait !== null && recharge.forfait !== dernierForfait) {
+        for (let i = 0; i < data.recharges.length; i++) {
+            const r = data.recharges[i];
+            if (dernierForfait !== null && r.forfait !== dernierForfait) {
                 forfaitChanges.push({
-                    date: recharge.date,
+                    date: r.date,
                     ancien: dernierForfait,
-                    nouveau: recharge.forfait
+                    nouveau: r.forfait
                 });
             }
-            dernierForfait = recharge.forfait;
-        });
+            dernierForfait = r.forfait;
+        }
         
-        // Calculer les pourcentages de crédit
+        // Calcul des pourcentages
         const creditPercentages = {};
-        Object.entries(data.credits).forEach(([credit, count]) => {
-            creditPercentages[credit] = ((count / data.totalRecharges) * 100).toFixed(1);
-        });
-        
-        // Crédit préféré
         let preferredCredit = null;
         let maxCount = 0;
-        Object.entries(data.credits).forEach(([credit, count]) => {
+        
+        for (const credit in data.credits) {
+            const count = data.credits[credit];
+            creditPercentages[credit] = ((count / data.totalRecharges) * 100).toFixed(1);
             if (count > maxCount) {
                 maxCount = count;
                 preferredCredit = credit;
             }
-        });
-        
-        // Dernières 5 recharges
-        const dernieresRecharges = data.recharges.slice(-5).reverse();
-        
-        // Calculer le crédit moyen
-        const creditMoyen = data.recharges.reduce((sum, r) => sum + r.credit, 0) / data.totalRecharges;
-        
-        // Ajouter les infos de forfait
-        const forfaitName = FORFAIT_NAMES[data.forfaitActuel] || `Forfait ${data.forfaitActuel}`;
-        let consoStatus = '';
-        let consoColor = '#999';
-        
-        const limits = FORFAIT_LIMITS[forfaitName];
-        if (limits) {
-            const ratio = (creditMoyen / limits.max) * 100;
-            
-            if (creditMoyen > limits.max) {
-                consoStatus = '🔴 Dépassement';
-                consoColor = '#f44336';
-            } else if (creditMoyen > limits.max * (1 - limits.tolerance/100)) {
-                consoStatus = '🟠 Limite';
-                consoColor = '#ff9800';
-            } else {
-                consoStatus = '✅ OK';
-                consoColor = '#4CAF50';
-            }
         }
         
-        // Mettre à jour le client
+        // Crédit moyen
+        let sumCredit = 0;
+        for (let i = 0; i < data.recharges.length; i++) {
+            sumCredit += data.recharges[i].credit;
+        }
+        const creditMoyen = sumCredit / data.totalRecharges;
+        
+        const forfaitName = FORFAIT_NAMES[data.forfaitActuel] || `Forfait ${data.forfaitActuel}`;
+        
+        // Mise à jour
         client.recharges = data.recharges;
         client.creditPercentages = creditPercentages;
         client.totalRecharges = data.totalRecharges;
         client.forfaitChanges = forfaitChanges;
         client.preferredCredit = preferredCredit;
         client.preferredPercentage = creditPercentages[preferredCredit] || '0';
-        client.dernieresRecharges = dernieresRecharges;
-        client.aChangeForfait = forfaitChanges.length > 0;
         client.creditMoyen = creditMoyen.toFixed(2);
         client.forfaitActuel = data.forfaitActuel;
         client.forfaitName = forfaitName;
-        client.consoStatus = consoStatus;
-        client.consoColor = consoColor;
-        
-        // Ajouter les recharges échouées si existe
-        client.failedRecharges = rechargesEcheesParClient.get(clientId) || [];
+        client.failedRecharges = echecsParClient.get(clientId) || [];
+        client.aChangeForfait = forfaitChanges.length > 0;
     });
     
-    database.commercialData.recharges = {
-        total: validRecharges.length,
-        parMontant: validRecharges.reduce((acc, r) => {
-            acc[r.credit] = (acc[r.credit] || 0) + 1;
-            return acc;
-        }, {})
+    commercialData.recharges = {
+        total: totalReussies,
+        parMontant: statsMontants
     };
-    
-    console.log(`✅ ${clients.size} clients analysés (recharges)`);
 }
 
 // ===========================================
-// ANALYSE DES ÉVÉNEMENTS COMMERCIAUX
+// ANALYSE DES ÉVÉNEMENTS
 // ===========================================
 
-function analyzeCommercialEvents() {
-    console.log("📊 Analyse des événements commerciaux...");
+function analyzeCommercialEvents(eventTable, commercialData, nanoreseau) {
+    const clients = commercialData.clients;
+    const events = commercialData.events;
+    const rows = eventTable.data;
     
-    const eventTable = database.tables.find(t => t.type === 'E');
-    if (!eventTable) return;
-    
-    const nanoreseau = document.getElementById('nanoreseauValue')?.textContent;
-    const clients = database.commercialData.clients;
-    
-    eventTable.data.forEach(row => {
-        const cells = row.split(';');
-        if (cells.length < 4) return;
+    for (let r = 0; r < rows.length; r++) {
+        const cells = rows[r].split(';');
+        if (cells.length < 4) continue;
         
         const eventType = cells[2];
         const fullClientId = cells[3];
         
-        if (!fullClientId || fullClientId === '0') return;
+        if (!fullClientId || fullClientId === '0') continue;
         
         const vraiClientId = extractClientId(fullClientId, nanoreseau);
         
-        const event = {
-            date: cells[1].split(' ')[0],
+        if (eventType === 'SuspendE') events.suspendE++;
+        else if (eventType === 'SuspendP') events.suspendP++;
+        else if (eventType === 'Surcharge') events.surcharge++;
+        
+        let client = clients.get(vraiClientId);
+        if (!client) {
+            client = createEmptyClient(vraiClientId, fullClientId);
+            clients.set(vraiClientId, client);
+        }
+        
+        if (!client.events) client.events = [];
+        client.events.push({
+            date: cells[1]?.split(' ')[0] || '',
             type: eventType,
             valeur: cells[4] || ''
-        };
-        
-        // Mettre à jour les compteurs globaux
-        if (eventType === 'SuspendE') database.commercialData.events.suspendE++;
-        else if (eventType === 'SuspendP') database.commercialData.events.suspendP++;
-        else if (eventType === 'Surcharge') database.commercialData.events.surcharge++;
-        
-        // Lier l'événement au client
-        if (vraiClientId) {
-            if (!clients.has(vraiClientId)) {
-                clients.set(vraiClientId, {
-                    id: vraiClientId,
-                    fullId: fullClientId,
-                    events: [],
-                    recharges: [],
-                    credits: [],
-                    zeroCreditDates: []
-                });
-            }
-            
-            const client = clients.get(vraiClientId);
-            if (!client.events) client.events = [];
-            client.events.push(event);
-        }
-    });
-    
-    console.log("✅ Analyse des événements terminée");
+        });
+    }
 }
 
 // ===========================================
-// ANALYSE DES REMBOURSEMENTS TECHNIQUES
+// POST-TRAITEMENT CLIENTS (UNE SEULE PASSE)
 // ===========================================
 
-function analyzeTechnicalRefunds() {
-    console.log("🔍 Analyse des remboursements techniques...");
-    
-    const clients = database.commercialData?.clients;
-    if (!clients) return;
-    
-    clients.forEach(client => {
-        const remboursements = client.credits?.filter(c => [2,3,4].includes(c.value)) || [];
-        const totalCredits = client.credits?.length || 1;
-        
-        client.technicalRefunds = {
-            count: remboursements.length,
-            dates: remboursements.map(r => r.date),
-            percentage: ((remboursements.length / totalCredits) * 100).toFixed(1),
-            isAbnormal: remboursements.length >= 3,
-            alert: remboursements.length >= 3 ? "⚠️ Remboursements techniques fréquents" : null,
-            byType: {
-                2: remboursements.filter(r => r.value === 2).length,
-                3: remboursements.filter(r => r.value === 3).length,
-                4: remboursements.filter(r => r.value === 4).length
-            }
-        };
-    });
-    
-    console.log("✅ Analyse remboursements terminée");
-}
-
-// ===========================================
-// ANALYSE CONSOMMATION VS FORFAIT
-// ===========================================
-
-function analyzeConsumptionVsForfait() {
-    console.log("📊 Analyse consommation vs forfait...");
-    
-    const clients = database.commercialData?.clients;
-    if (!clients) return;
-    
-    clients.forEach(client => {
-        const consoMoyenne = parseFloat(client.consommation?.moyenne) || 0;
-        const forfaitName = client.forfaitName;
-        const limits = FORFAIT_LIMITS[forfaitName];
-        const forfaitMax = limits?.max || 1;
-        
-        const ratio = (consoMoyenne / forfaitMax) * 100;
-        
-        let adequation = "NON DÉTERMINÉ";
-        let recommandation = "";
-        let couleur = "#999";
-        
-        if (ratio > 90) {
-            adequation = "SOUS-DIMENSIONNÉ";
-            recommandation = "📈 Passer au forfait supérieur";
-            couleur = "#f44336";
-        } else if (ratio > 70) {
-            adequation = "ADAPTÉ (forte utilisation)";
-            recommandation = "👍 Forfait bien choisi";
-            couleur = "#ff9800";
-        } else if (ratio > 30) {
-            adequation = "ADAPTÉ";
-            recommandation = "✅ Forfait adapté";
-            couleur = "#4CAF50";
-        } else if (ratio > 0) {
-            adequation = "SUR-DIMENSIONNÉ";
-            recommandation = "📉 Proposer forfait économique";
-            couleur = "#2196F3";
-        }
-        
-        client.consumptionAnalysis = {
-            consoMoyenne: consoMoyenne.toFixed(2),
-            forfaitMax: forfaitMax,
-            ratio: ratio.toFixed(1) + "%",
-            adequation: adequation,
-            recommandation: recommandation,
-            couleur: couleur
-        };
-    });
-}
-
-// ===========================================
-// CALCUL DU SCORE CLIENT
-// ===========================================
-
-function calculateClientScore() {
-    console.log("🏆 Calcul des scores clients...");
-    
-    const clients = database.commercialData?.clients;
-    if (!clients) return;
-    
-    clients.forEach(client => {
-        let score = 100;
-        const raisons = [];
-        
-        if (client.technicalRefunds?.isAbnormal) {
-            score -= 30;
-            raisons.push("Remboursements fréquents");
-        }
-        
-        const zeroPercent = parseFloat(client.zeroCreditPercentage || 0);
-        if (zeroPercent > 20) {
-            score -= 20;
-            raisons.push("Trop de jours sans crédit");
-        } else if (zeroPercent > 10) {
-            score -= 10;
-            raisons.push("Quelques jours sans crédit");
-        }
-        
-        const changes = client.forfaitChanges?.length || 0;
-        if (changes > 3) {
-            score -= 20;
-            raisons.push("Instabilité (changements forfait)");
-        } else if (changes > 1) {
-            score -= 10;
-            raisons.push("Quelques changements de forfait");
-        }
-        
-        if (client.consumptionAnalysis) {
-            const ratio = parseFloat(client.consumptionAnalysis.ratio);
-            if (ratio >= 30 && ratio <= 70) {
-                score += 10;
-                raisons.push("Consommation idéale");
-            }
-        }
-        
-        const recharges = client.totalRecharges || 0;
-        if (recharges > 20) {
-            score += 15;
-            raisons.push("Client fidèle");
-        } else if (recharges > 10) {
-            score += 10;
-            raisons.push("Client régulier");
-        }
-        
-        score = Math.max(0, Math.min(100, score));
-        
-        let grade = "";
-        let emoji = "";
-        if (score >= 80) {
-            grade = "EXCELLENT";
-            emoji = "💎";
-        } else if (score >= 60) {
-            grade = "BON";
-            emoji = "🟢";
-        } else if (score >= 40) {
-            grade = "FRAGILE";
-            emoji = "🟠";
-        } else {
-            grade = "CRITIQUE";
-            emoji = "🔴";
-        }
-        
-        client.score = {
-            valeur: score,
-            grade: grade,
-            emoji: emoji,
-            raisons: raisons,
-            alerte: raisons.length > 0 ? raisons.join(", ") : "Aucune anomalie"
-        };
-    });
-}
-
-// ===========================================
-// GÉNÉRATION DES RECOMMANDATIONS
-// ===========================================
-
-function generateRecommendations() {
-    console.log("💡 Génération des recommandations...");
-    
-    const clients = database.commercialData?.clients;
-    if (!clients) return;
-    
-    const recommendations = [];
-    
-    clients.forEach(client => {
-        const clientRec = {
-            clientId: client.id,
-            urgent: false,
-            actions: [],
-            synthese: {
-                credit: null,
-                recharge: null,
-                forfait: null
-            }
-        };
-        
-        // ===== SYNTHÈSE CRÉDIT =====
-        const totalJours = client.credits?.length || 0;
-        const zeroCount = client.zeroCreditDates?.length || 0;
-        const creditMax = client.maxCredit || 0;
-        
-        if (totalJours > 0) {
-            clientRec.synthese.credit = `📅 Ce client a eu ${zeroCount} jour(s) sans crédit sur ${totalJours} jours analysés, avec un crédit maximum de ${creditMax.toFixed(2)} jours.`;
-        }
-        
-        // ===== SYNTHÈSE RECHARGE =====
-        const totalRecharges = client.totalRecharges || 0;
-        const prefCredit = client.preferredCredit;
-        const prefPercent = client.preferredPercentage;
-        
-        if (totalRecharges > 0 && prefCredit) {
-            clientRec.synthese.recharge = `📱 Il recharge généralement pour ${prefCredit} jours (${prefPercent}% des ${totalRecharges} recharges).`;
-        }
-        
-        // ===== SYNTHÈSE FORFAIT =====
-        const forfaitChanges = client.forfaitChanges || [];
-        const forfaitActuel = client.forfaitName || 'Inconnu';
-        
-        if (forfaitChanges.length > 0) {
-            const evolution = forfaitChanges.map(c => {
-                const ancien = FORFAIT_NAMES[c.ancien] || `Forfait ${c.ancien}`;
-                const nouveau = FORFAIT_NAMES[c.nouveau] || `Forfait ${c.nouveau}`;
-                return `${ancien} → ${nouveau}`;
-            }).join(' → ');
-            
-            clientRec.synthese.forfait = `📦 Forfaits utilisés : ${evolution} (actuel : ${forfaitActuel}).`;
-        } else {
-            clientRec.synthese.forfait = `📦 Forfait actuel : ${forfaitActuel} (aucun changement).`;
-        }
-        
-        // ===== RECOMMANDATIONS SPÉCIFIQUES =====
-        
-        // Consommation vs forfait
-        if (client.consumptionAnalysis) {
-            const consoMoyenne = client.consumptionAnalysis.consoMoyenne;
-            const forfaitMax = client.consumptionAnalysis.forfaitMax;
-            const ratio = client.consumptionAnalysis.ratio;
-            
-            if (client.consumptionAnalysis.adequation === "SOUS-DIMENSIONNÉ") {
-                clientRec.actions.push({
-                    type: "upsell",
-                    message: `⚡ Consommation moyenne de ${consoMoyenne} Wh (${ratio}) pour un forfait max de ${forfaitMax} Wh. Proposer forfait supérieur.`,
-                    priorite: "haute"
-                });
-                clientRec.urgent = true;
-            } else if (client.consumptionAnalysis.adequation === "SUR-DIMENSIONNÉ") {
-                clientRec.actions.push({
-                    type: "downsell",
-                    message: `📉 Consommation moyenne de ${consoMoyenne} Wh (${ratio}) pour un forfait max de ${forfaitMax} Wh. Proposer forfait économique.`,
-                    priorite: "moyenne"
-                });
-            }
-        }
-        
-        // Remboursements techniques
-        if (client.technicalRefunds?.isAbnormal) {
-            const rembCount = client.technicalRefunds.count;
-            const rembDetails = Object.entries(client.technicalRefunds.byType)
-                .filter(([_, count]) => count > 0)
-                .map(([type, count]) => `${count}x pour ${type} jours`)
-                .join(', ');
-            
-            clientRec.actions.push({
-                type: "technical",
-                message: `🔧 ${rembCount} remboursements techniques détectés (${rembDetails}). Vérifier équipement client.`,
-                priorite: "haute"
-            });
-            clientRec.urgent = true;
-        }
-        
-        // Jours sans crédit
-        const zeroPercent = parseFloat(client.zeroCreditPercentage || 0);
-        if (zeroPercent > 20) {
-            clientRec.actions.push({
-                type: "credit",
-                message: `⚠️ ${zeroPercent}% de jours sans crédit (${zeroCount} jours). Proposer alerte de crédit faible.`,
-                priorite: "moyenne"
-            });
-        } else if (zeroPercent > 10) {
-            clientRec.actions.push({
-                type: "credit",
-                message: `📊 ${zeroPercent}% de jours sans crédit (${zeroCount} jours). À surveiller.`,
-                priorite: "basse"
-            });
-        }
-        
-        // Changements de forfait
-        const changes = client.forfaitChanges?.length || 0;
-        if (changes > 2) {
-            clientRec.actions.push({
-                type: "stability",
-                message: `🔄 ${changes} changements de forfait détectés. Contacter pour stabiliser.`,
-                priorite: "basse"
-            });
-        }
-        
-        // Score bas
-        if (client.score?.valeur < 40) {
-            clientRec.actions.push({
-                type: "urgent",
-                message: `🔴 Score client de ${client.score.valeur}/100. APPEL PRIORITAIRE - Client à risque de départ.`,
-                priorite: "urgente"
-            });
-            clientRec.urgent = true;
-        } else if (client.score?.valeur < 60) {
-            clientRec.actions.push({
-                type: "warning",
-                message: `🟠 Score client de ${client.score.valeur}/100. Client fragile, à contacter.`,
-                priorite: "moyenne"
-            });
-        }
-        
-        // Stocker les recommandations
-        if (clientRec.actions.length > 0 || clientRec.synthese.credit || clientRec.synthese.recharge || clientRec.synthese.forfait) {
-            recommendations.push(clientRec);
-        }
-        
-        client.recommendations = clientRec;
-    });
-    
-    // Trier par urgence
-    database.commercialData.recommendations = recommendations.sort((a, b) => {
-        if (a.urgent && !b.urgent) return -1;
-        if (!a.urgent && b.urgent) return 1;
-        return 0;
-    });
-    
-    console.log(`✅ ${recommendations.length} clients avec recommandations`);
-}
-
-// ===========================================
-// CALCUL DES STATISTIQUES DE CONSOMMATION
-// ===========================================
-
-function calculateConsumptionStats() {
-    console.log("📊 Calcul des stats de consommation...");
-    
-    const clients = database.commercialData?.clients;
-    if (!clients) return;
-    
+function postProcessClients(clients, commercialData) {
     let totalConso = 0;
     let countConso = 0;
-    let maxConso = 0;
-    let minConso = Infinity;
-    let joursSansConso = 0;
+    let maxConsoGlobal = 0;
+    let minConsoGlobal = Infinity;
+    let joursSansConsoTotal = 0;
+    
+    // Récupérer les recommandations pour le tri final
+    const allRecommendations = [];
     
     clients.forEach(client => {
-        const conso = client.consommation?.journaliere || [];
-        
-        if (conso.length > 0) {
-            const clientMax = Math.max(...conso.map(c => c.valeur));
-            const clientMoy = conso.reduce((s, c) => s + c.valeur, 0) / conso.length;
-            const clientJoursSans = conso.filter(c => c.valeur < 0.1).length;
-            
-            maxConso = Math.max(maxConso, clientMax);
-            minConso = Math.min(minConso, clientMoy);
-            totalConso += clientMoy;
-            countConso++;
-            joursSansConso += clientJoursSans;
-        }
-    });
-    
-    database.commercialData.consommation.globale = {
-        max: maxConso,
-        min: minConso === Infinity ? 0 : minConso,
-        moyenne: countConso > 0 ? (totalConso / countConso).toFixed(2) : 0,
-        joursSans: joursSansConso
-    };
-    
-    console.log("✅ Stats consommation calculées");
-}
-
-// ===========================================
-// PRÉPARATION CENTRALISÉE DES CLIENTS
-// ===========================================
-
-function prepareAllClients() {
-    console.log("🛠️ Préparation centralisée des clients...");
-    
-    const clients = database.commercialData?.clients;
-    if (!clients) return;
-    
-    const nanoreseau = document.getElementById('nanoreseauValue')?.textContent;
-    
-    clients.forEach(client => {
+        // Initialisations
         client.credits = client.credits || [];
         client.zeroCreditDates = client.zeroCreditDates || [];
         client.recharges = client.recharges || [];
         client.forfaitChanges = client.forfaitChanges || [];
         client.events = client.events || [];
-        
         client.consommation = client.consommation || { 
             journaliere: [], 
             max: 0, 
@@ -777,42 +346,347 @@ function prepareAllClients() {
             stats: { normal: 0, tolerance: 0, depasse: 0 }
         };
         
-        client.technicalRefunds = client.technicalRefunds || { 
-            count: 0, 
-            isAbnormal: false,
-            byType: { 2:0, 3:0, 4:0 }
-        };
+        // Analyses
+        analyzeTechnicalRefunds(client);
+        analyzeConsumptionVsForfait(client);
+        calculateClientScore(client);
+        const clientRec = generateClientRecommendations(client);
         
-        client.consumptionAnalysis = client.consumptionAnalysis || {
-            consoMoyenne: "0",
-            forfaitMax: 1,
-            ratio: "0%",
-            adequation: "NON DÉTERMINÉ",
-            recommandation: "",
-            couleur: "#999"
-        };
+        if (clientRec) allRecommendations.push(clientRec);
         
-        client.score = client.score || {
-            valeur: 50,
-            grade: "NON DÉTERMINÉ",
-            emoji: "❓",
-            raisons: [],
-            alerte: ""
-        };
+        // Stats conso globales
+        const conso = client.consommation?.journaliere || [];
+        if (conso.length > 0) {
+            let clientMax = 0;
+            let clientSum = 0;
+            let clientJoursSans = 0;
+            
+            for (let i = 0; i < conso.length; i++) {
+                const val = conso[i].valeur;
+                clientSum += val;
+                if (val > clientMax) clientMax = val;
+                if (val < 0.1) clientJoursSans++;
+            }
+            
+            const clientMoy = clientSum / conso.length;
+            
+            client.consommation.max = clientMax;
+            client.consommation.moyenne = clientMoy;
+            client.consommation.joursSans = clientJoursSans;
+            
+            maxConsoGlobal = Math.max(maxConsoGlobal, clientMax);
+            minConsoGlobal = Math.min(minConsoGlobal, clientMoy);
+            totalConso += clientMoy;
+            countConso++;
+            joursSansConsoTotal += clientJoursSans;
+            
+            // Stats par seuils
+            if (client.forfaitActuel && FORFAIT_LIMITS) {
+                const forfaitName = FORFAIT_NAMES[client.forfaitActuel];
+                const limits = FORFAIT_LIMITS[forfaitName];
+                
+                if (limits && CONSUMPTION_THRESHOLDS) {
+                    const stats = { normal: 0, tolerance: 0, depasse: 0 };
+                    for (let i = 0; i < conso.length; i++) {
+                        const ratio = (conso[i].valeur / limits.max) * 100;
+                        
+                        if (ratio > CONSUMPTION_THRESHOLDS.TOLERANCE_MAX) {
+                            stats.depasse++;
+                        } else if (ratio > CONSUMPTION_THRESHOLDS.NORMAL_MAX) {
+                            stats.tolerance++;
+                        } else {
+                            stats.normal++;
+                        }
+                    }
+                    client.consommation.stats = stats;
+                }
+            }
+        }
         
-        client.recommendations = client.recommendations || { actions: [] };
-        
+        // Nettoyage ID
         if (typeof client.id === 'string' && client.id.length > 3) {
-            const extracted = extractClientId(client.id, nanoreseau);
-            client.id = extracted;
+            client.id = extractClientId(client.id, null);
         }
     });
     
-    console.log(`✅ ${clients.size} clients préparés`);
+    // Stats globales
+    commercialData.consommation.globale = {
+        max: maxConsoGlobal,
+        min: minConsoGlobal === Infinity ? 0 : minConsoGlobal,
+        moyenne: countConso > 0 ? (totalConso / countConso).toFixed(2) : 0,
+        joursSans: joursSansConsoTotal
+    };
+    
+    // Trier les recommandations
+    commercialData.recommendations = allRecommendations.sort((a, b) => {
+        if (a.urgent && !b.urgent) return -1;
+        if (!a.urgent && b.urgent) return 1;
+        return 0;
+    });
 }
 
 // ===========================================
-// FONCTIONS D'EXPORT
+// FONCTIONS SPÉCIALISÉES
+// ===========================================
+
+function createEmptyClient(id, fullId) {
+    return {
+        id,
+        fullId,
+        credits: [],
+        zeroCreditDates: [],
+        recharges: [],
+        forfaitChanges: [],
+        events: [],
+        totalCredit: 0,
+        count: 0,
+        maxCredit: 0,
+        consommation: { 
+            journaliere: [], 
+            max: 0, 
+            moyenne: 0, 
+            joursSans: 0,
+            stats: { normal: 0, tolerance: 0, depasse: 0 }
+        }
+    };
+}
+
+function analyzeTechnicalRefunds(client) {
+    const credits = client.credits || [];
+    const remboursements = [];
+    const byType = { 2: 0, 3: 0, 4: 0 };
+    
+    for (let i = 0; i < credits.length; i++) {
+        const val = credits[i].value;
+        if (val === 2 || val === 3 || val === 4) {
+            remboursements.push(credits[i]);
+            byType[val]++;
+        }
+    }
+    
+    const count = remboursements.length;
+    const totalCredits = credits.length || 1;
+    
+    client.technicalRefunds = {
+        count,
+        dates: remboursements.map(r => r.date),
+        percentage: ((count / totalCredits) * 100).toFixed(1),
+        isAbnormal: count >= 3,
+        alert: count >= 3 ? "⚠️ Remboursements techniques fréquents" : null,
+        byType
+    };
+}
+
+function analyzeConsumptionVsForfait(client) {
+    const consoMoyenne = parseFloat(client.consommation?.moyenne) || 0;
+    const forfaitName = client.forfaitName;
+    const limits = FORFAIT_LIMITS?.[forfaitName];
+    const forfaitMax = limits?.max || 1;
+    
+    const ratio = (consoMoyenne / forfaitMax) * 100;
+    
+    let adequation = "NON DÉTERMINÉ";
+    let recommandation = "";
+    let couleur = "#999";
+    
+    if (ratio > 90) {
+        adequation = "SOUS-DIMENSIONNÉ";
+        recommandation = "📈 Passer au forfait supérieur";
+        couleur = "#f44336";
+    } else if (ratio > 70) {
+        adequation = "ADAPTÉ (forte utilisation)";
+        recommandation = "👍 Forfait bien choisi";
+        couleur = "#ff9800";
+    } else if (ratio > 30) {
+        adequation = "ADAPTÉ";
+        recommandation = "✅ Forfait adapté";
+        couleur = "#4CAF50";
+    } else if (ratio > 0) {
+        adequation = "SUR-DIMENSIONNÉ";
+        recommandation = "📉 Proposer forfait économique";
+        couleur = "#2196F3";
+    }
+    
+    client.consumptionAnalysis = {
+        consoMoyenne: consoMoyenne.toFixed(2),
+        forfaitMax,
+        ratio: ratio.toFixed(1) + "%",
+        adequation,
+        recommandation,
+        couleur
+    };
+}
+
+function calculateClientScore(client) {
+    let score = 100;
+    const raisons = [];
+    
+    if (client.technicalRefunds?.isAbnormal) {
+        score -= 30;
+        raisons.push("Remboursements fréquents");
+    }
+    
+    const zeroPercent = parseFloat(client.zeroCreditPercentage || 0);
+    if (zeroPercent > 20) {
+        score -= 20;
+        raisons.push("Trop de jours sans crédit");
+    } else if (zeroPercent > 10) {
+        score -= 10;
+        raisons.push("Quelques jours sans crédit");
+    }
+    
+    const changes = client.forfaitChanges?.length || 0;
+    if (changes > 3) {
+        score -= 20;
+        raisons.push("Instabilité (changements forfait)");
+    } else if (changes > 1) {
+        score -= 10;
+        raisons.push("Quelques changements de forfait");
+    }
+    
+    if (client.consumptionAnalysis) {
+        const ratio = parseFloat(client.consumptionAnalysis.ratio);
+        if (ratio >= 30 && ratio <= 70) {
+            score += 10;
+            raisons.push("Consommation idéale");
+        }
+    }
+    
+    const recharges = client.totalRecharges || 0;
+    if (recharges > 20) {
+        score += 15;
+        raisons.push("Client fidèle");
+    } else if (recharges > 10) {
+        score += 10;
+        raisons.push("Client régulier");
+    }
+    
+    score = Math.max(0, Math.min(100, score));
+    
+    let grade = "", emoji = "";
+    if (score >= 80) {
+        grade = "EXCELLENT"; emoji = "💎";
+    } else if (score >= 60) {
+        grade = "BON"; emoji = "🟢";
+    } else if (score >= 40) {
+        grade = "FRAGILE"; emoji = "🟠";
+    } else {
+        grade = "CRITIQUE"; emoji = "🔴";
+    }
+    
+    client.score = {
+        valeur: score,
+        grade,
+        emoji,
+        raisons,
+        alerte: raisons.length > 0 ? raisons.join(", ") : "Aucune anomalie"
+    };
+}
+
+function generateClientRecommendations(client) {
+    const clientRec = {
+        clientId: client.id,
+        urgent: false,
+        actions: [],
+        synthese: { credit: null, recharge: null, forfait: null }
+    };
+    
+    const totalJours = client.credits?.length || 0;
+    const zeroCount = client.zeroCreditDates?.length || 0;
+    const creditMax = client.maxCredit || 0;
+    
+    if (totalJours > 0) {
+        clientRec.synthese.credit = `📅 Ce client a eu ${zeroCount} jour(s) sans crédit sur ${totalJours} jours analysés, avec un crédit maximum de ${creditMax.toFixed(2)} jours.`;
+    }
+    
+    const totalRecharges = client.totalRecharges || 0;
+    const prefCredit = client.preferredCredit;
+    const prefPercent = client.preferredPercentage;
+    
+    if (totalRecharges > 0 && prefCredit) {
+        clientRec.synthese.recharge = `📱 Il recharge généralement pour ${prefCredit} jours (${prefPercent}% des ${totalRecharges} recharges).`;
+    }
+    
+    const forfaitChanges = client.forfaitChanges || [];
+    const forfaitActuel = client.forfaitName || 'Inconnu';
+    
+    if (forfaitChanges.length > 0) {
+        const evolution = forfaitChanges.map(c => {
+            const ancien = FORFAIT_NAMES[c.ancien] || `Forfait ${c.ancien}`;
+            const nouveau = FORFAIT_NAMES[c.nouveau] || `Forfait ${c.nouveau}`;
+            return `${ancien} → ${nouveau}`;
+        }).join(' → ');
+        clientRec.synthese.forfait = `📦 Forfaits utilisés : ${evolution} (actuel : ${forfaitActuel}).`;
+    } else {
+        clientRec.synthese.forfait = `📦 Forfait actuel : ${forfaitActuel} (aucun changement).`;
+    }
+    
+    // Actions
+    if (client.consumptionAnalysis?.adequation === "SOUS-DIMENSIONNÉ") {
+        clientRec.actions.push({
+            type: "upsell",
+            message: `⚡ Consommation moyenne de ${client.consumptionAnalysis.consoMoyenne} Wh (${client.consumptionAnalysis.ratio}) pour un forfait max de ${client.consumptionAnalysis.forfaitMax} Wh. Proposer forfait supérieur.`,
+            priorite: "haute"
+        });
+        clientRec.urgent = true;
+    } else if (client.consumptionAnalysis?.adequation === "SUR-DIMENSIONNÉ") {
+        clientRec.actions.push({
+            type: "downsell",
+            message: `📉 Consommation moyenne de ${client.consumptionAnalysis.consoMoyenne} Wh (${client.consumptionAnalysis.ratio}) pour un forfait max de ${client.consumptionAnalysis.forfaitMax} Wh. Proposer forfait économique.`,
+            priorite: "moyenne"
+        });
+    }
+    
+    if (client.technicalRefunds?.isAbnormal) {
+        const details = Object.entries(client.technicalRefunds.byType)
+            .filter(([_, count]) => count > 0)
+            .map(([type, count]) => `${count}x pour ${type} jours`)
+            .join(', ');
+        
+        clientRec.actions.push({
+            type: "technical",
+            message: `🔧 ${client.technicalRefunds.count} remboursements techniques détectés (${details}). Vérifier équipement client.`,
+            priorite: "haute"
+        });
+        clientRec.urgent = true;
+    }
+    
+    const zeroPercent = parseFloat(client.zeroCreditPercentage || 0);
+    if (zeroPercent > 20) {
+        clientRec.actions.push({
+            type: "credit",
+            message: `⚠️ ${zeroPercent}% de jours sans crédit (${zeroCount} jours). Proposer alerte de crédit faible.`,
+            priorite: "moyenne"
+        });
+    } else if (zeroPercent > 10) {
+        clientRec.actions.push({
+            type: "credit",
+            message: `📊 ${zeroPercent}% de jours sans crédit (${zeroCount} jours). À surveiller.`,
+            priorite: "basse"
+        });
+    }
+    
+    if (client.score?.valeur < 40) {
+        clientRec.actions.push({
+            type: "urgent",
+            message: `🔴 Score client de ${client.score.valeur}/100. APPEL PRIORITAIRE - Client à risque de départ.`,
+            priorite: "urgente"
+        });
+        clientRec.urgent = true;
+    } else if (client.score?.valeur < 60) {
+        clientRec.actions.push({
+            type: "warning",
+            message: `🟠 Score client de ${client.score.valeur}/100. Client fragile, à contacter.`,
+            priorite: "moyenne"
+        });
+    }
+    
+    client.recommendations = clientRec;
+    return clientRec;
+}
+
+// ===========================================
+// FONCTIONS D'EXPORT (INCHANGÉES)
 // ===========================================
 
 export function getClientList() {
@@ -829,13 +703,12 @@ export function getClientList() {
 }
 
 export function getUrgentRecommendations() {
-    return database.commercialData?.recommendations?.filter(r => r.urgent) || [];
+    const recommendations = database.commercialData?.recommendations;
+    return recommendations?.filter(r => r.urgent) || [];
 }
 
 export function getClientById(clientId) {
-    const clients = database.commercialData?.clients;
-    if (!clients) return null;
-    return clients.get(clientId) || null;
+    return database.commercialData?.clients?.get(clientId) || null;
 }
 
 export function getRechargeStats() {
@@ -867,7 +740,7 @@ export function getEventStats() {
 }
 
 export function calculateConsumptionFromEnergy(energyData) {
-    if (!energyData || !database.commercialData) return;
+    if (!energyData || !database.commercialData?.clients) return;
     
     const clients = database.commercialData.clients;
     let totalConso = 0;
@@ -878,13 +751,21 @@ export function calculateConsumptionFromEnergy(energyData) {
     
     clients.forEach(client => {
         const consoJournaliere = energyData[client.id] || [];
-        
         client.consommation.journaliere = consoJournaliere;
         
         if (consoJournaliere.length > 0) {
-            const clientMax = Math.max(...consoJournaliere.map(c => c.valeur));
-            const clientMoy = consoJournaliere.reduce((s, c) => s + c.valeur, 0) / consoJournaliere.length;
-            const clientJoursSans = consoJournaliere.filter(c => c.valeur < 0.1).length;
+            let clientMax = 0;
+            let clientSum = 0;
+            let clientJoursSans = 0;
+            
+            for (let i = 0; i < consoJournaliere.length; i++) {
+                const val = consoJournaliere[i].valeur;
+                clientSum += val;
+                if (val > clientMax) clientMax = val;
+                if (val < 0.1) clientJoursSans++;
+            }
+            
+            const clientMoy = clientSum / consoJournaliere.length;
             
             client.consommation.max = clientMax;
             client.consommation.moyenne = clientMoy;
@@ -895,25 +776,6 @@ export function calculateConsumptionFromEnergy(energyData) {
             totalConso += clientMoy;
             countConso++;
             joursSansConso += clientJoursSans;
-            
-            if (client.forfaitActuel) {
-                const forfaitName = FORFAIT_NAMES[client.forfaitActuel];
-                const limits = FORFAIT_LIMITS[forfaitName];
-                
-                if (limits) {
-                    consoJournaliere.forEach(jour => {
-                        const ratio = (jour.valeur / limits.max) * 100;
-                        
-                        if (ratio > CONSUMPTION_THRESHOLDS.TOLERANCE_MAX) {
-                            client.consommation.stats.depasse++;
-                        } else if (ratio > CONSUMPTION_THRESHOLDS.NORMAL_MAX) {
-                            client.consommation.stats.tolerance++;
-                        } else {
-                            client.consommation.stats.normal++;
-                        }
-                    });
-                }
-            }
         }
     });
     

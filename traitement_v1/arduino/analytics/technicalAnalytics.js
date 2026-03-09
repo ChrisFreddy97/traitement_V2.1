@@ -217,7 +217,7 @@ function analyzeLoadShedding() {
         partiel: 0,
         total: 0,
         jours: [],
-        parDate: {}  // ← NOUVEAU : comptage par date
+        parDate: {}  // ← Sera enrichi
     };
     
     eventTable.data.forEach(row => {
@@ -225,27 +225,47 @@ function analyzeLoadShedding() {
         if (cells.length < 4) return;
         
         const eventType = cells[2];
-        const date = cells[1].split(' ')[0];
+        const timestamp = cells[1];
+        const date = timestamp.split(' ')[0];
+        const time = timestamp.split(' ')[1];
         
-        // Initialiser le compteur pour cette date si nécessaire
+        // ✅ NOUVEAU : Stocker les heures précises
         if (!loadShedding.parDate[date]) {
-            loadShedding.parDate[date] = { partiel: 0, total: 0 };
+            loadShedding.parDate[date] = {
+                partiel: 0,
+                total: 0,
+                evenements: []  // ← Liste des événements avec heures
+            };
         }
         
-        // Compter les événements
         if (eventType === 'DelestagePartiel' || eventType === 'Delestage Partiel') {
             loadShedding.partiel++;
             loadShedding.parDate[date].partiel++;
+            loadShedding.parDate[date].evenements.push({
+                type: 'partiel',
+                time: time,
+                timestamp: timestamp
+            });
             if (!loadShedding.jours.includes(date)) {
                 loadShedding.jours.push(date);
             }
         } else if (eventType === 'DelestageTotal' || eventType === 'Delestage Total') {
             loadShedding.total++;
             loadShedding.parDate[date].total++;
+            loadShedding.parDate[date].evenements.push({
+                type: 'total',
+                time: time,
+                timestamp: timestamp
+            });
             if (!loadShedding.jours.includes(date)) {
                 loadShedding.jours.push(date);
             }
         }
+    });
+    
+    // Trier les événements par heure pour chaque jour
+    Object.values(loadShedding.parDate).forEach(jour => {
+        jour.evenements.sort((a, b) => a.time.localeCompare(b.time));
     });
     
     database.technicalData.loadShedding = loadShedding;

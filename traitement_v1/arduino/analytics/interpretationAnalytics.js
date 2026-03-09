@@ -212,33 +212,17 @@ export function analyzeCreditZeroCauses(client, sequenceDates) {
     const seqLength = sequenceDates.length;
 
     // ===========================================
-    // FONCTION UTILITAIRE INTÉGRÉE
+    // FONCTION UTILITAIRE INTÉGRÉE (CORRIGÉE)
     // ===========================================
     function hasRecentActivity(client) {
-        const today = new Date();
+        // Un client a des données = il existe, même si anciennes
+        const aDesRecharges = (client.recharges?.length > 0);
+        const aDesConso = (client.consommation?.journaliere?.length > 0);
+        const aDesCredits = (client.credits?.length > 0);
         
-        // Dernière recharge (30 jours)
-        const lastRecharge = client.recharges?.slice(-1)[0]?.date;
-        if (lastRecharge) {
-            const days = Math.floor((today - new Date(lastRecharge)) / (1000*60*60*24));
-            if (days < 30) return true;
-        }
-        
-        // Dernière consommation (30 jours)
-        const lastConso = client.consommation?.journaliere?.slice(-1)[0]?.date;
-        if (lastConso) {
-            const days = Math.floor((today - new Date(lastConso)) / (1000*60*60*24));
-            if (days < 30) return true;
-        }
-        
-        // Dernier événement (30 jours)
-        const lastEvent = client.events?.slice(-1)[0]?.date;
-        if (lastEvent) {
-            const days = Math.floor((today - new Date(lastEvent)) / (1000*60*60*24));
-            if (days < 30) return true;
-        }
-        
-        return false;
+        // ✅ CORRECTION : Si le client a des données, on le considère comme existant
+        // La notion de "récent" est trop stricte pour 1-2 jours d'absence
+        return aDesRecharges || aDesConso || aDesCredits;
     }
 
     function isGhostClient(client) {
@@ -247,14 +231,8 @@ export function analyzeCreditZeroCauses(client, sequenceDates) {
         const aDesEvents = (client.events?.length > 0);
         const aDesCredits = (client.credits?.length > 0);
         
-        if (!aDesRecharges && !aDesConso && !aDesEvents && !aDesCredits) {
-            return true;
-        }
-        
-        const consoToutesNulles = (client.consommation?.journaliere?.every(c => c.valeur === 0) ?? true);
-        const creditsTousNuls = (client.credits?.every(c => c.value === 0) ?? true);
-        
-        return (aDesConso && consoToutesNulles) || (aDesCredits && creditsTousNuls);
+        // Fantôme = absolument aucune donnée
+        return !aDesRecharges && !aDesConso && !aDesEvents && !aDesCredits;
     }
 
     function getTechnicalContextForDates(sequenceDates) {
@@ -301,7 +279,7 @@ export function analyzeCreditZeroCauses(client, sequenceDates) {
     const techContext = getTechnicalContextForDates(sequenceDates);
 
     // ===========================================
-    // NIVEAU 1: CLIENT FANTÔME (PAS DE DONNÉES)
+    // NIVEAU 1: CLIENT FANTÔME (PAS DE DONNÉES DU TOUT)
     // ===========================================
     if (isGhostClient(client)) {
         return {
@@ -337,12 +315,12 @@ export function analyzeCreditZeroCauses(client, sequenceDates) {
     }
 
     // ===========================================
-    // NIVEAU 3: CLIENT ACTIF (A DES DONNÉES RÉCENTES)
+    // NIVEAU 3: CLIENT EXISTANT (A DES DONNÉES)
     // ===========================================
-    const clientActif = hasRecentActivity(client);
+    const clientExistant = hasRecentActivity(client); // Maintenant = a des données
     
-    if (clientActif) {
-        // Priorité aux causes commerciales
+    if (clientExistant) {
+        // ✅ PRIORITÉ : Causes commerciales pour 1-2 jours
         const rechargesInSeq = (client.recharges || []).filter(r =>
             r.date >= seqStart && r.date <= seqEnd
         );
@@ -387,9 +365,20 @@ export function analyzeCreditZeroCauses(client, sequenceDates) {
     }
 
     // ===========================================
-    // NIVEAU 4: CAUSES D'ABSENCE (CLIENT INACTIF)
+    // NIVEAU 4: SÉQUENCES LONGUES
     // ===========================================
-    if (!clientActif) {
+    if (seqLength > 14) {
+        return {
+            mainCause: 'system',
+            confidence: 0.72,
+            evidence: `Séquence anormale: ${seqLength} jours`
+        };
+    }
+
+    // ===========================================
+    // NIVEAU 5: CAUSES D'ABSENCE (SEULEMENT SI TRÈS LONG)
+    // ===========================================
+    if (!clientExistant || seqLength > 7) {
         if (seqLength < 7) {
             return {
                 mainCause: 'vacances',
@@ -496,7 +485,7 @@ export function generateSequenceRecommendation(client, sequence, causeResult) {
         vacances: {
             priority: 'info',
             action: '🏠 Aucune action',
-            message: `Client en vacances - Pas de consommation`
+            message: `Rupture de crédit - Pas de consommation`
         },
         abandon: {
             priority: 'moyenne',
