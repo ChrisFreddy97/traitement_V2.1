@@ -5084,7 +5084,7 @@ function addHourlyEnergySummary(container, hourlyData, maxValue, selectedDate, s
             <div style="font-size: 10px; color: #475569;">sur ${values.length} heures • ${periodText}</div>
         </div>
         <div style="background: white; padding: 12px; border-radius: 8px; border-left: 4px solid #ef4444;">
-            <div style="font-size: 11px; color: #64748b; margin-bottom: 4px;">⬆️ Pic de consommation</div>
+            <div style="font-size: 11px; color: #64748b; margin-bottom: 4px;">⬆️Max de consommation</div>
             <div style="font-size: 18px; font-weight: 700; color: #ef4444;">${maxHour.value.toFixed(2)} Wh</div>
             <div style="font-size: 10px; color: #475569;">${maxHour.hour ? `${maxHour.hour}h` : '-'}</div>
         </div>
@@ -5096,11 +5096,11 @@ function addHourlyEnergySummary(container, hourlyData, maxValue, selectedDate, s
         <div style="background: white; padding: 12px; border-radius: 8px; border-left: 4px solid #8b5cf6;">
             <div style="font-size: 11px; color: #64748b; margin-bottom: 4px;">⏰ Répartition</div>
             <div style="font-size: 13px; font-weight: 600; color: #8b5cf6;">
-                ${avgMorning > 0 ? `Matin: ${avgMorning.toFixed(1)}` : ''}
+                ${avgMorning > 0 ? `Matin: ${avgMorning.toFixed(1)}` : ''} Wh
             </div>
             <div style="font-size: 10px; color: #475569;">
-                ${avgAfternoon > 0 ? `Après-midi: ${avgAfternoon.toFixed(1)} • ` : ''}
-                Soir: ${avgEvening.toFixed(1)} • Nuit: ${avgNight.toFixed(1)}
+                ${avgAfternoon > 0 ? `Après-midi: ${avgAfternoon.toFixed(1)} Wh • ` : ''}
+                Soir: ${avgEvening.toFixed(1)} Wh • Nuit: ${avgNight.toFixed(1)} Wh
             </div>
         </div>
     `;
@@ -9919,7 +9919,6 @@ function createDaysWithoutCreditCard(clientNumber) {
                         <span style="font-size: 9px; color: #64748b;">${day.date}</span>
                     </div>
                 </td>
-                <td style="padding: 10px; text-align: center; font-family: monospace;">${day.time}</td>
                 <td style="padding: 10px; text-align: center; font-weight: 700; color: #ef4444;">0</td>
             </tr>
         `;
