@@ -630,77 +630,52 @@ tr:nth-child(even) {
     }
 }
 
-/* ============================================
-   ADAPTATION POUR TOUS LES ÉCRANS - Version simple
-   ============================================ */
-
-/* Pour les téléphones (moins de 600px) */
-@media (max-width: 600px) {
-    /* Met tout en colonne */
-    .grid-2, .grid-3, .grid-4, .stats-grid, .norms-grid {
-        grid-template-columns: 1fr !important;
-    }
-    
-    /* Réduit la taille des textes */
-    body {
-        font-size: 14px;
-    }
-    
-    .card {
-        padding: 10px;
-    }
-    
-    .info-value {
-        font-size: 1.2rem;
-    }
-    
-    /* Cache les détails pour faire plus simple */
-    .info-sub, .stat-detail {
-        display: none;
-    }
-}
-
-/* Pour les tablettes (entre 600px et 900px) */
-@media (min-width: 601px) and (max-width: 900px) {
-    /* 2 colonnes au lieu de 3 ou 4 */
-    .grid-4, .grid-3 {
-        grid-template-columns: repeat(2, 1fr);
-    }
-    
-    .card {
-        padding: 15px;
-    }
-}
-
-/* Pour les très grands écrans (plus de 1400px) */
-@media (min-width: 1400px) {
-    .container {
-        max-width: 1300px;
-        margin: 0 auto;
-    }
-    
-    .card {
-        padding: 30px;
-    }
-}
 
 /* ============================================
-   ADAPTATION POUR ELECTRON
+   ADAPTATION PAR PLATEFORME
    ============================================ */
 
-/* Réduire la taille globale de 15% dans Electron */
+/* Base pour toutes les plateformes */
+html {
+    font-size: 16px; /* Taille de base */
+}
+
+/* WEB (desktop) */
+.web {
+    font-size: 12px;
+}
+
+/* ELECTRON (logiciel) */
 .electron {
-    font-size: 12px; /* Au lieu de 16px par défaut */
+    font-size: 12px;
 }
 
+/* TABLETTE */
+.tablet {
+    font-size: 9px;
+}
+
+/* MOBILE (téléphone) */
+.mobile {
+    font-size: 6px;
+}
+
+/* Ajustements supplémentaires pour mobile */
+.mobile .card {
+    padding: 0.5rem;
+}
+
+.mobile .info-sub,
+.mobile .stat-detail {
+    display: none; /* Cache les détails sur mobile */
+}
+
+/* Ajustements pour tablette */
+.tablet .card {
+    padding: 0.8rem;
+}
+
+/* Ajustements pour electron */
 .electron .card {
-    padding: 1.2rem; /* Réduction des espacements */
-}
-
-.electron .info-value {
-    font-size: 1.3rem; /* Valeurs plus petites */
-}
-
-.electron .stat-value {
-    font-size: 1.6rem;
+    padding: 1rem;
 }

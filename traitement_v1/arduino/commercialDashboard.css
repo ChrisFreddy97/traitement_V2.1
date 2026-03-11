@@ -1265,22 +1265,50 @@
 }
 
 /* ============================================
-   ADAPTATION POUR ELECTRON
+   ADAPTATION PAR PLATEFORME
    ============================================ */
 
-/* Réduire la taille globale de 15% dans Electron */
+/* Base pour toutes les plateformes */
+html {
+    font-size: 16px; /* Taille de base */
+}
+
+/* WEB (desktop) */
+.web {
+    font-size: 12px;
+}
+
+/* ELECTRON (logiciel) */
 .electron {
-    font-size: 12px; /* Au lieu de 16px par défaut */
+    font-size: 12px;
 }
 
+/* TABLETTE */
+.tablet {
+    font-size: 9px;
+}
+
+/* MOBILE (téléphone) */
+.mobile {
+    font-size: 6px;
+}
+
+/* Ajustements supplémentaires pour mobile */
+.mobile .card {
+    padding: 0.5rem;
+}
+
+.mobile .info-sub,
+.mobile .stat-detail {
+    display: none; /* Cache les détails sur mobile */
+}
+
+/* Ajustements pour tablette */
+.tablet .card {
+    padding: 0.8rem;
+}
+
+/* Ajustements pour electron */
 .electron .card {
-    padding: 1.2rem; /* Réduction des espacements */
-}
-
-.electron .info-value {
-    font-size: 1.3rem; /* Valeurs plus petites */
-}
-
-.electron .stat-value {
-    font-size: 1.6rem;
+    padding: 1rem;
 }
