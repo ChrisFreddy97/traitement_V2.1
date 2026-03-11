@@ -188,4 +188,9 @@ window.refreshCurrentTab = function() {
     renderByTab();
 };
 
+// DÉTECTION ELECTRON - À METTRE TOUT EN HAUT
+if (navigator.userAgent.toLowerCase().includes('electron')) {
+    document.documentElement.classList.add('electron');
+}
+
 console.log("✅ ArduinoMain initialisé - Prêt pour l'import");

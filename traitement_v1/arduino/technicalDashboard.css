@@ -906,3 +906,24 @@ input[type="file"] {
     font-family: monospace;
     letter-spacing: 0.5px;
 }
+
+/* ============================================
+   ADAPTATION POUR ELECTRON
+   ============================================ */
+
+/* Réduire la taille globale de 15% dans Electron */
+.electron {
+    font-size: 12px; /* Au lieu de 16px par défaut */
+}
+
+.electron .card {
+    padding: 1.2rem; /* Réduction des espacements */
+}
+
+.electron .info-value {
+    font-size: 1.3rem; /* Valeurs plus petites */
+}
+
+.electron .stat-value {
+    font-size: 1.6rem;
+}

@@ -225,6 +225,10 @@ function renderLoadSheddingBoard() {
     const totalEvenements = data.partiel + data.total;
     const moyenneParJour = joursAvecDelestage > 0 ? (totalEvenements / joursAvecDelestage).toFixed(1) : 0;
     
+    // Éviter division par zéro
+    const partielPercent = totalEvenements > 0 ? (data.partiel / totalEvenements) * 100 : 0;
+    const totalPercent = totalEvenements > 0 ? (data.total / totalEvenements) * 100 : 0;
+    
     // Déterminer le niveau de sévérité (pour le badge)
     let severityLevel = 'low';
     let severityMessage = '';
@@ -288,27 +292,52 @@ function renderLoadSheddingBoard() {
                 </div>
             </div>
             
-            <!-- Répartition partiel/total (simplifiée) -->
+            <!-- Remplacer le donut par une BARRE DE PROGRESSION MUTUELLE -->
             <div style="margin-bottom: 2rem;">
-                <h4 style="margin-bottom: 1rem; color: var(--dark); font-size: 1rem;">🔸 Répartition des événements</h4>
-                <div style="display: flex; gap: 1rem; align-items: center;">
-                    <div style="flex: 1;">
-                        <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
-                            <span style="width: 12px; height: 12px; background: #ff9800; border-radius: 3px;"></span>
-                            <span style="flex: 1;">Délestages partiels</span>
-                            <span style="font-weight: 600;">${data.partiel}</span>
-                            <span style="color: var(--gray-500);">(${((data.partiel/totalEvenements)*100).toFixed(1)}%)</span>
+                <h4 style="margin-bottom: 1rem; color: var(--dark); font-size: 1rem;">🔸 Répartition partielle vs totale</h4>
+                
+                <!-- Stats avec pourcentages -->
+                <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <span style="width: 12px; height: 12px; background: #ff9800; border-radius: 3px; display: inline-block;"></span>
+                        <span style="font-weight: 500;">Délestages partiels</span>
+                    </div>
+                    <div>
+                        <span style="font-weight: 600;">${data.partiel}</span>
+                        <span style="color: var(--gray-500); margin-left: 0.5rem;">(${partielPercent.toFixed(1)}%)</span>
+                    </div>
+                </div>
+                
+                <div style="display: flex; justify-content: space-between; margin-bottom: 0.75rem;">
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <span style="width: 12px; height: 12px; background: #f44336; border-radius: 3px; display: inline-block;"></span>
+                        <span style="font-weight: 500;">Délestages totaux</span>
+                    </div>
+                    <div>
+                        <span style="font-weight: 600;">${data.total}</span>
+                        <span style="color: var(--gray-500); margin-left: 0.5rem;">(${totalPercent.toFixed(1)}%)</span>
+                    </div>
+                </div>
+                
+                <!-- BARRE DE PROGRESSION MUTUELLE -->
+                <div style="margin: 1.5rem 0;">
+                    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+                        <span style="font-size: 0.9rem; color: var(--gray-600);">Partiel</span>
+                        <div style="flex: 1; height: 30px; background: #f0f0f0; border-radius: 100px; overflow: hidden; display: flex;">
+                            <div style="width: ${partielPercent}%; height: 100%; background: linear-gradient(90deg, #ffb74d, #ff9800); display: flex; align-items: center; justify-content: flex-end; padding-right: 10px; color: white; font-size: 0.8rem; font-weight: 600;">
+                                ${partielPercent > 8 ? partielPercent.toFixed(0)+'%' : ''}
+                            </div>
+                            <div style="width: ${totalPercent}%; height: 100%; background: linear-gradient(90deg, #f44336, #d32f2f); display: flex; align-items: center; padding-left: 10px; color: white; font-size: 0.8rem; font-weight: 600;">
+                                ${totalPercent > 8 ? totalPercent.toFixed(0)+'%' : ''}
+                            </div>
                         </div>
-                        <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem;">
-                            <span style="width: 12px; height: 12px; background: #f44336; border-radius: 3px;"></span>
-                            <span style="flex: 1;">Délestages totaux</span>
-                            <span style="font-weight: 600;">${data.total}</span>
-                            <span style="color: var(--gray-500);">(${((data.total/totalEvenements)*100).toFixed(1)}%)</span>
-                        </div>
+                        <span style="font-size: 0.9rem; color: var(--gray-600);">Total</span>
                     </div>
                     
-                    <div style="width: 100px; height: 100px;">
-                        <canvas id="loadSheddingDonut" width="100" height="100"></canvas>
+                    <!-- Mini légende -->
+                    <div style="display: flex; justify-content: space-between; margin-top: 0.25rem;">
+                        <span style="font-size: 0.8rem; color: #ff9800;">${data.partiel} événements partiels</span>
+                        <span style="font-size: 0.8rem; color: #f44336;">${data.total} événements totaux</span>
                     </div>
                 </div>
             </div>
@@ -341,19 +370,14 @@ function renderLoadSheddingBoard() {
                                     const totalJour = jourData.total || 0;
                                     const totalEvJour = partielJour + totalJour;
                                     
-                                    // ✅ Récupérer TOUTES les heures et les formater
                                     const heures = jourData.evenements?.map(e => {
                                         const [hour, minute] = e.time.split(':');
                                         return `${hour}h${minute}`;
                                     }) || [];
                                     
-                                    // Trier les heures chronologiquement
                                     heures.sort();
-                                    
-                                    // Afficher TOUTES les heures séparées par un point
                                     const heuresTexte = heures.length > 0 ? heures.join(' · ') : '—';
                                     
-                                    // Couleur de fond selon l'intensité
                                     let bgColor = '';
                                     if (totalEvJour > 20) bgColor = 'rgba(247, 37, 133, 0.05)';
                                     else if (totalEvJour > 10) bgColor = 'rgba(244, 67, 54, 0.05)';
@@ -378,67 +402,6 @@ function renderLoadSheddingBoard() {
             </div>
         </div>
     `;
-    
-    // Graphique donut
-    createLoadSheddingDonut(data.partiel, data.total);
-}
-
-function createLoadSheddingDonut(partiel, total) {
-    setTimeout(() => {
-        const canvas = document.getElementById('loadSheddingDonut');
-        if (!canvas) return;
-        
-        const ctx = canvas.getContext('2d');
-        const totalEvents = partiel + total;
-        
-        if (totalEvents === 0) {
-            ctx.font = '10px Arial';
-            ctx.fillStyle = '#999';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText('Aucun', 60, 60);
-            return;
-        }
-        
-        const partielAngle = (partiel / totalEvents) * 2 * Math.PI;
-        
-        ctx.clearRect(0, 0, 120, 120);
-        
-        // Fond
-        ctx.beginPath();
-        ctx.arc(60, 60, 50, 0, 2 * Math.PI);
-        ctx.fillStyle = '#f0f0f0';
-        ctx.fill();
-        
-        // Partiel (orange)
-        ctx.beginPath();
-        ctx.moveTo(60, 60);
-        ctx.arc(60, 60, 50, 0, partielAngle);
-        ctx.closePath();
-        ctx.fillStyle = '#ff9800';
-        ctx.fill();
-        
-        // Total (rouge)
-        ctx.beginPath();
-        ctx.moveTo(60, 60);
-        ctx.arc(60, 60, 50, partielAngle, 2 * Math.PI);
-        ctx.closePath();
-        ctx.fillStyle = '#f44336';
-        ctx.fill();
-        
-        // Centre blanc
-        ctx.beginPath();
-        ctx.arc(60, 60, 25, 0, 2 * Math.PI);
-        ctx.fillStyle = 'white';
-        ctx.fill();
-        
-        // Texte
-        ctx.font = 'bold 12px Arial';
-        ctx.fillStyle = '#333';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(totalEvents, 60, 60);
-    }, 100);
 }
 
 // ===========================================
