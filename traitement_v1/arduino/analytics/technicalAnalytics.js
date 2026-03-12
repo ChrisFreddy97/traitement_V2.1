@@ -216,29 +216,56 @@ function analyzeLoadShedding() {
     const loadShedding = {
         partiel: 0,
         total: 0,
-        jours: []
+        jours: [],
+        parDate: {}  // ← Sera enrichi
     };
     
     eventTable.data.forEach(row => {
         const cells = row.split(';');
-        
-        // ✅ Vérifie que c'est bien le format attendu
         if (cells.length < 4) return;
         
-        const eventType = cells[2];  // ✅ L'événement est à l'index 2
-        const date = cells[1].split(' ')[0];  // ✅ La date dans le timestamp
+        const eventType = cells[2];
+        const timestamp = cells[1];
+        const date = timestamp.split(' ')[0];
+        const time = timestamp.split(' ')[1];
         
-        if (eventType === 'Delestage Partiel') {
+        // ✅ NOUVEAU : Stocker les heures précises
+        if (!loadShedding.parDate[date]) {
+            loadShedding.parDate[date] = {
+                partiel: 0,
+                total: 0,
+                evenements: []  // ← Liste des événements avec heures
+            };
+        }
+        
+        if (eventType === 'DelestagePartiel' || eventType === 'Delestage Partiel') {
             loadShedding.partiel++;
+            loadShedding.parDate[date].partiel++;
+            loadShedding.parDate[date].evenements.push({
+                type: 'partiel',
+                time: time,
+                timestamp: timestamp
+            });
             if (!loadShedding.jours.includes(date)) {
                 loadShedding.jours.push(date);
             }
-        } else if (eventType === 'Delestage Total') {
+        } else if (eventType === 'DelestageTotal' || eventType === 'Delestage Total') {
             loadShedding.total++;
+            loadShedding.parDate[date].total++;
+            loadShedding.parDate[date].evenements.push({
+                type: 'total',
+                time: time,
+                timestamp: timestamp
+            });
             if (!loadShedding.jours.includes(date)) {
                 loadShedding.jours.push(date);
             }
         }
+    });
+    
+    // Trier les événements par heure pour chaque jour
+    Object.values(loadShedding.parDate).forEach(jour => {
+        jour.evenements.sort((a, b) => a.time.localeCompare(b.time));
     });
     
     database.technicalData.loadShedding = loadShedding;

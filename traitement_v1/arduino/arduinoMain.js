@@ -9,6 +9,45 @@ import { handleCellClick } from './arduinoEvents.js';
 import { renderByTab } from './arduinoRender.js';
 
 
+// ============================================
+// DÉTECTION PLATEFORME (À METTRE TOUT EN HAUT)
+// ============================================
+
+function detectPlatform() {
+    const ua = navigator.userAgent.toLowerCase();      // Info navigateur
+    const width = window.innerWidth;                    // Largeur écran
+    
+    // 1. Electron (logiciel desktop)
+    if (ua.includes('electron')) {
+        return 'electron';
+    }
+    
+    // 2. Mobile (téléphone)
+    if (width <= 768 || 'ontouchstart' in window) {
+        return 'mobile';
+    }
+    
+    // 3. Tablette
+    if (width <= 1024) {
+        return 'tablet';
+    }
+    
+    // 4. Web (desktop par défaut)
+    return 'web';
+}
+
+// Appliquer la classe détectée
+document.documentElement.classList.add(detectPlatform());
+
+// Mettre à jour si la fenêtre change de taille
+window.addEventListener('resize', () => {
+    // Enlever les anciennes classes
+    document.documentElement.classList.remove('electron', 'mobile', 'tablet', 'web');
+    // Ajouter la nouvelle
+    document.documentElement.classList.add(detectPlatform());
+});
+
+
 // Rendre handleCellClick accessible globalement
 window.handleCellClick = handleCellClick;
 

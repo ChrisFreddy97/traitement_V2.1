@@ -9,7 +9,7 @@ export const TABLE_TYPES = {
     'T': { name: 'Tension', color: '#9C27B0', icon: '🔋', tab: 'Technique' },
     'R': { name: 'Recharges', color: '#FF9800', icon: '💳', tab: 'Commercial' },
     'S': { name: 'Évolution crédit', color: '#2196F3', icon: '💰', tab: 'Commercial' },
-    'E': { name: 'Événements', color: '#F44336', icon: '🔔', tab: 'Commercial' }
+    'E': { name: 'Événements', color: '#F44336', icon: '🔔', tab: 'Evenement' }
 };
 
 // Normes de tension

@@ -36,16 +36,16 @@ export function renderCommercialDashboard() {
             </div>
         </div>
         
-        <div class="section-title"><h2>💰 I) ANALYSE DE CONSOMMATION</h2></div>
+        <div class="section-title"><h2>💰 ANALYSE DE CONSOMMATION</h2></div>
         <div id="consumptionBoard" class="card"></div>
         <div id="commercialEventsBoard" class="card"></div>
         <div id="forfaitChangesBoard" class="card"></div>
         
-        <div class="section-title"><h2>💳 II) ANALYSE CRÉDIT ET RECHARGE</h2></div>
+        <div class="section-title"><h2>💳 ANALYSE CRÉDIT ET RECHARGE</h2></div>
         <div id="creditBoard" class="card"></div>
         <div id="rechargeHabitsBoard" class="card"></div>
         
-        <div class="section-title"><h2>📊 III) SOLDE ET RECHARGE</h2></div>
+        <div class="section-title"><h2>📊 SOLDE ET RECHARGE</h2></div>
         <div id="balanceBoard" class="card"></div>
     `;
     
@@ -65,11 +65,17 @@ function renderGlobalClientTabs() {
     const container = document.getElementById('globalClientTabs');
     if (!container || clientsList.length === 0) return;
     
-    container.innerHTML = clientsList.map(client => `
-        <button class="client-tab ${client.id === activeClientId ? 'active' : ''}" data-client-id="${client.id}">
-            Client ${client.id}
-        </button>
-    `).join('');
+    container.innerHTML = clientsList.map(client => {
+        // Vérifier si c'est un client fantôme pour le style de l'onglet
+        const isGhost = isGhostClient(client);
+        return `
+            <button class="client-tab ${client.id === activeClientId ? 'active' : ''} ${isGhost ? 'ghost-client' : ''}" 
+                    data-client-id="${client.id}" 
+                    title="${isGhost ? '👻 Client fantôme - Aucune donnée' : ''}">
+                Client ${client.id} ${isGhost ? '👻' : ''}
+            </button>
+        `;
+    }).join('');
 }
 
 function attachGlobalNavigation() {
@@ -114,6 +120,67 @@ function attachGlobalNavigation() {
             });
         }
     }, 100);
+}
+
+// ===========================================
+// FONCTIONS UTILITAIRES
+// ===========================================
+
+/**
+ * Détecter si un client est fantôme
+ */
+function isGhostClient(client) {
+    const aDesRecharges = (client.recharges?.length > 0);
+    const aDesConso = (client.consommation?.journaliere?.length > 0);
+    const aDesEvents = (client.events?.length > 0);
+    const aDesCredits = (client.credits?.length > 0);
+    
+    if (!aDesRecharges && !aDesConso && !aDesEvents && !aDesCredits) {
+        return true;
+    }
+    
+    const consoToutesNulles = (client.consommation?.journaliere?.every(c => c.valeur === 0) ?? true);
+    const creditsTousNuls = (client.credits?.every(c => c.value === 0) ?? true);
+    
+    return (aDesConso && consoToutesNulles) || (aDesCredits && creditsTousNuls);
+}
+
+/**
+ * Déterminer le niveau de risque global d'un client
+ */
+function determineClientRiskLevel(client) {
+    if (!client || isGhostClient(client)) return 'ghost';
+    
+    const joursSansCredit = client.zeroCreditDates?.length || 0;
+    const joursAnalyses = client.count || client.credits?.length || 1;
+    const pourcentageSans = joursAnalyses > 0 ? (joursSansCredit / joursAnalyses) * 100 : 0;
+    const scoreValeur = client.score?.valeur || 100;
+    
+    // Client critique
+    if (scoreValeur < 30 || pourcentageSans > 30) return 'critical';
+    
+    // Client haut risque
+    if (scoreValeur < 50 || pourcentageSans > 20) return 'high';
+    
+    // Client risque moyen
+    if (scoreValeur < 70 || pourcentageSans > 10) return 'medium';
+    
+    // Client sain
+    return 'low';
+}
+
+/**
+ * Obtenir la classe CSS pour un message selon son type
+ */
+function getMessageClass(message) {
+    if (message.includes('✅')) return 'success';
+    if (message.includes('⚠️')) return 'warning';
+    if (message.includes('🔴')) return 'danger';
+    if (message.includes('📱')) return 'info';
+    if (message.includes('📦')) return 'purple';
+    if (message.includes('💳')) return 'gold';
+    if (message.includes('👻')) return 'ghost';
+    return '';
 }
 
 function renderAllBoards() {
@@ -223,12 +290,13 @@ function calculateKPIs(clients) {
     const scores = clients.map(c => c.score?.valeur || 0);
     const averageScore = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
     
-    // Clients à risque (score < 40)
-    const atRiskCount = clients.filter(c => c.score?.valeur < 40).length;
+    // Clients à risque (score < 40) - exclure les fantômes
+    const atRiskCount = clients.filter(c => !isGhostClient(c) && (c.score?.valeur < 40)).length;
     const atRiskPercent = totalClients > 0 ? (atRiskCount / totalClients) * 100 : 0;
     
-    // Consommation moyenne
+    // Consommation moyenne (exclure les fantômes)
     const consumptions = clients
+        .filter(c => !isGhostClient(c))
         .map(c => c.consommation?.moyenne || 0)
         .filter(v => v > 0);
     const avgConsumption = consumptions.length > 0 
@@ -243,11 +311,12 @@ function calculateKPIs(clients) {
         D: clients.filter(c => c.score?.grade === 'D').length
     };
     
-    // Clients sans crédit
-    const zeroCreditCount = clients.filter(c => (c.zeroCreditPercentage || 0) > 30).length;
+    // Clients sans crédit (exclure les fantômes)
+    const zeroCreditCount = clients.filter(c => !isGhostClient(c) && (c.zeroCreditPercentage || 0) > 30).length;
     
-    // Dépassement de forfait
+    // Dépassement de forfait (exclure les fantômes)
     const highConsumption = clients.filter(c => {
+        if (isGhostClient(c)) return false;
         const conso = c.consommation?.moyenne || 0;
         const max = c.consommation?.max || 0;
         return max > (c.forfaitActuel ? 120 : 100);
@@ -277,6 +346,25 @@ function renderConsumptionBoard() {
     const client = clientsList.find(c => c.id === activeClientId);
     if (!client) {
         container.innerHTML = '<p class="no-data">❌ Client non trouvé</p>';
+        return;
+    }
+    
+    // Si client fantôme, afficher un message spécifique
+    if (isGhostClient(client)) {
+        container.innerHTML = `
+            <h3 class="card-title">📊 ANALYSE DE CONSOMMATION - Client ${client.id}</h3>
+            <div class="client-card ghost">
+                <div class="client-header">
+                    <span class="client-icon">👻</span>
+                    <span class="client-id">Client ${client.id}</span>
+                    <span class="client-badge ghost">Client fantôme</span>
+                </div>
+                <div class="message-container">
+                    <p class="client-message ghost">👻 Ce client n'a aucune donnée de consommation.</p>
+                    <p class="client-message ghost">🔧 Vérifier l'existence du compteur sur le terrain.</p>
+                </div>
+            </div>
+        `;
         return;
     }
     
@@ -408,6 +496,24 @@ function renderEventsBoard() {
         return;
     }
     
+    // Si client fantôme, afficher un message spécifique
+    if (isGhostClient(client)) {
+        container.innerHTML = `
+            <h3 class="card-title">⚠️ ÉVÉNEMENTS - Client ${client.id}</h3>
+            <div class="client-card ghost">
+                <div class="client-header">
+                    <span class="client-icon">👻</span>
+                    <span class="client-id">Client ${client.id}</span>
+                    <span class="client-badge ghost">Client fantôme</span>
+                </div>
+                <div class="message-container">
+                    <p class="client-message ghost">👻 Aucun événement enregistré pour ce client.</p>
+                </div>
+            </div>
+        `;
+        return;
+    }
+    
     container.innerHTML = `
         <h3 class="card-title">⚠️ ÉVÉNEMENTS - Client ${client.id}</h3>
         ${renderEventsClient(client)}
@@ -494,6 +600,24 @@ function renderForfaitChangesBoard() {
         return;
     }
     
+    // Si client fantôme, afficher un message spécifique
+    if (isGhostClient(client)) {
+        container.innerHTML = `
+            <h3 class="card-title">🔄 CHANGEMENTS DE FORFAIT - Client ${client.id}</h3>
+            <div class="client-card ghost">
+                <div class="client-header">
+                    <span class="client-icon">👻</span>
+                    <span class="client-id">Client ${client.id}</span>
+                    <span class="client-badge ghost">Client fantôme</span>
+                </div>
+                <div class="message-container">
+                    <p class="client-message ghost">👻 Aucun changement de forfait enregistré.</p>
+                </div>
+            </div>
+        `;
+        return;
+    }
+    
     container.innerHTML = `
         <h3 class="card-title">🔄 CHANGEMENTS DE FORFAIT - Client ${client.id}</h3>
         ${renderForfaitClient(client)}
@@ -561,6 +685,24 @@ function renderRechargeHabitsBoard() {
     const client = clientsList.find(c => c.id === activeClientId);
     if (!client) {
         container.innerHTML = '<p class="no-data">❌ Client non trouvé</p>';
+        return;
+    }
+    
+    // Si client fantôme, afficher un message spécifique
+    if (isGhostClient(client)) {
+        container.innerHTML = `
+            <h3 class="card-title">💳 HABITUDES DE RECHARGE - Client ${client.id}</h3>
+            <div class="client-card ghost">
+                <div class="client-header">
+                    <span class="client-icon">👻</span>
+                    <span class="client-id">Client ${client.id}</span>
+                    <span class="client-badge ghost">Client fantôme</span>
+                </div>
+                <div class="message-container">
+                    <p class="client-message ghost">👻 Aucune habitude de recharge enregistrée.</p>
+                </div>
+            </div>
+        `;
         return;
     }
     
@@ -649,6 +791,24 @@ function renderCreditBoard() {
         return;
     }
     
+    // Si client fantôme, afficher un message spécifique
+    if (isGhostClient(client)) {
+        container.innerHTML = `
+            <h3 class="card-title">💰 ANALYSE CRÉDIT - Client ${client.id}</h3>
+            <div class="client-card ghost">
+                <div class="client-header">
+                    <span class="client-icon">👻</span>
+                    <span class="client-id">Client ${client.id}</span>
+                    <span class="client-badge ghost">Client fantôme</span>
+                </div>
+                <div class="message-container">
+                    <p class="client-message ghost">👻 Aucune donnée de crédit disponible.</p>
+                </div>
+            </div>
+        `;
+        return;
+    }
+    
     container.innerHTML = `
         <h3 class="card-title">💰 ANALYSE CRÉDIT - Client ${client.id}</h3>
         ${renderCreditClient(client)}
@@ -658,19 +818,30 @@ function renderCreditBoard() {
 function renderCreditClient(client) {
     const zeroCount = client.zeroCreditDates?.length || 0;
     const zeroPercent = client.zeroCreditPercentage || 0;
-    const creditMoyen = client.averageCredit || 0;
-    const creditMax = client.maxCredit || 0;
-    const totalRecharges = client.totalRecharges || 0;
     
     // Analyser les séquences
     const sequences = analyzeZeroCreditSequences(client.zeroCreditDates || []);
     
+    // Déterminer le niveau de risque pour le badge
+    const riskLevel = determineClientRiskLevel(client);
+    
+    let badgeClass = 'badge-success';
+    let badgeText = `${zeroCount} jour(s) sans crédit`;
+    
+    if (riskLevel === 'critical') {
+        badgeClass = 'badge-critical';
+    } else if (riskLevel === 'high') {
+        badgeClass = 'badge-danger';
+    } else if (riskLevel === 'medium') {
+        badgeClass = 'badge-warning';
+    }
+    
     return `
-        <div class="client-card">
+        <div class="client-card risk-${riskLevel}">
             <div class="client-header">
                 <span class="client-icon">💰</span>
                 <span class="client-id">Client ${client.id}</span>
-                <span class="client-badge ${zeroCount > 0 ? 'badge-warning' : 'badge-success'}">
+                <span class="client-badge ${badgeClass}">
                     ${zeroCount} jour(s) sans crédit
                 </span>
             </div>
@@ -707,6 +878,9 @@ function renderSequencesAnalysis(sequences, client) {
                 const displayInfo = formatSequenceForDisplay(seq, causes);
                 const recommendation = generateSequenceRecommendation(client, seq, causes);
                 
+                // Déterminer la classe de priorité pour la recommendation
+                const priorityClass = recommendation.priority || 'moyenne';
+                
                 return `
                     <div class="sequence-card severity-${displayInfo.severity}">
                         <!-- Header séquence -->
@@ -732,12 +906,12 @@ function renderSequencesAnalysis(sequences, client) {
                             ` : ''}
                         </div>
                         
-                        <!-- Causes et Action (simplifié) -->
+                        <!-- Causes et Action -->
                         <div class="causes-section-simple">
                             <div class="cause-summary">
                                 ${renderCauseTextSummary(causes)}
                             </div>
-                            <div class="recommendation ${recommendation.priority}">
+                            <div class="recommendation ${priorityClass}">
                                 <div class="rec-action-text">${recommendation.action}</div>
                                 <div class="rec-message">${recommendation.message}</div>
                             </div>
@@ -754,6 +928,18 @@ function renderCauseTextSummary(causeResult) {
     const confidence = ((causeResult?.confidence || 0) * 100).toFixed(0);
 
     const causes = {
+        // ===========================================
+        // CLIENTS FANTÔMES
+        // ===========================================
+        ghost_client: {
+            emoji: '👻',
+            name: 'Client fantôme',
+            text: `Aucune donnée reçue - Vérifier présence installation.`
+        },
+
+        // ===========================================
+        // CAUSES COMMERCIALES
+        // ===========================================
         noRecharge: {
             emoji: '📵',
             name: 'Pas de recharge',
@@ -764,11 +950,6 @@ function renderCauseTextSummary(causeResult) {
             name: 'Consommation élevée',
             text: `Client consomme plus que son forfait.`
         },
-        technicalEvent: {
-            emoji: '⚠️',
-            name: 'Interruption technique',
-            text: `Coupure ou maintenance détectée.`
-        },
         insufficientForfait: {
             emoji: '📦',
             name: 'Forfait insuffisant',
@@ -776,23 +957,50 @@ function renderCauseTextSummary(causeResult) {
         },
         payment: {
             emoji: '💳',
-            name: 'Problème de paiement',
-            text: `Recharges échouées. Problème banque/carte.`
+            name: 'Paiement échoué',
+            text: `Recharges échouées - Problème bancaire.`
         },
         overload: {
             emoji: '🔥',
-            name: 'Surcharge anormale',
-            text: `Consommation anormalement élevée sur équipement.`
+            name: 'Surcharge',
+            text: `Consommation anormalement élevée.`
         },
+
+        // ===========================================
+        // CAUSES TECHNIQUES
+        // ===========================================
+        technicalEvent: {
+            emoji: '⚠️',
+            name: 'Incident technique',
+            text: `Coupure ou maintenance détectée.`
+        },
+
+        // ===========================================
+        // CAUSES D'ABSENCE
+        // ===========================================
+        vacances: {
+            emoji: '🏠',
+            name: 'Absence temporaire',
+            text: `Client en vacances - Installation en veille.`
+        },
+        abandon: {
+            emoji: '🚚',
+            name: 'Inactivité prolongée',
+            text: `Aucune activité depuis longtemps - Client peut-être parti.`
+        },
+
+        // ===========================================
+        // AUTRES
+        // ===========================================
         system: {
             emoji: '🔧',
             name: 'Anomalie système',
-            text: `Séquence longue. Possible bug système.`
+            text: `Comportement anormal - À investiguer.`
         },
         noActivity: {
             emoji: '🕳️',
             name: 'Compte inactif',
-            text: `Aucune activité recharge enregistrée.`
+            text: `Aucune activité enregistrée.`
         },
         unknown: {
             emoji: '❓',
@@ -802,7 +1010,7 @@ function renderCauseTextSummary(causeResult) {
     };
 
     const info = causes[cause] || causes.unknown;
-    return `<p class="cause-main"><strong>${info.emoji} ${info.name}:</strong> ${info.text}</p>`;
+    return `<p class="cause-main"><strong>${info.emoji} ${info.name}:</strong> ${info.text} (confiance ${confidence}%)</p>`;
 }
 
 function getSeverityIcon(severity) {
@@ -844,79 +1052,183 @@ function renderBalanceClient(client) {
     const maxCredit = client.maxCredit || 0;
     const totalRecharges = client.totalRecharges || 0;
     
+    // Vérifier si c'est un client fantôme
+    const isGhost = isGhostClient(client);
+    
+    // ===========================================
+    // CAS SPÉCIAL : CLIENT FANTÔME
+    // ===========================================
+    if (isGhost) {
+        return `
+            <div class="client-card ghost">
+                <div class="client-header">
+                    <span class="client-icon">👻</span>
+                    <span class="client-id">Client ${client.id} - Statut: INCONNU</span>
+                    <span class="client-badge ghost">⚠️ Client fantôme</span>
+                </div>
+                
+                <div class="message-container">
+                    <p class="client-message warning">⚠️ Ce client n'a envoyé AUCUNE donnée depuis l'installation.</p>
+                    <p class="client-message info">📊 Données reçues: Consommation 0 Wh · Crédit 0 · Aucun événement</p>
+                </div>
+                
+                <div class="alert-section ghost">
+                    <h4>🔍 ANALYSE - 3 SCÉNARIOS POSSIBLES</h4>
+                    <ul>
+                        <li><strong>🏠 Client en vacances</strong> - Installation coupée, personne sur place</li>
+                        <li><strong>🔧 Installation déconnectée</strong> - Panne, maintenance, ou compteur débranché</li>
+                        <li><strong>📡 Contrôleur HS</strong> - Le boîtier de transmission ne fonctionne plus</li>
+                    </ul>
+                </div>
+                
+                <div class="recommendation-section ghost">
+                    <h4>👷 ACTION REQUISE</h4>
+                    <p class="recommendation-text">
+                        <strong>🔴 VISITE TERRAIN OBLIGATOIRE</strong><br>
+                        Se rendre sur place pour vérifier : présence client, état de l'installation, 
+                        fonctionnement du contrôleur. Mettre à jour le statut dans le système.
+                    </p>
+                </div>
+                
+                <div class="technical-details">
+                    <details>
+                        <summary>📋 Données techniques (cliquer pour voir)</summary>
+                        <div class="details-content">
+                            <p><strong>Dernière transmission:</strong> ${client.lastTransmission || 'Jamais'}</p>
+                            <p><strong>Type installation:</strong> ${client.installationType || 'Inconnu'}</p>
+                            <p><strong>Date installation:</strong> ${client.installationDate || 'Inconnue'}</p>
+                            <p><strong>Coordonnées:</strong> ${client.address || 'Non renseignées'}</p>
+                            <p><strong>ID Contrôleur:</strong> ${client.controllerId || 'Non assigné'}</p>
+                        </div>
+                    </details>
+                </div>
+            </div>
+        `;
+    }
+    
+    // ===========================================
+    // CAS NORMAL : CLIENT AVEC DONNÉES
+    // ===========================================
+    
     // Pourcentage jours sans crédit
     const pourcentageSans = joursAnalyses > 0 
         ? ((joursSansCredit / joursAnalyses) * 100).toFixed(1) 
         : 0;
     
-    // Message sur les jours sans crédit
-    let messageJoursSans = "";
+    // DÉTERMINATION DU NIVEAU DE RISQUE GLOBAL
+    let riskLevel = 'low';
+    let riskScore = 0;
+    
     if (joursSansCredit === 0) {
-        messageJoursSans = "✅ Ce client n'a jamais été à découvert.";
+        riskScore = 0;
     } else if (pourcentageSans < 10) {
-        messageJoursSans = `⚠️ Ce client a eu ${joursSansCredit} jour(s) sans crédit sur ${joursAnalyses} jours analysés (${pourcentageSans}%), ce qui reste acceptable.`;
+        riskScore = 30;
+    } else if (pourcentageSans < 20) {
+        riskScore = 60;
     } else {
-        messageJoursSans = `🔴 Ce client a eu ${joursSansCredit} jour(s) sans crédit sur ${joursAnalyses} jours analysés (${pourcentageSans}%). Une attention particulière est recommandée.`;
+        riskScore = 90;
     }
     
-    // Message sur le crédit max
-    let messageCreditMax = `💳 Son plus gros crédit était de ${maxCredit} jour(s).`;
+    if (client.score?.valeur) {
+        const scoreClient = client.score.valeur;
+        if (scoreClient < 30) riskScore = Math.max(riskScore, 95);
+        else if (scoreClient < 50) riskScore = Math.max(riskScore, 75);
+        else if (scoreClient < 70) riskScore = Math.max(riskScore, 50);
+    }
     
-    // Message sur les recharges
-    let messageRecharges = "";
+    if (riskScore >= 80) riskLevel = 'critical';
+    else if (riskScore >= 60) riskLevel = 'high';
+    else if (riskScore >= 30) riskLevel = 'medium';
+    else riskLevel = 'low';
+    
+    // Vérifier s'il y a des délestages dans les données techniques
+    const hasTechnicalIssues = database.technicalData?.loadShedding?.jours?.length > 0;
+    
+    // MESSAGES AVEC LEURS PROPRES NIVEAUX DE RISQUE
+    const messages = [];
+    
+    // Message 1: Jours sans crédit
+    if (joursSansCredit === 0) {
+        messages.push({ text: "✅ Ce client n'a jamais été à découvert.", class: 'success' });
+    } else if (pourcentageSans < 10) {
+        messages.push({ text: `⚠️ Ce client a eu ${joursSansCredit} jour(s) sans crédit sur ${joursAnalyses} jours analysés (${pourcentageSans}%), ce qui reste acceptable.`, class: 'warning' });
+    } else {
+        messages.push({ text: `🔴 Ce client a eu ${joursSansCredit} jour(s) sans crédit sur ${joursAnalyses} jours analysés (${pourcentageSans}%). Une attention particulière est recommandée.`, class: 'danger' });
+    }
+    
+    // Message 2: Recharges
     if (totalRecharges === 0) {
-        messageRecharges = "📱 Aucune recharge enregistrée.";
+        messages.push({ text: "📱 Aucune recharge enregistrée.", class: 'danger' });
     } else if (totalRecharges < 5) {
-        messageRecharges = `📱 Il a effectué ${totalRecharges} recharge(s) seulement.`;
+        messages.push({ text: `📱 Il a effectué ${totalRecharges} recharge(s) seulement.`, class: 'warning' });
     } else {
-        messageRecharges = `📱 Il recharge régulièrement (${totalRecharges} fois).`;
+        messages.push({ text: `📱 Il recharge régulièrement (${totalRecharges} fois).`, class: 'success' });
     }
     
-    // Message sur le crédit préféré
+    // ===========================================
+    // Message 3: Crédit préféré (AVEC DÉTECTION DES RECHARGES TECHNIQUES)
+    // ===========================================
     const creditPrefere = client.preferredCredit || "non déterminé";
     const pourcentagePref = client.preferredPercentage || 0;
-    let messageCreditPref = "";
+    
     if (creditPrefere !== "non déterminé") {
-        messageCreditPref = `📊 Il recharge généralement pour ${creditPrefere} jour(s) (${pourcentagePref}% des recharges).`;
+        // Vérifier si c'est une recharge technique (2, 3 ou 4 jours)
+        const isTechnicalRefund = ['2', '3', '4'].includes(creditPrefere.toString());
+        
+        let messageClass = 'info';
+        let messageText = `📊 Il recharge généralement pour ${creditPrefere} jour(s) (${pourcentagePref}% des recharges).`;
+        
+        if (isTechnicalRefund) {
+            if (hasTechnicalIssues) {
+                messageClass = 'warning';
+                messageText = `⚠️ Recharges techniques (${creditPrefere}j) liées à des délestages - À surveiller`;
+            } else {
+                messageClass = 'danger';
+                messageText = `🔴 RECHARGES TECHNIQUES INJUSTIFIÉES (${creditPrefere}j) - Vérifier installation`;
+            }
+        }
+        
+        messages.push({ text: messageText, class: messageClass });
     }
     
-    // Message sur les forfaits
-    let messageForfaits = "";
+    // Message 4: Forfaits
     const forfaitActuel = client.forfaitName || "inconnu";
     const changements = client.forfaitChanges || [];
     
     if (changements.length === 0) {
-        messageForfaits = `📦 Forfait actuel : ${forfaitActuel} (aucun changement).`;
+        messages.push({ text: `📦 Forfait actuel : ${forfaitActuel} (aucun changement).`, class: 'success' });
     } else {
         const historique = changements.map(c => 
             `${FORFAIT_NAMES[c.ancien] || c.ancien} → ${FORFAIT_NAMES[c.nouveau] || c.nouveau}`
         ).join(", ");
-        messageForfaits = `📦 Forfaits utilisés : ${historique} (actuel : ${forfaitActuel}).`;
+        messages.push({ text: `📦 Forfaits utilisés : ${historique} (actuel : ${forfaitActuel}).`, class: changements.length > 2 ? 'warning' : 'info' });
     }
+    
+    // Message 5: Crédit max
+    messages.push({ text: `💳 Son plus gros crédit était de ${maxCredit} jour(s).`, class: 'gold' });
     
     // Score
     const scoreMsg = client.score?.alerte 
         ? `🏷️ ${client.score.alerte}`
         : "🏷️ Profil standard";
     
+    // Construction du HTML
     return `
-        <div class="client-card">
+        <div class="client-card risk-${riskLevel}">
             <div class="client-header">
                 <span class="client-icon">📊</span>
                 <span class="client-id">Synthèse client ${client.id}</span>
-                <span class="client-badge">${scoreMsg}</span>
+                <span class="client-badge risk-${riskLevel}">${scoreMsg}</span>
             </div>
             
             <div class="message-container">
-                <p class="client-message">${messageJoursSans}</p>
-                <p class="client-message">${messageRecharges}</p>
-                <p class="client-message">${messageCreditPref}</p>
-                <p class="client-message">${messageForfaits}</p>
-                <p class="client-message">${messageCreditMax}</p>
+                ${messages.map(msg => `
+                    <p class="client-message ${msg.class}">${msg.text}</p>
+                `).join('')}
             </div>
             
             ${client.score?.raisons?.length > 0 ? `
-                <div class="alert-section">
+                <div class="alert-section risk-${riskLevel}">
                     <h4>🔔 Alertes</h4>
                     <ul>
                         ${client.score.raisons.map(r => `<li>${r}</li>`).join('')}
@@ -925,17 +1237,27 @@ function renderBalanceClient(client) {
             ` : ''}
             
             ${client.recommendations?.actions?.length > 0 ? `
-                <div class="recommendation-section">
+                <div class="recommendation-section risk-${riskLevel}">
                     <h4>💡 Recommandation</h4>
                     <p class="recommendation-text">
                         ${client.recommendations.actions[0]?.message || "Aucune recommandation"}
                     </p>
                 </div>
             ` : ''}
+            
+            <!-- Détails techniques toujours disponibles -->
+            <div class="technical-details">
+                <details>
+                    <summary>📋 Détails installation (cliquer)</summary>
+                    <div class="details-content">
+                        <p><strong>ID Client:</strong> ${client.id}</p>
+                        <p><strong>Installation:</strong> ${client.installationType || 'Standard'}</p>
+                        <p><strong>Date installation:</strong> ${client.installationDate || 'Non renseignée'}</p>
+                        <p><strong>Dernier contact:</strong> ${client.lastContact || 'Aujourd\'hui'}</p>
+                        <p><strong>ID Contrôleur:</strong> ${client.controllerId || 'N/A'}</p>
+                    </div>
+                </details>
+            </div>
         </div>
     `;
 }
-
-// Supprimer toutes les fonctions de navigation et de rendu des onglets individuels
-// (renderConsumptionTabs, renderEventsTabs, renderForfaitTabs, renderHabitsTabs, renderCreditTabs, renderBalanceTabs)
-// et leurs fonctions attach* correspondantes

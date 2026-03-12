@@ -1,4 +1,4 @@
-// arduinoRender.js
+// arduinoRender.js - VERSION CORRIGÉE
 import { database } from './arduinoCore.js';
 import { TABLE_TYPES } from './arduinoConstants.js';
 import { getEventColor, handleCellClick } from './arduinoEvents.js';
@@ -7,10 +7,6 @@ import { renderTechnicalDashboard } from './dashboards/technical/TechnicalDashbo
 import { renderCommercialDashboard } from './dashboards/commercial/CommercialDashboard.js'; 
 import { renderEventDashboard } from './dashboards/eventDashboard.js';
 import { FORFAIT_NAMES } from './arduinoConstants.js';
-
-
-// Rendre handleCellClick accessible globalement si nécessaire (déjà fait dans arduinoMain.js)
-// window.handleCellClick = handleCellClick; // déjà fait dans main
 
 export function renderByTab() {
     const currentTab = document.querySelector('.tab.active')?.dataset.tab || 'Technique';
@@ -21,24 +17,37 @@ export function renderByTab() {
         }
     });
 
+    // 🔴 1. D'ABORD sauvegarder la position de scroll
+    const scrollPos = window.scrollY;
+    
+    // 🔴 2. ENSUITE vider les dashboards (optionnel, mais propre)
+    document.getElementById('technicalDashboard').innerHTML = '';
+    document.getElementById('commercialDashboard').innerHTML = '';
+    const eventDashboard = document.getElementById('eventDashboard');
+    if (eventDashboard) eventDashboard.innerHTML = '';
+
+    // 🔴 3. Rendre le dashboard approprié
     if (currentTab === 'Technique') {
         renderTechnicalDashboard();
-        document.getElementById('commercialDashboard').innerHTML = '';
-        const eventDashboard = document.getElementById('eventDashboard');
-        if (eventDashboard) eventDashboard.innerHTML = '';
     } else if (currentTab === 'Commercial') {
         renderCommercialDashboard();
-        document.getElementById('technicalDashboard').innerHTML = '';
-        const eventDashboard = document.getElementById('eventDashboard');
-        if (eventDashboard) eventDashboard.innerHTML = '';
     } else if (currentTab === 'Evenement') {
         renderEventDashboard();
-        document.getElementById('technicalDashboard').innerHTML = '';
-        document.getElementById('commercialDashboard').innerHTML = '';
     }
+    
+    // 🔴 4. Rendre les tableaux
     displayTables(visibleTableIndices);
+    
+    // 🔴 5. RESTAURER la position de scroll
+    setTimeout(() => {
+        window.scrollTo({
+            top: scrollPos,
+            behavior: 'auto' // 'smooth' si vous voulez un effet doux
+        });
+    }, 10);
 }
 
+// Le reste de votre code displayTables reste IDENTIQUE
 export function displayTables(visibleTableIndices) {
     const container = document.getElementById('tablesContainer');
     if (!container) return;
