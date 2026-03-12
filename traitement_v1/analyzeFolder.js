@@ -7401,134 +7401,6 @@ function generateCommercialSummary(clientNumber) {
             status
         });
     });
-    
-    // ===== 5. DÉTERMINATION DU PROFIL =====
-    let profileIcon = '📊';
-    let profileName = 'Client standard';
-    let profileColor = '#6b7280';
-    let profileDesc = '';
-    
-    if (totalDaysWithConsumption === 0) {
-        profileIcon = '😴';
-        profileName = 'Client inactif';
-        profileColor = '#94a3b8';
-        profileDesc = "N'utilise pas du tout son kit";
-    }
-    else if (avgConsumption > forfaitMax * 0.8 || daysOverQuota > 0) {
-        profileIcon = '⚡';
-        profileName = 'Gros consommateur';
-        profileColor = '#ef4444';
-        profileDesc = `Fort utilisateur : ${avgConsumption}Wh/jour (${percentOfForfait}% du forfait) avec ${daysOverQuota} dépassement(s).`;
-    }
-    else if (percentActive >= 60 && percentOfForfait >= 20 && percentOfForfait <= 70) {
-        profileIcon = '📱';
-        profileName = 'Client régulier';
-        profileColor = '#22c55e';
-        profileDesc = `Utilisation régulière : ${percentActive}% des jours · ${avgConsumption}Wh/jour (${percentOfForfait}% du forfait)`;
-    }
-    else if (percentActive >= 50 && percentOfForfait < 20) {
-        profileIcon = '🌱';
-        profileName = 'Client économe';
-        profileColor = '#10b981';
-        profileDesc = `Utilisation régulière mais très modérée : ${avgConsumption}Wh/jour (${percentOfForfait}% du forfait)`;
-    }
-    else if (percentActive >= 20 && percentActive < 60) {
-        profileIcon = '🌤️';
-        profileName = 'Client occasionnel';
-        profileColor = '#f59e0b';
-        profileDesc = `Utilisation occasionnelle : ${percentActive}% des jours · ${avgConsumption}Wh/jour en moyenne`;
-    }
-    else if (percentActive > 0 && percentActive < 20) {
-        profileIcon = '🌙';
-        profileName = 'Client très occasionnel';
-        profileColor = '#64748b';
-        profileDesc = `Très peu d'utilisation : ${percentActive}% des jours seulement`;
-    }
-    
-    // ===== 6. DÉTERMINATION DU RISQUE =====
-    let riskIcon = '✅';
-    let riskLevel = 'FAIBLE';
-    let riskColor = '#22c55e';
-    let riskReasons = [];
-    
-    if (totalDaysWithConsumption === 0) {
-        riskIcon = '🔴';
-        riskLevel = 'ÉLEVÉ';
-        riskColor = '#ef4444';
-        riskReasons.push("N'utilise pas du tout son kit");
-    } else {
-        if (percentActive < 20) {
-            riskIcon = '🟠';
-            riskLevel = 'MOYEN';
-            riskColor = '#f97316';
-            riskReasons.push("Utilise très rarement son kit");
-        } else if (percentActive < 50) {
-            riskIcon = '🟠';
-            riskLevel = 'MOYEN';
-            riskColor = '#f97316';
-            riskReasons.push("Utilisation irrégulière");
-        }
-        
-        if (creditStatus === 'fragile') {
-            riskIcon = '🟠';
-            riskLevel = 'MOYEN';
-            riskColor = '#f97316';
-            riskReasons.push("Problèmes fréquents de crédit");
-        } else if (creditStatus === 'moyen') {
-            riskIcon = '🟠';
-            riskLevel = 'MOYEN';
-            riskColor = '#f97316';
-            riskReasons.push("Quelques jours sans crédit");
-        }
-        
-        if (hasSuspensions) {
-            riskIcon = '🟠';
-            riskLevel = 'MOYEN';
-            riskColor = '#f97316';
-            riskReasons.push("A subi des coupures de service");
-        }
-    }
-    
-    // ===== 7. CONSTRUCTION DU HTML COMPLET =====
-    return `
-        <div class="commercial-summary-card" style="background: white; border-radius: 20px; margin-bottom: 25px; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.08); border: 1px solid #e2e8f0;">
-            
-            <!-- En-tête avec profil -->
-            <div style="background: linear-gradient(135deg, #f8fafc 0%, #ffffff 100%); padding: 20px 25px; border-bottom: 2px solid #e2e8f0;">
-                <div style="display: flex; align-items: center; gap: 20px; flex-wrap: wrap;">
-                    
-                    <!-- Icône profil -->
-                    <div style="width: 70px; height: 70px; background: ${profileColor}20; border-radius: 20px; display: flex; align-items: center; justify-content: center; border: 3px solid ${profileColor};">
-                        <span style="font-size: 36px;">${profileIcon}</span>
-                    </div>
-                    
-                    <!-- Infos client -->
-                    <div style="flex: 1;">
-                        <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap; margin-bottom: 8px;">
-                            <h3 style="margin: 0; font-size: 22px; font-weight: 700; color: #0f172a;">Client ${clientNumber}</h3>
-                            <span style="background: ${profileColor}; color: white; padding: 6px 18px; border-radius: 40px; font-size: 14px; font-weight: 600;">
-                                ${profileName}
-                            </span>
-                            <span style="background: #f1f5f9; color: #475569; padding: 6px 18px; border-radius: 40px; font-size: 14px;">
-                                ${currentForfait} · ${forfaitMax}Wh
-                            </span>
-                        </div>
-                        <p style="margin: 0; color: #475569; font-size: 15px;">
-                            ${profileDesc}
-                        </p>
-                    </div>
-                </div>
-            </div>
-            <!-- Indicateurs supplémentaires (pied de carte) -->
-            <div style="padding: 12px 25px; background: #f1f5f9; border-top: 1px solid #e2e8f0; display: flex; gap: 25px; font-size: 11px; color: #475569; flex-wrap: wrap;">
-                <span><span style="font-weight: 600;">Max atteint:</span> ${maxConsumption} Wh</span>
-                <span><span style="font-weight: 600;">Jours >70%:</span> ${daysAbove70Percent}</span>
-                <span><span style="font-weight: 600;">Jours >90%:</span> ${daysAbove90Percent}</span>
-                <span><span style="font-weight: 600;">Analyse:</span> ${totalDays} jours</span>
-                <span><span style="font-weight: 600;">Événements:</span> ${hasSuspensions ? '🔴' : hasSurcharge ? '🟠' : '✅'}</span>
-            </div>
-        </div>
-    `;
 }
 function getOverQuotaDays(clientNumber, forfaitMax) {
     const energyKey = `Energie${clientNumber}`;
@@ -7822,27 +7694,423 @@ function displayClientCommercialAnalysis(container, clientNumber) {
         gap: 20px;
         box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
     `;
-    clientHeader.innerHTML = `
-        <div style="font-size: 40px; background: rgba(255,255,255,0.2); width: 70px; height: 70px; border-radius: 35px; display: flex; align-items: center; justify-content: center;">
-            👤
-        </div>
-        <div>
-            <h2 style="margin: 0 0 5px 0; font-size: 24px;">Client ${clientNumber}</h2>
-            <p style="margin: 0; opacity: 0.9; font-size: 14px;">
-                Analyse détaillée de la consommation et du comportement de crédit
-            </p>
-        </div>
-    `;
-    container.appendChild(clientHeader);
     
-    // Récupérer le forfait du client
+    // Récupérer le forfait actuel du client
     const rechargeAnalysis = analyzeRechargeData(clientNumber);
     const currentForfait = rechargeAnalysis.currentCode4Name || 'ECO';
     const forfaitLimits = getForfaitLimits(currentForfait);
     const forfaitMax = forfaitLimits.max || 50;
     
-    // === ANALYSE COMMERCIALE SIMPLIFIÉE ===
-    container.innerHTML += generateCommercialSummary(clientNumber);
+    // Déterminer si le client est actif
+    let isActive = false;
+    if (combinedEnergyData && combinedEnergyData.length > 0) {
+        const energyKey = `Energie${clientNumber}`;
+        for (let i = 0; i < Math.min(50, combinedEnergyData.length); i++) {
+            const value = combinedEnergyData[i][energyKey];
+            if (value && parseFloat(value) > 0) {
+                isActive = true;
+                break;
+            }
+        }
+    }
+    
+    clientHeader.innerHTML = `
+        <div style="width: 60px; height: 60px; background: white; border-radius: 30px; display: flex; align-items: center; justify-content: center;">
+            <span style="font-size: 30px;">👤</span>
+        </div>
+        <div style="flex: 1;">
+            <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
+                <h2 style="margin: 0; font-size: 24px; font-weight: 700;">Client ${clientNumber}</h2>
+                <span style="background: ${isActive ? '#22c55e' : '#94a3b8'}; padding: 4px 15px; border-radius: 30px; font-size: 14px; font-weight: 600;">
+                    ${isActive ? 'Actif' : 'Inactif'}
+                </span>
+                <span style="background: rgba(255,255,255,0.2); padding: 4px 15px; border-radius: 30px; font-size: 14px;">
+                    ${currentForfait} · ${forfaitMax}Wh
+                </span>
+            </div>
+        </div>
+    `;
+    container.appendChild(clientHeader);
+    
+    // ===== CONSTRUIRE L'HISTORIQUE DES FORFAITS AVEC ANALYSE =====
+    const forfaitHistory = [];
+    const energyKey = `Energie${clientNumber}`;
+    
+    // 1. Récupérer l'historique des forfaits depuis les recharges
+    if (combinedRechargeData && combinedRechargeData.length > 0) {
+        const clientRecharges = combinedRechargeData
+            .filter(row => row['Code 1']?.toString().trim() === clientNumber.toString())
+            .sort((a, b) => new Date(a['Date et Heure']) - new Date(b['Date et Heure']));
+        
+        clientRecharges.forEach((recharge, index) => {
+            const date = new Date(recharge['Date et Heure']);
+            const code4 = parseInt(recharge['Code 4']);
+            const forfaitName = getForfaitName(code4);
+            
+            if (index === 0) {
+                // Premier forfait
+                forfaitHistory.push({
+                    forfait: forfaitName,
+                    code: code4,
+                    startDate: date,
+                    endDate: null,
+                    isCurrent: true
+                });
+            } else if (code4 !== parseInt(clientRecharges[index-1]['Code 4'])) {
+                // Changement de forfait
+                forfaitHistory[forfaitHistory.length - 1].endDate = date;
+                forfaitHistory[forfaitHistory.length - 1].isCurrent = false;
+                
+                forfaitHistory.push({
+                    forfait: forfaitName,
+                    code: code4,
+                    startDate: date,
+                    endDate: null,
+                    isCurrent: true
+                });
+            }
+        });
+    }
+    
+    // Si pas d'historique, créer un forfait par défaut
+    if (forfaitHistory.length === 0) {
+        let oldestDate = new Date();
+        if (combinedEnergyData && combinedEnergyData.length > 0) {
+            combinedEnergyData.forEach(row => {
+                if (row['Date et Heure']) {
+                    const date = new Date(row['Date et Heure']);
+                    if (date < oldestDate) oldestDate = date;
+                }
+            });
+        }
+        
+        forfaitHistory.push({
+            forfait: 'ECO',
+            code: 1,
+            startDate: oldestDate,
+            endDate: null,
+            isCurrent: true
+        });
+    }
+    
+    // 2. Analyser les jours pour chaque forfait
+    const consumptionByDay = {};
+    
+    if (combinedEnergyData && combinedEnergyData.length > 0) {
+        combinedEnergyData.forEach(row => {
+            if (!row['Date et Heure']) return;
+            
+            const dateTime = new Date(row['Date et Heure']);
+            const dateStr = dateTime.toISOString().split('T')[0];
+            const value = parseFloat(row[energyKey]) || 0;
+            
+            if (!consumptionByDay[dateStr]) {
+                consumptionByDay[dateStr] = {
+                    date: dateStr,
+                    dateObj: dateTime,
+                    total: 0,
+                    hasData: false
+                };
+            }
+            
+            if (value > 0) {
+                consumptionByDay[dateStr].total = Math.max(consumptionByDay[dateStr].total, value);
+                consumptionByDay[dateStr].hasData = true;
+            }
+        });
+    }
+    
+    // 3. Récupérer les événements SuspendE pour ce client
+    const suspendEDates = new Set();
+    if (combinedEventData && combinedEventData.length > 0) {
+        combinedEventData.forEach(row => {
+            if (!row['Date et Heure'] || !row['Évènements']) return;
+            
+            const event = row['Évènements'].trim();
+            const code1 = row['Code 1']?.toString().trim() || '';
+            
+            if (event.includes('SuspendE') && code1.slice(-1) === clientNumber.toString()) {
+                const eventDate = new Date(row['Date et Heure']).toISOString().split('T')[0];
+                suspendEDates.add(eventDate);
+            }
+        });
+    }
+    
+    // 4. Calculer les statistiques pour chaque forfait
+    const forfaitStats = [];
+    
+    forfaitHistory.sort((a, b) => a.startDate - b.startDate);
+    
+    forfaitHistory.forEach((forfait, index) => {
+        // Filtrer les jours dans la période du forfait
+        const daysInPeriod = [];
+        
+        Object.values(consumptionByDay).forEach(day => {
+            const dayDate = day.dateObj;
+            let inPeriod = false;
+            
+            if (forfait.endDate) {
+                if (dayDate >= forfait.startDate && dayDate <= forfait.endDate) {
+                    inPeriod = true;
+                }
+            } else {
+                if (dayDate >= forfait.startDate) {
+                    inPeriod = true;
+                }
+            }
+            
+            if (inPeriod) {
+                daysInPeriod.push(day);
+            }
+        });
+        
+        const totalDays = daysInPeriod.length;
+        const daysWithConsumption = daysInPeriod.filter(day => day.total > 0).length;
+        const daysWithoutConsumption = totalDays - daysWithConsumption;
+        
+        // Calculer l'énergie max et moyenne
+        let maxEnergy = 0;
+        let totalEnergy = 0;
+        let maxEnergyDate = null;
+        
+        daysInPeriod.forEach(day => {
+            if (day.total > maxEnergy) {
+                maxEnergy = day.total;
+                maxEnergyDate = day.dateObj;
+            }
+            totalEnergy += day.total;
+        });
+        
+        const avgEnergy = daysWithConsumption > 0 ? (totalEnergy / daysWithConsumption).toFixed(1) : 0;
+        
+        // Calculer la répartition par seuils
+        const baseMax = getForfaitLimits(forfait.forfait).max || 90;
+        const seuil85 = baseMax * 0.85;
+        const maxWithTolerance = baseMax * 1.15;
+        
+        const daysWithConsumptionOnly = daysInPeriod.filter(day => day.total > 0);
+        
+        // Jours hors tolérance = jours avec SuspendE dans cette période
+        const daysAbove115 = daysWithConsumptionOnly.filter(day => 
+            suspendEDates.has(day.date)
+        ).length;
+        
+        const daysBelow85 = daysWithConsumptionOnly.filter(day => 
+            day.total <= seuil85 && !suspendEDates.has(day.date)
+        ).length;
+        
+        const daysInTolerance = daysWithConsumptionOnly.filter(day => 
+            day.total > seuil85 && day.total <= maxWithTolerance && !suspendEDates.has(day.date)
+        ).length;
+        
+        const percentBelow85 = daysWithConsumptionOnly.length > 0 ? 
+            ((daysBelow85 / daysWithConsumptionOnly.length) * 100).toFixed(1) : 0;
+        const percentInTolerance = daysWithConsumptionOnly.length > 0 ? 
+            ((daysInTolerance / daysWithConsumptionOnly.length) * 100).toFixed(1) : 0;
+        const percentAbove115 = daysWithConsumptionOnly.length > 0 ? 
+            ((daysAbove115 / daysWithConsumptionOnly.length) * 100).toFixed(1) : 0;
+        
+        forfaitStats.push({
+            ...forfait,
+            totalDays,
+            daysWithConsumption,
+            daysWithoutConsumption,
+            maxEnergy: maxEnergy.toFixed(1),
+            maxEnergyDate: maxEnergyDate ? maxEnergyDate.toLocaleDateString('fr-FR') : '-',
+            avgEnergy,
+            // Données pour la barre de progression
+            daysBelow85,
+            daysInTolerance,
+            daysAbove115,
+            percentBelow85,
+            percentInTolerance,
+            percentAbove115,
+            baseMax,
+            maxWithTolerance,
+            seuil85,
+            daysWithConsumptionOnly: daysWithConsumptionOnly.length
+        });
+    });
+    
+    // 5. Afficher l'historique enrichi avec les barres de progression
+    if (forfaitStats.length > 0) {
+        const historyCard = document.createElement('div');
+        historyCard.style.cssText = `
+            background: white;
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 25px;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        `;
+        
+        historyCard.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 15px;">
+                <div style="width: 40px; height: 40px; background: linear-gradient(135deg, #9f7aea 0%, #805ad5 100%); border-radius: 10px; display: flex; align-items: center; justify-content: center;">
+                    <span style="font-size: 20px; color: white;">📋</span>
+                </div>
+                <div>
+                    <h3 style="margin: 0; font-size: 16px; font-weight: 700; color: #1e293b;">Historique des forfaits et consommation</h3>
+                    <p style="margin: 2px 0 0 0; font-size: 12px; color: #64748b;">${forfaitStats.length} forfait(s) · Analyse détaillée par période</p>
+                </div>
+            </div>
+            
+            <div style="overflow-x: auto; border-radius: 8px; border: 1px solid #e2e8f0; margin-bottom: 20px;">
+                <table style="width: 100%; border-collapse: collapse; font-size: 13px; min-width: 1200px;">
+                    <thead style="background: #f8fafc; border-bottom: 2px solid #e2e8f0;">
+                        <tr>
+                            <th style="padding: 12px 15px; text-align: left; color: #475569; font-weight: 600;">Période</th>
+                            <th style="padding: 12px 15px; text-align: center; color: #475569; font-weight: 600;">Forfait</th>
+                            <th style="padding: 12px 15px; text-align: center; color: #475569; font-weight: 600;">Changement</th>
+                            <th style="padding: 12px 15px; text-align: center; color: #475569; font-weight: 600; background: #f1f5f9;">📅 Jours totaux</th>
+                            <th style="padding: 12px 15px; text-align: center; color: #475569; font-weight: 600; background: #f1f5f9;">✅ Jours avec conso</th>
+                            <th style="padding: 12px 15px; text-align: center; color: #475569; font-weight: 600; background: #f1f5f9;">⭕ Jours sans conso</th>
+                            <th style="padding: 12px 15px; text-align: center; color: #475569; font-weight: 600; background: #ede9fe;">⚡ Énergie max</th>
+                            <th style="padding: 12px 15px; text-align: center; color: #475569; font-weight: 600; background: #ede9fe;">📊 Énergie moy</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${forfaitStats.map((stat, index) => {
+                            const bgColor = index % 2 === 0 ? '#ffffff' : '#fafbfc';
+                            const isFirst = index === 0;
+                            
+                            const startDateStr = stat.startDate.toLocaleDateString('fr-FR');
+                            const endDateStr = stat.endDate ? stat.endDate.toLocaleDateString('fr-FR') : 'Présent';
+                            
+                            let changeText = '';
+                            if (isFirst) {
+                                changeText = '<span style="color: #64748b;">Premier forfait</span>';
+                            } else {
+                                changeText = `
+                                    <span style="background: #f97315; color: white; padding: 4px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; margin-right: 5px;">
+                                        ${forfaitStats[index-1].forfait}
+                                    </span>
+                                    →
+                                    <span style="background: #22c55e; color: white; padding: 4px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; margin-left: 5px;">
+                                        ${stat.forfait}
+                                    </span>
+                                `;
+                            }
+                            
+                            return `
+                                <tr style="border-bottom: 1px solid #e2e8f0; background: ${bgColor};">
+                                    <td style="padding: 12px 15px; white-space: nowrap;">
+                                        <strong>${startDateStr}</strong> → <strong>${endDateStr}</strong>
+                                        ${stat.isCurrent ? '<span style="background: #22c55e; color: white; padding: 2px 8px; border-radius: 12px; font-size: 10px; margin-left: 8px;">ACTUEL</span>' : ''}
+                                    </td>
+                                    <td style="padding: 12px 15px; text-align: center;">
+                                        <span style="background: ${stat.isCurrent ? '#22c55e20' : '#9f7aea20'}; color: ${stat.isCurrent ? '#22c55e' : '#9f7aea'}; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600;">
+                                            ${stat.forfait}
+                                        </span>
+                                    </td>
+                                    <td style="padding: 12px 15px; text-align: center; white-space: nowrap;">
+                                        ${changeText}
+                                    </td>
+                                    <td style="padding: 12px 15px; text-align: center; font-weight: 600; background: #f8fafc;">
+                                        ${stat.totalDays}
+                                    </td>
+                                    <td style="padding: 12px 15px; text-align: center; font-weight: 600; color: #22c55e; background: #f8fafc;">
+                                        ${stat.daysWithConsumption}
+                                        ${stat.totalDays > 0 ? `<span style="font-size: 11px; color: #64748b; margin-left: 4px;">(${Math.round(stat.daysWithConsumption/stat.totalDays*100)}%)</span>` : ''}
+                                    </td>
+                                    <td style="padding: 12px 15px; text-align: center; font-weight: 600; color: #64748b; background: #f8fafc;">
+                                        ${stat.daysWithoutConsumption}
+                                        ${stat.totalDays > 0 ? `<span style="font-size: 11px; color: #64748b; margin-left: 4px;">(${Math.round(stat.daysWithoutConsumption/stat.totalDays*100)}%)</span>` : ''}
+                                    </td>
+                                    <td style="padding: 12px 15px; text-align: center; font-weight: 600; color: #7c3aed; background: #f5f3ff;">
+                                        <div>${stat.maxEnergy} Wh</div>
+                                        <div style="font-size: 10px; color: #6b21a5;">${stat.maxEnergyDate}</div>
+                                    </td>
+                                    <td style="padding: 12px 15px; text-align: center; font-weight: 600; color: #7c3aed; background: #f5f3ff;">
+                                        ${stat.avgEnergy} Wh
+                                    </td>
+                                </tr>
+                            `;
+                        }).join('')}
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- Barres de progression pour chaque forfait -->
+            <div style="margin-top: 15px;">
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 15px;">
+                    <span style="font-size: 18px;">📊</span>
+                    <span style="font-weight: 600; color: #1e293b;">Répartition par rapport au forfait (seuils 85% et 115%)</span>
+                </div>
+                
+                ${forfaitStats.map((stat, index) => {
+                    const startDateStr = stat.startDate.toLocaleDateString('fr-FR');
+                    const endDateStr = stat.endDate ? stat.endDate.toLocaleDateString('fr-FR') : 'Présent';
+                    
+                    return `
+                        <div style="margin-bottom: 20px; padding: 15px; background: #f8fafc; border-radius: 12px; border: 1px solid #e2e8f0;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                                <div style="display: flex; align-items: center; gap: 10px;">
+                                    <span style="font-weight: 600; color: ${stat.isCurrent ? '#22c55e' : '#9f7aea'};">${stat.forfait}</span>
+                                    <span style="font-size: 11px; color: #64748b;">${startDateStr} → ${endDateStr}</span>
+                                </div>
+                                <span style="font-size: 12px; background: white; padding: 4px 12px; border-radius: 20px; border: 1px solid #e2e8f0;">
+                                    ${stat.daysWithConsumptionOnly} jours avec conso
+                                </span>
+                            </div>
+                            
+                            <!-- Barre de progression -->
+                            <div style="background: #f1f5f9; border-radius: 30px; height: 40px; overflow: hidden; display: flex; box-shadow: inset 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 10px;">
+                                <div style="width: ${stat.percentBelow85}%; height: 100%; background: #22c55e; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600; color: white;">
+                                    ${stat.percentBelow85 > 5 ? stat.percentBelow85 + '%' : ''}
+                                </div>
+                                <div style="width: ${stat.percentInTolerance}%; height: 100%; background: #f59e0b; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600; color: white;">
+                                    ${stat.percentInTolerance > 5 ? stat.percentInTolerance + '%' : ''}
+                                </div>
+                                <div style="width: ${stat.percentAbove115}%; height: 100%; background: #ef4444; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600; color: white;">
+                                    ${stat.percentAbove115 > 5 ? stat.percentAbove115 + '%' : ''}
+                                </div>
+                            </div>
+                            
+                            <!-- Légende compacte -->
+                            <div style="display: flex; flex-wrap: wrap; gap: 15px; justify-content: space-between; font-size: 11px;">
+                                <div style="display: flex; align-items: center; gap: 5px;">
+                                    <div style="width: 12px; height: 12px; background: #22c55e; border-radius: 3px;"></div>
+                                    <span><strong>${stat.daysBelow85} jours</strong> ≤${stat.seuil85.toFixed(0)}Wh · ${stat.percentBelow85}%</span>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 5px;">
+                                    <div style="width: 12px; height: 12px; background: #f59e0b; border-radius: 3px;"></div>
+                                    <span><strong>${stat.daysInTolerance} jours</strong> ${stat.seuil85.toFixed(0)}-${stat.maxWithTolerance.toFixed(0)}Wh · ${stat.percentInTolerance}%</span>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 5px;">
+                                    <div style="width: 12px; height: 12px; background: #ef4444; border-radius: 3px;"></div>
+                                    <span><strong>${stat.daysAbove115} jours</strong> >${stat.maxWithTolerance.toFixed(0)}Wh · ${stat.percentAbove115}%</span>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }).join('')}
+            </div>
+            
+            <div style="margin-top: 15px; padding: 15px; background: #f1f5f9; border-radius: 8px; font-size: 12px; display: flex; flex-direction: column; gap: 10px;">
+                <div style="display: flex; align-items: center; gap: 10px; color: #475569;">
+                    <span style="font-size: 14px;">📌</span>
+                    <span><strong>Légende des seuils de consommation :</strong></span>
+                </div>
+                <div style="display: flex; flex-wrap: wrap; gap: 20px; justify-content: space-around;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <div style="width: 16px; height: 16px; background: #22c55e; border-radius: 4px;"></div>
+                        <span><strong>Normal</strong> (0-85% du forfait)</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <div style="width: 16px; height: 16px; background: #f59e0b; border-radius: 4px;"></div>
+                        <span><strong>Tolérance</strong> (85-115% du forfait)</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <div style="width: 16px; height: 16px; background: #ef4444; border-radius: 4px;"></div>
+                        <span><strong>Hors tolérance</strong> (>115% du forfait) = SuspendE</span>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        container.appendChild(historyCard);
+    }
     
     // Statistiques rapides du client
     const statsGrid = document.createElement('div');
@@ -7856,12 +8124,6 @@ function displayClientCommercialAnalysis(container, clientNumber) {
     const clientStats = calculateClientStats(clientNumber);
     container.appendChild(statsGrid);
     
-    // Analyse de consommation pour ce client
-    if (combinedEnergyData.length > 0) {
-        const energyAnalysis = createClientEnergyAnalysis(clientNumber);
-        container.appendChild(energyAnalysis);
-    }
-    
     // ✅ TABLEAU DES ÉVÉNEMENTS (entre consommation et crédit)
     if (combinedEventData.length > 0 || combinedSoldeData.length > 0) {
         const eventsTable = createClientEventsTable(clientNumber);
@@ -7874,7 +8136,6 @@ function displayClientCommercialAnalysis(container, clientNumber) {
         container.appendChild(creditAnalysis);
     }
     
-    
     setTimeout(() => {
         drawGauges(clientNumber);
     }, 200);
@@ -7882,16 +8143,17 @@ function displayClientCommercialAnalysis(container, clientNumber) {
 function drawGauges(clientNumber) {
     console.log(`🔄 Dessin des jauges pour le client ${clientNumber}`);
     
-    // Récupérer les données du client à partir des variables globales disponibles
+    // Récupérer les données du client
     const energyKey = `Energie${clientNumber}`;
-    const forfaitName = 'ECO'; // Valeur par défaut, vous pouvez l'adapter
     
-    // Récupérer le forfait du client si possible
+    // Récupérer le forfait du client
     let forfaitMax = 500; // Valeur par défaut
+    let forfaitName = 'ECO';
     try {
         const rechargeAnalysis = typeof analyzeRechargeData === 'function' ? 
             analyzeRechargeData(clientNumber) : null;
         if (rechargeAnalysis && rechargeAnalysis.currentCode4Name) {
+            forfaitName = rechargeAnalysis.currentCode4Name;
             const limits = getForfaitLimits(rechargeAnalysis.currentCode4Name);
             forfaitMax = limits.max || 500;
         }
@@ -7899,8 +8161,10 @@ function drawGauges(clientNumber) {
         console.log('⚠️ Impossible de récupérer le forfait, utilisation de la valeur par défaut');
     }
     
-    // Analyser les données d'énergie directement depuis combinedEnergyData
-    const daysWithConsumption = [];
+    // Calculer le seuil de tolérance (115% du forfait)
+    const forfaitMaxAvecTolerance = forfaitMax * 1.15;
+    
+    // Analyser les données d'énergie
     const consumptionByDay = {};
     
     if (combinedEnergyData && combinedEnergyData.length > 0) {
@@ -7928,13 +8192,15 @@ function drawGauges(clientNumber) {
         return;
     }
     
-    // Calculer les pourcentages
-    const joursDansLimites = dailyValues.filter(v => v > 0 && v <= forfaitMax).length;
-    const joursDansTolerance = dailyValues.filter(v => v > forfaitMax && v <= (forfaitMax * 1.2)).length;
-    const joursHorsTolerance = dailyValues.filter(v => v > (forfaitMax * 1.2)).length;
+    // Calculer les pourcentages avec les nouveaux seuils
+    const joursDansLimites = dailyValues.filter(v => v > 0 && v <= forfaitMax).length; // 0-100% du forfait (pour la jauge, on garde 100% comme limite normale)
+    const joursDansTolerance = dailyValues.filter(v => v > forfaitMax && v <= forfaitMaxAvecTolerance).length; // 100-115%
+    const joursHorsTolerance = dailyValues.filter(v => v > forfaitMaxAvecTolerance).length; // >115%
     
     const total = joursDansLimites + joursDansTolerance + joursHorsTolerance;
     
+    // Pour les jauges, on utilise des pourcentages basés sur 100% (forfait max)
+    // Mais on garde les couleurs selon les catégories
     const pourcentLimites = total > 0 ? Math.round((joursDansLimites / total) * 100) : 0;
     const pourcentTolerance = total > 0 ? Math.round((joursDansTolerance / total) * 100) : 0;
     const pourcentHorsTolerance = total > 0 ? Math.round((joursHorsTolerance / total) * 100) : 0;
@@ -7946,12 +8212,14 @@ function drawGauges(clientNumber) {
         joursDansTolerance,
         pourcentTolerance,
         joursHorsTolerance,
-        pourcentHorsTolerance
+        pourcentHorsTolerance,
+        forfaitMax,
+        forfaitMaxAvecTolerance
     });
 
     // Dessiner les jauges
     setTimeout(() => {
-        // Jauge limites (verte)
+        // Jauge limites (verte) - Jours dans les limites normales (0-100%)
         const canvasLimits = document.getElementById(`gauge-${clientNumber}-limits`);
         if (canvasLimits) {
             const ctx = canvasLimits.getContext('2d');
@@ -7974,7 +8242,7 @@ function drawGauges(clientNumber) {
             // Progression
             ctx.beginPath();
             ctx.arc(centerX, centerY, radius, startAngle, endAngle);
-            ctx.strokeStyle = '#22c55e';
+            ctx.strokeStyle = '#22c55e'; // Vert success
             ctx.lineWidth = 10;
             ctx.stroke();
 
@@ -7984,11 +8252,16 @@ function drawGauges(clientNumber) {
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillText(pourcentLimites + '%', centerX, centerY);
+            
+            // Petit texte descriptif
+            ctx.font = 'bold 8px Arial';
+            ctx.fillStyle = '#166534';
+            ctx.fillText('Normal', centerX, centerY + 20);
         } else {
             console.log(`⚠️ Canvas gauge-${clientNumber}-limits non trouvé`);
         }
 
-        // Jauge tolérance (orange)
+        // Jauge tolérance (orange) - Jours dans la tolérance (100-115%)
         const canvasTolerance = document.getElementById(`gauge-${clientNumber}-tolerance`);
         if (canvasTolerance) {
             const ctx = canvasTolerance.getContext('2d');
@@ -8008,7 +8281,7 @@ function drawGauges(clientNumber) {
 
             ctx.beginPath();
             ctx.arc(centerX, centerY, radius, startAngle, endAngle);
-            ctx.strokeStyle = '#f59e0b';
+            ctx.strokeStyle = '#f59e0b'; // Orange warning
             ctx.lineWidth = 10;
             ctx.stroke();
 
@@ -8017,9 +8290,13 @@ function drawGauges(clientNumber) {
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillText(pourcentTolerance + '%', centerX, centerY);
+            
+            ctx.font = 'bold 8px Arial';
+            ctx.fillStyle = '#92400e';
+            ctx.fillText('Tolérance', centerX, centerY + 20);
         }
 
-        // Jauge hors tolérance (rouge)
+        // Jauge hors tolérance (rouge) - Jours hors tolérance (>115%)
         const canvasHors = document.getElementById(`gauge-${clientNumber}-hors`);
         if (canvasHors) {
             const ctx = canvasHors.getContext('2d');
@@ -8039,7 +8316,7 @@ function drawGauges(clientNumber) {
 
             ctx.beginPath();
             ctx.arc(centerX, centerY, radius, startAngle, endAngle);
-            ctx.strokeStyle = '#ef4444';
+            ctx.strokeStyle = '#ef4444'; // Rouge danger
             ctx.lineWidth = 10;
             ctx.stroke();
 
@@ -8048,6 +8325,33 @@ function drawGauges(clientNumber) {
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillText(pourcentHorsTolerance + '%', centerX, centerY);
+            
+            ctx.font = 'bold 8px Arial';
+            ctx.fillStyle = '#991b1b';
+            ctx.fillText('Hors tolérance', centerX, centerY + 20);
+        }
+        
+        // Ajouter une légende sous les jauges
+        const gaugesContainer = document.querySelector(`#gauge-${clientNumber}-limits`)?.parentNode;
+        if (gaugesContainer && !document.getElementById(`gauge-legend-${clientNumber}`)) {
+            const legend = document.createElement('div');
+            legend.id = `gauge-legend-${clientNumber}`;
+            legend.style.cssText = `
+                margin-top: 15px;
+                padding: 10px;
+                background: #f8fafc;
+                border-radius: 8px;
+                font-size: 11px;
+                display: flex;
+                justify-content: space-around;
+                border: 1px solid #e2e8f0;
+            `;
+            legend.innerHTML = `
+                <div><span style="color: #22c55e; font-weight: 700;">Vert:</span> ≤${forfaitMax}Wh (0-100%)</div>
+                <div><span style="color: #f59e0b; font-weight: 700;">Orange:</span> ${forfaitMax}-${forfaitMaxAvecTolerance.toFixed(0)}Wh (100-115%)</div>
+                <div><span style="color: #ef4444; font-weight: 700;">Rouge:</span> >${forfaitMaxAvecTolerance.toFixed(0)}Wh (>115%)</div>
+            `;
+            gaugesContainer.appendChild(legend);
         }
     }, 300);
 }
@@ -8099,7 +8403,7 @@ function createClientEventsTable(clientNumber) {
     `;
     header.innerHTML = `
         <span style="font-size: 24px;">⚠️</span>
-        <span>Événements de Délestage - Client ${clientNumber.toString().padStart(2, '0')}</span>
+        <span>Événements - Client ${clientNumber.toString().padStart(2, '0')}</span>
     `;
     container.appendChild(header);
     
@@ -8117,7 +8421,7 @@ function createClientEventsTable(clientNumber) {
             <div style="text-align: center; padding: 40px; color: #94a3b8; background: #f8fafc; border-radius: 12px;">
                 <span style="font-size: 48px; display: block; margin-bottom: 15px;">✅</span>
                 <h3 style="margin: 0 0 10px 0; color: #1e293b;">Aucun événement</h3>
-                <p style="margin: 0; font-size: 14px;">Aucun événement (surcharge, crédit nul, suspend P/E) pour ce client</p>
+                <p style="margin: 0; font-size: 14px;">Aucun événement pour ce client</p>
                 <p style="margin-top: 10px; font-size: 12px; color: #64748b;">Sur ${totalDiagnosticDays} jour(s) de diagnostic</p>
             </div>
         `;
@@ -8125,22 +8429,18 @@ function createClientEventsTable(clientNumber) {
         return container;
     }
     
-    // Calculer les statistiques (JOURS, pas nombre d'événements)
-    const daysWithSurcharge = new Set();
+    // Calculer les statistiques
     const daysWithCreditNul = new Set();
     const daysWithSuspendP = new Set();
     const daysWithSuspendE = new Set();
     
     eventsByDay.forEach(day => {
-        if (day.Surcharge > 0) daysWithSurcharge.add(day.date);
         if (day.CreditNul > 0) daysWithCreditNul.add(day.date);
         if (day.SuspendP > 0) daysWithSuspendP.add(day.date);
         if (day.SuspendE > 0) daysWithSuspendE.add(day.date);
     });
     
     // Calculer les pourcentages
-    const percentSurcharge = totalDiagnosticDays > 0 ? 
-        ((daysWithSurcharge.size / totalDiagnosticDays) * 100).toFixed(1) : 0;
     const percentCreditNul = totalDiagnosticDays > 0 ? 
         ((daysWithCreditNul.size / totalDiagnosticDays) * 100).toFixed(1) : 0;
     const percentSuspendP = totalDiagnosticDays > 0 ? 
@@ -8148,109 +8448,115 @@ function createClientEventsTable(clientNumber) {
     const percentSuspendE = totalDiagnosticDays > 0 ? 
         ((daysWithSuspendE.size / totalDiagnosticDays) * 100).toFixed(1) : 0;
     
-    const uniqueDays = new Set(eventsByDay.map(d => d.date)).size;
-    
-    // ✅ Carte des statistiques
+    // ✅ TABLEAU DE BORD COMPACT (cartes plus petites)
     const statsGrid = document.createElement('div');
     statsGrid.style.cssText = `
         display: grid;
-        grid-template-columns: repeat(4, 1fr);
-        gap: 15px;
-        margin-bottom: 25px;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 10px;
+        margin-bottom: 20px;
     `;
     
     statsGrid.innerHTML = `
-        <!-- Surcharge -->
-        <div style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); border-radius: 12px; padding: 18px; color: white;">
-            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
-                <span style="font-size: 24px;">⚡</span>
-                <span style="font-size: 14px; font-weight: 600; opacity: 0.9;">SURCHARGE</span>
-            </div>
-            <div style="font-size: 36px; font-weight: 800; margin-bottom: 5px;">${daysWithSurcharge.size}</div>
-            <div style="font-size: 13px; opacity: 0.9;">jour(s) concerné(s)</div>
-            <div style="margin-top: 10px; background: rgba(255,255,255,0.2); height: 6px; border-radius: 3px; overflow: hidden;">
-                <div style="width: ${percentSurcharge}%; height: 100%; background: white; border-radius: 3px;"></div>
-            </div>
-            <div style="margin-top: 8px; font-size: 13px; font-weight: 600;">${percentSurcharge}% du temps</div>
-        </div>
-        
         <!-- Crédit nul -->
-        <div style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); border-radius: 12px; padding: 18px; color: white;">
-            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
-                <span style="font-size: 24px;">💰</span>
-                <span style="font-size: 14px; font-weight: 600; opacity: 0.9;">CRÉDIT NUL</span>
+        <div style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); border-radius: 10px; padding: 12px; color: white;">
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                <span style="font-size: 20px;">💰</span>
+                <span style="font-size: 12px; font-weight: 600; opacity: 0.9;">CRÉDIT NUL</span>
             </div>
-            <div style="font-size: 36px; font-weight: 800; margin-bottom: 5px;">${daysWithCreditNul.size}</div>
-            <div style="font-size: 13px; opacity: 0.9;">jour(s) concerné(s)</div>
-            <div style="margin-top: 10px; background: rgba(255,255,255,0.2); height: 6px; border-radius: 3px; overflow: hidden;">
-                <div style="width: ${percentCreditNul}%; height: 100%; background: white; border-radius: 3px;"></div>
+            <div style="font-size: 28px; font-weight: 800; margin-bottom: 4px;">${daysWithCreditNul.size}</div>
+            <div style="font-size: 11px; opacity: 0.9;">jour(s) concerné(s)</div>
+            <div style="margin-top: 8px; background: rgba(255,255,255,0.2); height: 4px; border-radius: 2px; overflow: hidden;">
+                <div style="width: ${percentCreditNul}%; height: 100%; background: white; border-radius: 2px;"></div>
             </div>
-            <div style="margin-top: 8px; font-size: 13px; font-weight: 600;">${percentCreditNul}% du temps</div>
+            <div style="margin-top: 5px; font-size: 11px; font-weight: 600;">${percentCreditNul}%</div>
         </div>
         
-        <!-- Puissance dépassée (SuspendP) -->
-        <div style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); border-radius: 12px; padding: 18px; color: white;">
-            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
-                <span style="font-size: 24px;">📈</span>
-                <span style="font-size: 14px; font-weight: 600; opacity: 0.9;">PUISSANCE DÉPASSÉE</span>
+        <!-- Puissance dépassée -->
+        <div style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); border-radius: 10px; padding: 12px; color: white;">
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                <span style="font-size: 20px;">📈</span>
+                <span style="font-size: 12px; font-weight: 600; opacity: 0.9;">PUISSANCE</span>
             </div>
-            <div style="font-size: 36px; font-weight: 800; margin-bottom: 5px;">${daysWithSuspendP.size}</div>
-            <div style="font-size: 13px; opacity: 0.9;">jour(s) concerné(s)</div>
-            <div style="margin-top: 10px; background: rgba(255,255,255,0.2); height: 6px; border-radius: 3px; overflow: hidden;">
-                <div style="width: ${percentSuspendP}%; height: 100%; background: white; border-radius: 3px;"></div>
+            <div style="font-size: 28px; font-weight: 800; margin-bottom: 4px;">${daysWithSuspendP.size}</div>
+            <div style="font-size: 11px; opacity: 0.9;">jour(s) concerné(s)</div>
+            <div style="margin-top: 8px; background: rgba(255,255,255,0.2); height: 4px; border-radius: 2px; overflow: hidden;">
+                <div style="width: ${percentSuspendP}%; height: 100%; background: white; border-radius: 2px;"></div>
             </div>
-            <div style="margin-top: 8px; font-size: 13px; font-weight: 600;">${percentSuspendP}% du temps</div>
+            <div style="margin-top: 5px; font-size: 11px; font-weight: 600;">${percentSuspendP}%</div>
         </div>
         
-        <!-- Énergie épuisée (SuspendE) -->
-        <div style="background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%); border-radius: 12px; padding: 18px; color: white;">
-            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
-                <span style="font-size: 24px;">🔋</span>
-                <span style="font-size: 14px; font-weight: 600; opacity: 0.9;">ÉNERGIE ÉPUISÉE</span>
+        <!-- Énergie épuisée -->
+        <div style="background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%); border-radius: 10px; padding: 12px; color: white;">
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                <span style="font-size: 20px;">🔋</span>
+                <span style="font-size: 12px; font-weight: 600; opacity: 0.9;">ÉNERGIE</span>
             </div>
-            <div style="font-size: 36px; font-weight: 800; margin-bottom: 5px;">${daysWithSuspendE.size}</div>
-            <div style="font-size: 13px; opacity: 0.9;">jour(s) concerné(s)</div>
-            <div style="margin-top: 10px; background: rgba(255,255,255,0.2); height: 6px; border-radius: 3px; overflow: hidden;">
-                <div style="width: ${percentSuspendE}%; height: 100%; background: white; border-radius: 3px;"></div>
+            <div style="font-size: 28px; font-weight: 800; margin-bottom: 4px;">${daysWithSuspendE.size}</div>
+            <div style="font-size: 11px; opacity: 0.9;">jour(s) concerné(s)</div>
+            <div style="margin-top: 8px; background: rgba(255,255,255,0.2); height: 4px; border-radius: 2px; overflow: hidden;">
+                <div style="width: ${percentSuspendE}%; height: 100%; background: white; border-radius: 2px;"></div>
             </div>
-            <div style="margin-top: 8px; font-size: 13px; font-weight: 600;">${percentSuspendE}% du temps</div>
+            <div style="margin-top: 5px; font-size: 11px; font-weight: 600;">${percentSuspendE}%</div>
         </div>
     `;
     
     content.appendChild(statsGrid);
     
-    // ✅ Informations sur la période analysée
+    // ✅ Informations période compactes
     const periodInfo = document.createElement('div');
     periodInfo.style.cssText = `
         background: #f8fafc;
         border-radius: 8px;
-        padding: 12px 15px;
+        padding: 10px 15px;
         margin-bottom: 20px;
         display: flex;
         align-items: center;
-        gap: 15px;
+        justify-content: space-between;
         font-size: 12px;
         border: 1px solid #e2e8f0;
     `;
     periodInfo.innerHTML = `
-        <span style="display: flex; align-items: center; gap: 5px;">
-            <span style="font-size: 16px;">📅</span>
-            <span><strong>${totalDiagnosticDays}</strong> jour(s) de diagnostic analysés</span>
-        </span>
-        <span style="display: flex; align-items: center; gap: 5px;">
-            <span style="font-size: 16px;">📊</span>
-            <span><strong>${uniqueDays}</strong> jour(s) avec événements (${totalDiagnosticDays > 0 ? ((uniqueDays / totalDiagnosticDays) * 100).toFixed(1) : 0}%)</span>
-        </span>
+        <span>📅 ${totalDiagnosticDays} jours analysés</span>
+        <span>📊 ${new Set(eventsByDay.map(d => d.date)).size} jours avec événements</span>
+        <span>⚡ ${eventsByDay.reduce((sum, d) => sum + d.SuspendP + d.SuspendE + d.CreditNul, 0)} événements</span>
     `;
     content.appendChild(periodInfo);
     
-    // ✅ Tableau avec hauteur fixe et scroll
+    // ✅ Bouton Plus de détails
+    const toggleBtn = document.createElement('button');
+    toggleBtn.id = `toggle-events-${clientNumber}`;
+    toggleBtn.style.cssText = `
+        width: 100%;
+        padding: 12px;
+        background: #f1f5f9;
+        border: 1px solid #cbd5e1;
+        border-radius: 8px;
+        color: #334155;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        margin-bottom: 15px;
+    `;
+    toggleBtn.innerHTML = `
+        <span style="font-size: 16px;">🔽</span>
+        <span>Afficher le tableau détaillé</span>
+    `;
+    content.appendChild(toggleBtn);
+    
+    // ✅ TABLEAU (gardé exactement comme avant)
     const tableWrapper = document.createElement('div');
+    tableWrapper.id = `events-table-${clientNumber}`;
     tableWrapper.style.cssText = `
+        display: none;
         border: 2px solid #e2e8f0;
         border-radius: 12px;
         overflow: hidden;
-        margin-top: 20px;
+        margin-bottom: 15px;
         max-height: 350px;
         overflow-y: auto;
         overflow-x: auto;
@@ -8259,20 +8565,15 @@ function createClientEventsTable(clientNumber) {
     `;
     
     let tableHTML = `
-        <table style="width: 100%; border-collapse: collapse; font-size: 12px; min-width: 1000px;">
+        <table style="width: 100%; border-collapse: collapse; font-size: 12px; min-width: 900px;">
             <thead style="position: sticky; top: 0; z-index: 10;">
                 <tr>
                     <th rowspan="2" style="padding: 15px 10px; text-align: left; border-right: 2px solid #cbd5e1; background: #f1f5f9; font-size: 14px; position: sticky; left: 0; z-index: 11;">📅 DATE</th>
                     <th colspan="3" style="padding: 12px 10px; text-align: center; background: #3b82f6; color: white; border-right: 2px solid #2563eb;">📈 PUISSANCE DÉPASSÉE</th>
-                    <th colspan="3" style="padding: 12px 10px; text-align: center; background: #ef4444; color: white; border-right: 2px solid #dc2626;">⚡ SURCHARGE</th>
                     <th colspan="1" style="padding: 12px 10px; text-align: center; background: #f59e0b; color: white; border-right: 2px solid #d97706;">💰 CRÉDIT NUL</th>
                     <th colspan="3" style="padding: 12px 10px; text-align: center; background: #0ea5e9; color: white;">🔋 ÉNERGIE ÉPUISÉE</th>
                 </tr>
                 <tr style="background: #f1f5f9;">
-                    <th style="padding: 10px 8px; text-align: center; border-bottom: 1px solid #cbd5e1;">Début</th>
-                    <th style="padding: 10px 8px; text-align: center; border-bottom: 1px solid #cbd5e1;">Fin</th>
-                    <th style="padding: 10px 8px; text-align: center; border-bottom: 1px solid #cbd5e1; border-right: 2px solid #cbd5e1;">Durée</th>
-                    
                     <th style="padding: 10px 8px; text-align: center; border-bottom: 1px solid #cbd5e1;">Début</th>
                     <th style="padding: 10px 8px; text-align: center; border-bottom: 1px solid #cbd5e1;">Fin</th>
                     <th style="padding: 10px 8px; text-align: center; border-bottom: 1px solid #cbd5e1; border-right: 2px solid #cbd5e1;">Durée</th>
@@ -8287,7 +8588,6 @@ function createClientEventsTable(clientNumber) {
             <tbody>
     `;
     
-    // Trier par date décroissante
     eventsByDay.sort((a, b) => new Date(b.dateObj) - new Date(a.dateObj));
     
     eventsByDay.forEach((day, index) => {
@@ -8312,18 +8612,7 @@ function createClientEventsTable(clientNumber) {
                     ${day.SuspendP_duration || '-'}
                 </td>
                 
-                <!-- Surcharge -->
-                <td style="padding: 10px 8px; text-align: center; ${day.Surcharge > 0 ? 'background: #ef444410; font-weight: 600; color: #dc2626;' : 'color: #94a3b8;'}">
-                    ${day.Surcharge_start || '-'}
-                </td>
-                <td style="padding: 10px 8px; text-align: center; ${day.Surcharge > 0 ? 'background: #ef444410; font-weight: 600; color: #dc2626;' : 'color: #94a3b8;'}">
-                    ${day.Surcharge_end || '-'}
-                </td>
-                <td style="padding: 10px 8px; text-align: center; border-right: 2px solid #e2e8f0; ${day.Surcharge > 0 ? 'background: #ef444420; font-weight: 700; color: #dc2626;' : 'color: #94a3b8;'}">
-                    ${day.Surcharge_duration || '-'}
-                </td>
-                
-                <!-- Crédit Nul - Indicateur unique -->
+                <!-- Crédit Nul -->
                 <td style="padding: 10px 8px; text-align: center; border-right: 2px solid #e2e8f0; ${day.CreditNul > 0 ? 'background: #f59e0b; color: white; font-weight: 700;' : 'background: #f1f5f9; color: #94a3b8;'}">
                     ${day.CreditNul > 0 ? '⚠️ CRÉDIT NUL' : '✓ Normal'}
                 </td>
@@ -8349,39 +8638,43 @@ function createClientEventsTable(clientNumber) {
     // Légende
     const legend = document.createElement('div');
     legend.style.cssText = `
-        margin-top: 20px;
-        padding: 15px 20px;
+        margin-top: 15px;
+        padding: 12px 20px;
         background: #f8fafc;
-        border-radius: 12px;
+        border-radius: 8px;
         border: 1px solid #e2e8f0;
         display: flex;
         align-items: center;
-        gap: 25px;
+        gap: 20px;
         flex-wrap: wrap;
         font-size: 12px;
     `;
     
     legend.innerHTML = `
-        <div style="display: flex; align-items: center; gap: 8px;">
-            <div style="width: 16px; height: 16px; background: #3b82f6; border-radius: 4px;"></div>
-            <span><strong>Puissance dépassée</strong> (SuspendP)</span>
-        </div>
-        <div style="display: flex; align-items: center; gap: 8px;">
-            <div style="width: 16px; height: 16px; background: #ef4444; border-radius: 4px;"></div>
-            <span><strong>Surcharge</strong> (Surcharge)</span>
-        </div>
-        <div style="display: flex; align-items: center; gap: 8px;">
-            <div style="width: 16px; height: 16px; background: #f59e0b; border-radius: 4px;"></div>
-            <span><strong>Crédit nul</strong> (Signalement journalier)</span>
-        </div>
-        <div style="display: flex; align-items: center; gap: 8px;">
-            <div style="width: 16px; height: 16px; background: #0ea5e9; border-radius: 4px;"></div>
-            <span><strong>Énergie épuisée</strong> (SuspendE)</span>
-        </div>
+        <span><span style="color:#3b82f6;">⬤</span> Puissance dépassée</span>
+        <span><span style="color:#f59e0b;">⬤</span> Crédit nul</span>
+        <span><span style="color:#0ea5e9;">⬤</span> Énergie épuisée</span>
     `;
-    
     content.appendChild(legend);
+    
     container.appendChild(content);
+    
+    // Événement bouton
+    setTimeout(() => {
+        const btn = document.getElementById(`toggle-events-${clientNumber}`);
+        const table = document.getElementById(`events-table-${clientNumber}`);
+        if (btn && table) {
+            btn.addEventListener('click', () => {
+                if (table.style.display === 'none') {
+                    table.style.display = 'block';
+                    btn.innerHTML = `<span style="font-size:16px;">🔼</span><span>Masquer le tableau</span>`;
+                } else {
+                    table.style.display = 'none';
+                    btn.innerHTML = `<span style="font-size:16px;">🔽</span><span>Afficher le tableau détaillé</span>`;
+                }
+            });
+        }
+    }, 100);
     
     return container;
 }
@@ -8421,7 +8714,7 @@ function getTotalDiagnosticDaysForClient(clientNumber) {
     return totalDays.size;
 }
 // Fonction pour récupérer les événements groupés par jour
-function getEventsForClientGroupedByDay(clientNumber) {
+function getEventsForClientGroupedByDay(clientNumber, forfaitStartDate = null, forfaitEndDate = null) {
     const eventsByDay = {};
     const clientStr = clientNumber.toString();
     
@@ -8433,6 +8726,13 @@ function getEventsForClientGroupedByDay(clientNumber) {
         const event = row['Évènements'].trim();
         const code1 = row['Code 1']?.toString().trim() || '';
         
+        // Filtrer par période si spécifiée
+        if (forfaitStartDate || forfaitEndDate) {
+            const eventDateObj = new Date(date);
+            if (forfaitStartDate && eventDateObj < forfaitStartDate) return;
+            if (forfaitEndDate && eventDateObj > forfaitEndDate) return;
+        }
+        
         // Initialiser le jour si nécessaire
         if (!eventsByDay[date]) {
             eventsByDay[date] = {
@@ -8440,7 +8740,6 @@ function getEventsForClientGroupedByDay(clientNumber) {
                 dateObj: new Date(date),
                 SuspendP: 0, SuspendP_start: null, SuspendP_end: null, SuspendP_duration: '-',
                 SuspendE: 0, SuspendE_start: null, SuspendE_end: null, SuspendE_duration: '-',
-                Surcharge: 0, Surcharge_start: null, Surcharge_end: null, Surcharge_duration: '-',
                 CreditNul: 0, CreditNul_start: null, CreditNul_end: null, CreditNul_duration: '-'
             };
         }
@@ -8449,7 +8748,6 @@ function getEventsForClientGroupedByDay(clientNumber) {
         
         // Déterminer le type d'événement
         if (event.includes('SuspendP')) {
-            // Vérifier si c'est pour ce client (dernier chiffre du Code 1)
             if (code1 && code1.slice(-1) === clientStr) {
                 day.SuspendP++;
                 if (!day.SuspendP_start || time < day.SuspendP_start) day.SuspendP_start = time.substring(0, 5);
@@ -8463,16 +8761,11 @@ function getEventsForClientGroupedByDay(clientNumber) {
                 if (!day.SuspendE_end || time > day.SuspendE_end) day.SuspendE_end = time.substring(0, 5);
             }
         }
-        else if (event.includes('Surcharge')) {
-            // La surcharge est système, on l'affiche pour tous les clients
-            day.Surcharge++;
-            if (!day.Surcharge_start || time < day.Surcharge_start) day.Surcharge_start = time.substring(0, 5);
-            if (!day.Surcharge_end || time > day.Surcharge_end) day.Surcharge_end = time.substring(0, 5);
-        }
+        // SUPPRESSION DU BLOC "Surcharge"
     });
     
-    // Ajouter les données de crédit nul depuis combinedSoldeData
-    if (combinedSoldeData.length > 0) {
+    // Ajouter les données de crédit nul
+    if (combinedSoldeData && combinedSoldeData.length > 0) {
         const creditKey = `Credit${clientNumber}`;
         
         combinedSoldeData.forEach(row => {
@@ -8482,6 +8775,13 @@ function getEventsForClientGroupedByDay(clientNumber) {
             const [date, time] = dateTime.split(' ');
             const value = parseFloat(row[creditKey]) || 0;
             
+            // Filtrer par période si spécifiée
+            if (forfaitStartDate || forfaitEndDate) {
+                const creditDateObj = new Date(date);
+                if (forfaitStartDate && creditDateObj < forfaitStartDate) return;
+                if (forfaitEndDate && creditDateObj > forfaitEndDate) return;
+            }
+            
             if (value === 0) {
                 if (!eventsByDay[date]) {
                     eventsByDay[date] = {
@@ -8489,7 +8789,6 @@ function getEventsForClientGroupedByDay(clientNumber) {
                         dateObj: new Date(date),
                         SuspendP: 0, SuspendP_start: null, SuspendP_end: null, SuspendP_duration: '-',
                         SuspendE: 0, SuspendE_start: null, SuspendE_end: null, SuspendE_duration: '-',
-                        Surcharge: 0, Surcharge_start: null, Surcharge_end: null, Surcharge_duration: '-',
                         CreditNul: 0, CreditNul_start: null, CreditNul_end: null, CreditNul_duration: '-'
                     };
                 }
@@ -8502,16 +8801,13 @@ function getEventsForClientGroupedByDay(clientNumber) {
         });
     }
     
-    // Calculer les durées pour chaque jour
+    // Calculer les durées
     Object.values(eventsByDay).forEach(day => {
         if (day.SuspendP_start && day.SuspendP_end) {
             day.SuspendP_duration = calculateDuration(day.SuspendP_start, day.SuspendP_end);
         }
         if (day.SuspendE_start && day.SuspendE_end) {
             day.SuspendE_duration = calculateDuration(day.SuspendE_start, day.SuspendE_end);
-        }
-        if (day.Surcharge_start && day.Surcharge_end) {
-            day.Surcharge_duration = calculateDuration(day.Surcharge_start, day.Surcharge_end);
         }
         if (day.CreditNul_start && day.CreditNul_end) {
             day.CreditNul_duration = calculateDuration(day.CreditNul_start, day.CreditNul_end);
@@ -8921,85 +9217,275 @@ function createClientEnergyAnalysis(clientNumber) {
     const content = document.createElement('div');
     content.style.cssText = `padding: 25px;`;
     
-    // Récupérer l'historique des forfaits du client
-    const consumptionAnalysis = analyzeConsumptionWithForfaitHistory(clientNumber);
+    // Récupérer les données du client
+    const energyKey = `Energie${clientNumber}`;
     
-    if (!consumptionAnalysis.hasData) {
-        content.innerHTML = `<div style="text-align: center; padding: 50px; color: #94a3b8; background: #f8fafc; border-radius: 12px;">Aucune donnée de consommation pour ce client</div>`;
-        analysisDiv.appendChild(content);
-        return analysisDiv;
-    }
+    // ===== 1. CONSTRUIRE L'HISTORIQUE DES FORFAITS À PARTIR DES RECHARGES =====
+    const forfaitHistory = [];
     
-    // Vérifier s'il y a eu des changements de forfait
-    const hasForfaitChanges = consumptionAnalysis.forfaitHistory && consumptionAnalysis.forfaitHistory.length > 1;
-    
-    if (hasForfaitChanges) {
-        // Afficher un message indiquant qu'il y a eu des changements
-        const changeMessage = document.createElement('div');
-        changeMessage.style.cssText = `
-            background: #fef3c7;
-            border: 2px solid #f59e0b;
-            border-radius: 12px;
-            padding: 15px 20px;
-            margin-bottom: 25px;
-            display: flex;
-            align-items: center;
-            gap: 15px;
-        `;
-        changeMessage.innerHTML = `
-            <span style="font-size: 28px;">🔄</span>
-            <div>
-                <div style="font-weight: 700; color: #92400e; font-size: 16px;">Changements de forfait détectés</div>
-                <div style="color: #854d0e; font-size: 13px;">Le client a changé de forfait ${consumptionAnalysis.forfaitHistory.length - 1} fois. Analyse séparée par période ci-dessous.</div>
-            </div>
-        `;
-        content.appendChild(changeMessage);
-    }
-    
-    // Analyser chaque forfait séparément
-    const forfaits = consumptionAnalysis.consumptionByForfait;
-    
-    // Trier les forfaits par date de début
-    const sortedForfaits = Object.values(forfaits).sort((a, b) => a.startDate - b.startDate);
-    
-    // Pour chaque forfait, créer une carte d'analyse
-    sortedForfaits.forEach((forfaitStats, index) => {
-        const isCurrent = forfaitStats.forfait === consumptionAnalysis.currentForfait?.forfait;
+    if (combinedRechargeData && combinedRechargeData.length > 0) {
+        const clientRecharges = combinedRechargeData
+            .filter(row => row['Code 1']?.toString().trim() === clientNumber.toString())
+            .sort((a, b) => new Date(a['Date et Heure']) - new Date(b['Date et Heure']));
         
-        // Calculer les taux de pourcentage
-        const totalDaysWithConsumption = forfaitStats.totalDays;
-        const daysWithoutConso = 0; // À calculer si nécessaire
+        clientRecharges.forEach((recharge, index) => {
+            const date = new Date(recharge['Date et Heure']);
+            const code4 = parseInt(recharge['Code 4']);
+            const forfaitName = getForfaitName(code4);
+            
+            if (index === 0) {
+                // Premier forfait connu
+                forfaitHistory.push({
+                    forfait: forfaitName,
+                    forfaitCode: code4,
+                    startDate: date,
+                    endDate: null,
+                    isCurrent: true
+                });
+            } else if (code4 !== parseInt(clientRecharges[index-1]['Code 4'])) {
+                // Changement de forfait
+                forfaitHistory[forfaitHistory.length - 1].endDate = date;
+                forfaitHistory[forfaitHistory.length - 1].isCurrent = false;
+                
+                forfaitHistory.push({
+                    forfait: forfaitName,
+                    forfaitCode: code4,
+                    startDate: date,
+                    endDate: null,
+                    isCurrent: true
+                });
+            }
+        });
+    }
+    
+    // Si pas d'historique de forfait, on prend la date la plus ancienne des données
+    if (forfaitHistory.length === 0) {
+        let oldestDate = new Date();
+        if (combinedEnergyData && combinedEnergyData.length > 0) {
+            combinedEnergyData.forEach(row => {
+                if (row['Date et Heure']) {
+                    const date = new Date(row['Date et Heure']);
+                    if (date < oldestDate) oldestDate = date;
+                }
+            });
+        }
+        
+        forfaitHistory.push({
+            forfait: 'ECO',
+            forfaitCode: 1,
+            startDate: oldestDate,
+            endDate: null,
+            isCurrent: true
+        });
+    }
+    
+    // ===== 2. ANALYSER LA CONSOMMATION JOUR PAR JOUR =====
+    const consumptionByDay = {};
+    
+    if (combinedEnergyData && combinedEnergyData.length > 0) {
+        combinedEnergyData.forEach(row => {
+            if (!row['Date et Heure']) return;
+            
+            const dateTime = new Date(row['Date et Heure']);
+            const dateStr = dateTime.toISOString().split('T')[0];
+            
+            const value = parseFloat(row[energyKey]) || 0;
+            
+            if (!consumptionByDay[dateStr]) {
+                consumptionByDay[dateStr] = {
+                    date: dateStr,
+                    dateObj: dateTime,
+                    total: 0,
+                    hasData: false
+                };
+            }
+            
+            if (value > 0) {
+                consumptionByDay[dateStr].total = Math.max(consumptionByDay[dateStr].total, value);
+                consumptionByDay[dateStr].hasData = true;
+            }
+        });
+    }
+    
+    // ===== 3. POUR CHAQUE FORFAIT, ANALYSER LES JOURS CORRESPONDANTS =====
+    forfaitHistory.sort((a, b) => a.startDate - b.startDate);
+    
+    forfaitHistory.forEach((forfait) => {
+        const isCurrent = forfait.isCurrent;
+        const forfaitLimits = getForfaitLimits(forfait.forfait);
+        const baseMax = forfaitLimits.max || 90;
+        const maxWithTolerance = baseMax * 1.15; // 115%
+        const seuil85 = baseMax * 0.85; // 85%
+        
+        // Filtrer les jours pour ce forfait
+        const daysInPeriod = [];
+        
+        Object.values(consumptionByDay).forEach(day => {
+            const dayDate = day.dateObj;
+            
+            // Vérifier si le jour est dans la période du forfait
+            let inPeriod = false;
+            
+            if (forfait.endDate) {
+                // Forfait avec date de fin
+                if (dayDate >= forfait.startDate && dayDate <= forfait.endDate) {
+                    inPeriod = true;
+                }
+            } else {
+                // Forfait actuel (pas de date de fin)
+                if (dayDate >= forfait.startDate) {
+                    inPeriod = true;
+                }
+            }
+            
+            if (inPeriod) {
+                daysInPeriod.push({
+                    date: day.date,
+                    dateObj: dayDate,
+                    consumption: day.total,
+                    hasData: day.hasData
+                });
+            }
+        });
+        
+        // Trier par date
+        daysInPeriod.sort((a, b) => a.dateObj - b.dateObj);
+        
+        if (daysInPeriod.length === 0) return;
+        
+        // ===== STATISTIQUES PRINCIPALES =====
+        const totalDays = daysInPeriod.length; // Nombre total de jours avec données dans la période
+        
+        // Compter les jours AVEC consommation (>0)
+        const daysWithConsumption = daysInPeriod.filter(day => day.consumption > 0).length;
+        const daysWithoutConsumption = totalDays - daysWithConsumption;
+        
+        // Pourcentages
+        const percentWithoutConsumption = totalDays > 0 ? 
+            ((daysWithoutConsumption / totalDays) * 100).toFixed(1) : 0;
+        const percentWithConsumption = totalDays > 0 ? 
+            ((daysWithConsumption / totalDays) * 100).toFixed(1) : 0;
+        
+        // Énergie max et sa date
+        let maxConsumption = 0;
+        let maxConsumptionDate = null;
+        daysInPeriod.forEach(day => {
+            if (day.consumption > maxConsumption) {
+                maxConsumption = day.consumption;
+                maxConsumptionDate = day.dateObj;
+            }
+        });
+        
+        // Énergie totale et moyenne (sur les jours avec consommation uniquement)
+        const totalConsumption = daysInPeriod.reduce((sum, day) => sum + day.consumption, 0);
+        const avgConsumption = daysWithConsumption > 0 ? 
+            (totalConsumption / daysWithConsumption).toFixed(1) : 0;
+        
+        // ===== ANALYSE DES ÉVÉNEMENTS ÉNERGIE ÉPUISÉE (SuspendE) =====
+        let daysWithSuspendE = 0;
+        const suspendEDates = new Set();
 
-        // CORRECTION ICI : Recalculer daysBelow90 à partir des données disponibles
-        const daysAbove90 = forfaitStats.daysAbove90 || 0;
-        const daysBelow90 = totalDaysWithConsumption - daysAbove90; // 54 - 19 = 35
+        if (combinedEventData && combinedEventData.length > 0) {
+            combinedEventData.forEach(row => {
+                if (!row['Date et Heure'] || !row['Évènements']) return;
+                
+                const event = row['Évènements'].trim();
+                const code1 = row['Code 1']?.toString().trim() || '';
+                
+                // Vérifier si c'est un SuspendE pour ce client
+                if (event.includes('SuspendE') && code1.slice(-1) === clientNumber.toString()) {
+                    const eventDateTime = new Date(row['Date et Heure']);
+                    const eventDateStr = eventDateTime.toISOString().split('T')[0];
+                    
+                    // Vérifier si cette date est dans la période du forfait
+                    let inPeriod = false;
+                    
+                    // Convertir les dates en timestamp pour comparaison précise
+                    const eventTime = eventDateTime.getTime();
+                    const startTime = forfait.startDate.getTime();
+                    
+                    if (forfait.endDate) {
+                        // Forfait avec date de fin
+                        const endTime = forfait.endDate.getTime();
+                        if (eventTime >= startTime && eventTime <= endTime) {
+                            inPeriod = true;
+                        }
+                    } else {
+                        // Forfait actuel
+                        if (eventTime >= startTime) {
+                            inPeriod = true;
+                        }
+                    }
+                    
+                    if (inPeriod) {
+                        suspendEDates.add(eventDateStr);
+                    }
+                }
+            });
+            
+            daysWithSuspendE = suspendEDates.size;
+        }
 
-        const percentAbove90 = totalDaysWithConsumption > 0 ? 
-            ((daysAbove90 / totalDaysWithConsumption) * 100).toFixed(1) : 0;
-        const percentBelow90 = totalDaysWithConsumption > 0 ? 
-            ((daysBelow90 / totalDaysWithConsumption) * 100).toFixed(1) : 0;
+        // Débogage - à supprimer après vérification
+        if (daysWithSuspendE > 0) {
+            console.log(`Client ${clientNumber} - Forfait ${forfait.forfait}:`, {
+                start: forfait.startDate.toLocaleDateString('fr-FR'),
+                end: forfait.endDate ? forfait.endDate.toLocaleDateString('fr-FR') : 'Présent',
+                suspendEDates: Array.from(suspendEDates).sort(),
+                count: daysWithSuspendE
+            });
+        }
 
-        // Pour la répartition limites/tolérance
-        const daysInTolerance = forfaitStats.daysInTolerance || 0;
-        const daysOutTolerance = forfaitStats.daysAboveTolerance || 0;
-        const daysInLimits = totalDaysWithConsumption - (daysInTolerance + daysOutTolerance);
+        // ===== ANALYSE PAR SEUILS =====
+        const daysWithConsumptionOnly = daysInPeriod.filter(day => day.consumption > 0);
 
-        const percentInLimits = totalDaysWithConsumption > 0 ? 
-            ((daysInLimits / totalDaysWithConsumption) * 100).toFixed(1) : 0;
-        const percentInTolerance = totalDaysWithConsumption > 0 ? 
-            ((daysInTolerance / totalDaysWithConsumption) * 100).toFixed(1) : 0;
-        const percentOutTolerance = totalDaysWithConsumption > 0 ? 
-            ((daysOutTolerance / totalDaysWithConsumption) * 100).toFixed(1) : 0;
+        // Les jours hors tolérance sont exactement les jours avec SuspendE
+        const daysAbove115 = daysWithSuspendE;
+
+        // Les autres jours sont répartis entre ≤85% et 85-115%
+        const daysBelow85 = daysWithConsumptionOnly.filter(day => 
+            day.consumption <= seuil85 && !suspendEDates.has(day.date)
+        ).length;
+
+        const daysInTolerance = daysWithConsumptionOnly.filter(day => 
+            day.consumption > seuil85 && day.consumption <= maxWithTolerance && !suspendEDates.has(day.date)
+        ).length;
+
+        // Calcul des pourcentages
+        const percentBelow85 = daysWithConsumptionOnly.length > 0 ? 
+            ((daysBelow85 / daysWithConsumptionOnly.length) * 100).toFixed(1) : 0;
+
+        const percentInTolerance = daysWithConsumptionOnly.length > 0 ? 
+            ((daysInTolerance / daysWithConsumptionOnly.length) * 100).toFixed(1) : 0;
+
+        const percentAbove115 = daysWithConsumptionOnly.length > 0 ? 
+            ((daysAbove115 / daysWithConsumptionOnly.length) * 100).toFixed(1) : 0;
+
+        const percentSuspendE = daysWithConsumptionOnly.length > 0 ? 
+            ((daysWithSuspendE / daysWithConsumptionOnly.length) * 100).toFixed(1) : 0;
+
+        // Vérification
+        const totalCheck = daysBelow85 + daysInTolerance + daysAbove115;
+        if (totalCheck !== daysWithConsumptionOnly.length) {
+            console.warn(`⚠️ Incohérence pour client ${clientNumber}, forfait ${forfait.forfait}:`, {
+                daysBelow85,
+                daysInTolerance,
+                daysAbove115,
+                total: daysWithConsumptionOnly.length,
+                calculé: totalCheck,
+                suspendEDates: Array.from(suspendEDates)
+            });
+        }
         
         // Formater les dates
-        const startDateStr = forfaitStats.startDate.toLocaleDateString('fr-FR', {
+        const startDateStr = forfait.startDate.toLocaleDateString('fr-FR', {
             day: '2-digit', month: '2-digit', year: 'numeric'
         });
-        const endDateStr = forfaitStats.endDate.toLocaleDateString('fr-FR', {
+        const endDateStr = forfait.endDate ? forfait.endDate.toLocaleDateString('fr-FR', {
             day: '2-digit', month: '2-digit', year: 'numeric'
-        });
+        }) : 'Présent';
         
-        // Créer la carte pour ce forfait
+        // ===== CONSTRUCTION DE LA CARTE =====
         const forfaitCard = document.createElement('div');
         forfaitCard.style.cssText = `
             background: white;
@@ -9011,7 +9497,7 @@ function createClientEnergyAnalysis(clientNumber) {
             position: relative;
         `;
         
-        // Badge "ACTUEL" si c'est le forfait courant
+        // Badge "ACTUEL"
         if (isCurrent) {
             const currentBadge = document.createElement('div');
             currentBadge.style.cssText = `
@@ -9030,7 +9516,7 @@ function createClientEnergyAnalysis(clientNumber) {
             forfaitCard.appendChild(currentBadge);
         }
         
-        // En-tête du forfait
+        // En-tête
         const forfaitHeader = document.createElement('div');
         forfaitHeader.style.cssText = `
             display: flex;
@@ -9049,8 +9535,8 @@ function createClientEnergyAnalysis(clientNumber) {
                     <span style="font-size: 24px; color: white;">📦</span>
                 </div>
                 <div>
-                    <div style="font-size: 20px; font-weight: 800; color: ${isCurrent ? '#22c55e' : '#9f7aea'};">${forfaitStats.forfait}</div>
-                    <div style="font-size: 13px; color: #64748b;">Code ${forfaitStats.forfaitCode} · Limite: ${forfaitStats.baseMax}Wh · Tolérance: ${forfaitStats.maxWithTolerance}Wh</div>
+                    <div style="font-size: 20px; font-weight: 800; color: ${isCurrent ? '#22c55e' : '#9f7aea'};">${forfait.forfait}</div>
+                    <div style="font-size: 13px; color: #64748b;">Code ${forfait.forfaitCode} · Limite: ${baseMax}Wh · Tolérance: ${maxWithTolerance.toFixed(0)}Wh (115%)</div>
                 </div>
             </div>
             <div style="display: flex; align-items: center; gap: 15px;">
@@ -9058,174 +9544,183 @@ function createClientEnergyAnalysis(clientNumber) {
                     📅 ${startDateStr} → ${endDateStr}
                 </span>
                 <span style="background: #f1f5f9; padding: 8px 16px; border-radius: 30px; font-size: 13px;">
-                    📊 ${forfaitStats.totalDays} jours analysés
+                    📊 ${totalDays} jours de données
                 </span>
             </div>
         `;
         
         forfaitCard.appendChild(forfaitHeader);
         
-        // Première ligne : 4 indicateurs clés
+        // Ligne 1 : Énergie max et moyenne
         const row1 = document.createElement('div');
         row1.style.cssText = `
             display: grid;
-            grid-template-columns: repeat(4, 1fr);
+            grid-template-columns: repeat(2, 1fr);
             gap: 15px;
-            margin-bottom: 25px;
+            margin-bottom: 20px;
         `;
         
         row1.innerHTML = `
             <!-- Énergie max -->
             <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 16px; padding: 18px; color: white;">
                 <div style="font-size: 13px; opacity: 0.9; margin-bottom: 8px;">⚡ Énergie max (Wh)</div>
-                <div style="font-size: 32px; font-weight: 800; margin-bottom: 5px;">${forfaitStats.maxConsumption.toFixed(1)}</div>
-                <div style="font-size: 12px; opacity: 0.8;">le ${forfaitStats.endDate.toLocaleDateString('fr-FR')}</div>
+                <div style="font-size: 32px; font-weight: 800; margin-bottom: 5px;">${maxConsumption.toFixed(1)}</div>
+                <div style="font-size: 12px; opacity: 0.8;">le ${maxConsumptionDate ? maxConsumptionDate.toLocaleDateString('fr-FR') : '-'}</div>
             </div>
             
             <!-- Énergie moyenne -->
             <div style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); border-radius: 16px; padding: 18px; color: white;">
                 <div style="font-size: 13px; opacity: 0.9; margin-bottom: 8px;">📊 Énergie moyenne (Wh)</div>
-                <div style="font-size: 32px; font-weight: 800; margin-bottom: 5px;">${forfaitStats.avgConsumption}</div>
-                <div style="font-size: 12px; opacity: 0.8;">sur ${forfaitStats.totalDays} jours</div>
-            </div>
-            
-            <!-- Jours sans conso -->
-            <div style="background: linear-gradient(135deg, #94a3b8 0%, #64748b 100%); border-radius: 16px; padding: 18px; color: white;">
-                <div style="font-size: 13px; opacity: 0.9; margin-bottom: 8px;">⭕ Jours sans conso</div>
-                <div style="font-size: 32px; font-weight: 800; margin-bottom: 5px;">0</div>
-                <div style="font-size: 12px; opacity: 0.8;">Non calculé</div>
-            </div>
-            
-            <!-- Jours avec conso -->
-            <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 16px; padding: 18px; color: white;">
-                <div style="font-size: 13px; opacity: 0.9; margin-bottom: 8px;">✅ Jours avec conso</div>
-                <div style="font-size: 32px; font-weight: 800; margin-bottom: 5px;">${forfaitStats.totalDays}</div>
-                <div style="font-size: 12px; opacity: 0.8;">100% du temps</div>
+                <div style="font-size: 32px; font-weight: 800; margin-bottom: 5px;">${avgConsumption}</div>
+                <div style="font-size: 12px; opacity: 0.8;">sur ${daysWithConsumption} jours avec conso</div>
             </div>
         `;
         
         forfaitCard.appendChild(row1);
         
-        // Deuxième ligne : >90% et ≤90%
-        const row2 = document.createElement('div');
-        row2.style.cssText = `
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 15px;
-            margin-bottom: 25px;
-        `;
-        
-        row2.innerHTML = `
-            <!-- >90% du forfait -->
-            <div style="background: linear-gradient(135deg, #fee2e2 0%, #ffffff 100%); border-radius: 16px; padding: 18px; border: 2px solid #ef4444; display: flex; align-items: center; gap: 15px;">
-                <div style="width: 50px; height: 50px; background: #ef4444; border-radius: 12px; display: flex; align-items: center; justify-content: center;">
-                    <span style="font-size: 24px; color: white;">⚡</span>
-                </div>
-                <div style="flex: 1;">
-                    <div style="font-size: 13px; color: #991b1b; font-weight: 600; margin-bottom: 5px;">>90% du forfait</div>
-                    <div style="display: flex; align-items: baseline; gap: 8px;">
-                        <span style="font-size: 28px; font-weight: 800; color: #dc2626;">${forfaitStats.daysAbove90}</span>
-                        <span style="font-size: 16px; color: #64748b;">jours</span>
-                    </div>
-                    <div style="font-size: 12px; color: #b91c1c;">${percentAbove90}% des jours</div>
-                </div>
-            </div>
-            
-            <!-- ≤90% du forfait -->
-            <div style="background: linear-gradient(135deg, #dcfce7 0%, #ffffff 100%); border-radius: 16px; padding: 18px; border: 2px solid #22c55e; display: flex; align-items: center; gap: 15px;">
-                <div style="width: 50px; height: 50px; background: #22c55e; border-radius: 12px; display: flex; align-items: center; justify-content: center;">
-                    <span style="font-size: 24px; color: white;">✅</span>
-                </div>
-                <div style="flex: 1;">
-                    <div style="font-size: 13px; color: #166534; font-weight: 600; margin-bottom: 5px;">≤90% du forfait</div>
-                    <div style="display: flex; align-items: baseline; gap: 8px;">
-                        <span style="font-size: 28px; font-weight: 800; color: #16a34a;">${daysBelow90}</span>
-                        <span style="font-size: 16px; color: #64748b;">jours</span>
-                    </div>
-                    <div style="font-size: 12px; color: #15803d;">${percentBelow90}% des jours</div>
-                </div>
-            </div>
-        `;
-        
-        forfaitCard.appendChild(row2);
-        
-        // Titre pour la section répartition
+        // Titre répartition
         const repartitionTitle = document.createElement('div');
         repartitionTitle.style.cssText = `
             font-size: 16px;
             font-weight: 700;
             color: #0f172a;
-            margin-bottom: 20px;
+            margin: 20px 0 15px 0;
             display: flex;
             align-items: center;
             gap: 8px;
         `;
         repartitionTitle.innerHTML = `
             <span style="font-size: 20px;">📈</span>
-            <span>Répartition par rapport au forfait (${forfaitStats.baseMax}Wh, tolérance ${forfaitStats.tolerancePercent}%)</span>
+            <span>Répartition par rapport au forfait (seuils 85% et 115%)</span>
         `;
         forfaitCard.appendChild(repartitionTitle);
         
-        // Barre de progression horizontale pour la répartition
+        // Ligne 3 : Les 3 catégories de consommation
+        const row3 = document.createElement('div');
+        row3.style.cssText = `
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-bottom: 20px;
+        `;
+        
+        row3.innerHTML = `
+            <!-- ≤85% du forfait (Normal) -->
+            <div style="background: #f0fdf4; border-radius: 16px; padding: 18px; border: 2px solid #22c55e;">
+                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+                    <div style="width: 32px; height: 32px; background: #22c55e; border-radius: 8px; display: flex; align-items: center; justify-content: center;">
+                        <span style="font-size: 18px; color: white;">✅</span>
+                    </div>
+                    <span style="font-size: 14px; font-weight: 600; color: #166534;">Normal (≤85%)</span>
+                </div>
+                <div style="font-size: 32px; font-weight: 800; color: #22c55e; margin-bottom: 5px;">${daysBelow85}</div>
+                <div style="font-size: 14px; color: #166534; margin-bottom: 10px;">jours</div>
+                <div style="background: #dcfce7; padding: 8px 12px; border-radius: 8px; font-size: 13px; font-weight: 600; color: #166534;">
+                    ${percentBelow85}% des jours avec conso
+                </div>
+            </div>
+            
+            <!-- 85-115% du forfait (Tolérance) -->
+            <div style="background: #fef3c7; border-radius: 16px; padding: 18px; border: 2px solid #f59e0b;">
+                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+                    <div style="width: 32px; height: 32px; background: #f59e0b; border-radius: 8px; display: flex; align-items: center; justify-content: center;">
+                        <span style="font-size: 18px; color: white;">⚠️</span>
+                    </div>
+                    <span style="font-size: 14px; font-weight: 600; color: #92400e;">Tolérance (85-115%)</span>
+                </div>
+                <div style="font-size: 32px; font-weight: 800; color: #f59e0b; margin-bottom: 5px;">${daysInTolerance}</div>
+                <div style="font-size: 14px; color: #92400e; margin-bottom: 10px;">jours</div>
+                <div style="background: #fed7aa; padding: 8px 12px; border-radius: 8px; font-size: 13px; font-weight: 600; color: #92400e;">
+                    ${percentInTolerance}% des jours avec conso
+                </div>
+            </div>
+            
+            <!-- ≥115% du forfait (Hors tolérance) -->
+            <div style="background: #fee2e2; border-radius: 16px; padding: 18px; border: 2px solid #ef4444;">
+                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+                    <div style="width: 32px; height: 32px; background: #ef4444; border-radius: 8px; display: flex; align-items: center; justify-content: center;">
+                        <span style="font-size: 18px; color: white;">🔴</span>
+                    </div>
+                    <span style="font-size: 14px; font-weight: 600; color: #991b1b;">Hors tolérance (≥115%)</span>
+                </div>
+                <div style="font-size: 32px; font-weight: 800; color: #ef4444; margin-bottom: 5px;">${daysAbove115}</div>
+                <div style="font-size: 14px; color: #991b1b; margin-bottom: 10px;">jours</div>
+                <div style="background: #fecaca; padding: 8px 12px; border-radius: 8px; font-size: 13px; font-weight: 600; color: #991b1b;">
+                    ${percentAbove115}% des jours avec conso
+                </div>
+            </div>
+        `;
+        
+        forfaitCard.appendChild(row3);
+        
+        // Ligne 4 : Événements énergie épuisée
+        const row4 = document.createElement('div');
+        row4.style.cssText = `
+            margin-top: 15px;
+            padding: 18px;
+            background: ${daysWithSuspendE > 0 ? '#fee2e2' : '#f8fafc'};
+            border-radius: 12px;
+            border: 2px solid ${daysWithSuspendE > 0 ? '#ef4444' : '#e2e8f0'};
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        `;
+        
+        // Barre de progression
         const progressBar = document.createElement('div');
         progressBar.style.cssText = `
-            margin-top: 15px;
-            margin-bottom: 25px;
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8fafc;
+            border-radius: 12px;
+            border: 1px solid #e2e8f0;
         `;
-
+        
         progressBar.innerHTML = `
             <div style="display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 12px; color: #64748b;">
-                <span>Répartition de la consommation (sur les jours avec conso)</span>
-                <span>${forfaitStats.totalDays} jours</span>
+                <span>Répartition sur ${daysWithConsumption} jours avec consommation</span>
+                <span>Seuils: 85% (${seuil85.toFixed(0)}Wh) et 115% (${maxWithTolerance.toFixed(0)}Wh)</span>
             </div>
             
             <!-- Barre de progression avec 3 segments -->
             <div style="background: #f1f5f9; border-radius: 30px; height: 40px; overflow: hidden; display: flex; box-shadow: inset 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 15px;">
-                <!-- Dans les limites (vert) -->
-                <div style="width: ${percentInLimits}%; height: 100%; background: #22c55e; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; color: white;">
-                    ${percentInLimits > 5 ? percentInLimits + '%' : ''}
+                <!-- Normal (≤85%) -->
+                <div style="width: ${percentBelow85}%; height: 100%; background: #22c55e; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; color: white;">
+                    ${percentBelow85 > 5 ? percentBelow85 + '%' : ''}
                 </div>
-                <!-- Dans la tolérance (orange) -->
+                <!-- Tolérance (85-115%) -->
                 <div style="width: ${percentInTolerance}%; height: 100%; background: #f59e0b; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; color: white;">
                     ${percentInTolerance > 5 ? percentInTolerance + '%' : ''}
                 </div>
-                <!-- Hors tolérance (rouge) -->
-                <div style="width: ${percentOutTolerance}%; height: 100%; background: #ef4444; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; color: white;">
-                    ${percentOutTolerance > 5 ? percentOutTolerance + '%' : ''}
+                <!-- Hors tolérance (>115%) -->
+                <div style="width: ${percentAbove115}%; height: 100%; background: #ef4444; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; color: white;">
+                    ${percentAbove115 > 5 ? percentAbove115 + '%' : ''}
                 </div>
             </div>
             
-            <!-- Légende avec 3 catégories détaillées -->
-            <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 10px;">
-                <!-- Dans les limites -->
-                <div style="display: flex; align-items: center; gap: 8px; background: #f0fdf4; padding: 8px 12px; border-radius: 8px; border-left: 4px solid #22c55e;">
+            <!-- Légende détaillée -->
+            <div style="display: flex; flex-wrap: wrap; gap: 15px; justify-content: space-between; margin-top: 10px;">
+                <div style="display: flex; align-items: center; gap: 8px;">
                     <span style="width: 16px; height: 16px; background: #22c55e; border-radius: 4px;"></span>
-                    <span style="flex: 1; font-size: 13px; color: #166534;">
-                        <strong>${daysInLimits} jours</strong> (≤${forfaitStats.baseMax}Wh) · <strong>${percentInLimits}%</strong> 
-                        <span style="color: #22c55e; font-weight: 600;">(Normal)</span>
+                    <span style="font-size: 12px; color: #166534;">
+                        <strong>${daysBelow85} jours</strong> (≤${seuil85.toFixed(0)}Wh) · ${percentBelow85}%
                     </span>
                 </div>
-                
-                <!-- Dans la tolérance -->
-                <div style="display: flex; align-items: center; gap: 8px; background: #fef3c7; padding: 8px 12px; border-radius: 8px; border-left: 4px solid #f59e0b;">
+                <div style="display: flex; align-items: center; gap: 8px;">
                     <span style="width: 16px; height: 16px; background: #f59e0b; border-radius: 4px;"></span>
-                    <span style="flex: 1; font-size: 13px; color: #92400e;">
-                        <strong>${daysInTolerance} jours</strong> (${forfaitStats.baseMax}-${forfaitStats.maxWithTolerance}Wh) · <strong>${percentInTolerance}%</strong>
-                        <span style="color: #f59e0b; font-weight: 600;">(Atteint la tolérance)</span>
+                    <span style="font-size: 12px; color: #92400e;">
+                        <strong>${daysInTolerance} jours</strong> (${seuil85.toFixed(0)}-${maxWithTolerance.toFixed(0)}Wh) · ${percentInTolerance}%
                     </span>
                 </div>
-                
-                <!-- Hors tolérance -->
-                <div style="display: flex; align-items: center; gap: 8px; background: #fee2e2; padding: 8px 12px; border-radius: 8px; border-left: 4px solid #ef4444;">
+                <div style="display: flex; align-items: center; gap: 8px;">
                     <span style="width: 16px; height: 16px; background: #ef4444; border-radius: 4px;"></span>
-                    <span style="flex: 1; font-size: 13px; color: #991b1b;">
-                        <strong>${daysOutTolerance} jours</strong> (>${forfaitStats.maxWithTolerance}Wh) · <strong>${percentOutTolerance}%</strong>
-                        <span style="color: #ef4444; font-weight: 600;">(Hors tolérance)</span>
+                    <span style="font-size: 12px; color: #991b1b;">
+                        <strong>${daysAbove115} jours</strong> (>${maxWithTolerance.toFixed(0)}Wh) · ${percentAbove115}%
                     </span>
                 </div>
             </div>
         `;
-
+        
         forfaitCard.appendChild(progressBar);
         
         content.appendChild(forfaitCard);
@@ -9320,126 +9815,60 @@ function createClientCreditAnalysis(clientNumber) {
     analysisDiv.style.cssText = `
         background: white;
         border-radius: 12px;
-        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
         margin-bottom: 20px;
         overflow: hidden;
+        border: 1px solid #e2e8f0;
     `;
     
+    // En-tête compact
     const header = document.createElement('div');
     header.style.cssText = `
         background: linear-gradient(135deg, #9f7aea 0%, #805ad5 100%);
         color: white;
-        padding: 15px 25px;
-        font-size: 16px;
+        padding: 10px 18px;
+        font-size: 15px;
         font-weight: 600;
         display: flex;
         align-items: center;
-        gap: 10px;
+        gap: 8px;
     `;
-    header.innerHTML = `💰 Analyse de Crédit et Recharges - Client ${clientNumber}`;
+    header.innerHTML = `💰 Crédit & Recharges - Client ${clientNumber}`;
     analysisDiv.appendChild(header);
     
     const content = document.createElement('div');
-    content.style.cssText = `padding: 20px;`;
+    content.style.cssText = `padding: 15px;`;
 
-    // Analyser les données de solde (crédit)
+    // Analyser les données de solde
     const creditData = combinedSoldeData.map(row => ({
         date: row['Date et Heure'],
         value: parseFloat(row[`Credit${clientNumber}`]) || 0
     })).filter(d => !isNaN(d.value) && d.value !== null);
     
-    const totalDays = new Set(creditData.map(d => d.date.split(' ')[0])).size;
-    const daysWithoutCredit = creditData.filter(d => d.value === 0).length;
-    const maxCredit = creditData.length > 0 ? Math.max(...creditData.map(d => d.value)) : 0;
-    
     // Analyser les données de recharge
     const rechargeAnalysis = analyzeRechargeData(clientNumber);
     
-    if (totalDays === 0 && !rechargeAnalysis.hasData) {
-        content.innerHTML = `<div style="text-align: center; padding: 30px; color: #94a3b8;">Aucune donnée de crédit ou recharge pour ce client</div>`;
+    if (creditData.length === 0 && !rechargeAnalysis.hasData) {
+        content.innerHTML = `<div style="text-align: center; padding: 25px; color: #94a3b8;">Aucune donnée</div>`;
     } else {
-        // === SYNTHÈSE COMMERCIALE EN PHRASE (EN PREMIER) ===
-        const syntheseDiv = document.createElement('div');
-        syntheseDiv.style.cssText = `
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            border-radius: 16px;
-            padding: 20px 25px;
-            margin-bottom: 25px;
-            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.3);
-            color: white;
-            font-size: 14px;
-            line-height: 1.6;
-            border: 1px solid rgba(255, 255, 255, 0.2);
-        `;
-
-        // Construire la phrase de synthèse commerciale
-        let syntheseText = `
-            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
-                <div style="background: rgba(255, 255, 255, 0.2); width: 40px; height: 40px; border-radius: 12px; display: flex; align-items: center; justify-content: center;">
-                    <span style="font-size: 22px;">📌</span>
-                </div>
-                <div>
-                    <div style="font-size: 12px; opacity: 0.9; margin-bottom: 2px;">Synthèse client</div>
-                    <div style="font-size: 20px; font-weight: 700;">Client ${clientNumber}</div>
-                </div>
-            </div>
-            
-            <div style="font-size: 14px; margin-top: 5px;">
-                <span style="opacity: 0.9;">👉 </span>
-                <span>Ce client a eu <strong style="color: #fcd34d;">${daysWithoutCredit} jour(s) sans crédit</strong> sur ${totalDays} jours analysés, avec un crédit maximum de <strong>${maxCredit.toFixed(2)} jours</strong>.</span>
-        `;
-
-        if (rechargeAnalysis.hasData) {
-            // Calculer l'habitude principale
-            const mainDays = rechargeAnalysis.purchaseDays.reduce((acc, item) => {
-                acc[item.days] = (acc[item.days] || 0) + 1;
-                return acc;
-            }, {});
-            
-            const mainHabit = Object.entries(mainDays)
-                .sort((a, b) => b[1] - a[1])[0];
-            
-            if (mainHabit) {
-                const percentage = (mainHabit[1] / rechargeAnalysis.purchaseDays.length * 100).toFixed(1);
-                syntheseText += `<br><br><span style="opacity: 0.9;">📱 </span>Il recharge généralement pour <strong style="color: #fcd34d;">${mainHabit[0]} jours</strong> (${percentage}% des ${rechargeAnalysis.totalRecharges} recharges).`;
-            }
-            
-            if (rechargeAnalysis.code4ValuesWithNames.length > 0) {
-                const forfaitNames = rechargeAnalysis.code4ValuesWithNames.map(f => f.name).join(' → ');
-                syntheseText += `<br><br><span style="opacity: 0.9;">📦 </span>Forfaits utilisés : <strong>${forfaitNames}</strong>`;
-                if (rechargeAnalysis.currentCode4Name) {
-                    syntheseText += ` (actuel : <strong style="color: #6ee7b7;">${rechargeAnalysis.currentCode4Name}</strong>)`;
-                }
-                syntheseText += `.`;
-            }
-        } else {
-            syntheseText += `<br><br><span style="opacity: 0.9;">⚠️ </span>Aucune donnée de recharge disponible pour ce client.`;
-        }
-
-        syntheseText += `</div>`;
-
-        syntheseDiv.innerHTML = syntheseText;
-        content.appendChild(syntheseDiv);
         
-        // === CARTE DES JOURS SANS CRÉDIT ===
-        const daysWithoutCreditCard = createDaysWithoutCreditCard(clientNumber);
-        content.appendChild(daysWithoutCreditCard);
+        // === SÉRIES CONSÉCUTIVES SANS CRÉDIT ===
+        const streaksCard = createDaysWithoutCreditCard(clientNumber);
+        content.appendChild(streaksCard);
         
-        // === ANALYSE DES POURCENTAGES DES JOURS ACHETÉS (CODE 3) ===
+        // === HABITUDES DE RECHARGE ===
         if (rechargeAnalysis.hasData && rechargeAnalysis.purchaseDays.length > 0) {
-            // Calculer les pourcentages
             const totalPurchases = rechargeAnalysis.purchaseDays.length;
-            const daysCountMap = new Map();
             
+            // 1. HABITUDE DE RECHARGE (par nombre de jours spécifiques)
+            const daysCountMap = new Map();
             rechargeAnalysis.purchaseDays.forEach(item => {
                 const days = item.days;
                 daysCountMap.set(days, (daysCountMap.get(days) || 0) + 1);
             });
             
-            // Trier par nombre de jours
             const sortedDays = Array.from(daysCountMap.entries()).sort((a, b) => b[0] - a[0]);
             
-            // Trouver l'habitude principale (le plus fréquent)
             let mainHabit = { days: 0, count: 0, percentage: 0 };
             sortedDays.forEach(([days, count]) => {
                 if (count > mainHabit.count) {
@@ -9447,347 +9876,406 @@ function createClientCreditAnalysis(clientNumber) {
                 }
             });
             
-            // Créer la section des pourcentages
-            const percentageSection = document.createElement('div');
-            percentageSection.style.cssText = `
-                background: linear-gradient(135deg, #f8fafc 0%, #ffffff 100%);
-                border-radius: 12px;
-                padding: 20px;
-                margin-bottom: 20px;
-                border: 1px solid #e2e8f0;
-                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
-            `;
+            // 2. RÉPARTITION PAR INTERVALLES
+            let intervalJours = 0;      // 1-6 jours
+            let intervalSemaine = 0;    // 7-29 jours
+            let intervalMois = 0;        // >=30 jours
             
-            percentageSection.innerHTML = `
-                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 15px;">
-                    <span style="font-size: 22px;">📊</span>
-                    <span style="font-weight: 700; color: #1e293b; font-size: 16px;">Habitudes de recharge (Jours achetés)</span>
-                </div>
-                
-                <!-- Barres de pourcentage -->
-                <div style="margin-bottom: 20px;">
-                    ${sortedDays.map(([days, count]) => {
-                        const percentage = (count / totalPurchases * 100).toFixed(1);
-                        const isMain = days === mainHabit.days;
-                        return `
-                            <div style="margin-bottom: 12px;">
-                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-                                    <div style="display: flex; align-items: center; gap: 8px;">
-                                        <span style="font-weight: 600; color: ${isMain ? '#9f7aea' : '#475569'};">${days} jours</span>
-                                        ${isMain ? '<span style="background: #9f7aea; color: white; padding: 2px 8px; border-radius: 12px; font-size: 10px;">HABITUDE</span>' : ''}
-                                    </div>
-                                    <span style="font-weight: 700; color: ${isMain ? '#9f7aea' : '#334155'};">${percentage}%</span>
-                                </div>
-                                <div style="width: 100%; height: 10px; background: #e2e8f0; border-radius: 6px; overflow: hidden;">
-                                    <div style="width: ${percentage}%; height: 100%; background: ${isMain ? '#9f7aea' : '#94a3b8'}; border-radius: 6px; transition: width 0.3s ease;"></div>
-                                </div>
-                                <div style="display: flex; justify-content: space-between; margin-top: 2px;">
-                                    <span style="font-size: 10px; color: #64748b;">${count} recharge${count > 1 ? 's' : ''}</span>
-                                    <span style="font-size: 10px; color: #64748b;">sur ${totalPurchases}</span>
-                                </div>
-                            </div>
-                        `;
-                    }).join('')}
-                </div>
-                
-                <!-- Conclusion -->
-                <div style="background: ${mainHabit.days === 7 ? '#f0fdf4' : mainHabit.days >= 5 ? '#fef9c3' : '#fee2e2'}; padding: 12px 15px; border-radius: 8px; border-left: 4px solid ${mainHabit.days === 7 ? '#22c55e' : mainHabit.days >= 5 ? '#eab308' : '#ef4444'};">
-                    <div style="display: flex; align-items: center; gap: 8px;">
-                        <span style="font-size: 18px;">${mainHabit.days === 7 ? '✅' : mainHabit.days >= 5 ? '⚠️' : '🔴'}</span>
-                        <div>
-                            <span style="font-weight: 600; color: #1e293b;">Conclusion : </span>
-                            <span style="color: #475569;">
-                                Le client effectue généralement une recharge de <strong style="color: ${mainHabit.days === 7 ? '#22c55e' : mainHabit.days >= 5 ? '#eab308' : '#ef4444'};">${mainHabit.days} jours</strong> 
-                                (${mainHabit.percentage}% du temps, ${mainHabit.count} recharges).
-                            </span>
-                        </div>
-                    </div>
-                </div>
-            `;
+            rechargeAnalysis.purchaseDays.forEach(item => {
+                const days = item.days;
+                if (days >= 1 && days <= 6) intervalJours++;
+                else if (days >= 7 && days <= 28) intervalSemaine++;
+                else if (days >= 29) intervalMois++;
+            });
             
-            content.appendChild(percentageSection);
-        }
-        
-        // === SECTION FORFAITS UTILISÉS ===
-        if (rechargeAnalysis.hasData && rechargeAnalysis.code4ValuesWithNames.length > 0) {
-            const code4Section = document.createElement('div');
-            code4Section.style.cssText = `
+            const percentJours = totalPurchases > 0 ? (intervalJours / totalPurchases * 100).toFixed(1) : 0;
+            const percentSemaine = totalPurchases > 0 ? (intervalSemaine / totalPurchases * 100).toFixed(1) : 0;
+            const percentMois = totalPurchases > 0 ? (intervalMois / totalPurchases * 100).toFixed(1) : 0;
+            
+            const intervals = [
+                { name: 'Jours', value: intervalJours, percent: percentJours, color: '#f97316', range: '1-6j' },
+                { name: 'Semaine', value: intervalSemaine, percent: percentSemaine, color: '#3b82f6', range: '7-28j' },
+                { name: 'Mois', value: intervalMois, percent: percentMois, color: '#22c55e', range: '>28j' }
+            ];
+            
+            const mainInterval = intervals.reduce((max, interval) => 
+                interval.value > max.value ? interval : max
+            );
+            
+            const habitSection = document.createElement('div');
+            habitSection.style.cssText = `
                 background: #f8fafc;
-                border-radius: 12px;
-                padding: 20px;
-                margin-bottom: 20px;
+                border-radius: 8px;
+                padding: 12px;
+                margin-bottom: 12px;
                 border: 1px solid #e2e8f0;
             `;
             
-            // Créer les badges des forfaits avec noms
-            const badgesHtml = rechargeAnalysis.code4ValuesWithNames.map(item => {
-                // Couleur différente selon le type de forfait
-                let bgColor = '#9f7aea'; // Violet par défaut
-                if (item.name.includes('ECO')) bgColor = '#22c55e';
-                else if (item.name.includes('ECLAIRAGE')) bgColor = '#eab308';
-                else if (item.name.includes('MULTIMEDIA')) bgColor = '#f97316';
-                else if (item.name.includes('CONGEL')) bgColor = '#3b82f6';
-                else if (item.name.includes('CSB')) bgColor = '#ec4899';
+            // Construction de la barre d'habitude (détail par jour)
+            let habitBarHTML = '';
+            let habitLegendHTML = '';
+            
+            sortedDays.forEach(([days, count]) => {
+                const percentage = (count / totalPurchases * 100).toFixed(1);
+                const isMain = days === mainHabit.days;
                 
-                return `
-                    <span style="background: ${bgColor}; color: white; padding: 6px 16px; border-radius: 30px; font-size: 13px; font-weight: 600; display: inline-flex; align-items: center; gap: 5px; box-shadow: 0 2px 5px ${bgColor}60;">
-                        <span style="font-size: 14px;">📦</span>
-                        ${item.name}
+                let bgColor = '';
+                if (days >= 30) bgColor = '#22c55e';
+                else if (days >= 20) bgColor = '#84cc16';
+                else if (days >= 15) bgColor = '#eab308';
+                else if (days >= 10) bgColor = '#f97316';
+                else if (days >= 7) bgColor = '#ef4444';
+                else if (days >= 5) bgColor = '#ec4899';
+                else if (days >= 3) bgColor = '#8b5cf6';
+                else bgColor = '#94a3b8';
+                
+                habitBarHTML += `
+                    <div style="width: ${percentage}%; height: 100%; background: ${bgColor}; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 600; color: white; position: relative;" title="${days}j : ${percentage}%">
+                        ${percentage > 8 ? percentage + '%' : ''}
+                        ${isMain ? '<span style="position: absolute; top: -6px; font-size: 12px;">⭐</span>' : ''}
+                    </div>
+                `;
+                
+                habitLegendHTML += `
+                    <span style="display: flex; align-items: center; gap: 3px; font-size: 9px;">
+                        <span style="width: 8px; height: 8px; background: ${bgColor}; border-radius: 2px;"></span>
+                        ${days}j ${percentage}%${isMain ? ' ⭐' : ''}
                     </span>
-                `;
-            }).join('');
-            
-            code4Section.innerHTML = `
-                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 15px;">
-                    <span style="font-size: 20px;">📋</span>
-                    <span style="font-weight: 700; color: #334155; font-size: 16px;">Forfaits utilisés</span>
-                </div>
-                <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 15px;">
-                    ${badgesHtml}
-                    ${rechargeAnalysis.currentCode4Name ? `
-                        <span style="background: #22c55e; color: white; padding: 6px 16px; border-radius: 30px; font-size: 12px; font-weight: 600; margin-left: auto; display: flex; align-items: center; gap: 5px;">
-                            <span style="font-size: 14px;">✅</span>
-                            Actuel: ${rechargeAnalysis.currentCode4Name}
-                        </span>
-                    ` : ''}
-                </div>
-            `;
-            
-            // Tableau des changements de forfait (avec noms)
-            if (rechargeAnalysis.code4Changes.length > 1) {
-                const changesTable = document.createElement('div');
-                changesTable.style.cssText = `
-                    margin-top: 15px;
-                    border-top: 1px solid #e2e8f0;
-                    padding-top: 15px;
-                `;
-                
-                let tableHTML = `
-                    <div style="font-weight: 600; color: #334155; margin-bottom: 10px;">📅 Historique des changements de forfait :</div>
-                    <div style="max-height: 200px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 8px;">
-                        <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
-                            <thead style="position: sticky; top: 0; background: #f1f5f9;">
-                                <tr>
-                                    <th style="padding: 8px; text-align: left;">Date</th>
-                                    <th style="padding: 8px; text-align: center;">Ancien forfait</th>
-                                    <th style="padding: 8px; text-align: center;">Nouveau forfait</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                `;
-                
-                rechargeAnalysis.code4Changes.forEach((change, index) => {
-                    if (change.type === 'change') {
-                        tableHTML += `
-                            <tr style="border-bottom: 1px solid #e2e8f0; background: ${index % 2 === 0 ? '#ffffff' : '#fafbfc'};">
-                                <td style="padding: 8px;">${change.formattedDate} à ${change.time}</td>
-                                <td style="padding: 8px; text-align: center;">
-                                    <span style="background: #f97316; color: white; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600;">
-                                        ${change.oldName}
-                                    </span>
-                                </td>
-                                <td style="padding: 8px; text-align: center;">
-                                    <span style="background: #22c55e; color: white; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600;">
-                                        ${change.newName}
-                                    </span>
-                                </td>
-                            </tr>
-                        `;
-                    }
-                });
-                
-                tableHTML += `</tbody></table></div>`;
-                changesTable.innerHTML = tableHTML;
-                code4Section.appendChild(changesTable);
-            }
-            
-            content.appendChild(code4Section);
-        }
-        
-        // === TABLEAU DES RECHARGES ===
-        if (rechargeAnalysis.hasData) {
-            const rechargeTable = document.createElement('div');
-            rechargeTable.style.cssText = `
-                margin-bottom: 20px;
-                border: 1px solid #e2e8f0;
-                border-radius: 12px;
-                overflow: hidden;
-            `;
-            
-            const tableHeader = document.createElement('div');
-            tableHeader.style.cssText = `
-                background: linear-gradient(135deg, #9f7aea 0%, #805ad5 100%);
-                color: white;
-                padding: 12px 20px;
-                font-weight: 600;
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-            `;
-            tableHeader.innerHTML = `
-                <span style="display: flex; align-items: center; gap: 8px;">
-                    <span style="font-size: 18px;">⚡</span>
-                    Historique des recharges
-                </span>
-                <span style="background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 20px; font-size: 12px;">
-                    ${rechargeAnalysis.totalRecharges} opération(s)
-                </span>
-            `;
-            
-            const tableWrapper = document.createElement('div');
-            tableWrapper.style.cssText = `
-                max-height: 350px;
-                overflow-y: auto;
-                overflow-x: auto;
-                background: white;
-            `;
-            
-            let tableHTML = `
-                <table style="width: 100%; border-collapse: collapse; font-size: 12px; min-width: 900px;">
-                    <thead style="position: sticky; top: 0; background: #f8fafc; z-index: 10;">
-                        <tr style="border-bottom: 2px solid #e2e8f0;">
-                            <th style="padding: 12px 10px; text-align: left;">Date</th>
-                            <th style="padding: 12px 10px; text-align: center;">Code</th>
-                            <th style="padding: 12px 10px; text-align: center;">Type</th>
-                            <th style="padding: 12px 10px; text-align: center;">Code 3 (jours)</th>
-                            <th style="padding: 12px 10px; text-align: center;">Forfait</th>
-                            <th style="padding: 12px 10px; text-align: center;">Statut</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-            `;
-            
-            // Trier par date décroissante (plus récent en premier)
-            const sortedRecharges = [...combinedRechargeData]
-                .filter(row => row['Code 1']?.toString().trim() === clientNumber.toString())
-                .sort((a, b) => new Date(b['Date et Heure']) - new Date(a['Date et Heure']));
-            
-            sortedRecharges.forEach((row, index) => {
-                const date = row['Date et Heure'] || '-';
-                const type = row['Type de code'] || '-';
-                const code3 = row['Code 3'] || '-';
-                const code4 = row['Code 4'] || '-';
-                const status = row['Status'] || '-';
-                
-                const statusColor = status.toLowerCase().includes('reussie') ? '#22c55e' : 
-                                status.toLowerCase().includes('echoue') ? '#ef4444' : '#f59e0b';
-                
-                // Afficher le nom du forfait au lieu du numéro
-                const code4Num = parseInt(code4);
-                const code4Name = getForfaitName(code4Num);
-                const code4Display = !isNaN(code4Num) && code4Num > 0 ? 
-                    `<span style="background: #9f7aea20; padding: 3px 8px; border-radius: 16px; font-weight: 600; color: #9f7aea;">
-                        ${code4Name}
-                    </span>` : '-';
-                
-                // Mettre en évidence la ligne si c'est un changement de forfait
-                const isCode4Change = rechargeAnalysis.code4Changes.some(
-                    change => change.date === row['Date et Heure'] && change.type === 'change'
-                );
-                
-                tableHTML += `
-                    <tr style="border-bottom: 1px solid #e2e8f0; background: ${index % 2 === 0 ? '#ffffff' : '#fafbfc'}; ${isCode4Change ? 'border-left: 3px solid #9f7aea;' : ''}">
-                        <td style="padding: 10px; white-space: nowrap;">${date}</td>
-                        <td style="padding: 10px; text-align: center; font-family: monospace;">${row['Code enregistrer'] || '-'}</td>
-                        <td style="padding: 10px; text-align: center;">${type}</td>
-                        <td style="padding: 10px; text-align: center; font-weight: 600; color: #f97316;">${code3}</td>
-                        <td style="padding: 10px; text-align: center;">${code4Display}</td>
-                        <td style="padding: 10px; text-align: center;">
-                            <span style="background: ${statusColor}20; color: ${statusColor}; padding: 3px 10px; border-radius: 20px; font-weight: 600; font-size: 11px;">
-                                ${status}
-                            </span>
-                        </td>
-                    </tr>
                 `;
             });
             
-            tableHTML += `</tbody></table>`;
-            tableWrapper.innerHTML = tableHTML;
-            rechargeTable.appendChild(tableHeader);
-            rechargeTable.appendChild(tableWrapper);
-            content.appendChild(rechargeTable);
-        }
-        
-        // === TABLEAU DES SOLDES ===
-        const soldeTable = document.createElement('div');
-        soldeTable.style.cssText = `
-            border: 1px solid #e2e8f0;
-            border-radius: 12px;
-            overflow: hidden;
-            margin-bottom: 20px;
-        `;
-        
-        const soldeHeader = document.createElement('div');
-        soldeHeader.style.cssText = `
-            background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
-            color: white;
-            padding: 12px 20px;
-            font-weight: 600;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        `;
-        soldeHeader.innerHTML = `
-            <span style="display: flex; align-items: center; gap: 8px;">
-                <span style="font-size: 18px;">💰</span>
-                Historique des soldes (crédits)
-            </span>
-            <span style="background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 20px; font-size: 12px;">
-                ${creditData.length} relevé(s)
-            </span>
-        `;
-        
-        const soldeWrapper = document.createElement('div');
-        soldeWrapper.style.cssText = `
-            max-height: 350px;
-            overflow-y: auto;
-            overflow-x: auto;
-            background: white;
-        `;
-        
-        // Filtrer les données de solde pour ce client
-        const clientSoldeData = combinedSoldeData
-            .filter(row => {
-                const value = row[`Credit${clientNumber}`];
-                return value && value.toString().trim() !== '' && value.toString().trim() !== '-';
-            })
-            .sort((a, b) => new Date(b['Date et Heure']) - new Date(a['Date et Heure']));
-        
-        let soldeHTML = `
-            <table style="width: 100%; border-collapse: collapse; font-size: 12px; min-width: 400px;">
-                <thead style="position: sticky; top: 0; background: #f8fafc; z-index: 10;">
-                    <tr style="border-bottom: 2px solid #e2e8f0;">
-                        <th style="padding: 12px 10px; text-align: left;">Date</th>
-                        <th style="padding: 12px 10px; text-align: center;">Crédit (jours)</th>
-                        <th style="padding: 12px 10px; text-align: center;">Statut</th>
-                    </tr>
-                </thead>
-                <tbody>
-        `;
-        
-        clientSoldeData.forEach((row, index) => {
-            const date = row['Date et Heure'] || '-';
-            const value = parseFloat(row[`Credit${clientNumber}`]) || 0;
-            const bgColor = index % 2 === 0 ? '#ffffff' : '#fafbfc';
-            
-            soldeHTML += `
-                <tr style="border-bottom: 1px solid #e2e8f0; background: ${bgColor};">
-                    <td style="padding: 10px; white-space: nowrap;">${date}</td>
-                    <td style="padding: 10px; text-align: center; font-weight: 600; color: ${value === 0 ? '#ef4444' : '#48bb78'};">${value}</td>
-                    <td style="padding: 10px; text-align: center;">
-                        ${value === 0 ? 
-                            '<span style="background: #ef444420; color: #ef4444; padding: 3px 10px; border-radius: 20px; font-size: 11px;">Sans crédit</span>' : 
-                            '<span style="background: #48bb7820; color: #48bb78; padding: 3px 10px; border-radius: 20px; font-size: 11px;">Crédit disponible</span>'}
-                    </td>
-                </tr>
+            habitSection.innerHTML = `
+                <!-- Habitude de recharge (détail) -->
+                <div style="margin-bottom: 15px;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                        <div style="display: flex; align-items: center; gap: 5px;">
+                            <span style="font-size: 16px;">📊</span>
+                            <span style="font-weight: 600; font-size: 13px;">Habitudes de recharge</span>
+                        </div>
+                        <span style="background: #e2e8f0; padding: 2px 10px; border-radius: 12px; font-size: 10px; font-weight: 600;">
+                            ${totalPurchases} recharges
+                        </span>
+                    </div>
+                    
+                    <!-- Barre de progression avec tooltips -->
+                    <div style="height: 36px; background: #f1f5f9; border-radius: 18px; overflow: hidden; display: flex; margin-bottom: 10px; box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);">
+                        ${sortedDays.map(([days, count]) => {
+                            const percentage = (count / totalPurchases * 100).toFixed(1);
+                            const isMain = days === mainHabit.days;
+                            
+                            let bgColor = '';
+                            if (days >= 30) bgColor = '#22c55e';
+                            else if (days >= 20) bgColor = '#84cc16';
+                            else if (days >= 15) bgColor = '#eab308';
+                            else if (days >= 10) bgColor = '#f97316';
+                            else if (days >= 7) bgColor = '#ef4444';
+                            else if (days >= 5) bgColor = '#ec4899';
+                            else if (days >= 3) bgColor = '#8b5cf6';
+                            else bgColor = '#94a3b8';
+                            
+                            // Ajouter un effet de bordure pour l'habitude principale
+                            const borderStyle = isMain ? 'border: 2px solid #00000040; box-sizing: border-box;' : '';
+                            
+                            return `
+                                <div style="width: ${percentage}%; height: 100%; background: ${bgColor}; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: white; ${borderStyle} transition: all 0.2s;" 
+                                    title="${days} jours : ${count} recharge(s) (${percentage}%)"
+                                    onmouseover="this.style.opacity='0.9'"
+                                    onmouseout="this.style.opacity='1'">
+                                    ${percentage > 8 ? percentage + '%' : ''}
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                    
+                    <!-- Légende améliorée avec indicateur principal -->
+                    <div style="display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 5px; padding: 5px; background: #f8fafc; border-radius: 6px;">
+                        ${sortedDays.map(([days, count]) => {
+                            const percentage = (count / totalPurchases * 100).toFixed(1);
+                            const isMain = days === mainHabit.days;
+                            
+                            let bgColor = '';
+                            if (days >= 30) bgColor = '#22c55e';
+                            else if (days >= 20) bgColor = '#84cc16';
+                            else if (days >= 15) bgColor = '#eab308';
+                            else if (days >= 10) bgColor = '#f97316';
+                            else if (days >= 7) bgColor = '#ef4444';
+                            else if (days >= 5) bgColor = '#ec4899';
+                            else if (days >= 3) bgColor = '#8b5cf6';
+                            else bgColor = '#94a3b8';
+                            
+                            return `
+                                <div style="display: flex; align-items: center; gap: 5px; ${isMain ? 'background: #f1f5f9; padding: 2px 8px; border-radius: 16px; border: 1px solid #cbd5e1;' : ''}">
+                                    <div style="width: 12px; height: 12px; background: ${bgColor}; border-radius: 3px; ${isMain ? 'box-shadow: 0 0 0 2px white, 0 0 0 3px ' + bgColor + ';' : ''}"></div>
+                                    <span style="font-size: 11px; color: #334155;">
+                                        <strong>${days}j</strong>
+                                        <span style="color: #64748b;"> ${count}x</span>
+                                        <span style="color: #475569; font-weight: 600;"> ${percentage}%</span>
+                                        ${isMain ? '<span style="margin-left: 4px; font-size: 12px;">👑</span>' : ''}
+                                    </span>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                    
+                    <!-- Indication visuelle de l'habitude principale -->
+                    <div style="background: #f1f5f9; padding: 6px 10px; border-radius: 6px; font-size: 11px; color: #334155; display: flex; align-items: center; gap: 8px; border-left: 3px solid #9f7aea;">
+                        <span style="font-size: 14px;">👉</span>
+                        <span><strong>Habitude principale :</strong> <span style="background: #9f7aea20; color: #7e22ce; padding: 2px 10px; border-radius: 20px; font-weight: 700;">${mainHabit.days} jours</span> (${mainHabit.percentage}% des recharges)</span>
+                    </div>
+                </div>
+                
+                <!-- Séparateur -->
+                <div style="height: 1px; background: #e2e8f0; margin: 10px 0;"></div>
+                
+                <!-- Répartition par intervalles -->
+                <div style="margin-top: 10px;">
+                    <div style="display: flex; align-items: center; gap: 5px; margin-bottom: 8px;">
+                        <span style="font-size: 14px;">📈</span>
+                        <span style="font-weight: 600; font-size: 12px;">Répartition par intervalle</span>
+                    </div>
+                    
+                    <div style="height: 36px; background: #f1f5f9; border-radius: 18px; overflow: hidden; display: flex; margin-bottom: 10px; box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);">
+                        <div style="width: ${percentJours}%; height: 100%; background: #f97316; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: white; transition: all 0.2s;" 
+                            title="1-6 jours : ${intervalJours} recharge(s) (${percentJours}%)"
+                            onmouseover="this.style.opacity='0.9'"
+                            onmouseout="this.style.opacity='1'">
+                            ${percentJours > 8 ? percentJours + '%' : ''}
+                        </div>
+                        <div style="width: ${percentSemaine}%; height: 100%; background: #3b82f6; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: white; transition: all 0.2s;" 
+                            title="7-29 jours : ${intervalSemaine} recharge(s) (${percentSemaine}%)"
+                            onmouseover="this.style.opacity='0.9'"
+                            onmouseout="this.style.opacity='1'">
+                            ${percentSemaine > 8 ? percentSemaine + '%' : ''}
+                        </div>
+                        <div style="width: ${percentMois}%; height: 100%; background: #22c55e; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: white; transition: all 0.2s;" 
+                            title="≥30 jours : ${intervalMois} recharge(s) (${percentMois}%)"
+                            onmouseover="this.style.opacity='0.9'"
+                            onmouseout="this.style.opacity='1'">
+                            ${percentMois > 8 ? percentMois + '%' : ''}
+                        </div>
+                    </div>
+                    
+                    <div style="display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-around; margin-bottom: 8px;">
+                        <div style="display: flex; align-items: center; gap: 5px; ${mainInterval.name === 'Jours' ? 'background: #f1f5f9; padding: 3px 10px; border-radius: 20px;' : ''}">
+                            <div style="width: 14px; height: 14px; background: #f97316; border-radius: 3px; ${mainInterval.name === 'Jours' ? 'box-shadow: 0 0 0 2px white, 0 0 0 3px #f97316;' : ''}"></div>
+                            <span style="font-size: 11px;"><strong>Jours</strong> 1-6j: ${intervalJours}x (${percentJours}%)</span>
+                            ${mainInterval.name === 'Jours' ? '<span style="font-size: 14px;">👑</span>' : ''}
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 5px; ${mainInterval.name === 'Semaine' ? 'background: #f1f5f9; padding: 3px 10px; border-radius: 20px;' : ''}">
+                            <div style="width: 14px; height: 14px; background: #3b82f6; border-radius: 3px; ${mainInterval.name === 'Semaine' ? 'box-shadow: 0 0 0 2px white, 0 0 0 3px #3b82f6;' : ''}"></div>
+                            <span style="font-size: 11px;"><strong>Semaine</strong> 7-28j: ${intervalSemaine}x (${percentSemaine}%)</span>
+                            ${mainInterval.name === 'Semaine' ? '<span style="font-size: 14px;">👑</span>' : ''}
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 5px; ${mainInterval.name === 'Mois' ? 'background: #f1f5f9; padding: 3px 10px; border-radius: 20px;' : ''}">
+                            <div style="width: 14px; height: 14px; background: #22c55e; border-radius: 3px; ${mainInterval.name === 'Mois' ? 'box-shadow: 0 0 0 2px white, 0 0 0 3px #22c55e;' : ''}"></div>
+                            <span style="font-size: 11px;"><strong>Mois</strong> >28j: ${intervalMois}x (${percentMois}%)</span>
+                            ${mainInterval.name === 'Mois' ? '<span style="font-size: 14px;">👑</span>' : ''}
+                        </div>
+                    </div>
+                    
+                    <div style="background: #f1f5f9; padding: 6px 10px; border-radius: 6px; font-size: 11px; display: flex; align-items: center; gap: 8px;">
+                        <span style="font-size: 14px;">🏆</span>
+                        <span><strong>Intervalle principal :</strong> <span style="background: ${mainInterval.color}20; color: ${mainInterval.color}; padding: 2px 12px; border-radius: 20px; font-weight: 700;">${mainInterval.name}</span> (${mainInterval.percent}%, ${mainInterval.range})</span>
+                    </div>
+                </div>
+                
+                <!-- Bouton -->
+                <button id="toggle-credit-${clientNumber}" style="width:100%; padding:8px; margin-top:12px; background:#f1f5f9; border:1px solid #cbd5e1; border-radius:6px; font-size:13px; font-weight:600; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:5px;">
+                    <span style="font-size:14px;">🔽</span> Afficher les détails
+                </button>
             `;
-        });
-        
-        soldeHTML += `</tbody></table>`;
-        soldeWrapper.innerHTML = soldeHTML;
-        soldeTable.appendChild(soldeHeader);
-        soldeTable.appendChild(soldeWrapper);
-        content.appendChild(soldeTable);
+            
+            content.appendChild(habitSection);
+            
+            // === TABLEAUX DÉTAILS (cachés) - VERSION ORIGINALE RESTAURÉE ===
+            const detailsContainer = document.createElement('div');
+            detailsContainer.id = `credit-details-${clientNumber}`;
+            detailsContainer.style.cssText = `display: none; margin-top: 15px;`;
+            
+            // Tableau des recharges - Version originale
+            if (rechargeAnalysis.hasData) {
+                const rechargeTable = document.createElement('div');
+                rechargeTable.style.cssText = `
+                    border: 2px solid #e2e8f0;
+                    border-radius: 12px;
+                    overflow: hidden;
+                    margin-bottom: 20px;
+                `;
+                
+                const tableHeader = document.createElement('div');
+                tableHeader.style.cssText = `
+                    background: linear-gradient(135deg, #9f7aea 0%, #805ad5 100%);
+                    color: white;
+                    padding: 15px 20px;
+                    font-size: 16px;
+                    font-weight: 700;
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                `;
+                tableHeader.innerHTML = `
+                    <span style="display: flex; align-items: center; gap: 10px;">
+                        <span style="font-size: 20px;">⚡</span>
+                        Historique des recharges
+                    </span>
+                    <span style="background: rgba(255,255,255,0.2); padding: 5px 15px; border-radius: 30px; font-size: 13px;">
+                        ${rechargeAnalysis.totalRecharges} opération(s)
+                    </span>
+                `;
+                
+                const tableWrapper = document.createElement('div');
+                tableWrapper.style.cssText = `
+                    max-height: 350px;
+                    overflow-y: auto;
+                    overflow-x: auto;
+                    background: white;
+                `;
+                
+                let tableHTML = `
+                    <table style="width: 100%; border-collapse: collapse; font-size: 12px; min-width: 700px;">
+                        <thead style="position: sticky; top: 0; background: #f8fafc; z-index: 10;">
+                            <tr style="border-bottom: 2px solid #e2e8f0;">
+                                <th style="padding: 12px 10px; text-align: left;">Date</th>
+                                <th style="padding: 12px 10px; text-align: center;">Code 3 (jours)</th>
+                                <th style="padding: 12px 10px; text-align: center;">Statut</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                `;
+                
+                const sortedRecharges = [...combinedRechargeData]
+                    .filter(row => row['Code 1']?.toString().trim() === clientNumber.toString())
+                    .sort((a, b) => new Date(b['Date et Heure']) - new Date(a['Date et Heure']));
+                
+                sortedRecharges.forEach((row, index) => {
+                    const date = row['Date et Heure'] || '-';
+                    const code3 = row['Code 3'] || '-';
+                    const status = row['Status'] || '-';
+                    
+                    const statusColor = status.toLowerCase().includes('reussie') ? '#22c55e' : 
+                                    status.toLowerCase().includes('echoue') ? '#ef4444' : '#f59e0b';
+                    
+                    const bgColor = index % 2 === 0 ? '#ffffff' : '#fafbfc';
+                    
+                    tableHTML += `
+                        <tr style="border-bottom: 1px solid #e2e8f0; background: ${bgColor};">
+                            <td style="padding: 10px; white-space: nowrap;">${date}</td>
+                            <td style="padding: 10px; text-align: center; font-weight: 600; color: #f97316;">${code3}</td>
+                            <td style="padding: 10px; text-align: center;">
+                                <span style="background: ${statusColor}20; color: ${statusColor}; padding: 3px 10px; border-radius: 20px; font-weight: 600; font-size: 11px;">
+                                    ${status}
+                                </span>
+                            </td>
+                        </tr>
+                    `;
+                });
+                
+                tableHTML += `</tbody></table>`;
+                tableWrapper.innerHTML = tableHTML;
+                rechargeTable.appendChild(tableHeader);
+                rechargeTable.appendChild(tableWrapper);
+                detailsContainer.appendChild(rechargeTable);
+            }
+            
+            // Tableau des soldes - Version originale
+            if (creditData.length > 0) {
+                const soldeTable = document.createElement('div');
+                soldeTable.style.cssText = `
+                    border: 2px solid #e2e8f0;
+                    border-radius: 12px;
+                    overflow: hidden;
+                    margin-bottom: 20px;
+                `;
+                
+                const soldeHeader = document.createElement('div');
+                soldeHeader.style.cssText = `
+                    background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+                    color: white;
+                    padding: 15px 20px;
+                    font-size: 16px;
+                    font-weight: 700;
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                `;
+                soldeHeader.innerHTML = `
+                    <span style="display: flex; align-items: center; gap: 10px;">
+                        <span style="font-size: 20px;">💰</span>
+                        Historique des soldes (crédits)
+                    </span>
+                    <span style="background: rgba(255,255,255,0.2); padding: 5px 15px; border-radius: 30px; font-size: 13px;">
+                        ${creditData.length} relevé(s)
+                    </span>
+                `;
+                
+                const soldeWrapper = document.createElement('div');
+                soldeWrapper.style.cssText = `
+                    max-height: 350px;
+                    overflow-y: auto;
+                    overflow-x: auto;
+                    background: white;
+                `;
+                
+                const clientSoldeData = [...combinedSoldeData]
+                    .filter(row => row[`Credit${clientNumber}`] && row[`Credit${clientNumber}`].toString().trim() !== '')
+                    .sort((a, b) => new Date(b['Date et Heure']) - new Date(a['Date et Heure']));
+                
+                let soldeHTML = `
+                    <table style="width: 100%; border-collapse: collapse; font-size: 12px; min-width: 400px;">
+                        <thead style="position: sticky; top: 0; background: #f8fafc; z-index: 10;">
+                            <tr style="border-bottom: 2px solid #e2e8f0;">
+                                <th style="padding: 12px 10px; text-align: left;">Date</th>
+                                <th style="padding: 12px 10px; text-align: center;">Crédit (jours)</th>
+                                <th style="padding: 12px 10px; text-align: center;">Statut</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                `;
+                
+                clientSoldeData.forEach((row, index) => {
+                    const date = row['Date et Heure'] || '-';
+                    const value = parseFloat(row[`Credit${clientNumber}`]) || 0;
+                    const bgColor = index % 2 === 0 ? '#ffffff' : '#fafbfc';
+                    
+                    soldeHTML += `
+                        <tr style="border-bottom: 1px solid #e2e8f0; background: ${bgColor};">
+                            <td style="padding: 10px; white-space: nowrap;">${date}</td>
+                            <td style="padding: 10px; text-align: center; font-weight: 600; color: ${value === 0 ? '#ef4444' : '#48bb78'};">${value}</td>
+                            <td style="padding: 10px; text-align: center;">
+                                ${value === 0 ? 
+                                    '<span style="background: #ef444420; color: #ef4444; padding: 3px 10px; border-radius: 20px; font-size: 11px;">Sans crédit</span>' : 
+                                    '<span style="background: #48bb7820; color: #48bb78; padding: 3px 10px; border-radius: 20px; font-size: 11px;">Crédit disponible</span>'}
+                            </td>
+                        </tr>
+                    `;
+                });
+                
+                soldeHTML += `</tbody></table>`;
+                soldeWrapper.innerHTML = soldeHTML;
+                soldeTable.appendChild(soldeHeader);
+                soldeTable.appendChild(soldeWrapper);
+                detailsContainer.appendChild(soldeTable);
+            }
+            
+            content.appendChild(detailsContainer);
+            
+            // Événement bouton
+            setTimeout(() => {
+                const btn = document.getElementById(`toggle-credit-${clientNumber}`);
+                const details = document.getElementById(`credit-details-${clientNumber}`);
+                if (btn && details) {
+                    btn.addEventListener('click', () => {
+                        if (details.style.display === 'none') {
+                            details.style.display = 'block';
+                            btn.innerHTML = `<span style="font-size:14px;">🔼</span> Masquer les détails`;
+                        } else {
+                            details.style.display = 'none';
+                            btn.innerHTML = `<span style="font-size:14px;">🔽</span> Afficher les détails`;
+                        }
+                    });
+                }
+            }, 100);
+        }
     }
     
     analysisDiv.appendChild(content);
@@ -9800,185 +10288,73 @@ function createDaysWithoutCreditCard(clientNumber) {
     const card = document.createElement('div');
     card.style.cssText = `
         background: white;
-        border-radius: 16px;
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-        margin-bottom: 20px;
+        border-radius: 8px;
+        margin-bottom: 12px;
         overflow: hidden;
         border: 1px solid #e2e8f0;
     `;
     
-    // En-tête
-    const header = document.createElement('div');
-    header.style.cssText = `
-        background: linear-gradient(135deg, #f43f5e 0%, #e11d48 100%);
-        color: white;
-        padding: 15px 20px;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        flex-wrap: wrap;
-        gap: 15px;
-    `;
-    
-    header.innerHTML = `
-        <div style="display: flex; align-items: center; gap: 12px;">
-            <span style="font-size: 24px;">🚫</span>
-            <div>
-                <span style="font-size: 16px; font-weight: 700;">Jours sans crédit</span>
-                <div style="font-size: 12px; opacity: 0.9;">Client ${clientNumber}</div>
-            </div>
-        </div>
-        <div style="display: flex; align-items: center; gap: 15px;">
-            <span style="background: rgba(255,255,255,0.2); padding: 6px 15px; border-radius: 30px; font-size: 13px;">
-                📅 ${analysis.totalDaysWithoutCredit} jour(s) sans crédit
-            </span>
-            ${analysis.longestStreak > 0 ? `
-                <span style="background: rgba(255,255,255,0.2); padding: 6px 15px; border-radius: 30px; font-size: 13px;">
-                    🔴 Série max: ${analysis.longestStreak} jour(s)
-                </span>
-            ` : ''}
-        </div>
-    `;
-    
-    card.appendChild(header);
-    
-    if (!analysis.hasData) {
+    if (!analysis.hasData || analysis.consecutiveDays.filter(group => group.length > 1).length === 0) {
         const noData = document.createElement('div');
         noData.style.cssText = `
-            padding: 40px;
+            padding: 10px;
             text-align: center;
             color: #64748b;
             background: #f8fafc;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+            font-size: 11px;
         `;
         noData.innerHTML = `
-            <span style="font-size: 48px; display: block; margin-bottom: 15px;">✅</span>
-            <p style="margin: 0; font-size: 14px;">Aucun jour sans crédit détecté pour ce client</p>
-            <p style="margin-top: 8px; font-size: 12px;">Sur ${analysis.totalDays} jours analysés</p>
+            <span style="font-size: 14px;">🔗</span>
+            <span>Aucune série >1 jour sans crédit</span>
         `;
         card.appendChild(noData);
         return card;
     }
     
     const content = document.createElement('div');
-    content.style.cssText = `padding: 20px;`;
+    content.style.cssText = `padding: 12px;`;
     
-    // === LISTE DES JOURS SANS CRÉDIT ===
-    const tableContainer = document.createElement('div');
-    tableContainer.style.cssText = `
-        border: 1px solid #e2e8f0;
-        border-radius: 8px;
-        overflow: hidden;
-        margin-bottom: 20px;
-    `;
+    const significantStreaks = analysis.consecutiveDays.filter(group => group.length > 1);
     
-    const tableHeader = document.createElement('div');
-    tableHeader.style.cssText = `
-        background: #f1f5f9;
-        padding: 12px 15px;
-        font-weight: 600;
-        color: #334155;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        border-bottom: 1px solid #e2e8f0;
-    `;
-    tableHeader.innerHTML = `
-        <span>📋 Liste des jours sans crédit</span>
-        <span style="font-size: 11px; background: #e2e8f0; padding: 3px 10px; border-radius: 20px;">
-            ${analysis.daysWithoutCredit.length} entrée(s)
-        </span>
-    `;
-    
-    const tableWrapper = document.createElement('div');
-    tableWrapper.style.cssText = `
-        max-height: 250px;
-        overflow-y: auto;
-        overflow-x: auto;
-        background: white;
-    `;
-    
-    let tableHTML = `
-        <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
-            <thead style="position: sticky; top: 0; background: #f8fafc; z-index: 10;">
-                <tr style="border-bottom: 2px solid #e2e8f0;">
-                    <th style="padding: 10px; text-align: left;">Date</th>
-                    <th style="padding: 10px; text-align: center;">Crédit</th>
-                </tr>
-            </thead>
-            <tbody>
-    `;
-    
-    analysis.daysWithoutCredit.slice(0, 50).forEach((day, index) => { // Limiter à 50 pour la performance
-        const bgColor = index % 2 === 0 ? '#ffffff' : '#fafbfc';
-        
-        tableHTML += `
-            <tr style="border-bottom: 1px solid #e2e8f0; background: ${bgColor};">
-                <td style="padding: 10px;">
-                    <div style="display: flex; flex-direction: column;">
-                        <span style="font-weight: 500;">${day.formattedDate}</span>
-                        <span style="font-size: 9px; color: #64748b;">${day.date}</span>
-                    </div>
-                </td>
-                <td style="padding: 10px; text-align: center; font-weight: 700; color: #ef4444;">0</td>
-            </tr>
-        `;
-    });
-    
-    if (analysis.daysWithoutCredit.length > 50) {
-        tableHTML += `
-            <tr style="background: #f1f5f9;">
-                <td colspan="3" style="padding: 10px; text-align: center; font-style: italic; color: #64748b;">
-                    ... et ${analysis.daysWithoutCredit.length - 50} autre(s) jour(s) non affiché(s)
-                </td>
-            </tr>
-        `;
-    }
-    
-    tableHTML += `</tbody></table>`;
-    tableWrapper.innerHTML = tableHTML;
-    tableContainer.appendChild(tableHeader);
-    tableContainer.appendChild(tableWrapper);
-    content.appendChild(tableContainer);
-    
-    // === SÉRIES CONSÉCUTIVES (UNIQUEMENT > 1 JOUR) ===
-    if (analysis.consecutiveDays.length > 0) {
+    if (significantStreaks.length > 0) {
         const streaksSection = document.createElement('div');
-        streaksSection.style.cssText = `
-            padding: 15px;
-            background: #f8fafc;
-            border-radius: 8px;
-            border: 1px solid #e2e8f0;
+        streaksSection.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 5px; margin-bottom: 10px;">
+                <span style="font-size: 16px;">🔗</span>
+                <span style="font-weight: 600; font-size: 13px;">Séries sans crédit (>1 jour)</span>
+                <span style="margin-left: auto; background: #e2e8f0; padding: 2px 8px; border-radius: 12px; font-size: 10px;">
+                    ${significantStreaks.length}
+                </span>
+            </div>
+            <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                ${significantStreaks.map((group, idx) => {
+                    const start = new Date(group[0].date).toLocaleDateString('fr-FR', {
+                        day: '2-digit', month: '2-digit'
+                    });
+                    const end = new Date(group[group.length - 1].date).toLocaleDateString('fr-FR', {
+                        day: '2-digit', month: '2-digit'
+                    });
+                    const isLongest = group.length === analysis.longestStreak;
+                    
+                    return `
+                        <div style="background: white; padding: 8px 10px; border-radius: 6px; border-left: 3px solid ${isLongest ? '#ef4444' : '#f97316'}; min-width: 140px; flex: 1 1 auto; border: 1px solid #e2e8f0; font-size: 11px;">
+                            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 3px;">
+                                <span style="color: #64748b;">#${idx+1}</span>
+                                ${isLongest ? '<span style="background: #ef4444; color: white; padding: 1px 6px; border-radius: 10px; font-size: 8px;">MAX</span>' : ''}
+                            </div>
+                            <div style="font-weight: 700; color: ${isLongest ? '#ef4444' : '#f97316'}; font-size: 16px;">${group.length} jours</div>
+                            <div style="color: #475569;">${start} → ${end}</div>
+                        </div>
+                    `;
+                }).join('')}
+            </div>
         `;
         
-        // Filtrer pour garder uniquement les séries > 1 jour
-        const significantStreaks = analysis.consecutiveDays.filter(group => group.length > 1);
-        
-        if (significantStreaks.length > 0) {
-            streaksSection.innerHTML = `
-                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
-                    <span style="font-size: 18px;">🔗</span>
-                    <span style="font-weight: 600; color: #1e293b;">Séries consécutives sans crédit (>1 jour)</span>
-                </div>
-                <div style="display: flex; flex-wrap: wrap; gap: 10px;">
-                    ${significantStreaks.map((group, idx) => {
-                        const start = new Date(group[0].date).toLocaleDateString('fr-FR');
-                        const end = new Date(group[group.length - 1].date).toLocaleDateString('fr-FR');
-                        const isLongest = group.length === analysis.longestStreak;
-                        
-                        return `
-                            <div style="background: white; padding: 10px 15px; border-radius: 8px; border-left: 4px solid ${isLongest ? '#ef4444' : '#f97316'}; min-width: 180px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
-                                <div style="font-size: 11px; color: #64748b; margin-bottom: 4px;">Série ${idx + 1}</div>
-                                <div style="font-weight: 700; color: ${isLongest ? '#ef4444' : '#f97316'}; font-size: 18px;">${group.length} jour(s)</div>
-                                <div style="font-size: 11px; color: #475569; margin: 4px 0;">${start} → ${end}</div>
-                                ${isLongest ? '<span style="background: #ef4444; color: white; padding: 2px 10px; border-radius: 12px; font-size: 10px; display: inline-block; margin-top: 5px;">SÉRIE MAX</span>' : ''}
-                            </div>
-                        `;
-                    }).join('')}
-                </div>
-            `;
-            
-            content.appendChild(streaksSection);
-        }
+        content.appendChild(streaksSection);
     }
     
     card.appendChild(content);

@@ -10,14 +10,49 @@ body {
     background: #f5f7fa;
     color: #333;
     line-height: 1.6;
+    width: 100%;
+    overflow-x: auto; /* Permet le défilement horizontal si nécessaire */
 }
 
 .container {
-    max-width: 1200px;
-    margin: 0 auto;
+    width: 100%;
+    max-width: none; /* Supprime la limite de 1200px */
+    margin: 0;
     padding: 20px;
 }
 
+/* Optionnel : Ajustements pour les tableaux et cartes */
+.table-wrapper {
+    overflow-x: auto;
+    width: 100%;
+}
+
+.card, .main-tension-card, .main-energy-card {
+    width: 100%;
+    margin-left: 0;
+    margin-right: 0;
+}
+
+/* Pour les en-têtes et sections */
+.all-clients-header, .commercial-header {
+    width: 100%;
+}
+
+/* Pour les tableaux */
+.daily-summary-table, .all-clients-table, .events-matrix-table {
+    width: 100%;
+    min-width: 100%; /* S'assure que le tableau prend toute la largeur */
+}
+
+/* Pour les graphiques */
+.chart-container {
+    width: 100% !important;
+}
+
+.chart-container canvas {
+    width: 100% !important;
+    height: auto !important;
+}
 /* ============ HEADER ============ */
 .header {
     background: white;
