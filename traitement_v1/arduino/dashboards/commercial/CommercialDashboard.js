@@ -2,12 +2,6 @@
 import { database } from '../../arduinoCore.js';
 import { FORFAIT_LIMITS } from '../../arduinoConstants.js';
 import { FORFAIT_NAMES } from '../../arduinoConstants.js';
-import { 
-    analyzeZeroCreditSequences, 
-    analyzeCreditZeroCauses, 
-    generateSequenceRecommendation,
-    formatSequenceForDisplay,
-} from '../../analytics/interpretationAnalytics.js';
 
 // Variable globale pour suivre le client actif
 let activeClientId = null;
@@ -38,16 +32,18 @@ export function renderCommercialDashboard() {
         
         <div class="section-title"><h2>💰 ANALYSE DE CONSOMMATION</h2></div>
         <div id="consumptionBoard" class="card"></div>
-        <div id="commercialEventsBoard" class="card"></div>
-        <div id="forfaitChangesBoard" class="card"></div>
         
         <div class="section-title"><h2>💳 ANALYSE CRÉDIT ET RECHARGE</h2></div>
-        <div id="creditBoard" class="card"></div>
-        <div id="rechargeHabitsBoard" class="card"></div>
+        <div id="commercialEventsBoard" class="card"></div>
         
         <div class="section-title"><h2>📊 SOLDE ET RECHARGE</h2></div>
-        <div id="balanceBoard" class="card"></div>
-    `;
+        <div id="creditBoard" class="card"></div>
+                
+        <!-- 👉 BOUTON POUR AFFICHER LES TABLEAUX -->
+        <button class="toggle-tables-btn" onclick="toggleTablesContainer()">
+            📋 Afficher les tableaux détaillés
+        </button>
+        `;
     
     container.innerHTML = html;
     
@@ -169,29 +165,13 @@ function determineClientRiskLevel(client) {
     return 'low';
 }
 
-/**
- * Obtenir la classe CSS pour un message selon son type
- */
-function getMessageClass(message) {
-    if (message.includes('✅')) return 'success';
-    if (message.includes('⚠️')) return 'warning';
-    if (message.includes('🔴')) return 'danger';
-    if (message.includes('📱')) return 'info';
-    if (message.includes('📦')) return 'purple';
-    if (message.includes('💳')) return 'gold';
-    if (message.includes('👻')) return 'ghost';
-    return '';
-}
+
 
 function renderAllBoards() {
     // Rendre tous les boards avec le client actif
-    renderKPIDashboard();
     renderConsumptionBoard();
     renderEventsBoard();
-    renderForfaitChangesBoard();
     renderCreditBoard();
-    renderRechargeHabitsBoard();
-    renderBalanceBoard();
 }
 
 // Rendre accessible la fonction de détail
@@ -202,137 +182,9 @@ window.showClientDetail = (clientId) => {
     });
 };
 
-function renderKPIDashboard() {
-    const container = document.getElementById('kpiDashboard');
-    if (!container) return;
-    
-    // Filtrer pour n'avoir que les clients valides
-    const clients = clientsList;
-    
-    if (clients.length === 0) {
-        container.innerHTML = '<p class="no-data">Aucun client disponible</p>';
-        return;
-    }
-    
-    // Calcul des KPI
-    const kpis = calculateKPIs(clients);
-    
-    container.innerHTML = `
-        <h3 class="card-title">📊 KPI GLOBAUX</h3>
-        
-        <!-- Grille 4 colonnes KPI -->
-        <div class="kpi-grid">
-            <div class="kpi-card kpi-primary">
-                <div class="kpi-icon">👥</div>
-                <div class="kpi-label">Total Clients</div>
-                <div class="kpi-value">${clients.length}</div>
-                <div class="kpi-sub">actifs</div>
-            </div>
-            
-            <div class="kpi-card kpi-success">
-                <div class="kpi-icon">⭐</div>
-                <div class="kpi-label">Score Moyen</div>
-                <div class="kpi-value">${kpis.averageScore.toFixed(1)}</div>
-                <div class="kpi-sub">/ 100</div>
-            </div>
-            
-            <div class="kpi-card kpi-warning">
-                <div class="kpi-icon">⚠️</div>
-                <div class="kpi-label">Clients à Risque</div>
-                <div class="kpi-value">${kpis.atRiskCount}</div>
-                <div class="kpi-sub">${kpis.atRiskPercent.toFixed(1)}%</div>
-            </div>
-            
-            <div class="kpi-card kpi-info">
-                <div class="kpi-icon">⚡</div>
-                <div class="kpi-label">Conso Moyenne</div>
-                <div class="kpi-value">${kpis.avgConsumption.toFixed(0)}</div>
-                <div class="kpi-sub">Wh/jour</div>
-            </div>
-        </div>
-        
-        <!-- Distribution par profil -->
-        <div class="kpi-distribution">
-            <h4>Distribution Profils Clients</h4>
-            <div class="profile-bars">
-                ${['A', 'B', 'C', 'D'].map(grade => {
-                    const count = kpis.profileDistribution[grade] || 0;
-                    const percent = clients.length > 0 ? ((count / clients.length) * 100).toFixed(1) : 0;
-                    return `
-                        <div class="profile-bar">
-                            <div class="profile-label">Profil ${grade}</div>
-                            <div class="profile-bar-container">
-                                <div class="profile-bar-fill grade-${grade}" style="width: ${percent}%"></div>
-                            </div>
-                            <div class="profile-count">${count} (${percent}%)</div>
-                        </div>
-                    `;
-                }).join('')}
-            </div>
-        </div>
-        
-        <!-- Recommandations principales -->
-        <div class="kpi-recommendations">
-            <h4>🎯 Actions Prioritaires</h4>
-            <ul class="action-list">
-                ${kpis.atRiskCount > 0 ? `<li class="action-danger">Contacter <strong>${kpis.atRiskCount}</strong> clients à risque</li>` : ''}
-                ${kpis.zeroCreditCount > 0 ? `<li class="action-warning">Suivre <strong>${kpis.zeroCreditCount}</strong> clients sans crédit régulièrement</li>` : ''}
-                ${kpis.highConsumption > 0 ? `<li class="action-info">Étudier <strong>${kpis.highConsumption}</strong> dépassements de forfait</li>` : ''}
-            </ul>
-        </div>
-    `;
-}
 
-function calculateKPIs(clients) {
-    const totalClients = clients.length;
-    
-    // Scores
-    const scores = clients.map(c => c.score?.valeur || 0);
-    const averageScore = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
-    
-    // Clients à risque (score < 40) - exclure les fantômes
-    const atRiskCount = clients.filter(c => !isGhostClient(c) && (c.score?.valeur < 40)).length;
-    const atRiskPercent = totalClients > 0 ? (atRiskCount / totalClients) * 100 : 0;
-    
-    // Consommation moyenne (exclure les fantômes)
-    const consumptions = clients
-        .filter(c => !isGhostClient(c))
-        .map(c => c.consommation?.moyenne || 0)
-        .filter(v => v > 0);
-    const avgConsumption = consumptions.length > 0 
-        ? consumptions.reduce((a, b) => a + b, 0) / consumptions.length 
-        : 0;
-    
-    // Distribution par profil
-    const profileDistribution = {
-        A: clients.filter(c => c.score?.grade === 'A').length,
-        B: clients.filter(c => c.score?.grade === 'B').length,
-        C: clients.filter(c => c.score?.grade === 'C').length,
-        D: clients.filter(c => c.score?.grade === 'D').length
-    };
-    
-    // Clients sans crédit (exclure les fantômes)
-    const zeroCreditCount = clients.filter(c => !isGhostClient(c) && (c.zeroCreditPercentage || 0) > 30).length;
-    
-    // Dépassement de forfait (exclure les fantômes)
-    const highConsumption = clients.filter(c => {
-        if (isGhostClient(c)) return false;
-        const conso = c.consommation?.moyenne || 0;
-        const max = c.consommation?.max || 0;
-        return max > (c.forfaitActuel ? 120 : 100);
-    }).length;
-    
-    return {
-        totalClients,
-        averageScore,
-        atRiskCount,
-        atRiskPercent,
-        avgConsumption,
-        profileDistribution,
-        zeroCreditCount,
-        highConsumption
-    };
-}
+
+
 
 function renderConsumptionBoard() {
     const container = document.getElementById('consumptionBoard');
@@ -349,10 +201,10 @@ function renderConsumptionBoard() {
         return;
     }
     
-    // Si client fantôme, afficher un message spécifique
+    // Si client fantôme
     if (isGhostClient(client)) {
         container.innerHTML = `
-            <h3 class="card-title">📊 ANALYSE DE CONSOMMATION - Client ${client.id}</h3>
+            <h3 class="card-title">📋 HISTORIQUE FORFAITS & CONSOMMATION - Client ${client.id}</h3>
             <div class="client-card ghost">
                 <div class="client-header">
                     <span class="client-icon">👻</span>
@@ -360,125 +212,261 @@ function renderConsumptionBoard() {
                     <span class="client-badge ghost">Client fantôme</span>
                 </div>
                 <div class="message-container">
-                    <p class="client-message ghost">👻 Ce client n'a aucune donnée de consommation.</p>
-                    <p class="client-message ghost">🔧 Vérifier l'existence du compteur sur le terrain.</p>
+                    <p class="client-message ghost">👻 Aucune donnée de consommation ou forfait disponible.</p>
                 </div>
             </div>
         `;
         return;
     }
     
-    container.innerHTML = `
-        <h3 class="card-title">📊 ANALYSE DE CONSOMMATION - Client ${client.id}</h3>
-        ${renderConsumptionClient(client)}
-    `;
-}
-
-function renderConsumptionClient(client) {
-    // Récupérer la conso du client
-    const conso = client.consommation?.journaliere || [];
-    const forfaitName = client.forfaitName;
-    const forfaitMax = FORFAIT_LIMITS[forfaitName]?.max || 1;
+    // ===== CONSTRUCTION DE L'HISTORIQUE DES FORFAITS =====
+    const forfaitHistory = [];
+    const changes = client.forfaitChanges || [];
+    const consoJournaliere = client.consommation?.journaliere || [];
+    const events = client.events || [];
     
-    // Calculer les stats demandées par le chef
-    const energieMax = Math.max(...conso.map(c => c.valeur), 0);
-    const energieMoy = conso.length > 0 
-        ? (conso.reduce((s, c) => s + c.valeur, 0) / conso.length).toFixed(2)
-        : 0;
-    const joursSans = conso.filter(c => c.valeur < 0.1).length;
-    
-    let joursDepasse90 = 0;
-    let joursNormal = 0;
-    let joursTolerance = 0;
-    let joursHorsTolerance = 0;
-    
-    conso.forEach(jour => {
-        const ratio = (jour.valeur / forfaitMax) * 100;
-        if (ratio > 114) joursHorsTolerance++;
-        else if (ratio > 100) joursTolerance++;
-        else if (ratio > 90) joursDepasse90++;
-        else joursNormal++;
+    // Récupérer les dates de SuspendE pour ce client
+    const suspendEDates = new Set();
+    events.forEach(e => {
+        if (e.type === 'SuspendE' && e.date) {
+            suspendEDates.add(e.date.split('T')[0]); // Format YYYY-MM-DD
+        }
     });
     
-    const totalJours = conso.length;
-    const normalPercent = totalJours > 0 ? ((joursNormal / totalJours) * 100).toFixed(1) : 0;
-    const tolerancePercent = totalJours > 0 ? ((joursTolerance / totalJours) * 100).toFixed(1) : 0;
-    const horsTolerancePercent = totalJours > 0 ? ((joursHorsTolerance / totalJours) * 100).toFixed(1) : 0;
+    // Construire l'historique des forfaits à partir des changements
+    if (changes.length === 0) {
+        // Pas de changement : un seul forfait depuis le début
+        const premiereDate = consoJournaliere.length > 0 
+            ? consoJournaliere[0].date 
+            : '2024-01-01';
+        
+        forfaitHistory.push({
+            forfait: client.forfaitName || 'ECO',
+            code: client.forfaitActuel || 1,
+            startDate: premiereDate,
+            endDate: null,
+            isCurrent: true
+        });
+    } else {
+        // Trier les changements par date
+        const sortedChanges = [...changes].sort((a, b) => 
+            new Date(a.date) - new Date(b.date)
+        );
+        
+        // Premier forfait (avant le premier changement)
+        const premiereDate = consoJournaliere.length > 0 
+            ? consoJournaliere[0].date 
+            : '2024-01-01';
+        
+        forfaitHistory.push({
+            forfait: FORFAIT_NAMES[sortedChanges[0].ancien] || `Forfait ${sortedChanges[0].ancien}`,
+            code: sortedChanges[0].ancien,
+            startDate: premiereDate,
+            endDate: sortedChanges[0].date,
+            isCurrent: false
+        });
+        
+        // Changements intermédiaires
+        for (let i = 0; i < sortedChanges.length; i++) {
+            const change = sortedChanges[i];
+            const nextChange = sortedChanges[i + 1];
+            
+            forfaitHistory.push({
+                forfait: FORFAIT_NAMES[change.nouveau] || `Forfait ${change.nouveau}`,
+                code: change.nouveau,
+                startDate: change.date,
+                endDate: nextChange ? nextChange.date : null,
+                isCurrent: !nextChange
+            });
+        }
+    }
     
-    return `
+    // ===== ANALYSER LA CONSO POUR CHAQUE PÉRIODE =====
+    const forfaitStats = forfaitHistory.map(forfait => {
+        const daysInPeriod = [];
+        const forfaitMax = FORFAIT_LIMITS[forfait.forfait]?.max || 100;
+        const seuil85 = forfaitMax * 0.85;
+        const seuil115 = forfaitMax * 1.15;
+        
+        // Filtrer les jours dans la période
+        consoJournaliere.forEach(day => {
+            const dayDate = day.date;
+            if (!dayDate) return;
+            
+            let inPeriod = false;
+            if (forfait.endDate) {
+                if (dayDate >= forfait.startDate && dayDate <= forfait.endDate) {
+                    inPeriod = true;
+                }
+            } else {
+                if (dayDate >= forfait.startDate) {
+                    inPeriod = true;
+                }
+            }
+            
+            if (inPeriod && day.valeur > 0) {
+                daysInPeriod.push(day);
+            }
+        });
+        
+        // Stats
+        const maxEnergy = daysInPeriod.length > 0 
+            ? Math.max(...daysInPeriod.map(d => d.valeur)).toFixed(1)
+            : 0;
+        
+        const avgEnergy = daysInPeriod.length > 0 
+            ? (daysInPeriod.reduce((sum, d) => sum + d.valeur, 0) / daysInPeriod.length).toFixed(1)
+            : 0;
+        
+        // Répartition par seuils
+        const daysBelow85 = daysInPeriod.filter(d => d.valeur <= seuil85).length;
+        const daysInTolerance = daysInPeriod.filter(d => d.valeur > seuil85 && d.valeur <= seuil115).length;
+        const daysAbove115 = daysInPeriod.filter(d => {
+            const dateStr = d.date.split('T')[0];
+            return d.valeur > seuil115 || suspendEDates.has(dateStr);
+        }).length;
+        
+        const total = daysInPeriod.length;
+        
+        return {
+            ...forfait,
+            totalDays: total,
+            maxEnergy,
+            avgEnergy,
+            daysBelow85,
+            daysInTolerance,
+            daysAbove115,
+            percentBelow85: total > 0 ? ((daysBelow85 / total) * 100).toFixed(1) : 0,
+            percentInTolerance: total > 0 ? ((daysInTolerance / total) * 100).toFixed(1) : 0,
+            percentAbove115: total > 0 ? ((daysAbove115 / total) * 100).toFixed(1) : 0,
+            forfaitMax,
+            seuil85,
+            seuil115
+        };
+    });
+    
+    // ===== RENDU HTML (avec TES classes CSS) =====
+    let html = `
+        <h3 class="card-title">📋 HISTORIQUE FORFAITS & CONSOMMATION - Client ${client.id}</h3>
         <div class="client-card">
-            <div class="client-header">
-                <span class="client-icon">⚡</span>
-                <span class="client-id">Client ${client.id}</span>
-                <span class="client-badge">Forfait: ${forfaitName}</span>
-            </div>
-            
-            <!-- Stats principales (demandées par le chef) -->
-            <div class="stats-grid-4">
-                <div class="stat-item">
-                    <span class="stat-label">⚡ Énergie max</span>
-                    <span class="stat-value">${energieMax.toFixed(2)} Wh</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-label">📊 Énergie moy</span>
-                    <span class="stat-value">${energieMoy} Wh</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-label">📅 Jour(s) sans</span>
-                    <span class="stat-value ${joursSans > 0 ? 'warning' : ''}">${joursSans}</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-label">📈 Jour(s) >90%</span>
-                    <span class="stat-value">${joursDepasse90}</span>
-                </div>
-            </div>
-            
-
-            <!-- Répartition en pourcentages avec détails -->
-            <div class="distribution-section">
-                <h4>Répartition de la consommation</h4>
-                
-                <div class="percent-bar">
-                    <div class="bar-label">
-                        <span class="label-with-icon">✅ taux de consommation normale</span>
-                        <span class="percentage-value">${normalPercent}%</span>
-                    </div>
-                    <div class="bar-detail">
-                        <span class="detail-count">${joursNormal} jour(s) sur ${totalJours}</span>
-                    </div>
-                    <div class="bar-container">
-                        <div class="bar-fill success" style="width: ${normalPercent}%"></div>
-                    </div>
-                </div>
-                
-                <div class="percent-bar">
-                    <div class="bar-label">
-                        <span class="label-with-icon">🟠 taux de consommation dans la Tolérance</span>
-                        <span class="percentage-value">${tolerancePercent}%</span>
-                    </div>
-                    <div class="bar-detail">
-                        <span class="detail-count">${joursTolerance} jour(s) sur ${totalJours}</span>
-                    </div>
-                    <div class="bar-container">
-                        <div class="bar-fill warning" style="width: ${tolerancePercent}%"></div>
-                    </div>
-                </div>
-                
-                <div class="percent-bar">
-                    <div class="bar-label">
-                        <span class="label-with-icon">🔴 taux de consommation hors tolérance</span>
-                        <span class="percentage-value">${horsTolerancePercent}%</span>
-                    </div>
-                    <div class="bar-detail">
-                        <span class="detail-count">${joursHorsTolerance} jour(s) sur ${totalJours}</span>
-                    </div>
-                    <div class="bar-container">
-                        <div class="bar-fill danger" style="width: ${horsTolerancePercent}%"></div>
-                    </div>
-                </div>
-            </div>
-        </div>
     `;
+    
+    if (forfaitStats.length > 0) {
+        // TABLEAU RÉCAPITULATIF
+        html += `
+            <div style="overflow-x: auto; margin-bottom: 25px;">
+                <table style="width: 100%; border-collapse: collapse; font-size: 13px; min-width: 1000px;">
+                    <thead style="background: #f8fafc; border-bottom: 2px solid #e2e8f0;">
+                        <tr>
+                            <th style="padding: 12px 10px; text-align: left;">Période</th>
+                            <th style="padding: 12px 10px; text-align: center;">Forfait</th>
+                            <th style="padding: 12px 10px; text-align: center;">Jours</th>
+                            <th style="padding: 12px 10px; text-align: center;">⚡ Max</th>
+                            <th style="padding: 12px 10px; text-align: center;">📊 Moy</th>
+                            <th style="padding: 12px 10px; text-align: center;">✅ ≤85%</th>
+                            <th style="padding: 12px 10px; text-align: center;">🟠 85-115%</th>
+                            <th style="padding: 12px 10px; text-align: center;">🔴 >115%</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+        
+        forfaitStats.forEach((stat, index) => {
+            const bgColor = index % 2 === 0 ? '#ffffff' : '#fafbfc';
+            const startDate = new Date(stat.startDate).toLocaleDateString('fr-FR');
+            const endDate = stat.endDate 
+                ? new Date(stat.endDate).toLocaleDateString('fr-FR') 
+                : 'Présent';
+            
+            html += `
+                <tr style="border-bottom: 1px solid #e2e8f0; background: ${bgColor};">
+                    <td style="padding: 12px 10px; white-space: nowrap;">
+                        ${startDate} → ${endDate}
+                        ${stat.isCurrent ? '<span class="client-badge" style="background: #22c55e; margin-left: 8px;">Actuel</span>' : ''}
+                    </td>
+                    <td style="padding: 12px 10px; text-align: center;">
+                        <span class="client-badge" style="background: ${stat.isCurrent ? '#22c55e20' : '#9f7aea20'}; color: ${stat.isCurrent ? '#22c55e' : '#9f7aea'};">
+                            ${stat.forfait}
+                        </span>
+                    </td>
+                    <td style="padding: 12px 10px; text-align: center; font-weight: 600;">${stat.totalDays}</td>
+                    <td style="padding: 12px 10px; text-align: center;">${stat.maxEnergy} Wh</td>
+                    <td style="padding: 12px 10px; text-align: center;">${stat.avgEnergy} Wh</td>
+                    <td style="padding: 12px 10px; text-align: center; color: #22c55e;">${stat.daysBelow85}</td>
+                    <td style="padding: 12px 10px; text-align: center; color: #f59e0b;">${stat.daysInTolerance}</td>
+                    <td style="padding: 12px 10px; text-align: center; color: #ef4444;">${stat.daysAbove115}</td>
+                </tr>
+            `;
+        });
+        
+        html += `
+                    </tbody>
+                </table>
+            </div>
+        `;
+        
+        // BARRES DE PROGRESSION PAR PÉRIODE (comme dans ton style)
+        forfaitStats.forEach(stat => {
+            const startDate = new Date(stat.startDate).toLocaleDateString('fr-FR');
+            const endDate = stat.endDate 
+                ? new Date(stat.endDate).toLocaleDateString('fr-FR') 
+                : 'Présent';
+            
+            html += `
+                <div style="margin-bottom: 20px; padding: 15px; background: #f8fafc; border-radius: 12px; border: 1px solid #e2e8f0;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                        <div>
+                            <span class="client-badge" style="background: ${stat.isCurrent ? '#22c55e' : '#9f7aea'}; color: white; margin-right: 10px;">
+                                ${stat.forfait}
+                            </span>
+                            <span style="font-size: 12px; color: #64748b;">${startDate} → ${endDate}</span>
+                        </div>
+                        <span style="font-size: 12px;">${stat.totalDays} jours</span>
+                    </div>
+                    
+                    <!-- Barre de progression comme dans ton code -->
+                    <div class="unified-progress-bar" style="height: 40px; margin-bottom: 10px;">
+                        <div class="progress-segment success" style="width: ${stat.percentBelow85}%;" 
+                             title="≤85% : ${stat.daysBelow85} jours (${stat.percentBelow85}%)"></div>
+                        <div class="progress-segment warning" style="width: ${stat.percentInTolerance}%;"
+                             title="85-115% : ${stat.daysInTolerance} jours (${stat.percentInTolerance}%)"></div>
+                        <div class="progress-segment danger" style="width: ${stat.percentAbove115}%;"
+                             title=">115% : ${stat.daysAbove115} jours (${stat.percentAbove115}%)"></div>
+                    </div>
+                    
+                    <!-- Légende -->
+                    <div class="progress-legend" style="justify-content: space-around;">
+                        <div class="legend-item">
+                            <span class="legend-dot success"></span>
+                            <span>≤${stat.seuil85.toFixed(0)}Wh: ${stat.daysBelow85}j (${stat.percentBelow85}%)</span>
+                        </div>
+                        <div class="legend-item">
+                            <span class="legend-dot warning"></span>
+                            <span>${stat.seuil85.toFixed(0)}-${stat.seuil115.toFixed(0)}Wh: ${stat.daysInTolerance}j (${stat.percentInTolerance}%)</span>
+                        </div>
+                        <div class="legend-item">
+                            <span class="legend-dot danger"></span>
+                            <span>>${stat.seuil115.toFixed(0)}Wh: ${stat.daysAbove115}j (${stat.percentAbove115}%)</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+        
+        // Note sur les SuspendE
+        if (suspendEDates.size > 0) {
+            html += `
+                <div class="info-note" style="margin-top: 15px; padding: 10px; background: #fee2e2; border-radius: 8px; font-size: 12px;">
+                    ⚠️ ${suspendEDates.size} jour(s) avec SuspendE détecté(s) (comptés dans la zone rouge)
+                </div>
+            `;
+        }
+    } else {
+        html += '<p class="no-data">Aucune donnée de consommation disponible</p>';
+    }
+    
+    html += `</div>`;
+    container.innerHTML = html;
 }
 
 function renderEventsBoard() {
@@ -521,259 +509,289 @@ function renderEventsBoard() {
 }
 
 function renderEventsClient(client) {
-    // Filtrer les événements de ce client
     const events = client.events || [];
-    
-    const suspendE = events.filter(e => e.type === 'SuspendE').length;
-    const suspendP = events.filter(e => e.type === 'SuspendP').length;
-    const surcharge = events.filter(e => e.type === 'Surcharge').length;
-    
-    // Jours avec crédit nul pour ce client
     const zeroCreditDates = client.zeroCreditDates || [];
-    const zeroCreditJours = zeroCreditDates.length;
-    const zeroCreditPourcent = client.zeroCreditPercentage || 0;
     
-    return `
+    // Récupérer le nombre total de jours analysés (si disponible)
+    const totalDays = client.consommation?.journaliere?.length || 
+                     client.credits?.length || 
+                     zeroCreditDates.length || 
+                     1;
+    
+    // Regrouper les événements par jour (comme dans le nouveau code)
+    const eventsByDay = [];
+    const eventsMap = new Map();
+    
+    // Traiter les événements SuspendE et SuspendP
+    events.forEach(event => {
+        if (!event.date) return;
+        const dateStr = event.date.split('T')[0];
+        const hour = event.date.includes('T') ? event.date.split('T')[1]?.substring(0,5) : '';
+        
+        if (!eventsMap.has(dateStr)) {
+            eventsMap.set(dateStr, {
+                date: dateStr,
+                dateObj: new Date(event.date),
+                SuspendE: 0,
+                SuspendE_start: '',
+                SuspendE_end: '',
+                SuspendE_duration: '',
+                SuspendP: 0,
+                SuspendP_start: '',
+                SuspendP_end: '',
+                SuspendP_duration: '',
+                CreditNul: 0
+            });
+        }
+        
+        const dayData = eventsMap.get(dateStr);
+        
+        if (event.type === 'SuspendE') {
+            dayData.SuspendE++;
+            if (!dayData.SuspendE_start) dayData.SuspendE_start = hour;
+            dayData.SuspendE_end = hour;
+            // Calcul approximatif de la durée (si plusieurs événements)
+            if (dayData.SuspendE > 1) {
+                dayData.SuspendE_duration = `${dayData.SuspendE} évts`;
+            } else {
+                dayData.SuspendE_duration = '-';
+            }
+        }
+        
+        if (event.type === 'SuspendP') {
+            dayData.SuspendP++;
+            if (!dayData.SuspendP_start) dayData.SuspendP_start = hour;
+            dayData.SuspendP_end = hour;
+            if (dayData.SuspendP > 1) {
+                dayData.SuspendP_duration = `${dayData.SuspendP} évts`;
+            } else {
+                dayData.SuspendP_duration = '-';
+            }
+        }
+    });
+    
+    // Ajouter les jours avec crédit nul
+    zeroCreditDates.forEach(date => {
+        const dateStr = date.split('T')[0];
+        if (!eventsMap.has(dateStr)) {
+            eventsMap.set(dateStr, {
+                date: dateStr,
+                dateObj: new Date(date),
+                SuspendE: 0,
+                SuspendE_start: '',
+                SuspendE_end: '',
+                SuspendE_duration: '',
+                SuspendP: 0,
+                SuspendP_start: '',
+                SuspendP_end: '',
+                SuspendP_duration: '',
+                CreditNul: 1
+            });
+        } else {
+            eventsMap.get(dateStr).CreditNul = 1;
+        }
+    });
+    
+    // Convertir la Map en array
+    eventsMap.forEach(dayData => eventsByDay.push(dayData));
+    
+    // Statistiques
+    const daysWithCreditNul = new Set();
+    const daysWithSuspendP = new Set();
+    const daysWithSuspendE = new Set();
+    
+    eventsByDay.forEach(day => {
+        if (day.CreditNul > 0) daysWithCreditNul.add(day.date);
+        if (day.SuspendP > 0) daysWithSuspendP.add(day.date);
+        if (day.SuspendE > 0) daysWithSuspendE.add(day.date);
+    });
+    
+    const percentCreditNul = ((daysWithCreditNul.size / totalDays) * 100).toFixed(1);
+    const percentSuspendP = ((daysWithSuspendP.size / totalDays) * 100).toFixed(1);
+    const percentSuspendE = ((daysWithSuspendE.size / totalDays) * 100).toFixed(1);
+    
+    // Génération du HTML avec le nouveau look
+    let html = `
         <div class="client-card">
             <div class="client-header">
                 <span class="client-icon">⚠️</span>
-                <span class="client-id">Client ${client.id}</span>
-                <span class="client-badge">${events.length} événements</span>
+                <span class="client-id">Événements - Client ${client.id}</span>
+                <span class="client-badge">${events.length + zeroCreditDates.length} signalements</span>
             </div>
             
-            <!-- Stats événements -->
-            <div class="stats-grid-4">
-                <div class="stat-item">
-                    <span class="stat-label">🔮 SuspendE</span>
-                    <span class="stat-value">${suspendE}</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-label">💰 SuspendP</span>
-                    <span class="stat-value">${suspendP}</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-label">⚡ Surcharge</span>
-                    <span class="stat-value">${surcharge}</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-label">📅 Crédit nul</span>
-                    <span class="stat-value">${zeroCreditJours} jour(s)</span>
-                </div>
-            </div>
-            
-            <!-- Détail crédit nul -->
-            <div class="detail-section">
-                <h4>📊 Analyse crédit nul</h4>
-                <div class="info-row">
-                    <span>Jour(s) sans crédit:</span>
-                    <span class="value">${zeroCreditJours}</span>
-                </div>
-                <div class="info-row">
-                    <span>Pourcentage:</span>
-                    <span class="value ${zeroCreditPourcent > 20 ? 'warning' : ''}">${zeroCreditPourcent}%</span>
-                </div>
-                ${zeroCreditJours > 0 ? `
-                    <div class="zero-list-small">
-                        ${zeroCreditDates.slice(0, 5).map(d => 
-                            `<span class="zero-badge">${d}</span>`
-                        ).join('')}
-                        ${zeroCreditJours > 5 ? `<span class="more">+${zeroCreditJours-5}</span>` : ''}
+            <!-- Statistiques sous forme de cartes -->
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 20px;">
+                <!-- Crédit nul -->
+                <div style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); border-radius: 10px; padding: 12px; color: white;">
+                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                        <span style="font-size: 20px;">💰</span>
+                        <span style="font-size: 12px; font-weight: 600; opacity: 0.9;">CRÉDIT NUL</span>
                     </div>
-                ` : ''}
+                    <div style="font-size: 28px; font-weight: 800; margin-bottom: 4px;">${daysWithCreditNul.size}</div>
+                    <div style="font-size: 11px; opacity: 0.9;">jour(s) concerné(s)</div>
+                    <div style="margin-top: 8px; background: rgba(255,255,255,0.2); height: 4px; border-radius: 2px; overflow: hidden;">
+                        <div style="width: ${percentCreditNul}%; height: 100%; background: white; border-radius: 2px;"></div>
+                    </div>
+                    <div style="margin-top: 5px; font-size: 11px; font-weight: 600;">${percentCreditNul}%</div>
+                </div>
+                
+                <!-- Puissance dépassée -->
+                <div style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); border-radius: 10px; padding: 12px; color: white;">
+                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                        <span style="font-size: 20px;">📈</span>
+                        <span style="font-size: 12px; font-weight: 600; opacity: 0.9;">PUISSANCE</span>
+                    </div>
+                    <div style="font-size: 28px; font-weight: 800; margin-bottom: 4px;">${daysWithSuspendP.size}</div>
+                    <div style="font-size: 11px; opacity: 0.9;">jour(s) concerné(s)</div>
+                    <div style="margin-top: 8px; background: rgba(255,255,255,0.2); height: 4px; border-radius: 2px; overflow: hidden;">
+                        <div style="width: ${percentSuspendP}%; height: 100%; background: white; border-radius: 2px;"></div>
+                    </div>
+                    <div style="margin-top: 5px; font-size: 11px; font-weight: 600;">${percentSuspendP}%</div>
+                </div>
+                
+                <!-- Énergie épuisée -->
+                <div style="background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%); border-radius: 10px; padding: 12px; color: white;">
+                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                        <span style="font-size: 20px;">🔋</span>
+                        <span style="font-size: 12px; font-weight: 600; opacity: 0.9;">ÉNERGIE</span>
+                    </div>
+                    <div style="font-size: 28px; font-weight: 800; margin-bottom: 4px;">${daysWithSuspendE.size}</div>
+                    <div style="font-size: 11px; opacity: 0.9;">jour(s) concerné(s)</div>
+                    <div style="margin-top: 8px; background: rgba(255,255,255,0.2); height: 4px; border-radius: 2px; overflow: hidden;">
+                        <div style="width: ${percentSuspendE}%; height: 100%; background: white; border-radius: 2px;"></div>
+                    </div>
+                    <div style="margin-top: 5px; font-size: 11px; font-weight: 600;">${percentSuspendE}%</div>
+                </div>
             </div>
-        </div>
+            
+            <!-- Info période -->
+            <div style="background: #f8fafc; border-radius: 8px; padding: 10px 15px; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; font-size: 12px; border: 1px solid #e2e8f0;">
+                <span>📅 ${totalDays} jours analysés</span>
+                <span>📊 ${eventsByDay.length} jours avec événements</span>
+                <span>⚡ ${events.length + zeroCreditDates.length} signalements</span>
+            </div>
     `;
-}
-
-function renderForfaitChangesBoard() {
-    const container = document.getElementById('forfaitChangesBoard');
-    if (!container) return;
     
-    if (!activeClientId) {
-        container.innerHTML = '<p class="no-data">❌ Aucun client sélectionné</p>';
-        return;
-    }
-    
-    const client = clientsList.find(c => c.id === activeClientId);
-    if (!client) {
-        container.innerHTML = '<p class="no-data">❌ Client non trouvé</p>';
-        return;
-    }
-    
-    // Si client fantôme, afficher un message spécifique
-    if (isGhostClient(client)) {
-        container.innerHTML = `
-            <h3 class="card-title">🔄 CHANGEMENTS DE FORFAIT - Client ${client.id}</h3>
-            <div class="client-card ghost">
-                <div class="client-header">
-                    <span class="client-icon">👻</span>
-                    <span class="client-id">Client ${client.id}</span>
-                    <span class="client-badge ghost">Client fantôme</span>
-                </div>
-                <div class="message-container">
-                    <p class="client-message ghost">👻 Aucun changement de forfait enregistré.</p>
-                </div>
+    // Bouton toggle si il y a des événements
+    if (eventsByDay.length > 0) {
+        const toggleId = `toggle-events-${client.id}`;
+        const tableId = `events-table-${client.id}`;
+        
+        html += `
+            <button id="${toggleId}" style="width: 100%; padding: 12px; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 8px; color: #334155; font-size: 14px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 15px;">
+                <span style="font-size: 16px;">🔽</span>
+                <span>Afficher le tableau détaillé</span>
+            </button>
+            
+            <div id="${tableId}" style="display: none; border: 2px solid #e2e8f0; border-radius: 12px; overflow: hidden; margin-bottom: 15px; max-height: 350px; overflow-y: auto; overflow-x: auto;">
+                <table style="width: 100%; border-collapse: collapse; font-size: 12px; min-width: 900px;">
+                    <thead style="position: sticky; top: 0; z-index: 10;">
+                        <tr>
+                            <th rowspan="2" style="padding: 15px 10px; text-align: left; border-right: 2px solid #cbd5e1; background: #f1f5f9; font-size: 14px; position: sticky; left: 0; z-index: 11;">📅 DATE</th>
+                            <th colspan="3" style="padding: 12px 10px; text-align: center; background: #3b82f6; color: white; border-right: 2px solid #2563eb;">📈 PUISSANCE DÉPASSÉE</th>
+                            <th colspan="1" style="padding: 12px 10px; text-align: center; background: #f59e0b; color: white; border-right: 2px solid #d97706;">💰 CRÉDIT NUL</th>
+                            <th colspan="3" style="padding: 12px 10px; text-align: center; background: #0ea5e9; color: white;">🔋 ÉNERGIE ÉPUISÉE</th>
+                        </tr>
+                        <tr style="background: #f1f5f9;">
+                            <th style="padding: 10px 8px; text-align: center; border-bottom: 1px solid #cbd5e1;">Début</th>
+                            <th style="padding: 10px 8px; text-align: center; border-bottom: 1px solid #cbd5e1;">Fin</th>
+                            <th style="padding: 10px 8px; text-align: center; border-bottom: 1px solid #cbd5e1; border-right: 2px solid #cbd5e1;">Durée</th>
+                            <th style="padding: 10px 8px; text-align: center; border-bottom: 1px solid #cbd5e1; border-right: 2px solid #cbd5e1;">Signalement</th>
+                            <th style="padding: 10px 8px; text-align: center; border-bottom: 1px solid #cbd5e1;">Début</th>
+                            <th style="padding: 10px 8px; text-align: center; border-bottom: 1px solid #cbd5e1;">Fin</th>
+                            <th style="padding: 10px 8px; text-align: center; border-bottom: 1px solid #cbd5e1;">Durée</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+        
+        // Trier par date décroissante
+        eventsByDay.sort((a, b) => new Date(b.dateObj) - new Date(a.dateObj));
+        
+        eventsByDay.forEach((day, index) => {
+            const bgColor = index % 2 === 0 ? '#ffffff' : '#fafbfc';
+            const formattedDate = new Date(day.date).toLocaleDateString('fr-FR', {
+                day: '2-digit', month: '2-digit', year: 'numeric'
+            });
+            
+            html += `
+                <tr style="border-bottom: 1px solid #e2e8f0; background: ${bgColor};">
+                    <td style="padding: 12px 10px; font-weight: 600; border-right: 2px solid #e2e8f0; position: sticky; left: 0; background: ${bgColor};">
+                        ${formattedDate}
+                    </td>
+                    
+                    <!-- SuspendP -->
+                    <td style="padding: 10px 8px; text-align: center; ${day.SuspendP > 0 ? 'background: #3b82f610; font-weight: 600; color: #2563eb;' : 'color: #94a3b8;'}">
+                        ${day.SuspendP_start || '-'}
+                    </td>
+                    <td style="padding: 10px 8px; text-align: center; ${day.SuspendP > 0 ? 'background: #3b82f610; font-weight: 600; color: #2563eb;' : 'color: #94a3b8;'}">
+                        ${day.SuspendP_end || '-'}
+                    </td>
+                    <td style="padding: 10px 8px; text-align: center; border-right: 2px solid #e2e8f0; ${day.SuspendP > 0 ? 'background: #3b82f620; font-weight: 700; color: #2563eb;' : 'color: #94a3b8;'}">
+                        ${day.SuspendP_duration || '-'}
+                    </td>
+                    
+                    <!-- Crédit Nul -->
+                    <td style="padding: 10px 8px; text-align: center; border-right: 2px solid #e2e8f0; ${day.CreditNul > 0 ? 'background: #f59e0b; color: white; font-weight: 700;' : 'background: #f1f5f9; color: #94a3b8;'}">
+                        ${day.CreditNul > 0 ? '⚠️ CRÉDIT NUL' : '✓ Normal'}
+                    </td>
+                    
+                    <!-- SuspendE -->
+                    <td style="padding: 10px 8px; text-align: center; ${day.SuspendE > 0 ? 'background: #0ea5e910; font-weight: 600; color: #0284c7;' : 'color: #94a3b8;'}">
+                        ${day.SuspendE_start || '-'}
+                    </td>
+                    <td style="padding: 10px 8px; text-align: center; ${day.SuspendE > 0 ? 'background: #0ea5e910; font-weight: 600; color: #0284c7;' : 'color: #94a3b8;'}">
+                        ${day.SuspendE_end || '-'}
+                    </td>
+                    <td style="padding: 10px 8px; text-align: center; ${day.SuspendE > 0 ? 'background: #0ea5e920; font-weight: 700; color: #0284c7;' : 'color: #94a3b8;'}">
+                        ${day.SuspendE_duration || '-'}
+                    </td>
+                </tr>
+            `;
+        });
+        
+        html += `
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- Légende -->
+            <div style="margin-top: 15px; padding: 12px 20px; background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0; display: flex; align-items: center; gap: 20px; flex-wrap: wrap; font-size: 12px;">
+                <span><span style="color:#3b82f6;">⬤</span> Puissance dépassée (SuspendP)</span>
+                <span><span style="color:#f59e0b;">⬤</span> Crédit nul</span>
+                <span><span style="color:#0ea5e9;">⬤</span> Énergie épuisée (SuspendE)</span>
             </div>
         `;
-        return;
-    }
-    
-    container.innerHTML = `
-        <h3 class="card-title">🔄 CHANGEMENTS DE FORFAIT - Client ${client.id}</h3>
-        ${renderForfaitClient(client)}
-    `;
-}
-
-function renderForfaitClient(client) {
-    const changes = client.forfaitChanges || [];
-    const forfaitActuel = FORFAIT_NAMES[client.forfaitActuel] || `Forfait ${client.forfaitActuel}`;    
-    return `
-        <div class="client-card">
-            <div class="client-header">
-                <span class="client-icon">🔄</span>
-                <span class="client-id">Client ${client.id}</span>
-                <span class="client-badge">${changes.length} changements</span>
-            </div>
-            
-            <!-- Forfait actuel -->
-            <div class="current-forfait">
-                <span class="label">Forfait actuel:</span>
-                <span class="value">${forfaitActuel}</span>
-            </div>
-            
-            <!-- Historique des changements -->
-            ${changes.length > 0 ? `
-                <h4>📋 Historique</h4>
-                <div class="changes-timeline">
-                    ${changes.map(change => {
-                        const ancien = FORFAIT_NAMES[change.ancien] || `Forfait ${change.ancien}`;
-                        const nouveau = FORFAIT_NAMES[change.nouveau] || `Forfait ${change.nouveau}`;
-                        return `
-                            <div class="change-item">
-                                <span class="change-date">${change.date}</span>
-                                <span class="change-old">${ancien}</span>
-                                <span class="change-arrow">→</span>
-                                <span class="change-new">${nouveau}</span>
-                            </div>
-                        `;
-                    }).join('')}
-                </div>
-            ` : '<p class="no-data">Aucun changement de forfait</p>'}
-            
-            <!-- Indicateur de stabilité -->
-            <div class="stability-indicator">
-                <span class="label">Stabilité:</span>
-                <span class="value ${changes.length > 2 ? 'warning' : 'success'}">
-                    ${changes.length === 0 ? '✅ Stable' : 
-                      changes.length === 1 ? '🟡 Peu de changements' : 
-                      '🔴 Instable'}
-                </span>
-            </div>
-        </div>
-    `;
-}
-
-function renderRechargeHabitsBoard() {
-    const container = document.getElementById('rechargeHabitsBoard');
-    if (!container) return;
-    
-    if (!activeClientId) {
-        container.innerHTML = '<p class="no-data">❌ Aucun client sélectionné</p>';
-        return;
-    }
-    
-    const client = clientsList.find(c => c.id === activeClientId);
-    if (!client) {
-        container.innerHTML = '<p class="no-data">❌ Client non trouvé</p>';
-        return;
-    }
-    
-    // Si client fantôme, afficher un message spécifique
-    if (isGhostClient(client)) {
-        container.innerHTML = `
-            <h3 class="card-title">💳 HABITUDES DE RECHARGE - Client ${client.id}</h3>
-            <div class="client-card ghost">
-                <div class="client-header">
-                    <span class="client-icon">👻</span>
-                    <span class="client-id">Client ${client.id}</span>
-                    <span class="client-badge ghost">Client fantôme</span>
-                </div>
-                <div class="message-container">
-                    <p class="client-message ghost">👻 Aucune habitude de recharge enregistrée.</p>
-                </div>
+    } else {
+        html += `
+            <div style="text-align: center; padding: 40px; color: #94a3b8; background: #f8fafc; border-radius: 12px;">
+                <span style="font-size: 48px; display: block; margin-bottom: 15px;">✅</span>
+                <h3 style="margin: 0 0 10px 0; color: #1e293b;">Aucun événement</h3>
+                <p style="margin: 0; font-size: 14px;">Aucun événement pour ce client</p>
             </div>
         `;
-        return;
     }
     
-    container.innerHTML = `
-        <h3 class="card-title">💳 HABITUDES DE RECHARGE - Client ${client.id}</h3>
-        ${renderHabitsClient(client)}
-    `;
-}
-
-function renderHabitsClient(client) {
-    const recharges = client.recharges || [];
-    const creditPercentages = client.creditPercentages || {};
-    const preferredCredit = client.preferredCredit;
-    const preferredPercentage = client.preferredPercentage || 0;
-    const forfaitName = client.forfaitName || 'Inconnu';
+    html += `</div>`;
     
-    // Distribution des montants
-    const montants = Object.entries(creditPercentages)
-        .sort((a, b) => parseFloat(b[1]) - parseFloat(a[1]));
+    // Ajouter le script pour le toggle après le rendu
+    setTimeout(() => {
+        const toggleBtn = document.getElementById(`toggle-events-${client.id}`);
+        const table = document.getElementById(`events-table-${client.id}`);
+        if (toggleBtn && table) {
+            toggleBtn.addEventListener('click', () => {
+                if (table.style.display === 'none') {
+                    table.style.display = 'block';
+                    toggleBtn.innerHTML = `<span style="font-size:16px;">🔼</span><span>Masquer le tableau</span>`;
+                } else {
+                    table.style.display = 'none';
+                    toggleBtn.innerHTML = `<span style="font-size:16px;">🔽</span><span>Afficher le tableau détaillé</span>`;
+                }
+            });
+        }
+    }, 100);
     
-    return `
-        <div class="client-card">
-            <div class="client-header">
-                <span class="client-icon">💳</span>
-                <span class="client-id">Client ${client.id}</span>
-                <span class="client-badge">${recharges.length} recharges</span>
-            </div>
-            
-            <div class="stats-grid-3">
-                <div class="stat-item">
-                    <span class="stat-label">📊 Forfait</span>
-                    <span class="stat-value">${forfaitName}</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-label">💎 Crédit souvent utilisé</span>
-                    <span class="stat-value">${preferredCredit || 'N/A'} jour(s)</span>
-                    <span class="stat-detail">${preferredPercentage}% des recharges</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-label">💰 Crédit moyen</span>
-                    <span class="stat-value">${client.creditMoyen || 0} </span>
-                </div>
-            </div>
-            
-            <h4>📊 Distribution des crédits</h4>
-            <div class="credit-distribution">
-                ${montants.map(([montant, pourcentage]) => `
-                    <div class="percent-bar">
-                        <div class="bar-label">
-                            <span>${montant} jour(s)</span>
-                            <span>${pourcentage}%</span>
-                        </div>
-                        <div class="bar-container">
-                            <div class="bar-fill" style="width: ${pourcentage}%; background: #4CAF50;"></div>
-                        </div>
-                    </div>
-                `).join('')}
-            </div>
-            
-            <h4>⏱️ Dernières recharges</h4>
-            <div class="recent-list">
-                ${recharges.slice(-5).reverse().map(r => `
-                    <div class="recharge-item">
-                        <span class="recharge-date">${r.date}</span>
-                        <span class="recharge-amount">${r.credit} jour(s)</span>
-                        <span class="recharge-forfait">${FORFAIT_NAMES[r.forfait] || r.forfait}</span>
-                    </div>
-                `).join('')}
-            </div>
-        </div>
-    `;
+    return html;
 }
 
 function renderCreditBoard() {
@@ -791,10 +809,9 @@ function renderCreditBoard() {
         return;
     }
     
-    // Si client fantôme, afficher un message spécifique
     if (isGhostClient(client)) {
         container.innerHTML = `
-            <h3 class="card-title">💰 ANALYSE CRÉDIT - Client ${client.id}</h3>
+            <h3 class="card-title">💰 CRÉDIT & RECHARGES - Client ${client.id}</h3>
             <div class="client-card ghost">
                 <div class="client-header">
                     <span class="client-icon">👻</span>
@@ -802,462 +819,531 @@ function renderCreditBoard() {
                     <span class="client-badge ghost">Client fantôme</span>
                 </div>
                 <div class="message-container">
-                    <p class="client-message ghost">👻 Aucune donnée de crédit disponible.</p>
+                    <p class="client-message ghost">👻 Aucune donnée de crédit ou recharge disponible.</p>
                 </div>
             </div>
         `;
         return;
     }
     
-    container.innerHTML = `
-        <h3 class="card-title">💰 ANALYSE CRÉDIT - Client ${client.id}</h3>
-        ${renderCreditClient(client)}
-    `;
-}
-
-function renderCreditClient(client) {
-    const zeroCount = client.zeroCreditDates?.length || 0;
-    const zeroPercent = client.zeroCreditPercentage || 0;
-    
-    // Analyser les séquences
-    const sequences = analyzeZeroCreditSequences(client.zeroCreditDates || []);
-    
-    // Déterminer le niveau de risque pour le badge
-    const riskLevel = determineClientRiskLevel(client);
-    
-    let badgeClass = 'badge-success';
-    let badgeText = `${zeroCount} jour(s) sans crédit`;
-    
-    if (riskLevel === 'critical') {
-        badgeClass = 'badge-critical';
-    } else if (riskLevel === 'high') {
-        badgeClass = 'badge-danger';
-    } else if (riskLevel === 'medium') {
-        badgeClass = 'badge-warning';
-    }
-    
-    return `
-        <div class="client-card risk-${riskLevel}">
-            <div class="client-header">
-                <span class="client-icon">💰</span>
-                <span class="client-id">Client ${client.id}</span>
-                <span class="client-badge ${badgeClass}">
-                    ${zeroCount} jour(s) sans crédit
-                </span>
-            </div>
-            
-            <div class="credit-summary">
-                <div class="summary-item">
-                    ${zeroCount === 0 ? 
-                        '✅ <strong>Bon client</strong> - Recharge régulièrement son crédit. Aucun problème détecté.' :
-                        zeroCount <= 2 ? 
-                            '⚠️ <strong>À surveiller</strong> - ' + zeroCount + ' jour(s) sans crédit. Peut être un oubli.' :
-                            '🔴 <strong>À traiter!</strong> - ' + zeroCount + ' jour(s) sans crédit (' + zeroPercent + '%). Risque de perte client.'
-                    }
-                </div>
-            </div>
-            
-            ${zeroCount > 0 ? `
-                <!-- ANALYSE DES SÉQUENCES CONSÉCUTIVES -->
-                <div class="sequences-section">
-                    <h4>🔍 Analyse des séquences sans crédit</h4>
-                    ${renderSequencesAnalysis(sequences, client)}
-                </div>
-            ` : ''}
-        </div>
-    `;
-}
-
-function renderSequencesAnalysis(sequences, client) {
-    if (sequences.length === 0) return '<p class="no-data">Aucune séquence</p>';
-
-    return `
-        <div class="sequences-grid">
-            ${sequences.map((seq, idx) => {
-                const causes = analyzeCreditZeroCauses(client, seq.dates);
-                const displayInfo = formatSequenceForDisplay(seq, causes);
-                const recommendation = generateSequenceRecommendation(client, seq, causes);
-                
-                // Déterminer la classe de priorité pour la recommendation
-                const priorityClass = recommendation.priority || 'moyenne';
-                
-                return `
-                    <div class="sequence-card severity-${displayInfo.severity}">
-                        <!-- Header séquence -->
-                        <div class="sequence-header">
-                            <span class="sequence-badge ${displayInfo.isRecent ? 'recent' : ''}">
-                                ${displayInfo.isRecent ? '🔴 RÉCENT' : ''}
-                                ${displayInfo.label}
-                            </span>
-                            <span class="severity-icon">${getSeverityIcon(displayInfo.severity)}</span>
-                        </div>
-                        
-                        <!-- Dates de la séquence -->
-                        <div class="sequence-dates">
-                            <div class="date-range">
-                                <span class="label">Du:</span>
-                                <span class="date">${seq.startDate}</span>
-                            </div>
-                            ${seq.startDate !== seq.endDate ? `
-                                <div class="date-range">
-                                    <span class="label">Au:</span>
-                                    <span class="date">${seq.endDate}</span>
-                                </div>
-                            ` : ''}
-                        </div>
-                        
-                        <!-- Causes et Action -->
-                        <div class="causes-section-simple">
-                            <div class="cause-summary">
-                                ${renderCauseTextSummary(causes)}
-                            </div>
-                            <div class="recommendation ${priorityClass}">
-                                <div class="rec-action-text">${recommendation.action}</div>
-                                <div class="rec-message">${recommendation.message}</div>
-                            </div>
-                        </div>
-                    </div>
-                `;
-            }).join('')}
-        </div>
-    `;
-}
-
-function renderCauseTextSummary(causeResult) {
-    const cause = causeResult?.mainCause || 'unknown';
-    const confidence = ((causeResult?.confidence || 0) * 100).toFixed(0);
-
-    const causes = {
-        // ===========================================
-        // CLIENTS FANTÔMES
-        // ===========================================
-        ghost_client: {
-            emoji: '👻',
-            name: 'Client fantôme',
-            text: `Aucune donnée reçue - Vérifier présence installation.`
-        },
-
-        // ===========================================
-        // CAUSES COMMERCIALES
-        // ===========================================
-        noRecharge: {
-            emoji: '📵',
-            name: 'Pas de recharge',
-            text: `Client n'a pas rechargé son crédit.`
-        },
-        highConsumption: {
-            emoji: '⚡',
-            name: 'Consommation élevée',
-            text: `Client consomme plus que son forfait.`
-        },
-        insufficientForfait: {
-            emoji: '📦',
-            name: 'Forfait insuffisant',
-            text: `Forfait trop petit pour la consommation réelle.`
-        },
-        payment: {
-            emoji: '💳',
-            name: 'Paiement échoué',
-            text: `Recharges échouées - Problème bancaire.`
-        },
-        overload: {
-            emoji: '🔥',
-            name: 'Surcharge',
-            text: `Consommation anormalement élevée.`
-        },
-
-        // ===========================================
-        // CAUSES TECHNIQUES
-        // ===========================================
-        technicalEvent: {
-            emoji: '⚠️',
-            name: 'Incident technique',
-            text: `Coupure ou maintenance détectée.`
-        },
-
-        // ===========================================
-        // CAUSES D'ABSENCE
-        // ===========================================
-        vacances: {
-            emoji: '🏠',
-            name: 'Absence temporaire',
-            text: `Client en vacances - Installation en veille.`
-        },
-        abandon: {
-            emoji: '🚚',
-            name: 'Inactivité prolongée',
-            text: `Aucune activité depuis longtemps - Client peut-être parti.`
-        },
-
-        // ===========================================
-        // AUTRES
-        // ===========================================
-        system: {
-            emoji: '🔧',
-            name: 'Anomalie système',
-            text: `Comportement anormal - À investiguer.`
-        },
-        noActivity: {
-            emoji: '🕳️',
-            name: 'Compte inactif',
-            text: `Aucune activité enregistrée.`
-        },
-        unknown: {
-            emoji: '❓',
-            name: 'À investiguer',
-            text: `Cause incertaine.`
-        }
-    };
-
-    const info = causes[cause] || causes.unknown;
-    return `<p class="cause-main"><strong>${info.emoji} ${info.name}:</strong> ${info.text} (confiance ${confidence}%)</p>`;
-}
-
-function getSeverityIcon(severity) {
-    const icons = {
-        critical: '🔴',
-        warning: '🟠',
-        info: '🔵'
-    };
-    return icons[severity] || '⚪';
-}
-
-function renderBalanceBoard() {
-    const container = document.getElementById('balanceBoard');
-    if (!container) return;
-    
-    if (!activeClientId) {
-        container.innerHTML = '<p class="no-data">❌ Aucun client sélectionné</p>';
-        return;
-    }
-    
-    const client = clientsList.find(c => c.id === activeClientId);
-    if (!client) {
-        container.innerHTML = '<p class="no-data">❌ Client non trouvé</p>';
-        return;
-    }
-    
-    container.innerHTML = `
-        <h3 class="card-title">📊 SOLDE & RECHARGE - Client ${client.id}</h3>
-        ${renderBalanceClient(client)}
-    `;
-}
-
-function renderBalanceClient(client) {
-    // Données
-    const dernierCredit = client.credits?.slice(-1)[0]?.value || 0;
+    // ===== RÉCUPÉRATION DES DONNÉES =====
     const credits = client.credits || [];
-    const joursAnalyses = client.count || credits.length;
-    const joursSansCredit = client.zeroCreditDates?.length || 0;
-    const maxCredit = client.maxCredit || 0;
-    const totalRecharges = client.totalRecharges || 0;
+    const recharges = client.recharges || [];
+    const zeroCreditDates = client.zeroCreditDates || [];
     
-    // Vérifier si c'est un client fantôme
-    const isGhost = isGhostClient(client);
+    // Traitement des données pour les séries sans crédit
+    const streaksData = processCreditStreaks(credits, zeroCreditDates);
     
-    // ===========================================
-    // CAS SPÉCIAL : CLIENT FANTÔME
-    // ===========================================
-    if (isGhost) {
-        return `
-            <div class="client-card ghost">
-                <div class="client-header">
-                    <span class="client-icon">👻</span>
-                    <span class="client-id">Client ${client.id} - Statut: INCONNU</span>
-                    <span class="client-badge ghost">⚠️ Client fantôme</span>
-                </div>
-                
-                <div class="message-container">
-                    <p class="client-message warning">⚠️ Ce client n'a envoyé AUCUNE donnée depuis l'installation.</p>
-                    <p class="client-message info">📊 Données reçues: Consommation 0 Wh · Crédit 0 · Aucun événement</p>
-                </div>
-                
-                <div class="alert-section ghost">
-                    <h4>🔍 ANALYSE - 3 SCÉNARIOS POSSIBLES</h4>
-                    <ul>
-                        <li><strong>🏠 Client en vacances</strong> - Installation coupée, personne sur place</li>
-                        <li><strong>🔧 Installation déconnectée</strong> - Panne, maintenance, ou compteur débranché</li>
-                        <li><strong>📡 Contrôleur HS</strong> - Le boîtier de transmission ne fonctionne plus</li>
-                    </ul>
-                </div>
-                
-                <div class="recommendation-section ghost">
-                    <h4>👷 ACTION REQUISE</h4>
-                    <p class="recommendation-text">
-                        <strong>🔴 VISITE TERRAIN OBLIGATOIRE</strong><br>
-                        Se rendre sur place pour vérifier : présence client, état de l'installation, 
-                        fonctionnement du contrôleur. Mettre à jour le statut dans le système.
-                    </p>
-                </div>
-                
-                <div class="technical-details">
-                    <details>
-                        <summary>📋 Données techniques (cliquer pour voir)</summary>
-                        <div class="details-content">
-                            <p><strong>Dernière transmission:</strong> ${client.lastTransmission || 'Jamais'}</p>
-                            <p><strong>Type installation:</strong> ${client.installationType || 'Inconnu'}</p>
-                            <p><strong>Date installation:</strong> ${client.installationDate || 'Inconnue'}</p>
-                            <p><strong>Coordonnées:</strong> ${client.address || 'Non renseignées'}</p>
-                            <p><strong>ID Contrôleur:</strong> ${client.controllerId || 'Non assigné'}</p>
-                        </div>
-                    </details>
-                </div>
+    // Traitement des données de recharge
+    const rechargeData = processRechargeData(recharges);
+    
+    // ===== CONSTRUCTION DU HTML =====
+    let html = `
+        <h3 class="card-title">💰 CRÉDIT & RECHARGES - Client ${client.id}</h3>
+        <div class="client-card" style="padding: 0; overflow: hidden;">
+            <!-- En-tête violet -->
+            <div style="background: linear-gradient(135deg, #9f7aea 0%, #805ad5 100%); color: white; padding: 10px 18px; font-size: 15px; font-weight: 600; display: flex; align-items: center; gap: 8px;">
+                <span style="font-size: 18px;">💰</span>
+                <span>Crédit & Recharges - Client ${client.id}</span>
             </div>
-        `;
+            
+            <div style="padding: 15px;">
+    `;
+    
+    // ===== 1. CARTE DES SÉRIES SANS CRÉDIT =====
+    html += createStreaksCardHTML(streaksData);
+    
+    // ===== 2. ANALYSE DES HABITUDES DE RECHARGE =====
+    if (rechargeData.hasData) {
+        html += createRechargeHabitsHTML(rechargeData);
     }
     
-    // ===========================================
-    // CAS NORMAL : CLIENT AVEC DONNÉES
-    // ===========================================
+    // ===== 3. BOUTON TOGGLE =====
+    const toggleId = `toggle-credit-${client.id}`;
+    const detailsId = `credit-details-${client.id}`;
     
-    // Pourcentage jours sans crédit
-    const pourcentageSans = joursAnalyses > 0 
-        ? ((joursSansCredit / joursAnalyses) * 100).toFixed(1) 
-        : 0;
-    
-    // DÉTERMINATION DU NIVEAU DE RISQUE GLOBAL
-    let riskLevel = 'low';
-    let riskScore = 0;
-    
-    if (joursSansCredit === 0) {
-        riskScore = 0;
-    } else if (pourcentageSans < 10) {
-        riskScore = 30;
-    } else if (pourcentageSans < 20) {
-        riskScore = 60;
-    } else {
-        riskScore = 90;
-    }
-    
-    if (client.score?.valeur) {
-        const scoreClient = client.score.valeur;
-        if (scoreClient < 30) riskScore = Math.max(riskScore, 95);
-        else if (scoreClient < 50) riskScore = Math.max(riskScore, 75);
-        else if (scoreClient < 70) riskScore = Math.max(riskScore, 50);
-    }
-    
-    if (riskScore >= 80) riskLevel = 'critical';
-    else if (riskScore >= 60) riskLevel = 'high';
-    else if (riskScore >= 30) riskLevel = 'medium';
-    else riskLevel = 'low';
-    
-    // Vérifier s'il y a des délestages dans les données techniques
-    const hasTechnicalIssues = database.technicalData?.loadShedding?.jours?.length > 0;
-    
-    // MESSAGES AVEC LEURS PROPRES NIVEAUX DE RISQUE
-    const messages = [];
-    
-    // Message 1: Jours sans crédit
-    if (joursSansCredit === 0) {
-        messages.push({ text: "✅ Ce client n'a jamais été à découvert.", class: 'success' });
-    } else if (pourcentageSans < 10) {
-        messages.push({ text: `⚠️ Ce client a eu ${joursSansCredit} jour(s) sans crédit sur ${joursAnalyses} jours analysés (${pourcentageSans}%), ce qui reste acceptable.`, class: 'warning' });
-    } else {
-        messages.push({ text: `🔴 Ce client a eu ${joursSansCredit} jour(s) sans crédit sur ${joursAnalyses} jours analysés (${pourcentageSans}%). Une attention particulière est recommandée.`, class: 'danger' });
-    }
-    
-    // Message 2: Recharges
-    if (totalRecharges === 0) {
-        messages.push({ text: "📱 Aucune recharge enregistrée.", class: 'danger' });
-    } else if (totalRecharges < 5) {
-        messages.push({ text: `📱 Il a effectué ${totalRecharges} recharge(s) seulement.`, class: 'warning' });
-    } else {
-        messages.push({ text: `📱 Il recharge régulièrement (${totalRecharges} fois).`, class: 'success' });
-    }
-    
-    // ===========================================
-    // Message 3: Crédit préféré (AVEC DÉTECTION DES RECHARGES TECHNIQUES)
-    // ===========================================
-    const creditPrefere = client.preferredCredit || "non déterminé";
-    const pourcentagePref = client.preferredPercentage || 0;
-    
-    if (creditPrefere !== "non déterminé") {
-        // Vérifier si c'est une recharge technique (2, 3 ou 4 jours)
-        const isTechnicalRefund = ['2', '3', '4'].includes(creditPrefere.toString());
+    html += `
+        <button id="${toggleId}" style="width: 100%; padding: 8px; margin-top: 12px; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 5px;">
+            <span style="font-size:14px;">🔽</span> Afficher les détails
+        </button>
         
-        let messageClass = 'info';
-        let messageText = `📊 Il recharge généralement pour ${creditPrefere} jour(s) (${pourcentagePref}% des recharges).`;
-        
-        if (isTechnicalRefund) {
-            if (hasTechnicalIssues) {
-                messageClass = 'warning';
-                messageText = `⚠️ Recharges techniques (${creditPrefere}j) liées à des délestages - À surveiller`;
+        <div id="${detailsId}" style="display: none; margin-top: 15px;">
+    `;
+    
+    // ===== 4. TABLEAUX DÉTAILS =====
+    if (rechargeData.hasData) {
+        html += createRechargeTableHTML(rechargeData, client.id);
+    }
+    
+    if (credits.length > 0) {
+        html += createSoldeTableHTML(credits, client.id);
+    }
+    
+    html += `
+            </div>
+        </div>
+    </div>`;
+    
+    container.innerHTML = html;
+    
+    // ===== ATTACHER L'ÉVÉNEMENT AU BOUTON =====
+    setTimeout(() => {
+        const toggleBtn = document.getElementById(toggleId);
+        const detailsDiv = document.getElementById(detailsId);
+        if (toggleBtn && detailsDiv) {
+            toggleBtn.addEventListener('click', () => {
+                if (detailsDiv.style.display === 'none') {
+                    detailsDiv.style.display = 'block';
+                    toggleBtn.innerHTML = `<span style="font-size:14px;">🔼</span> Masquer les détails`;
+                } else {
+                    detailsDiv.style.display = 'none';
+                    toggleBtn.innerHTML = `<span style="font-size:14px;">🔽</span> Afficher les détails`;
+                }
+            });
+        }
+    }, 100);
+}
+
+// ===== FONCTIONS DE TRAITEMENT DES DONNÉES =====
+
+function processCreditStreaks(credits, zeroCreditDates) {
+    // Construire un tableau jour par jour avec les valeurs de crédit
+    const creditByDate = new Map();
+    
+    // D'abord, ajouter tous les credits
+    credits.forEach(c => {
+        if (c.date) {
+            const dateStr = c.date.split('T')[0];
+            creditByDate.set(dateStr, c.value || 0);
+        }
+    });
+    
+    // Marquer les jours sans crédit (zeroCreditDates)
+    zeroCreditDates.forEach(date => {
+        const dateStr = date.split('T')[0];
+        creditByDate.set(dateStr, 0);
+    });
+    
+    // Convertir en tableau trié
+    const sortedEntries = Array.from(creditByDate.entries())
+        .map(([date, value]) => ({
+            date,
+            dateObj: new Date(date),
+            value
+        }))
+        .sort((a, b) => a.dateObj - b.dateObj);
+    
+    // Détecter les séries consécutives de jours à 0
+    const consecutiveGroups = [];
+    let currentGroup = [];
+    
+    sortedEntries.forEach((record, index) => {
+        if (record.value === 0) {
+            if (index === 0) {
+                currentGroup = [record];
             } else {
-                messageClass = 'danger';
-                messageText = `🔴 RECHARGES TECHNIQUES INJUSTIFIÉES (${creditPrefere}j) - Vérifier installation`;
+                const prevDate = sortedEntries[index-1].dateObj;
+                const currDate = record.dateObj;
+                const dayDiff = Math.round((currDate - prevDate) / (1000 * 60 * 60 * 24));
+                
+                if (dayDiff === 1 && sortedEntries[index-1].value === 0) {
+                    currentGroup.push(record);
+                } else {
+                    if (currentGroup.length > 1) {
+                        consecutiveGroups.push([...currentGroup]);
+                    }
+                    currentGroup = [record];
+                }
             }
         }
+    });
+    
+    if (currentGroup.length > 1) {
+        consecutiveGroups.push(currentGroup);
+    }
+    
+    return {
+        hasData: consecutiveGroups.length > 0,
+        consecutiveDays: consecutiveGroups
+    };
+}
+
+function processRechargeData(recharges) {
+    if (!recharges || recharges.length === 0) {
+        return { hasData: false, purchaseDays: [], totalRecharges: 0 };
+    }
+    
+    const purchaseDays = recharges.map(r => ({
+        date: r.date,
+        days: r.credit || 0,
+        status: r.status || 'Réussie'
+    })).filter(item => item.days > 0);
+    
+    // Compter les occurrences par nombre de jours
+    const daysCountMap = new Map();
+    purchaseDays.forEach(item => {
+        const days = item.days;
+        daysCountMap.set(days, (daysCountMap.get(days) || 0) + 1);
+    });
+    
+    const sortedDays = Array.from(daysCountMap.entries()).sort((a, b) => b[0] - a[0]);
+    
+    // Répartition par intervalles
+    let intervalJours = 0, intervalSemaine = 0, intervalMois = 0;
+    purchaseDays.forEach(item => {
+        const days = item.days;
+        if (days >= 1 && days <= 6) intervalJours++;
+        else if (days >= 7 && days <= 28) intervalSemaine++;
+        else if (days >= 29) intervalMois++;
+    });
+    
+    const total = purchaseDays.length;
+    
+    return {
+        hasData: true,
+        totalRecharges: recharges.length,
+        purchaseDays: purchaseDays,
+        rawData: recharges,
+        daysCountMap,
+        sortedDays,
+        intervals: {
+            jours: { count: intervalJours, percent: ((intervalJours / total) * 100).toFixed(1) },
+            semaine: { count: intervalSemaine, percent: ((intervalSemaine / total) * 100).toFixed(1) },
+            mois: { count: intervalMois, percent: ((intervalMois / total) * 100).toFixed(1) }
+        }
+    };
+}
+
+// ===== FONCTIONS DE RENDU HTML =====
+
+function createStreaksCardHTML(streaksData) {
+    if (!streaksData.hasData) {
+        return `
+            <div style="background: white; border-radius: 8px; margin-bottom: 12px; overflow: hidden; border: 1px solid #e2e8f0;">
+                <div style="padding: 10px; text-align: center; color: #64748b; background: #f8fafc; display: flex; align-items: center; justify-content: center; gap: 5px; font-size: 11px;">
+                    <span style="font-size: 14px;">🔗</span>
+                    <span>Aucune série >1 jour sans crédit</span>
+                </div>
+            </div>
+        `;
+    }
+    
+    const significantStreaks = streaksData.consecutiveDays.filter(group => group.length > 1);
+    
+    if (significantStreaks.length === 0) {
+        return `
+            <div style="background: white; border-radius: 8px; margin-bottom: 12px; overflow: hidden; border: 1px solid #e2e8f0;">
+                <div style="padding: 10px; text-align: center; color: #64748b; background: #f8fafc; display: flex; align-items: center; justify-content: center; gap: 5px; font-size: 11px;">
+                    <span style="font-size: 14px;">🔗</span>
+                    <span>Aucune série >1 jour sans crédit</span>
+                </div>
+            </div>
+        `;
+    }
+    
+    let longestStreak = 0;
+    significantStreaks.forEach(group => {
+        if (group.length > longestStreak) longestStreak = group.length;
+    });
+    
+    const streaksHTML = significantStreaks.map((group, idx) => {
+        const start = new Date(group[0].date).toLocaleDateString('fr-FR', {
+            day: '2-digit', month: '2-digit'
+        });
+        const end = new Date(group[group.length - 1].date).toLocaleDateString('fr-FR', {
+            day: '2-digit', month: '2-digit'
+        });
+        const isLongest = group.length === longestStreak;
         
-        messages.push({ text: messageText, class: messageClass });
-    }
+        return `
+            <div style="background: white; padding: 8px 10px; border-radius: 6px; border-left: 3px solid ${isLongest ? '#ef4444' : '#f97316'}; min-width: 140px; flex: 1 1 auto; border: 1px solid #e2e8f0; font-size: 11px;">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 3px;">
+                    <span style="color: #64748b;">#${idx+1}</span>
+                    ${isLongest ? '<span style="background: #ef4444; color: white; padding: 1px 6px; border-radius: 10px; font-size: 8px;">MAX</span>' : ''}
+                </div>
+                <div style="font-weight: 700; color: ${isLongest ? '#ef4444' : '#f97316'}; font-size: 16px;">${group.length} jours</div>
+                <div style="color: #475569;">${start} → ${end}</div>
+            </div>
+        `;
+    }).join('');
     
-    // Message 4: Forfaits
-    const forfaitActuel = client.forfaitName || "inconnu";
-    const changements = client.forfaitChanges || [];
-    
-    if (changements.length === 0) {
-        messages.push({ text: `📦 Forfait actuel : ${forfaitActuel} (aucun changement).`, class: 'success' });
-    } else {
-        const historique = changements.map(c => 
-            `${FORFAIT_NAMES[c.ancien] || c.ancien} → ${FORFAIT_NAMES[c.nouveau] || c.nouveau}`
-        ).join(", ");
-        messages.push({ text: `📦 Forfaits utilisés : ${historique} (actuel : ${forfaitActuel}).`, class: changements.length > 2 ? 'warning' : 'info' });
-    }
-    
-    // Message 5: Crédit max
-    messages.push({ text: `💳 Son plus gros crédit était de ${maxCredit} jour(s).`, class: 'gold' });
-    
-    // Score
-    const scoreMsg = client.score?.alerte 
-        ? `🏷️ ${client.score.alerte}`
-        : "🏷️ Profil standard";
-    
-    // Construction du HTML
     return `
-        <div class="client-card risk-${riskLevel}">
-            <div class="client-header">
-                <span class="client-icon">📊</span>
-                <span class="client-id">Synthèse client ${client.id}</span>
-                <span class="client-badge risk-${riskLevel}">${scoreMsg}</span>
-            </div>
-            
-            <div class="message-container">
-                ${messages.map(msg => `
-                    <p class="client-message ${msg.class}">${msg.text}</p>
-                `).join('')}
-            </div>
-            
-            ${client.score?.raisons?.length > 0 ? `
-                <div class="alert-section risk-${riskLevel}">
-                    <h4>🔔 Alertes</h4>
-                    <ul>
-                        ${client.score.raisons.map(r => `<li>${r}</li>`).join('')}
-                    </ul>
+        <div style="background: white; border-radius: 8px; margin-bottom: 12px; overflow: hidden; border: 1px solid #e2e8f0;">
+            <div style="padding: 12px;">
+                <div style="display: flex; align-items: center; gap: 5px; margin-bottom: 10px;">
+                    <span style="font-size: 16px;">🔗</span>
+                    <span style="font-weight: 600; font-size: 13px;">Séries sans crédit (>1 jour)</span>
+                    <span style="margin-left: auto; background: #e2e8f0; padding: 2px 8px; border-radius: 12px; font-size: 10px;">
+                        ${significantStreaks.length}
+                    </span>
                 </div>
-            ` : ''}
-            
-            ${client.recommendations?.actions?.length > 0 ? `
-                <div class="recommendation-section risk-${riskLevel}">
-                    <h4>💡 Recommandation</h4>
-                    <p class="recommendation-text">
-                        ${client.recommendations.actions[0]?.message || "Aucune recommandation"}
-                    </p>
+                <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                    ${streaksHTML}
                 </div>
-            ` : ''}
-            
-            <!-- Détails techniques toujours disponibles -->
-            <div class="technical-details">
-                <details>
-                    <summary>📋 Détails installation (cliquer)</summary>
-                    <div class="details-content">
-                        <p><strong>ID Client:</strong> ${client.id}</p>
-                        <p><strong>Installation:</strong> ${client.installationType || 'Standard'}</p>
-                        <p><strong>Date installation:</strong> ${client.installationDate || 'Non renseignée'}</p>
-                        <p><strong>Dernier contact:</strong> ${client.lastContact || 'Aujourd\'hui'}</p>
-                        <p><strong>ID Contrôleur:</strong> ${client.controllerId || 'N/A'}</p>
-                    </div>
-                </details>
             </div>
         </div>
     `;
+}
+
+function createRechargeHabitsHTML(rechargeData) {
+    const totalPurchases = rechargeData.totalRecharges;
+    const sortedDays = rechargeData.sortedDays;
+    const intervals = rechargeData.intervals;
+    
+    // Déterminer l'habitude principale
+    let mainHabit = { days: 0, count: 0, percentage: 0 };
+    sortedDays.forEach(([days, count]) => {
+        if (count > mainHabit.count) {
+            mainHabit = { days, count, percentage: ((count / totalPurchases) * 100).toFixed(1) };
+        }
+    });
+    
+    // Déterminer l'intervalle principal
+    const intervalList = [
+        { name: 'Jours', value: intervals.jours.count, percent: intervals.jours.percent, color: '#f97316', range: '1-6j' },
+        { name: 'Semaine', value: intervals.semaine.count, percent: intervals.semaine.percent, color: '#3b82f6', range: '7-28j' },
+        { name: 'Mois', value: intervals.mois.count, percent: intervals.mois.percent, color: '#22c55e', range: '>28j' }
+    ];
+    
+    const mainInterval = intervalList.reduce((max, interval) => 
+        interval.value > max.value ? interval : max
+    );
+    
+    // Barre des habitudes
+    const habitBarHTML = sortedDays.map(([days, count]) => {
+        const percentage = ((count / totalPurchases) * 100).toFixed(1);
+        const bgColor = getDaysColor(days);
+        
+        return `
+            <div style="width: ${percentage}%; height: 100%; background: ${bgColor}; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: white;" 
+                title="${days} jours : ${count} recharge(s) (${percentage}%)">
+                ${percentage > 8 ? percentage + '%' : ''}
+            </div>
+        `;
+    }).join('');
+    
+    // Légende des habitudes
+    const habitLegendHTML = sortedDays.map(([days, count]) => {
+        const percentage = ((count / totalPurchases) * 100).toFixed(1);
+        const bgColor = getDaysColor(days);
+        const isMain = days === mainHabit.days;
+        
+        return `
+            <div style="display: flex; align-items: center; gap: 5px; ${isMain ? 'background: #f1f5f9; padding: 2px 8px; border-radius: 16px; border: 1px solid #cbd5e1;' : ''}">
+                <div style="width: 12px; height: 12px; background: ${bgColor}; border-radius: 3px;"></div>
+                <span style="font-size: 11px; color: #334155;">
+                    <strong>${days}j</strong>
+                    <span style="color: #64748b;"> ${count}x</span>
+                    <span style="color: #475569; font-weight: 600;"> ${percentage}%</span>
+                    ${isMain ? '<span style="margin-left: 4px; font-size: 12px;">👑</span>' : ''}
+                </span>
+            </div>
+        `;
+    }).join('');
+    
+    // Barre des intervalles
+    const intervalBarHTML = `
+        <div style="width: ${intervals.jours.percent}%; height: 100%; background: #f97316; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: white;" 
+            title="1-6 jours : ${intervals.jours.count} recharge(s) (${intervals.jours.percent}%)">
+            ${intervals.jours.percent > 8 ? intervals.jours.percent + '%' : ''}
+        </div>
+        <div style="width: ${intervals.semaine.percent}%; height: 100%; background: #3b82f6; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: white;" 
+            title="7-28 jours : ${intervals.semaine.count} recharge(s) (${intervals.semaine.percent}%)">
+            ${intervals.semaine.percent > 8 ? intervals.semaine.percent + '%' : ''}
+        </div>
+        <div style="width: ${intervals.mois.percent}%; height: 100%; background: #22c55e; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: white;" 
+            title=">28 jours : ${intervals.mois.count} recharge(s) (${intervals.mois.percent}%)">
+            ${intervals.mois.percent > 8 ? intervals.mois.percent + '%' : ''}
+        </div>
+    `;
+    
+    // Légende des intervalles
+    const intervalLegendHTML = intervalList.map(interval => {
+        const isMain = interval.name === mainInterval.name;
+        return `
+            <div style="display: flex; align-items: center; gap: 5px; ${isMain ? 'background: #f1f5f9; padding: 3px 10px; border-radius: 20px;' : ''}">
+                <div style="width: 14px; height: 14px; background: ${interval.color}; border-radius: 3px;"></div>
+                <span style="font-size: 11px;"><strong>${interval.name}</strong> ${interval.range}: ${interval.value}x (${interval.percent}%)</span>
+                ${isMain ? '<span style="font-size: 14px;">👑</span>' : ''}
+            </div>
+        `;
+    }).join('');
+    
+    return `
+        <div style="background: #f8fafc; border-radius: 8px; padding: 12px; margin-top: 12px; border: 1px solid #e2e8f0;">
+            <!-- Habitude de recharge -->
+            <div style="margin-bottom: 15px;">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                    <div style="display: flex; align-items: center; gap: 5px;">
+                        <span style="font-size: 16px;">📊</span>
+                        <span style="font-weight: 600; font-size: 13px;">Habitudes de recharge</span>
+                    </div>
+                    <span style="background: #e2e8f0; padding: 2px 10px; border-radius: 12px; font-size: 10px; font-weight: 600;">
+                        ${totalPurchases} recharges
+                    </span>
+                </div>
+                
+                <!-- Barre de progression -->
+                <div style="height: 36px; background: #f1f5f9; border-radius: 18px; overflow: hidden; display: flex; margin-bottom: 10px; box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);">
+                    ${habitBarHTML}
+                </div>
+                
+                <!-- Légende -->
+                <div style="display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 5px; padding: 5px; background: #f8fafc; border-radius: 6px;">
+                    ${habitLegendHTML}
+                </div>
+                
+                <!-- Indication habitude principale -->
+                <div style="background: #f1f5f9; padding: 6px 10px; border-radius: 6px; font-size: 11px; color: #334155; display: flex; align-items: center; gap: 8px; border-left: 3px solid #9f7aea;">
+                    <span style="font-size: 14px;">👉</span>
+                    <span><strong>Habitude principale :</strong> <span style="background: #9f7aea20; color: #7e22ce; padding: 2px 10px; border-radius: 20px; font-weight: 700;">${mainHabit.days} jours</span> (${mainHabit.percentage}% des recharges)</span>
+                </div>
+            </div>
+            
+            <!-- Séparateur -->
+            <div style="height: 1px; background: #e2e8f0; margin: 10px 0;"></div>
+            
+            <!-- Répartition par intervalles -->
+            <div style="margin-top: 10px;">
+                <div style="display: flex; align-items: center; gap: 5px; margin-bottom: 8px;">
+                    <span style="font-size: 14px;">📈</span>
+                    <span style="font-weight: 600; font-size: 12px;">Répartition par intervalle</span>
+                </div>
+                
+                <div style="height: 36px; background: #f1f5f9; border-radius: 18px; overflow: hidden; display: flex; margin-bottom: 10px; box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);">
+                    ${intervalBarHTML}
+                </div>
+                
+                <div style="display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-around; margin-bottom: 8px;">
+                    ${intervalLegendHTML}
+                </div>
+                
+                <div style="background: #f1f5f9; padding: 6px 10px; border-radius: 6px; font-size: 11px; display: flex; align-items: center; gap: 8px;">
+                    <span style="font-size: 14px;">🏆</span>
+                    <span><strong>Intervalle principal :</strong> <span style="background: ${mainInterval.color}20; color: ${mainInterval.color}; padding: 2px 12px; border-radius: 20px; font-weight: 700;">${mainInterval.name}</span> (${mainInterval.percent}%, ${mainInterval.range})</span>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function createRechargeTableHTML(rechargeData, clientId) {
+    const sortedData = [...rechargeData.rawData].sort((a, b) => 
+        new Date(b.date) - new Date(a.date)
+    );
+    
+    let rowsHTML = '';
+    sortedData.forEach((row, index) => {
+        const date = row.date || '-';
+        const days = row.credit || 0;
+        const status = row.status || 'Réussie';
+        
+        const statusColor = status.toLowerCase().includes('reussie') ? '#22c55e' : 
+                           status.toLowerCase().includes('echoue') ? '#ef4444' : '#f59e0b';
+        
+        const bgColor = index % 2 === 0 ? '#ffffff' : '#fafbfc';
+        
+        rowsHTML += `
+            <tr style="border-bottom: 1px solid #e2e8f0; background: ${bgColor};">
+                <td style="padding: 10px; white-space: nowrap;">${date}</td>
+                <td style="padding: 10px; text-align: center; font-weight: 600; color: #f97316;">${days}</td>
+                <td style="padding: 10px; text-align: center;">
+                    <span style="background: ${statusColor}20; color: ${statusColor}; padding: 3px 10px; border-radius: 20px; font-weight: 600; font-size: 11px;">
+                        ${status}
+                    </span>
+                </td>
+            </tr>
+        `;
+    });
+    
+    return `
+        <div style="border: 2px solid #e2e8f0; border-radius: 12px; overflow: hidden; margin-bottom: 20px;">
+            <div style="background: linear-gradient(135deg, #9f7aea 0%, #805ad5 100%); color: white; padding: 15px 20px; font-size: 16px; font-weight: 700; display: flex; justify-content: space-between; align-items: center;">
+                <span style="display: flex; align-items: center; gap: 10px;">
+                    <span style="font-size: 20px;">⚡</span>
+                    Historique des recharges
+                </span>
+                <span style="background: rgba(255,255,255,0.2); padding: 5px 15px; border-radius: 30px; font-size: 13px;">
+                    ${rechargeData.totalRecharges} opération(s)
+                </span>
+            </div>
+            <div style="max-height: 350px; overflow-y: auto; overflow-x: auto; background: white;">
+                <table style="width: 100%; border-collapse: collapse; font-size: 12px; min-width: 700px;">
+                    <thead style="position: sticky; top: 0; background: #f8fafc; z-index: 10;">
+                        <tr style="border-bottom: 2px solid #e2e8f0;">
+                            <th style="padding: 12px 10px; text-align: left;">Date</th>
+                            <th style="padding: 12px 10px; text-align: center;">Jours rechargés</th>
+                            <th style="padding: 12px 10px; text-align: center;">Statut</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${rowsHTML}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    `;
+}
+
+function createSoldeTableHTML(credits, clientId) {
+    const sortedData = [...credits].sort((a, b) => new Date(b.date) - new Date(a.date));
+    
+    let rowsHTML = '';
+    sortedData.forEach((row, index) => {
+        const date = row.date || '-';
+        const value = row.value || 0;
+        const bgColor = index % 2 === 0 ? '#ffffff' : '#fafbfc';
+        
+        rowsHTML += `
+            <tr style="border-bottom: 1px solid #e2e8f0; background: ${bgColor};">
+                <td style="padding: 10px; white-space: nowrap;">${date}</td>
+                <td style="padding: 10px; text-align: center; font-weight: 600; color: ${value === 0 ? '#ef4444' : '#48bb78'};">${value}</td>
+                <td style="padding: 10px; text-align: center;">
+                    ${value === 0 ? 
+                        '<span style="background: #ef444420; color: #ef4444; padding: 3px 10px; border-radius: 20px; font-size: 11px;">Sans crédit</span>' : 
+                        '<span style="background: #48bb7820; color: #48bb78; padding: 3px 10px; border-radius: 20px; font-size: 11px;">Crédit disponible</span>'}
+                </td>
+            </tr>
+        `;
+    });
+    
+    return `
+        <div style="border: 2px solid #e2e8f0; border-radius: 12px; overflow: hidden;">
+            <div style="background: linear-gradient(135deg, #48bb78 0%, #38a169 100%); color: white; padding: 15px 20px; font-size: 16px; font-weight: 700; display: flex; justify-content: space-between; align-items: center;">
+                <span style="display: flex; align-items: center; gap: 10px;">
+                    <span style="font-size: 20px;">💰</span>
+                    Historique des soldes (crédits)
+                </span>
+                <span style="background: rgba(255,255,255,0.2); padding: 5px 15px; border-radius: 30px; font-size: 13px;">
+                    ${credits.length} relevé(s)
+                </span>
+            </div>
+            <div style="max-height: 350px; overflow-y: auto; overflow-x: auto; background: white;">
+                <table style="width: 100%; border-collapse: collapse; font-size: 12px; min-width: 400px;">
+                    <thead style="position: sticky; top: 0; background: #f8fafc; z-index: 10;">
+                        <tr style="border-bottom: 2px solid #e2e8f0;">
+                            <th style="padding: 12px 10px; text-align: left;">Date</th>
+                            <th style="padding: 12px 10px; text-align: center;">Crédit (jours)</th>
+                            <th style="padding: 12px 10px; text-align: center;">Statut</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${rowsHTML}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    `;
+}
+
+function getDaysColor(days) {
+    if (days >= 30) return '#22c55e';      // Vert
+    if (days >= 20) return '#84cc16';      // Vert clair
+    if (days >= 15) return '#eab308';      // Jaune
+    if (days >= 10) return '#f97316';      // Orange
+    if (days >= 7) return '#ef4444';       // Rouge
+    if (days >= 5) return '#ec4899';       // Rose
+    if (days >= 3) return '#8b5cf6';       // Violet
+    if (days === 2) return '#60a5fa';       // Bleu clair pour 2j
+    return '#94a3b8';                        // Gris clair pour 1j
 }

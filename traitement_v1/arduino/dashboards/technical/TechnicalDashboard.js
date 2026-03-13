@@ -44,7 +44,7 @@ export function renderTechnicalDashboard() {
         return;
     }
 
-    // HTML statique des cartes
+    // HTML statique des cartes (votre code existant)
     container.innerHTML = `
         <div class="section-title"><h2>🔧DONNÉES TECHNIQUES</h2></div>
         <div id="infoCard" class="card"></div>
@@ -60,9 +60,14 @@ export function renderTechnicalDashboard() {
         <div class="section-title"><h2>⚡ANALYSE ÉNERGIE</h2></div>
         <div id="energyBoard" class="card"></div>
         <div id="combinedEnergyTable" class="card"></div>
-        `;
+        
+        <!-- 👉 BOUTON POUR AFFICHER LES TABLEAUX -->
+        <button class="toggle-tables-btn" onclick="toggleTablesContainer()">
+            📋 Afficher les tableaux détaillés
+        </button>
+    `;
 
-    // RENDER DES CARTES
+    // Vos render existants
     renderInfoCard();
     renderConformityCard();
     renderNormsCard();
@@ -73,7 +78,6 @@ export function renderTechnicalDashboard() {
     renderEnergyBoard();
     renderCombinedEnergyTable();
 }
-
 // ===========================================
 // I) INFO CARD
 // ===========================================

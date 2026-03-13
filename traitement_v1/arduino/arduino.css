@@ -679,3 +679,108 @@ html {
 .electron .card {
     padding: 1rem;
 }
+/* Barre de progression unifiée */
+.unified-progress-bar {
+    display: flex;
+    height: 24px;
+    width: 100%;
+    border-radius: 12px;
+    overflow: hidden;
+    margin: 15px 0 10px;
+    background: #edf2f7;
+    box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.progress-segment {
+    height: 100%;
+    transition: width 0.3s ease;
+}
+
+.progress-segment.success { background: linear-gradient(135deg, #4cc9f0, #4895ef); }
+.progress-segment.warning { background: linear-gradient(135deg, #ff9800, #f57c00); }
+.progress-segment.danger { background: linear-gradient(135deg, #f44336, #d32f2f); }
+
+/* Légende compacte */
+.progress-legend {
+    display: flex;
+    gap: 20px;
+    margin: 10px 0 8px;
+    flex-wrap: wrap;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+}
+
+.legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 3px;
+}
+
+.legend-dot.success { background: #4cc9f0; }
+.legend-dot.warning { background: #ff9800; }
+.legend-dot.danger { background: #f44336; }
+
+.legend-label {
+    color: #4a5568;
+}
+
+.legend-value {
+    font-weight: 600;
+    color: #2d3748;
+    margin-left: 2px;
+}
+
+/* Footer compact */
+.progress-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px dashed #e2e8f0;
+    font-size: 12px;
+    color: #718096;
+}
+
+.total-days {
+    font-weight: 500;
+}
+
+.detail-counts {
+    font-family: monospace;
+    background: #f7fafc;
+    padding: 2px 8px;
+    border-radius: 12px;
+}
+
+/* Cacher les tableaux par défaut */
+#tablesContainer {
+    display: none;
+    margin-top: 2rem;
+}
+
+/* Style du bouton */
+.toggle-tables-btn {
+    width: 100%;
+    padding: 1rem;
+    margin: 2rem 0 1rem 0;
+    background: linear-gradient(145deg, var(--gray-100), var(--white));
+    border: 2px solid var(--gray-200);
+    border-radius: var(--radius-lg);
+    color: var(--primary);
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.toggle-tables-btn:hover {
+    background: var(--primary);
+    color: var(--white);
+    border-color: var(--primary);
+}
