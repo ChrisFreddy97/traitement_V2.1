@@ -4755,18 +4755,6 @@ function createStabilityChart(containerId, stabilityData, tensionResults) {
                         </div>
                     </div>
 
-                    <!-- Jours Hors Limites -->
-                    <div style="background: linear-gradient(135deg, #fee2e2 0%, #ffffff 100%); padding: 16px; border-radius: 10px; border-left: 5px solid #ef4444; box-shadow: 0 2px 8px rgba(0,0,0,0.06); transition: all 0.3s ease;">
-                        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
-                            <div style="background: #ef4444; color: white; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px;">🚫</div>
-                            <div style="font-size: 11px; color: #718096; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Hors Limites</div>
-                        </div>
-                        <div style="font-size: 32px; font-weight: 800; color: #ef4444; text-align: center; margin-bottom: 8px;">${outOfLimits}</div>
-                        <div style="text-align: center; padding: 6px 12px; background: rgba(239, 68, 68, 0.1); border-radius: 6px; font-size: 12px; color: #991b1b; font-weight: 600;">
-                            ${totalDays > 0 ? Math.round((outOfLimits / totalDays) * 100) : 0}% des jours
-                        </div>
-                    </div>
-
                     <!-- CARTE NOUVELLE : Jours d'Alerte -->
                     <div style="background: linear-gradient(135deg, #fff7ed 0%, #ffffff 100%); padding: 16px; border-radius: 10px; border-left: 5px solid #f97316; box-shadow: 0 2px 8px rgba(0,0,0,0.06); transition: all 0.3s ease;">
                         <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
@@ -4777,7 +4765,7 @@ function createStabilityChart(containerId, stabilityData, tensionResults) {
                             ${alertData.alertDays} / ${alertData.totalDays}
                         </div>
                         <div style="text-align: center; padding: 6px 12px; background: rgba(249, 115, 22, 0.1); border-radius: 6px; font-size: 12px; color: #92400e; font-weight: 600;">
-                            ⚡ ${alertData.alertHours} heure(s) hors seuil
+                            ⚡ ${getSystemLimits(systemType).alertThreshold}V/h</div>
                         </div>
                     </div>
 
@@ -5917,7 +5905,7 @@ function convertTimeToMinutes(timeStr) {
     return (hours || 0) * 60 + (minutes || 0);
 }
 // ======================== FILTRE GLOBAL PAR DATES ========================
-// ======================== FILTRE GLOBAL PAR DATES ========================
+// Crée le filtre global des données avec tous les filtres sur la même ligne
 function createGlobalDateFilter() {
     const allDates = allClientsHourlyMatrix.dates || [];
     if (allDates.length === 0) return null;
@@ -5969,7 +5957,7 @@ function createGlobalDateFilter() {
                             ${allDates.length} jour${allDates.length !== 1 ? 's' : ''} disponibles
                             ${isFilterActive ? ` · <strong>${window.filteredDates.length}</strong> sélectionné${window.filteredDates.length !== 1 ? 's' : ''}` : ''}
                         </div>
-                        <!-- NOUVEAU : Affichage de la plage de dates -->
+                        <!-- Affichage de la plage de dates -->
                         <div style="font-size: 13px; color: #2563eb; margin-top: 4px; font-weight: 500; background: #dbeafe; padding: 4px 10px; border-radius: 20px; display: inline-block;">
                             📅 ${dateRangeText}
                         </div>
@@ -5988,176 +5976,165 @@ function createGlobalDateFilter() {
                 </div>
             </div>
             
-            <!-- Filtres principaux (conservés intacts) -->
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; margin-bottom: 20px;">
-                <!-- Sélection par période -->
-                <div class="filter-group">
+            <!-- TOUS LES FILTRES SUR UNE SEULE LIGNE -->
+            <div style="display: flex; gap: 15px; margin-bottom: 20px; flex-wrap: wrap;">
+                
+                <!-- 1. FILTRE PAR PÉRIODE (30% de largeur) -->
+                <div class="filter-group" style="flex: 3; min-width: 250px;">
                     <div class="filter-group-title">
                         <span>📅</span> Période
                     </div>
-                    <div style="display: flex; gap: 12px; flex-wrap: wrap;">
-                        <div style="flex: 1; min-width: 140px;">
-                            <label style="display: block; font-size: 12px; color: #64748b; margin-bottom: 6px; font-weight: 500;">
-                                Date de début
-                            </label>
+                    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                        <div style="flex: 1;">
                             <input type="date" id="filter-start-date" class="filter-date-input" 
-                                   style="width: 100%; padding: 12px; border: 2px solid #e2e8f0; border-radius: 8px; 
-                                          font-size: 13px; transition: all 0.2s;">
+                                   style="width: 100%; padding: 8px 10px; border: 2px solid #e2e8f0; border-radius: 6px; font-size: 12px;">
                         </div>
-                        <div style="flex: 1; min-width: 140px;">
-                            <label style="display: block; font-size: 12px; color: #64748b; margin-bottom: 6px; font-weight: 500;">
-                                Date de fin
-                            </label>
+                        <div style="flex: 1;">
                             <input type="date" id="filter-end-date" class="filter-date-input" 
-                                   style="width: 100%; padding: 12px; border: 2px solid #e2e8f0; border-radius: 8px; 
-                                          font-size: 13px; transition: all 0.2s;">
+                                   style="width: 100%; padding: 8px 10px; border: 2px solid #e2e8f0; border-radius: 6px; font-size: 12px;">
                         </div>
                     </div>
                 </div>
                 
-                <!-- Filtre par année/mois -->
-                <div class="filter-group">
+                <!-- 2. FILTRE PAR ANNÉE/MOIS (20% de largeur) -->
+                <div class="filter-group" style="flex: 2; min-width: 180px;">
                     <div class="filter-group-title">
                         <span>🗓️</span> Année/Mois
                     </div>
-                    <div style="display: flex; gap: 12px; flex-wrap: wrap;">
-                        <div style="flex: 1; min-width: 120px;">
-                            <label style="display: block; font-size: 12px; color: #64748b; margin-bottom: 6px; font-weight: 500;">
-                                Année
-                            </label>
-                            <select id="filter-year" class="filter-select" 
-                                    style="width: 100%; padding: 12px; border: 2px solid #e2e8f0; border-radius: 8px; 
-                                           font-size: 13px; background: white; cursor: pointer;">
-                                <option value="all">Toutes les années</option>
-                                ${[...new Set(allDates.map(d => d.split('/')[2]))].sort((a, b) => b - a).map(year => 
-                                    `<option value="${year}">${year}</option>`
-                                ).join('')}
-                            </select>
-                        </div>
-                        <div style="flex: 1; min-width: 120px;">
-                            <label style="display: block; font-size: 12px; color: #64748b; margin-bottom: 6px; font-weight: 500;">
-                                Mois
-                            </label>
-                            <select id="filter-month" class="filter-select" 
-                                    style="width: 100%; padding: 12px; border: 2px solid #e2e8f0; border-radius: 8px; 
-                                           font-size: 13px; background: white; cursor: pointer;">
-                                <option value="all">Tous les mois</option>
-                                <option value="1">Janvier</option>
-                                <option value="2">Février</option>
-                                <option value="3">Mars</option>
-                                <option value="4">Avril</option>
-                                <option value="5">Mai</option>
-                                <option value="6">Juin</option>
-                                <option value="7">Juillet</option>
-                                <option value="8">Août</option>
-                                <option value="9">Septembre</option>
-                                <option value="10">Octobre</option>
-                                <option value="11">Novembre</option>
-                                <option value="12">Décembre</option>
-                            </select>
-                        </div>
+                    <div style="display: flex; gap: 8px;">
+                        <select id="filter-year" class="filter-select" 
+                                style="flex: 1; padding: 8px 10px; border: 2px solid #e2e8f0; border-radius: 6px; font-size: 12px; background: white;">
+                            <option value="all">Année</option>
+                            ${[...new Set(allDates.map(d => d.split('/')[2]))].sort((a, b) => b - a).map(year => 
+                                `<option value="${year}">${year}</option>`
+                            ).join('')}
+                        </select>
+                        <select id="filter-month" class="filter-select" 
+                                style="flex: 1; padding: 8px 10px; border: 2px solid #e2e8f0; border-radius: 6px; font-size: 12px; background: white;">
+                            <option value="all">Mois</option>
+                            <option value="1">Jan</option>
+                            <option value="2">Fév</option>
+                            <option value="3">Mar</option>
+                            <option value="4">Avr</option>
+                            <option value="5">Mai</option>
+                            <option value="6">Juin</option>
+                            <option value="7">Juil</option>
+                            <option value="8">Aoû</option>
+                            <option value="9">Sep</option>
+                            <option value="10">Oct</option>
+                            <option value="11">Nov</option>
+                            <option value="12">Déc</option>
+                        </select>
                     </div>
                 </div>
-            </div>
-            
-            <!-- Sélection individuelle de dates (conservée intacte) -->
-            <div class="filter-group" style="overflow: visible;">
-                <div class="filter-group-title">
-                    <span>📌</span> Sélection de dates spécifiques
-                    <span style="margin-left: 10px; font-size: 11px; color: #64748b; font-weight: normal;">
-                        ${allDates.length} date${allDates.length > 1 ? 's' : ''} disponibles
-                    </span>
-                </div>
                 
-                <!-- Boutons de sélection rapide des derniers jours -->
-                <div style="margin-bottom: 20px;">
-                    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap;">
-                        <span style="font-size: 12px; font-weight: 600; color: #475569; background: #f1f5f9; padding: 4px 12px; border-radius: 20px;">
-                            ⚡ Sélection rapide :
+                <!-- 3. SÉLECTION DE DATES SPÉCIFIQUES (50% de largeur) -->
+                <div class="filter-group" style="flex: 5; min-width: 300px;">
+                    <div class="filter-group-title">
+                        <span>📌</span> Sélection de dates spécifiques
+                        <span style="margin-left: 10px; font-size: 11px; color: #64748b; font-weight: normal;">
+                            ${allDates.length} date${allDates.length > 1 ? 's' : ''}
                         </span>
-                        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-                            <button class="quick-select-btn" onclick="selectLastNDays(3)">3 derniers jours</button>
-                            <button class="quick-select-btn" onclick="selectLastNDays(7)">7 derniers jours</button>
-                            <button class="quick-select-btn" onclick="selectLastNDays(15)">15 derniers jours</button>
-                            <button class="quick-select-btn" onclick="selectLastNDays(30)">30 derniers jours</button>
-                        </div>
                     </div>
-                </div>
-                
-                <!-- Actions de sélection -->
-                <div class="date-selection-actions" style="margin-bottom: 20px;">
-                    <button id="select-all-dates" class="date-select-btn date-select-btn-primary">
-                        ✅ Tout sélectionner
-                    </button>
-                    <button id="deselect-all-dates" class="date-select-btn date-select-btn-secondary">
-                        ❌ Tout désélectionner
-                    </button>
-                </div>
-                
-                <!-- Grille des dates -->
-                <div class="date-checkbox-container" style="
-                    max-height: none;
-                    overflow-y: visible;
-                    height: auto;
-                    display: grid;
-                    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
-                    gap: 8px;
-                    padding: 10px 0;
-                ">
-                    ${allDates.map(date => {
-                        const isChecked = window.filteredDates ? 
-                            window.filteredDates.includes(date) : true;
-                        const labelClass = isChecked ? 'date-checkbox-label checked' : 'date-checkbox-label';
-                        
-                        return `
-                            <label class="${labelClass}">
-                                <input type="checkbox" class="date-checkbox" value="${date}" ${isChecked ? 'checked' : ''}>
-                                <span>${date}</span>
-                            </label>
-                        `;
-                    }).join('')}
-                </div>
-                
-                <!-- Compteur visible -->
-                <div style="
-                    margin-top: 15px;
-                    padding: 10px;
-                    background: #f8fafc;
-                    border-radius: 8px;
-                    font-size: 12px;
-                    color: #475569;
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                    border: 1px solid #e2e8f0;
-                ">
-                    <span>
-                        📊 <strong id="selected-count-display">${document.querySelectorAll('.date-checkbox:checked').length}</strong> date(s) sélectionnée(s)
-                    </span>
-                    <span style="color: #64748b;">
-                        Total: ${allDates.length} date(s)
-                    </span>
+                    
+                    <!-- Boutons de sélection rapide -->
+                    <div style="display: flex; gap: 5px; margin-bottom: 8px; flex-wrap: wrap;">
+                        <button class="quick-select-btn" onclick="selectLastNDays(3)" style="padding: 4px 8px; font-size: 11px;">3j</button>
+                        <button class="quick-select-btn" onclick="selectLastNDays(7)" style="padding: 4px 8px; font-size: 11px;">7j</button>
+                        <button class="quick-select-btn" onclick="selectLastNDays(15)" style="padding: 4px 8px; font-size: 11px;">15j</button>
+                        <button class="quick-select-btn" onclick="selectLastNDays(30)" style="padding: 4px 8px; font-size: 11px;">30j</button>
+                        <button id="select-all-dates" class="date-select-btn date-select-btn-primary" style="padding: 4px 8px; font-size: 11px;">✅ Tout</button>
+                        <button id="deselect-all-dates" class="date-select-btn date-select-btn-secondary" style="padding: 4px 8px; font-size: 11px;">❌ Rien</button>
+                    </div>
+                    
+                    <!-- Grille des dates (en dessous) -->
+                    <div class="date-checkbox-container" style="
+                        max-height: 100px;
+                        overflow-y: auto;
+                        display: flex;
+                        flex-wrap: wrap;
+                        gap: 5px;
+                        padding: 5px;
+                        background: white;
+                        border: 1px solid #e2e8f0;
+                        border-radius: 6px;
+                    ">
+                        ${allDates.map(date => {
+                            const isChecked = window.filteredDates ? 
+                                window.filteredDates.includes(date) : true;
+                            const labelClass = isChecked ? 'date-checkbox-label checked' : 'date-checkbox-label';
+                            
+                            return `
+                                <label class="${labelClass}" style="
+                                    display: inline-flex;
+                                    align-items: center;
+                                    gap: 3px;
+                                    padding: 3px 8px;
+                                    background: ${isChecked ? '#dbeafe' : '#f1f5f9'};
+                                    border-radius: 15px;
+                                    font-size: 11px;
+                                    cursor: pointer;
+                                    border: 1px solid ${isChecked ? '#3b82f6' : '#cbd5e1'};
+                                ">
+                                    <input type="checkbox" class="date-checkbox" value="${date}" ${isChecked ? 'checked' : ''} style="display: none;">
+                                    <span>${date}</span>
+                                </label>
+                            `;
+                        }).join('')}
+                    </div>
+                    
+                    <!-- Compteur compact -->
+                    <div style="
+                        margin-top: 8px;
+                        font-size: 11px;
+                        color: #475569;
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                    ">
+                        <span>
+                            📊 <strong id="selected-count-display">${document.querySelectorAll('.date-checkbox:checked').length}</strong> sélectionnée(s)
+                        </span>
+                        <span style="color: #64748b;">
+                            Total: ${allDates.length}
+                        </span>
+                    </div>
                 </div>
             </div>
             
-            <!-- Indicateur de sélection amélioré avec la période -->
-            <div id="filter-indicator" class="filter-indicator ${isFilterActive ? 'filtered' : ''}">
+            <!-- Indicateur de sélection -->
+            <div id="filter-indicator" class="filter-indicator ${isFilterActive ? 'filtered' : ''}" style="
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                padding: 10px 16px;
+                background: ${isFilterActive ? '#dcfce7' : '#f0f9ff'};
+                border-radius: 8px;
+                border: 2px solid ${isFilterActive ? '#86efac' : '#bae6fd'};
+                margin-top: 15px;
+            ">
                 <span class="filter-indicator-icon">📊</span>
-                <div class="filter-indicator-info">
-                    <div class="filter-indicator-title">
+                <div class="filter-indicator-info" style="flex: 1;">
+                    <div class="filter-indicator-title" style="font-weight: 700; color: ${isFilterActive ? '#166534' : '#0369a1'}; font-size: 13px;">
                         <span id="selected-dates-count">${isFilterActive ? window.filteredDates.length : allDates.length}</span>
                         jour${(isFilterActive ? window.filteredDates.length : allDates.length) !== 1 ? 's' : ''} sélectionné${(isFilterActive ? window.filteredDates.length : allDates.length) !== 1 ? 's' : ''}
                     </div>
-                    <div class="filter-indicator-description">
+                    <div class="filter-indicator-description" style="font-size: 11px; color: ${isFilterActive ? '#166534' : '#0c4a6e'};">
                         Période: <strong>${dateRangeText}</strong>
-                        ${isFilterActive ? `<br><span style="font-size: 11px;">(Total disponible: ${fullRangeText})</span>` : ''}
                     </div>
                 </div>
                 ${isFilterActive ? `
-                <button onclick="resetAllFilters()" style="background: #f1f5f9; border: 1px solid #cbd5e1; 
-                        padding: 8px 16px; border-radius: 6px; font-size: 12px; cursor: pointer; 
-                        color: #64748b; font-weight: 500;">
-                    Effacer le filtre
+                <button onclick="resetAllFilters()" style="
+                    background: white; 
+                    border: 1px solid #cbd5e1; 
+                    padding: 5px 12px; 
+                    border-radius: 20px; 
+                    font-size: 11px; 
+                    cursor: pointer; 
+                    color: #64748b; 
+                    font-weight: 500;
+                ">
+                    Effacer
                 </button>
                 ` : ''}
             </div>
@@ -8089,6 +8066,9 @@ function displayAllClientsTab() {
 
     // === INITIALISATION DES ÉVÉNEMENTS ===
     initializeFilterEvents();
+    setTimeout(() => {
+        initializeDPDTTableToggles();
+    }, 200);
     
     // === CRÉER LES GRAPHIQUES ===
     setTimeout(() => {
@@ -8267,6 +8247,7 @@ function createDailyIntensityChart(dailyIntensityStats) {
 }
 
 // ======================== TABLEAU COMBINÉ DP/DT UNIQUEMENT (pour onglet TECHNIQUE) ========================
+// Tableau combiné DP/DT uniquement (pour onglet TECHNIQUE) avec bouton
 function createDPDTOnlyTable(combinedAnalysis) {
     const { dailyEvents, eventTypes } = combinedAnalysis;
     
@@ -8321,7 +8302,7 @@ function createDPDTOnlyTable(combinedAnalysis) {
     const percentBoth = diagnosticDays > 0 ? ((daysWithBothCount / diagnosticDays) * 100).toFixed(1) : '0';
     const percentTotal = diagnosticDays > 0 ? ((totalDaysWithEvents / diagnosticDays) * 100).toFixed(1) : '0';
     
-    // Pourcentages pour les barres de progression (arrondis à l'entier)
+    // Pourcentages pour les barres de progression
     const percentPartielBar = Math.round(parseFloat(percentDP));
     const percentTotalBar = Math.round(parseFloat(percentDT));
     const percentBothBar = Math.round(parseFloat(percentBoth));
@@ -8330,8 +8311,12 @@ function createDPDTOnlyTable(combinedAnalysis) {
     // Dernière date avec événement
     const lastEventDate = sortedDates.length > 0 ? sortedDates[0] : '-';
     
+    // ID unique pour ce tableau
+    const tableId = `dpdt-detailed-table-${Date.now()}`;
+    const buttonId = `toggle-dpdt-table-${Date.now()}`;
+
     // Créer le HTML du tableau
-    let html = `
+    let tableHTML = `
         <style>
             .dpdt-analysis-container {
                 background: white;
@@ -8548,40 +8533,39 @@ function createDPDTOnlyTable(combinedAnalysis) {
                 margin-top: 2px;
             }
             
-            /* Tableau */
-            .dpdt-table-container {
-                padding: 0 20px 20px 20px;
-            }
-            
-            .dpdt-table-title {
+            /* Bouton toggle */
+            .toggle-table-btn {
+                width: 100%;
+                padding: 12px 20px;
+                background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+                color: white;
+                border: none;
+                border-radius: 8px;
+                font-size: 14px;
+                font-weight: 600;
+                cursor: pointer;
                 display: flex;
                 align-items: center;
-                gap: 12px;
-                margin: 20px 0 15px 0;
+                justify-content: center;
+                gap: 10px;
+                transition: all 0.3s ease;
+                margin: 0 20px 20px 20px;
             }
             
-            .dpdt-table-title h4 {
-                margin: 0;
-                font-size: 16px;
-                font-weight: 700;
-                color: #0f172a;
+            .toggle-table-btn:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 6px 16px rgba(59, 130, 246, 0.4);
             }
             
-            .dpdt-table-title span {
-                background: #f1f5f9;
-                padding: 4px 12px;
-                border-radius: 30px;
-                font-size: 12px;
-                color: #475569;
-            }
-            
+            /* Tableau */
             .dpdt-table-wrapper {
+                max-height: 450px;
+                overflow-y: auto;
                 overflow-x: auto;
                 border-radius: 16px;
                 border: 1px solid #e2e8f0;
                 background: white;
-                max-height: 450px;
-                overflow-y: auto;
+                margin: 0 20px 20px 20px;
             }
             
             .dpdt-table {
@@ -8657,19 +8641,6 @@ function createDPDTOnlyTable(combinedAnalysis) {
                 font-size: 13px;
             }
             
-            .dpdt-table .date-cell small {
-                display: block;
-                font-size: 10px;
-                color: #64748b;
-                font-weight: 400;
-                margin-top: 2px;
-            }
-            
-            .dpdt-table .event-cell {
-                font-family: 'Courier New', monospace;
-                font-weight: 600;
-            }
-            
             .dpdt-table .event-multiple {
                 display: inline-block;
                 background: #f1f5f9;
@@ -8694,7 +8665,7 @@ function createDPDTOnlyTable(combinedAnalysis) {
                 background: #e6f0fa;
             }
             
-            /* Pied de tableau avec totaux */
+            /* Pied de tableau */
             .dpdt-table-footer {
                 display: flex;
                 justify-content: space-between;
@@ -8703,6 +8674,7 @@ function createDPDTOnlyTable(combinedAnalysis) {
                 background: #f8fafc;
                 border-top: 2px solid #e2e8f0;
                 font-size: 13px;
+                margin: 0 20px 20px 20px;
             }
             
             .dpdt-total-events {
@@ -8733,6 +8705,7 @@ function createDPDTOnlyTable(combinedAnalysis) {
                 background: white;
                 border-top: 1px solid #e2e8f0;
                 font-size: 11px;
+                margin: 0 20px 20px 20px;
             }
             
             .dpdt-legend-item {
@@ -8796,7 +8769,7 @@ function createDPDTOnlyTable(combinedAnalysis) {
                 </div>
             </div>
             
-            <!-- Grille de statistiques avec barres de progression -->
+            <!-- Grille de statistiques avec barres de progression (TOUJOURS VISIBLE) -->
             <div class="dpdt-stats-grid">
                 <!-- Délestage Partiel -->
                 <div class="dpdt-stat-card partial">
@@ -8842,6 +8815,27 @@ function createDPDTOnlyTable(combinedAnalysis) {
                     </div>
                 </div>
                 
+                <!-- Jours avec les deux types -->
+                <div class="dpdt-stat-card both">
+                    <div class="dpdt-stat-header">
+                        <div class="dpdt-stat-icon both">⚡</div>
+                        <div class="dpdt-stat-title">PARTIEL + TOTAL</div>
+                    </div>
+                    <div class="dpdt-stat-value">${daysWithBothCount}</div>
+                    <div class="dpdt-stat-detail">
+                        <span>Jours avec les deux</span>
+                        <span class="dpdt-stat-percent">${percentBoth}%</span>
+                    </div>
+                    
+                    <!-- Barre de progression -->
+                    <div class="progress-bar-container">
+                        <div class="progress-bar both" style="width: ${percentBothBar}%;"></div>
+                    </div>
+                    <div class="progress-label">
+                        <span>${percentBoth}% des jours</span>
+                    </div>
+                </div>
+                
                 <!-- Synthèse -->
                 <div class="dpdt-stat-card summary">
                     <div class="dpdt-stat-header">
@@ -8878,13 +8872,14 @@ function createDPDTOnlyTable(combinedAnalysis) {
                 </div>
             </div>
             
-            <!-- Tableau des événements -->
-            <div class="dpdt-table-container">
-                <div class="dpdt-table-title">
-                    <h4>📅 Détail journalier des délestages</h4>
-                    <span>${sortedDates.length} jour(s) avec événements</span>
-                </div>
-                
+            <!-- BOUTON POUR AFFICHER/MASQUER LE TABLEAU DÉTAILLÉ -->
+            <button id="${buttonId}" class="toggle-table-btn" data-table-id="${tableId}">
+                <span style="font-size: 18px;">🔽</span>
+                <span>Afficher le tableau détaillé</span>
+            </button>
+            
+            <!-- TABLEAU DÉTAILLÉ (CACHÉ PAR DÉFAUT) -->
+            <div id="${tableId}" class="dpdt-detailed-table" style="display: none;">
                 <div class="dpdt-table-wrapper">
                     <table class="dpdt-table">
                         <thead>
@@ -8907,12 +8902,10 @@ function createDPDTOnlyTable(combinedAnalysis) {
     
     // Remplir les lignes du tableau
     sortedDates.forEach(date => {
-        const [day, month, year] = date.split('/');
-        const isoDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
         const dateEvents = dailyEvents[date];
         
-        html += `<tr>`;
-        html += `<td class="date-cell">${date}<small>${isoDate}</small></td>`;
+        tableHTML += `<tr>`;
+        tableHTML += `<td class="date-cell">${date}</td>`;
         
         // Délestage Partiel
         const dpPeriods = dateEvents['DP'] ? dateEvents['DP'].periods : [];
@@ -8923,15 +8916,15 @@ function createDPDTOnlyTable(combinedAnalysis) {
             const multiple = dpPeriods.length > 1 ? 
                 `<span class="event-multiple" title="${dpPeriods.length} périodes">${dpPeriods.length}x</span>` : '';
             
-            html += `
-                <td class="event-cell" style="background: #fef3c7; color: #b45309; font-weight: 600;">${period.debut}</td>
-                <td class="event-cell" style="background: #fef3c7; color: #b45309; font-weight: 600;">${period.fin}</td>
-                <td class="event-cell" style="background: #fef3c7; color: #b45309; font-weight: 700;">
+            tableHTML += `
+                <td style="background: #fef3c7; color: #b45309; font-weight: 600;">${period.debut}</td>
+                <td style="background: #fef3c7; color: #b45309; font-weight: 600;">${period.fin}</td>
+                <td style="background: #fef3c7; color: #b45309; font-weight: 700;">
                     ${period.duree} ${multiple}
                 </td>
             `;
         } else {
-            html += `<td class="empty-cell" colspan="3">-</td>`;
+            tableHTML += `<td class="empty-cell" colspan="3">-</td>`;
         }
         
         // Délestage Total
@@ -8943,21 +8936,21 @@ function createDPDTOnlyTable(combinedAnalysis) {
             const multiple = dtPeriods.length > 1 ? 
                 `<span class="event-multiple" title="${dtPeriods.length} périodes">${dtPeriods.length}x</span>` : '';
             
-            html += `
-                <td class="event-cell" style="background: #fee2e2; color: #b91c1c; font-weight: 600;">${period.debut}</td>
-                <td class="event-cell" style="background: #fee2e2; color: #b91c1c; font-weight: 600;">${period.fin}</td>
-                <td class="event-cell" style="background: #fee2e2; color: #b91c1c; font-weight: 700;">
+            tableHTML += `
+                <td style="background: #fee2e2; color: #b91c1c; font-weight: 600;">${period.debut}</td>
+                <td style="background: #fee2e2; color: #b91c1c; font-weight: 600;">${period.fin}</td>
+                <td style="background: #fee2e2; color: #b91c1c; font-weight: 700;">
                     ${period.duree} ${multiple}
                 </td>
             `;
         } else {
-            html += `<td class="empty-cell" colspan="3">-</td>`;
+            tableHTML += `<td class="empty-cell" colspan="3">-</td>`;
         }
         
-        html += `</tr>`;
+        tableHTML += `</tr>`;
     });
     
-    html += `
+    tableHTML += `
                         </tbody>
                     </table>
                 </div>
@@ -8997,7 +8990,51 @@ function createDPDTOnlyTable(combinedAnalysis) {
         </div>
     `;
     
-    return html;
+    return tableHTML;
+}
+// ======================== FONCTION GLOBALE ========================
+// Initialise tous les boutons de toggle pour les tableaux DP/DT
+function initializeDPDTTableToggles() {
+    setTimeout(() => {
+        console.log('🔧 Initialisation des boutons de toggle DP/DT');
+        
+        // Trouver tous les boutons de toggle
+        document.querySelectorAll('.toggle-table-btn').forEach(button => {
+            // Éviter de dupliquer les événements
+            button.removeEventListener('click', handleDPDTTableToggle);
+            button.addEventListener('click', handleDPDTTableToggle);
+        });
+    }, 200);
+}
+
+// Gestionnaire d'événements pour les boutons
+function handleDPDTTableToggle(event) {
+    const button = event.currentTarget;
+    const tableId = button.getAttribute('data-table-id');
+    const table = document.getElementById(tableId);
+    
+    if (table) {
+        if (table.style.display === 'none') {
+            // Afficher le tableau
+            table.style.display = 'block';
+            button.innerHTML = '<span style="font-size: 18px;">🔼</span><span>Masquer le tableau détaillé</span>';
+            button.style.background = 'linear-gradient(135deg, #64748b 0%, #475569 100%)';
+        } else {
+            // Cacher le tableau
+            table.style.display = 'none';
+            button.innerHTML = '<span style="font-size: 18px;">🔽</span><span>Afficher le tableau détaillé</span>';
+            button.style.background = 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)';
+        }
+    } else {
+        console.error(`❌ Tableau avec ID ${tableId} non trouvé`);
+    }
+}
+// Initialise tous les boutons de toggle après l'affichage
+function initializeAllToggles() {
+    setTimeout(() => {
+        // Cette fonction sera appelée automatiquement par le script inline
+        console.log('✅ Boutons de toggle initialisés');
+    }, 200);
 }
 // ======================== CALCUL DES DONNÉES HORAIRES ========================
 function calculateHourlyEnergyData(dates, maxDays = null) {
@@ -16048,11 +16085,103 @@ function addCommercialStyles() {
     `;
     document.head.appendChild(style);
 }
+// ======================== STYLES CSS À AJOUTER ========================
+// Ajoutez cette fonction et appelez-la au chargement
+function addFilterStyles() {
+    if (document.querySelector('#filter-styles')) return;
+    
+    const styles = document.createElement('style');
+    styles.id = 'filter-styles';
+    styles.textContent = `
+        /* Style pour les groupes de filtres */
+        .filter-group {
+            background: #f8fafc;
+            border-radius: 8px;
+            padding: 12px 15px;
+            border: 1px solid #e2e8f0;
+            transition: all 0.2s;
+        }
+        
+        .filter-group:hover {
+            border-color: #cbd5e1;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+        
+        .filter-group-title {
+            font-weight: 600;
+            color: #475569;
+            margin-bottom: 8px;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        /* Style pour les inputs */
+        .filter-date-input, .filter-select {
+            border: 2px solid #e2e8f0;
+            border-radius: 6px;
+            padding: 8px 10px;
+            font-size: 12px;
+            background: white;
+            transition: all 0.2s;
+        }
+        
+        .filter-date-input:focus, .filter-select:focus {
+            border-color: #3b82f6;
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+        
+        /* Style pour les boutons rapides */
+        .quick-select-btn {
+            background: white;
+            border: 1px solid #cbd5e1;
+            border-radius: 20px;
+            padding: 4px 12px;
+            font-size: 11px;
+            cursor: pointer;
+            color: #475569;
+            transition: all 0.2s;
+        }
+        
+        .quick-select-btn:hover {
+            background: #3b82f6;
+            color: white;
+            border-color: #3b82f6;
+        }
+        
+        /* Style pour les labels de dates */
+        .date-checkbox-label {
+            transition: all 0.2s;
+        }
+        
+        .date-checkbox-label:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .date-checkbox-label.checked {
+            background: #dbeafe !important;
+            border-color: #3b82f6 !important;
+        }
+        
+        /* Responsive */
+        @media (max-width: 1200px) {
+            .filter-group {
+                flex: 1 1 100% !important;
+                min-width: 100% !important;
+            }
+        }
+    `;
+    
+    document.head.appendChild(styles);
+}
 // Ajouter les styles au chargement
 document.addEventListener('DOMContentLoaded', addSimplifiedCommercialStyles);
-
 document.addEventListener('DOMContentLoaded', addCommercialStyles);
 document.addEventListener('DOMContentLoaded', addAllClientsStyles);
+document.addEventListener('DOMContentLoaded', addFilterStyles);
 // Appeler la fonction au chargement
 document.addEventListener('DOMContentLoaded', addNewColumnStyles);
 // Effet de réduction de l'en-tête au scroll
