@@ -543,101 +543,187 @@ function createDailyTensionChart(data) {
 // II-7) HOURLY CHART
 // ===========================================
 
-function renderHourlyChart(selectedDate = null) {
+// ===========================================
+// II-7) HOURLY CHART AVEC FILTRE PLAGE (7 jours max)
+// ===========================================
+// ===========================================
+// II-7) HOURLY CHART AVEC SÉLECTEURS + JAUGE
+// ===========================================
+
+let chartStartIndex = 0;
+let chartEndIndex = 0;
+let allDates = [];
+let allTensionData = [];
+
+function renderHourlyChart() {
     const container = document.getElementById('hourlyChartCard');
     if (!container) return;
 
-    const table = database.tables?.find(t=>t.type==='T');
+    const table = database.tables?.find(t => t.type === 'T');
     if (!table) { 
-        container.innerHTML='<p class="no-data">Données horaires indisponibles</p>'; 
+        container.innerHTML = '<p class="no-data">Données horaires indisponibles</p>'; 
         return; 
     }
 
     // ===========================================
-    // RÉCUPÉRATION DE TOUTES LES DATES DISPONIBLES
+    // CHARGEMENT DES DONNÉES (une seule fois)
     // ===========================================
-    const allDates = [...new Set(table.data.map(r => r.split(';')[1].split(' ')[0]))].sort();
+    if (allDates.length === 0) {
+        const dateMap = new Map();
+        table.data.forEach(row => {
+            const cells = row.split(';');
+            const datetime = cells[1];
+            const date = datetime.split(' ')[0];
+            
+            if (!dateMap.has(date)) {
+                dateMap.set(date, []);
+            }
+            dateMap.get(date).push({
+                datetime,
+                hour: datetime.split(' ')[1].substring(0,5),
+                tension: parseFloat(cells[4])
+            });
+        });
+        
+        allDates = Array.from(dateMap.keys()).sort();
+        allTensionData = allDates.map(date => dateMap.get(date));
+    }
     
     if (allDates.length === 0) {
-        container.innerHTML='<p class="no-data">Aucune date disponible</p>';
+        container.innerHTML = '<p class="no-data">Aucune donnée disponible</p>';
         return;
     }
     
-    // Déterminer la date à afficher
-    const currentDate = selectedDate || allDates[0];
-    
-    // Filtrer les données pour la date sélectionnée
-    const dayData = table.data.filter(r => r.split(';')[1].startsWith(currentDate));
-    
-    if (dayData.length === 0) { 
-        container.innerHTML='<p class="no-data">Aucune donnée pour ce jour</p>'; 
-        return; 
+    // Initialiser les indices (7 derniers jours par défaut)
+    if (chartEndIndex === 0) {
+        chartEndIndex = allDates.length - 1;
+        chartStartIndex = Math.max(0, chartEndIndex - 6);
     }
 
-    // Extraire les heures et tensions
-    const hours = dayData.map(r => r.split(';')[1].split(' ')[1].substring(0,5));
-    const tensions = dayData.map(r => parseFloat(r.split(';')[4]));
     const norms = VOLTAGE_NORMS[database.technicalData?.normSystem || '12V'];
+    const daysCount = chartEndIndex - chartStartIndex + 1;
 
     // ===========================================
-    // CONSTRUCTION DU HTML AVEC FILTRE DE DATES
+    // CONSTRUCTION DU HTML
     // ===========================================
     container.innerHTML = `
-        <div class="chart-header-with-filter">
-            <h3 class="card-title">⏱ TENSIONS HORAIRES</h3>
-            <div class="date-filter">
-                <label for="hourlyDateSelect">📅 Date :</label>
-                <select id="hourlyDateSelect" class="date-select">
-                    ${allDates.map(date => `
-                        <option value="${date}" ${date === currentDate ? 'selected' : ''}>
-                            ${date}
-                        </option>
-                    `).join('')}
-                </select>
+        <div style="padding: 15px;">
+            <!-- Titre -->
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h3 class="card-title" style="margin:0;">⏱ TENSIONS HORAIRES</h3>
+                <span style="background: #3b82f6; color: white; padding: 4px 16px; border-radius: 100px; font-size: 13px; font-weight: 600;">
+                    ${daysCount} jour${daysCount > 1 ? 's' : ''}
+                </span>
             </div>
-        </div>
-        <div style="height:300px;width:100%">
-            <canvas id="hourlyTensionChart"></canvas>
+            
+            <!-- SÉLECTEURS DE DATES (grands et visibles) -->
+            <div style="display: flex; gap: 15px; margin-bottom: 25px; background: #f8fafc; padding: 20px; border-radius: 16px; border: 1px solid #e2e8f0;">
+                <div style="flex: 1;">
+                    <label style="display: block; font-size: 12px; color: #64748b; margin-bottom: 5px; font-weight: 600;">📅 DATE DE DÉBUT</label>
+                    <select id="startDateSelect" style="width: 100%; padding: 12px; border: 2px solid #e2e8f0; border-radius: 10px; font-size: 14px; font-weight: 500; background: white;">
+                        ${allDates.map((date, index) => `
+                            <option value="${index}" ${index === chartStartIndex ? 'selected' : ''}>
+                                ${date}
+                            </option>
+                        `).join('')}
+                    </select>
+                </div>
+                
+                <div style="flex: 1;">
+                    <label style="display: block; font-size: 12px; color: #64748b; margin-bottom: 5px; font-weight: 600;">📅 DATE DE FIN</label>
+                    <select id="endDateSelect" style="width: 100%; padding: 12px; border: 2px solid #e2e8f0; border-radius: 10px; font-size: 14px; font-weight: 500; background: white;">
+                        ${allDates.map((date, index) => `
+                            <option value="${index}" ${index === chartEndIndex ? 'selected' : ''}>
+                                ${date}
+                            </option>
+                        `).join('')}
+                    </select>
+                </div>
+                
+                <div style="display: flex; align-items: flex-end;">
+                    <button id="applyDateBtn" style="background: #3b82f6; color: white; border: none; padding: 12px 24px; border-radius: 10px; font-weight: 600; cursor: pointer; font-size: 14px;">
+                        APPLIQUER
+                    </button>
+                </div>
+            </div>
+            
+            <!-- JAUGE (moins large) -->
+            <div style="margin-bottom: 25px; padding: 0 10px;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 12px; color: #475569;">
+                    <span>${allDates[0]}</span>
+                    <span style="font-weight: 600; color: #3b82f6; background: #dbeafe; padding: 2px 12px; border-radius: 100px;" id="jaugeRange">
+                        ${allDates[chartStartIndex]} → ${allDates[chartEndIndex]}
+                    </span>
+                    <span>${allDates[allDates.length-1]}</span>
+                </div>
+                
+                <!-- Jauge (hauteur réduite) -->
+                <div id="filterTrack" style="position: relative; width: 100%; height: 30px; background: #e2e8f0; border-radius: 15px; cursor: pointer;">
+                    <div id="filterSelection" style="position: absolute; height: 30px; background: linear-gradient(90deg, #3b82f6, #8b5cf6); border-radius: 15px; box-shadow: 0 2px 8px rgba(59,130,246,0.3); border: 2px solid white; box-sizing: border-box; cursor: grab; left: ${(chartStartIndex/allDates.length)*100}%; width: ${(daysCount/allDates.length)*100}%;">
+                        <div class="filter-handle left" style="position: absolute; width: 8px; height: 26px; background: white; top: 0; left: -4px; cursor: ew-resize; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.2);"></div>
+                        <div class="filter-handle right" style="position: absolute; width: 8px; height: 26px; background: white; top: 0; right: -4px; cursor: ew-resize; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.2);"></div>
+                    </div>
+                </div>
+                
+                <!-- Mini ticks -->
+                <div style="display: flex; justify-content: space-between; margin-top: 5px; font-size: 9px; color: #94a3b8;">
+                    <span>|</span><span>|</span><span>|</span><span>|</span><span>|</span><span>|</span><span>|</span><span>|</span><span>|</span><span>|</span>
+                </div>
+            </div>
+            
+            <!-- Graphique -->
+            <div style="height: 300px; width: 100%; margin-top: 10px;">
+                <canvas id="hourlyTensionChart"></canvas>
+            </div>
         </div>
     `;
 
     // ===========================================
-    // ATTACHER L'ÉVÉNEMENT DE CHANGEMENT DE DATE
+    // PRÉPARATION DES DONNÉES POUR LE GRAPHIQUE
     // ===========================================
-    const dateSelect = document.getElementById('hourlyDateSelect');
-    if (dateSelect) {
-        // Remplacer l'ancien écouteur s'il existe
-        const newSelect = dateSelect.cloneNode(true);
-        dateSelect.parentNode.replaceChild(newSelect, dateSelect);
-        
-        newSelect.addEventListener('change', (e) => {
-            renderHourlyChart(e.target.value);
-        });
-    }
+    updateChartData();
 
     // ===========================================
-    // CRÉATION DU GRAPHIQUE
+    // ATTACHER LES ÉVÉNEMENTS
     // ===========================================
+    attachFilterEvents();
+    attachDateSelectors();
+}
+
+function updateChartData() {
+    const labels = [];
+    const tensions = [];
+    
+    for (let i = chartStartIndex; i <= chartEndIndex; i++) {
+        const dayData = allTensionData[i];
+        dayData.forEach(point => {
+            labels.push(point.hour);
+            tensions.push(point.tension);
+        });
+    }
+    
+    const norms = VOLTAGE_NORMS[database.technicalData?.normSystem || '12V'];
+    
     chartManager.destroy('hourlyTensionChart');
     requestAnimationFrame(() => {
         chartManager.create('hourlyTensionChart', {
             type: 'line',
             data: {
-                labels: hours,
+                labels: labels,
                 datasets: [
                     { 
-                        label: `Tension - ${currentDate}`, 
+                        label: `Tension (${allDates[chartStartIndex]} → ${allDates[chartEndIndex]})`, 
                         data: tensions, 
                         borderColor: '#ff9800', 
                         backgroundColor: 'rgba(255, 152, 0, 0.1)',
                         fill: true, 
-                        pointRadius: 5,
-                        pointHoverRadius: 8,
+                        pointRadius: 1,
+                        pointHoverRadius: 4,
                         tension: 0.3
                     },
                     { 
                         label: 'Seuil min', 
-                        data: Array(hours.length).fill(norms.min), 
+                        data: Array(labels.length).fill(norms.min), 
                         borderColor: '#f44336', 
                         borderDash: [5, 5], 
                         pointRadius: 0, 
@@ -645,17 +731,9 @@ function renderHourlyChart(selectedDate = null) {
                     },
                     { 
                         label: 'Seuil max', 
-                        data: Array(hours.length).fill(norms.max), 
+                        data: Array(labels.length).fill(norms.max), 
                         borderColor: '#ff9800', 
                         borderDash: [5, 5], 
-                        pointRadius: 0, 
-                        fill: false 
-                    },
-                    { 
-                        label: 'Plage idéale', 
-                        data: Array(hours.length).fill((norms.min + norms.max) / 2), 
-                        borderColor: '#4CAF50', 
-                        borderDash: [3, 3], 
                         pointRadius: 0, 
                         fill: false 
                     }
@@ -664,33 +742,203 @@ function renderHourlyChart(selectedDate = null) {
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
+                animation: false,
                 plugins: {
-                    tooltip: {
-                        mode: 'index',
-                        intersect: false
-                    },
-                    legend: {
-                        display: true,
-                        position: 'top'
-                    }
+                    tooltip: { mode: 'index', intersect: false },
+                    legend: { display: true, position: 'top' }
                 },
                 scales: {
-                    y: {
+                    y: { 
                         beginAtZero: false,
-                        title: {
-                            display: true,
-                            text: 'Tension (V)'
-                        }
+                        title: { display: true, text: 'Tension (V)' }
                     },
-                    x: {
-                        title: {
-                            display: true,
-                            text: 'Heure'
-                        }
+                    x: { 
+                        ticks: { maxRotation: 45, minRotation: 45 }
                     }
                 }
             }
         });
+    });
+    
+    // Mettre à jour l'affichage de la jauge
+    const jaugeRange = document.getElementById('jaugeRange');
+    if (jaugeRange) {
+        jaugeRange.textContent = `${allDates[chartStartIndex]} → ${allDates[chartEndIndex]}`;
+    }
+    
+    // Mettre à jour les sélecteurs
+    const startSelect = document.getElementById('startDateSelect');
+    const endSelect = document.getElementById('endDateSelect');
+    if (startSelect) startSelect.value = chartStartIndex;
+    if (endSelect) endSelect.value = chartEndIndex;
+}
+
+// ===========================================
+// ÉVÉNEMENTS DE LA JAUGE
+// ===========================================
+function attachFilterEvents() {
+    const track = document.getElementById('filterTrack');
+    const selection = document.getElementById('filterSelection');
+    const leftHandle = document.querySelector('.filter-handle.left');
+    const rightHandle = document.querySelector('.filter-handle.right');
+    
+    if (!track || !selection) return;
+    
+    let isDragging = false;
+    let isResizingLeft = false;
+    let isResizingRight = false;
+    let startX = 0;
+    let startLeft = 0;
+    let startRight = 0;
+    
+    function getMousePercent(e) {
+        const rect = track.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        return Math.max(0, Math.min(1, x / rect.width));
+    }
+    
+    function updateFromPercents(leftPercent, rightPercent) {
+        let newStart = Math.floor(leftPercent * allDates.length);
+        let newEnd = Math.floor(rightPercent * allDates.length) - 1;
+        
+        newStart = Math.max(0, Math.min(allDates.length - 1, newStart));
+        newEnd = Math.max(0, Math.min(allDates.length - 1, newEnd));
+        
+        const range = newEnd - newStart + 1;
+        if (range > 7) {
+            if (isResizingLeft) {
+                newStart = newEnd - 6;
+            } else if (isResizingRight) {
+                newEnd = newStart + 6;
+            } else {
+                newEnd = newStart + 6;
+            }
+        }
+        
+        if (newStart >= 0 && newEnd < allDates.length && newStart <= newEnd) {
+            chartStartIndex = newStart;
+            chartEndIndex = newEnd;
+            
+            selection.style.left = (chartStartIndex / allDates.length) * 100 + '%';
+            selection.style.width = ((chartEndIndex - chartStartIndex + 1) / allDates.length) * 100 + '%';
+            
+            updateChartData();
+        }
+    }
+    
+    selection.addEventListener('mousedown', (e) => {
+        if (e.target.classList.contains('filter-handle')) return;
+        
+        isDragging = true;
+        startX = getMousePercent(e);
+        startLeft = chartStartIndex / allDates.length;
+        startRight = (chartEndIndex + 1) / allDates.length;
+        selection.style.cursor = 'grabbing';
+        e.preventDefault();
+    });
+    
+    leftHandle?.addEventListener('mousedown', (e) => {
+        isResizingLeft = true;
+        startX = getMousePercent(e);
+        startLeft = chartStartIndex / allDates.length;
+        e.preventDefault();
+    });
+    
+    rightHandle?.addEventListener('mousedown', (e) => {
+        isResizingRight = true;
+        startX = getMousePercent(e);
+        startRight = (chartEndIndex + 1) / allDates.length;
+        e.preventDefault();
+    });
+    
+    window.addEventListener('mousemove', (e) => {
+        if (!isDragging && !isResizingLeft && !isResizingRight) return;
+        
+        const currentX = getMousePercent(e);
+        const delta = currentX - startX;
+        
+        if (isDragging) {
+            let newLeft = startLeft + delta;
+            let newRight = startRight + delta;
+            
+            if (newLeft >= 0 && newRight <= 1) {
+                updateFromPercents(newLeft, newRight);
+            }
+        } else if (isResizingLeft) {
+            let newLeft = startLeft + delta;
+            updateFromPercents(newLeft, (chartEndIndex + 1) / allDates.length);
+        } else if (isResizingRight) {
+            let newRight = startRight + delta;
+            updateFromPercents(chartStartIndex / allDates.length, newRight);
+        }
+    });
+    
+    window.addEventListener('mouseup', () => {
+        isDragging = false;
+        isResizingLeft = false;
+        isResizingRight = false;
+        selection.style.cursor = 'grab';
+    });
+}
+
+// ===========================================
+// ÉVÉNEMENTS DES SÉLECTEURS DE DATES
+// ===========================================
+function attachDateSelectors() {
+    const startSelect = document.getElementById('startDateSelect');
+    const endSelect = document.getElementById('endDateSelect');
+    const applyBtn = document.getElementById('applyDateBtn');
+    
+    if (!startSelect || !endSelect || !applyBtn) return;
+    
+    // Fonction pour mettre à jour les options de fin
+    function updateEndDateOptions() {
+        const startIdx = parseInt(startSelect.value);
+        const currentEndIdx = parseInt(endSelect.value);
+        
+        // Vider et reconstruire les options de fin
+        endSelect.innerHTML = '';
+        
+        // Limiter aux 7 jours suivants (startIdx à startIdx + 6)
+        const maxEndIdx = Math.min(startIdx + 6, allDates.length - 1);
+        
+        for (let i = startIdx; i <= maxEndIdx; i++) {
+            const option = document.createElement('option');
+            option.value = i;
+            option.textContent = allDates[i];
+            if (i === currentEndIdx || (i === startIdx && currentEndIdx < startIdx)) {
+                option.selected = true;
+            }
+            endSelect.appendChild(option);
+        }
+        
+        // Si l'ancienne fin n'est plus disponible, prendre la dernière disponible
+        if (currentEndIdx < startIdx || currentEndIdx > maxEndIdx) {
+            endSelect.value = maxEndIdx;
+        }
+    }
+    
+    // Initialiser au chargement
+    updateEndDateOptions();
+    
+    // Mettre à jour quand la date de début change
+    startSelect.addEventListener('change', updateEndDateOptions);
+    
+    applyBtn.addEventListener('click', () => {
+        const newStart = parseInt(startSelect.value);
+        const newEnd = parseInt(endSelect.value);
+        
+        chartStartIndex = newStart;
+        chartEndIndex = newEnd;
+        
+        // Mettre à jour la jauge
+        const selection = document.getElementById('filterSelection');
+        if (selection) {
+            selection.style.left = (chartStartIndex / allDates.length) * 100 + '%';
+            selection.style.width = ((chartEndIndex - chartStartIndex + 1) / allDates.length) * 100 + '%';
+        }
+        
+        updateChartData();
     });
 }
 // ===========================================
