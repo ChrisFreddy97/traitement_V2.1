@@ -784,3 +784,106 @@ html {
     color: var(--white);
     border-color: var(--primary);
 }
+
+/* Défilement fluide */
+html {
+    scroll-behavior: smooth;
+}
+
+/* Style pour les boutons de lien vers graphique */
+.chart-link {
+    background: none;
+    border: none;
+    font-size: 1.2rem;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 4px;
+    transition: background 0.2s;
+}
+
+.chart-link:hover {
+    background: #e2e8f0;
+}
+
+/* Mise en évidence du graphique quand on vient d'un clic */
+.hourly-chart-highlight {
+    animation: highlight-pulse 1s ease;
+}
+
+@keyframes highlight-pulse {
+    0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7); }
+    50% { box-shadow: 0 0 0 10px rgba(59, 130, 246, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+}
+
+/* Bouton Voir détails unifié */
+.detail-btn {
+    margin: 10px 0;
+    padding: 8px 16px;
+    background: #f1f5f9;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.2s;
+}
+
+.detail-btn:hover {
+    background: #e2e8f0;
+    border-color: #94a3b8;
+}
+
+/* Grille de stats horizontale pour High Voltage Board */
+.stats-grid-4 {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    justify-content: space-between;
+    margin-bottom: 1.5rem;
+}
+
+.stats-grid-4 .stat-card {
+    flex: 1 1 200px;  /* Permet aux cartes de s'étendre mais avec une base de 200px */
+    min-width: 180px;  /* Évite qu'elles deviennent trop petites */
+    background: var(--white);
+    border-radius: var(--radius-lg);
+    padding: 1.25rem 1rem;
+    box-shadow: var(--shadow-sm);
+    border: 1px solid var(--gray-200);
+    transition: all 0.2s ease;
+    text-align: center;
+}
+
+.stats-grid-4 .stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+    border-color: var(--primary-light);
+}
+
+/* Styles spécifiques pour les cartes de qualité */
+.stats-grid-4 .stat-card.excellent {
+    border-top: 4px solid #4CAF50;
+}
+
+.stats-grid-4 .stat-card.bon {
+    border-top: 4px solid #FFD700;
+}
+
+.stats-grid-4 .stat-card.mauvais {
+    border-top: 4px solid #FF9800;
+}
+
+.stats-grid-4 .stat-card.critique {
+    border-top: 4px solid #F44336;
+}
+
+/* Pour les très petits écrans, on repasse en colonne */
+@media (max-width: 768px) {
+    .stats-grid-4 {
+        flex-direction: column;
+    }
+    
+    .stats-grid-4 .stat-card {
+        width: 100%;
+    }
+}
