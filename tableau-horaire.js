@@ -23,6 +23,10 @@ document.addEventListener('DOMContentLoaded', async function () {
         showError(`Erreur: ${error.message}`);
     }
 });
+
+// ======================== VARIABLES GLOBALES ========================
+let matrixTableVisible = false; // FALSE par défaut (tableau caché)
+
 // ======================== ANALYSE ENR SIMPLE ========================
 function analyzeENRSimple(input) {
     if (!input) return [];
@@ -4768,26 +4772,6 @@ function createStabilityChart(containerId, stabilityData, tensionResults) {
                             ⚡ ${getSystemLimits(systemType).alertThreshold}V/h</div>
                         </div>
                     </div>
-
-                    <!-- Variation Moyenne -->
-                    <!-- <div style="background: linear-gradient(135deg, #ecfdf5 0%, #ffffff 100%); padding: 16px; border-radius: 10px; border-left: 5px solid #10b981; box-shadow: 0 2px 8px rgba(0,0,0,0.06); transition: all 0.3s ease;">
-                        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
-                            <div style="background: #10b981; color: white; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px;">📈</div>
-                            <div style="font-size: 11px; color: #718096; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Variation Moy.</div>
-                        </div>
-                        <div style="font-size: 32px; font-weight: 800; color: #10b981; text-align: center; margin-bottom: 8px;">${averageVariation}</div>
-                        <div style="text-align: center; padding: 6px 12px; background: rgba(16, 185, 129, 0.1); border-radius: 6px; font-size: 12px; color: #065f46; font-weight: 600;">V/h</div>
-                    </div>-->
-
-                    <!-- Carte supplémentaire : Système -->
-                    <div style="background: linear-gradient(135deg, #e0e7ff 0%, #ffffff 100%); padding: 16px; border-radius: 10px; border-left: 5px solid #6366f1; box-shadow: 0 2px 8px rgba(0,0,0,0.06); transition: all 0.3s ease;">
-                        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
-                            <div style="background: #6366f1; color: white; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px;">⚡</div>
-                            <div style="font-size: 11px; color: #718096; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Système</div>
-                        </div>
-                        <div style="font-size: 28px; font-weight: 800; color: #6366f1; text-align: center; margin-bottom: 8px;">${systemType}</div>
-                        <div style="text-align: center; padding: 6px 12px; background: rgba(99, 102, 241, 0.1); border-radius: 6px; font-size: 12px; color: #4f46e5; font-weight: 600;">DC</div>
-                    </div>
                 </div>
 
                 <!-- Conclusion intelligente -->
@@ -5148,7 +5132,6 @@ function createStabilityPieChart(canvasId, stable, unstable, outOfLimits) {
     });
 }
 
-// ======================== TABLEAU DES ATTEINTES DE TENSION NOMINALE ========================
 // ======================== TABLEAU DES ATTEINTES DE TENSION NOMINALE ========================
 function createNominalTensionTable(tensionResults, systemType, allDates) {
     if (!tensionResults || tensionResults.length === 0) {
@@ -5611,7 +5594,7 @@ function createNominalTensionTable(tensionResults, systemType, allDates) {
                     </div>
                     <div style="display: flex; justify-content: space-between; font-size: 12px; color: #64748b;">
                         <span>${daysWith0} jour(s)</span>
-                        <span>🔴 Nulle</span>
+                        <span>🔴 Faible</span>
                     </div>
                 </div>
             </div>
@@ -5735,8 +5718,7 @@ function createNominalTensionTable(tensionResults, systemType, allDates) {
             </div>
 
             <!-- GRAPHIQUE EN LIGNE AMÉLIORÉ -->
-            <div style="background: white; border-radius: 16px; border: 1px solid #86efac; padding: 20px;
-                      box-shadow: 0 8px 20px rgba(0,0,0,0.05);">
+            <div style="background: white; border-radius: 16px; border: 1px solid #86efac; padding: 20px; box-shadow: 0 8px 20px rgba(0,0,0,0.05);">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
                     <div style="display: flex; align-items: center; gap: 8px;">
                         <span style="font-size: 18px;">📈</span>
@@ -5753,23 +5735,23 @@ function createNominalTensionTable(tensionResults, systemType, allDates) {
                 </div>
                 
                 <!-- Conteneur du graphique SVG avec scroll horizontal -->
-                <div style="overflow-x: auto; padding: 10px 0;">
-                    <svg width="${Math.max(chartWidth, sortedDates.length * 40)}" height="${chartHeight + 30}" 
-                         viewBox="0 0 ${Math.max(chartWidth, sortedDates.length * 40)} ${chartHeight + 30}"
-                         style="display: block; margin: 0 auto;">
+                <div style="overflow-x: auto; width: auto; padding: 10px 0;">
+                    <svg width="${Math.max(800, sortedDates.length * 35)}" height="${chartHeight + 30}" 
+                        viewBox="0 0 ${Math.max(800, sortedDates.length * 35)} ${chartHeight + 30}"
+                        style="display: block; min-width: ${Math.max(800, sortedDates.length * 35)}px;">
                         
                         <!-- Fond du graphique -->
-                        <rect x="0" y="0" width="${Math.max(chartWidth, sortedDates.length * 40)}" 
-                              height="${chartHeight + 30}" fill="white" />
+                        <rect x="0" y="0" width="${Math.max(800, sortedDates.length * 35)}" 
+                            height="${chartHeight + 30}" fill="white" />
                         
                         <!-- Grille horizontale -->
                         ${gridLines.join('')}
                         
                         <!-- Axe X -->
                         <line x1="${padding.left}" y1="${chartHeight - padding.bottom}" 
-                              x2="${Math.max(chartWidth, sortedDates.length * 40) - padding.right}" 
-                              y2="${chartHeight - padding.bottom}" 
-                              stroke="#94a3b8" stroke-width="2" />
+                            x2="${Math.max(800, sortedDates.length * 35) - padding.right}" 
+                            y2="${chartHeight - padding.bottom}" 
+                            stroke="#94a3b8" stroke-width="2" />
                         
                         <!-- Marqueurs de dates -->
                         ${dateMarkers.join('')}
@@ -5785,7 +5767,7 @@ function createNominalTensionTable(tensionResults, systemType, allDates) {
                         
                         <!-- Ligne principale -->
                         <path d="${linePath}" fill="none" stroke="#22c55e" stroke-width="3" 
-                              stroke-linecap="round" stroke-linejoin="round" />
+                            stroke-linecap="round" stroke-linejoin="round" />
                         
                         <!-- Points de données -->
                         ${dataPoints}
@@ -5896,6 +5878,120 @@ function convertTimeToMinutes(timeStr) {
     if (!timeStr) return 0;
     const [hours, minutes] = timeStr.split(':').map(Number);
     return (hours || 0) * 60 + (minutes || 0);
+}
+
+// ===== FONCTIONS D'INTERACTION POUR LE FILTRE DE DATES DU GRAPHIQUE TENSION =====
+
+// Récupère et mémorise la liste triée de toutes les dates disponibles pour le graphique tension
+function getSortedTensionDates() {
+    const context = window.tensionEvolutionContext || {};
+    let allDates = (context.allDates && context.allDates.length)
+        ? context.allDates.slice()
+        : (allClientsHourlyMatrix.dates || []).slice();
+
+    if (!allDates.length) return [];
+
+    allDates.sort((a, b) => {
+        const da = new Date(a.split('/').reverse().join('-'));
+        const db = new Date(b.split('/').reverse().join('-'));
+        return da - db;
+    });
+
+    context.sortedDates = allDates;
+    window.tensionEvolutionContext = context;
+    return allDates;
+}
+
+// Met à jour la liste des dates possibles pour la fin en fonction de la date de début (fenêtre max 7 jours)
+function onTensionStartDateChange() {
+    const startSelect = document.getElementById('tension-start-date');
+    const endSelect = document.getElementById('tension-end-date');
+    if (!startSelect || !endSelect) return;
+
+    const sortedDates = getSortedTensionDates();
+    if (!sortedDates.length) return;
+
+    const selectedStart = startSelect.value || sortedDates[0];
+    let startIndex = sortedDates.indexOf(selectedStart);
+    if (startIndex === -1) {
+        startIndex = 0;
+        startSelect.value = sortedDates[0];
+    }
+
+    // On limite à 7 jours maximum (début inclus)
+    const allowedDates = sortedDates.slice(startIndex, startIndex + 7);
+
+    // Reconstruire les options du select de fin avec seulement ces dates
+    endSelect.innerHTML = allowedDates.map((date, index) => {
+        const isLast = index === allowedDates.length - 1;
+        return `<option value="${date}" ${isLast ? 'selected' : ''}>${date}</option>`;
+    }).join('');
+}
+
+function applyTensionDateFilter() {
+    const startSelect = document.getElementById('tension-start-date');
+    const endSelect = document.getElementById('tension-end-date');
+    if (!startSelect || !endSelect) return;
+
+    const startDate = startSelect.value;
+    const endDate = endSelect.value;
+
+    if (!startDate || !endDate) return;
+
+    // Récupérer les dates triées (format JJ/MM/AAAA)
+    const allDates = getSortedTensionDates();
+    if (!allDates.length) return;
+
+    const startIndex = allDates.indexOf(startDate);
+    const endIndex = allDates.indexOf(endDate);
+
+    if (startIndex === -1 || endIndex === -1) return;
+
+    const realStartIndex = Math.min(startIndex, endIndex);
+    const realEndIndex = Math.max(startIndex, endIndex);
+
+    const selectedRange = allDates.slice(realStartIndex, realEndIndex + 1);
+
+    // Mettre à jour le badge d'information
+    const startLabel = document.getElementById('tension-range-start-label');
+    const endLabel = document.getElementById('tension-range-end-label');
+    if (startLabel && endLabel) {
+        startLabel.textContent = selectedRange[0];
+        endLabel.textContent = selectedRange[selectedRange.length - 1];
+    }
+
+    // Recréer le graphique sur la plage sélectionnée
+    createTensionEvolutionChart(selectedRange);
+}
+
+function resetTensionDateFilter() {
+    const context = window.tensionEvolutionContext || {};
+    const allDates = getSortedTensionDates();
+    if (!allDates.length) return;
+
+    const firstDate = allDates[0];
+    const lastDate = allDates[allDates.length - 1];
+
+    // Remettre les select sur une fenêtre de 7 jours maximum depuis le début
+    const startSelect = document.getElementById('tension-start-date');
+    const endSelect = document.getElementById('tension-end-date');
+    if (startSelect) startSelect.value = firstDate;
+
+    // Recalcule les options de fin en respectant la fenêtre de 7 jours
+    if (startSelect && endSelect) {
+        onTensionStartDateChange();
+    }
+
+    // Mettre à jour le badge
+    const startLabel = document.getElementById('tension-range-start-label');
+    const endLabel = document.getElementById('tension-range-end-label');
+    if (startLabel && endLabel) {
+        startLabel.textContent = firstDate;
+        endLabel.textContent = lastDate;
+    }
+
+    // Revenir à l'affichage complet
+    createTensionEvolutionChart(allDates);
 }
 
 // Fonction utilitaire pour convertir l'heure en minutes
@@ -6254,6 +6350,17 @@ function applyGlobalDateFilter() {
     });
     
     refreshAllTechniqueComponents();
+    
+    // AJOUTEZ CES LIGNES ICI
+    setTimeout(() => {
+        if (matrixTableVisible) {
+            const tableContainer = document.getElementById('matrix-table-container');
+            if (tableContainer) {
+                tableContainer.style.display = 'block';
+            }
+        }
+    }, 200);
+    
     console.log(`✅ Filtre appliqué: ${selectedDates.length} jour(s) sélectionné(s)`);
     return true;
 }
@@ -7835,22 +7942,21 @@ function displayAllClientsTab() {
                 <div id="nominal-tension-table-container"></div>
             </div>
 
-            <!-- CARTE 4 : Tension Min/Max par Jour -->
+            <!-- CARTE 4 : Tension journalière (Min/Max/Moyenne par Jour) -->
             <div style="background: #f8fafc; border-radius: 20px; padding: 20px; margin-bottom: 25px; border: 1px solid #e2e8f0;">
-                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 20px;">
-                    <div style="width: 44px; height: 44px; background: linear-gradient(135deg, #a855f7 0%, #7e22ce 100%); border-radius: 12px; display: flex; align-items: center; justify-content: center;">
-                        <span style="font-size: 22px; color: white;">📊</span>
+                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 15px;">
+                    <div style="width: 40px; height: 40px; background: linear-gradient(135deg, #a855f7 0%, #7e22ce 100%); border-radius: 10px; display: flex; align-items: center; justify-content: center;">
+                        <span style="font-size: 18px; color: white;">📊</span>
                     </div>
-                    <h4 style="margin: 0; font-size: 18px; font-weight: 700; color: #1e293b;">Tension journalière (Système ${systemType})</h4>
+                    <h4 style="margin: 0; font-size: 16px; font-weight: 700; color: #1e293b;">Tension journalière (Système ${systemType})</h4>
                 </div>
-                <div class="system-info" style="font-size: 12px; color: #64748b; margin-bottom: 15px; display: flex; gap: 20px; flex-wrap: wrap; padding: 10px 0;">
-                    <span>🔧 Type: ${systemType} DC</span>
-                    <span>Min acceptable: ${systemLimits.min}V</span>
-                    <span>Plage idéale: ${systemLimits.ideal.min}-${systemLimits.ideal.max}V</span>
-                    <span>Max acceptable: ${systemLimits.max}V</span>
+                <div class="system-info" style="font-size: 11px; color: #64748b; margin-bottom: 10px; display: flex; gap: 15px; flex-wrap: wrap; padding: 8px 0;">
+                    <span>Min: ${systemLimits.min}V</span>
+                    <span>Idéal: ${systemLimits.ideal.min}-${systemLimits.ideal.max}V</span>
+                    <span>Max: ${systemLimits.max}V</span>
                 </div>
-                <div class="chart-container all-clients-line-chart-container" style="height: 200px;">
-                    <canvas id="allClientsTensionChart"></canvas>
+                <div class="chart-container all-clients-line-chart-container" style="height: 100%;">
+                    <canvas id="allClientsTensionChart" style="width: 100% !important; height: 100% !important; display: block;"></canvas>
                 </div>
             </div>
 
@@ -7860,28 +7966,77 @@ function displayAllClientsTab() {
                     <div style="width: 44px; height: 44px; background: linear-gradient(135deg, #f97316 0%, #c2410c 100%); border-radius: 12px; display: flex; align-items: center; justify-content: center;">
                         <span style="font-size: 22px; color: white;">⏱️</span>
                     </div>
-                    <h4 style="margin: 0; font-size: 18px; font-weight: 700; color: #1e293b;">Évolution de la Tension (par date/heure)</h4>
+                    <div style="display: flex; flex-direction: column; gap: 4px; flex: 1;">
+                        <h4 style="margin: 0; font-size: 18px; font-weight: 700; color: #1e293b;">Évolution de la Tension (par date/heure)</h4>
+                        <span style="font-size: 12px; color: #64748b;">
+                            Visualisation fine des variations de tension avec surbrillance de la plage idéale.
+                        </span>
+                    </div>
                 </div>
+
+                <!-- FILTRE PAR PLAGE DE DATES POUR LE GRAPHIQUE TENSION -->
+                <div style="margin-bottom: 18px; padding: 12px 16px; background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0;">
+                    <!-- Ligne 1: contrôles sur la même ligne -->
+                    <div style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap;">
+                        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                            <span style="font-size: 13px; font-weight: 600; color: #334155;">📅 Plage de dates :</span>
+                            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                                <label style="font-size: 12px; color: #64748b;">
+                                    Début
+                                    <select id="tension-start-date" onchange="onTensionStartDateChange()" style="margin-left: 4px; padding: 8px 12px; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 13px; font-weight: 500; background: #ffffff; cursor: pointer; min-width: 130px;">
+                                        ${allClientsHourlyMatrix.dates.map((date, index) => `
+                                            <option value="${date}" ${index === 0 ? 'selected' : ''}>${date}</option>
+                                        `).join('')}
+                                    </select>
+                                </label>
+                                <label style="font-size: 12px; color: #64748b;">
+                                    Fin
+                                    <select id="tension-end-date" style="margin-left: 4px; padding: 8px 12px; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 13px; font-weight: 500; background: #ffffff; cursor: pointer; min-width: 130px;">
+                                        ${allClientsHourlyMatrix.dates.map((date, index, arr) => `
+                                            <option value="${date}" ${index === arr.length - 1 ? 'selected' : ''}>${date}</option>
+                                        `).join('')}
+                                    </select>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div style="display: flex; gap: 10px; margin-left: auto;">
+                            <button onclick="applyTensionDateFilter()" style="padding: 9px 20px; background: #f97316; color: white; border: none; border-radius: 999px; font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 6px 12px rgba(249, 115, 22, 0.25);">
+                                <span>🔍</span> Appliquer le filtre
+                            </button>
+                            <button onclick="resetTensionDateFilter()" style="padding: 9px 16px; background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; border-radius: 999px; font-size: 13px; font-weight: 600; cursor: pointer;">
+                                Réinitialiser
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Ligne 2: info 7 jours uniquement -->
+                    <div style="margin-top: 8px; font-size: 11px; color: #64748b; display: flex; align-items: center; gap: 6px;">
+                        <span style="font-size: 12px;">ℹ️</span>
+                        <span>Période limitée à <strong style="color:#334155;">7 jours maximum</strong>. La date de fin s’ajuste automatiquement selon la date de début.</span>
+                    </div>
+
+                    <div id="tension-current-range-badge" style="margin-top: 10px; font-size: 12px; color: #1e40af;">
+                        <span style="padding: 4px 10px; background: #dbeafe; border-radius: 999px; display: inline-flex; align-items: center; gap: 6px;">
+                            📊 Période affichée :
+                            <strong>
+                                <span id="tension-range-start-label">${allClientsHourlyMatrix.dates[0]}</span>
+                                &nbsp;→&nbsp;
+                                <span id="tension-range-end-label">${allClientsHourlyMatrix.dates[allClientsHourlyMatrix.dates.length - 1]}</span>
+                            </strong>
+                        </span>
+                    </div>
+                </div>
+
                 <div id="tension-evolution-container" style="background: transparent; padding: 0; border: none; box-shadow: none;">
-                    <div class="chart-container" style="height: 350px; position: relative;">
-                        <canvas id="tensionEvolutionChart"></canvas>
+                    <div class="chart-container" style="height: 350px; width: 100%; position: relative;">
+                        <canvas id="tensionEvolutionChart" style="width: 100% !important; height: 100% !important;"></canvas>
                     </div>
                     <div id="tension-evolution-stats"></div>
                 </div>
             </div>
 
-            <!-- PIED DE CARTE : Résumé des indicateurs -->
-            <div style="margin-top: 25px; padding: 16px 20px; background: #f1f5f9; border-radius: 16px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; font-size: 13px;">
-                <div style="display: flex; gap: 25px; flex-wrap: wrap;">
-                    <div><span style="font-weight: 600;">✅ Jours Conforme:</span> ${stabilityData?.stable || 0}</div>
-                    <div><span style="font-weight: 600;">⚠️ Jours Non Conformes:</span> ${stabilityData?.unstable || 0}</div>
-                    <div><span style="font-weight: 600;">🚫 Hors Limites:</span> ${stabilityData?.outOfLimits || 0}</div>
-                    ${combinedAnalysis ? `<div><span style="font-weight: 600;">📊 Événements:</span> ${combinedAnalysis.allEvents.length}</div>` : ''}
-                </div>
-                <div style="background: #3b82f6; color: white; padding: 6px 20px; border-radius: 40px; font-weight: 600;">
-                    ${stabilityData?.days || 0} jours analysés
-                </div>
-            </div>
+            <!-- (supprimé) PIED DE CARTE : Résumé des indicateurs -->
         </div>
         <!-- ===== FIN CARTE PRINCIPALE TENSION ===== -->
 
@@ -7931,34 +8086,62 @@ function displayAllClientsTab() {
                     <h4 style="margin: 0; font-size: 18px; font-weight: 700; color: #1e293b;">Énergie Totale par Heure (Somme Clients)</h4>
                 </div>
                 
-                <!-- ===== NOUVEAU : FILTRE PAR DATE UNIQUE ===== -->
-                <div style="display: flex; gap: 20px; align-items: center; margin-bottom: 20px; padding: 15px; background: white; border-radius: 12px; border: 1px solid #e2e8f0; flex-wrap: wrap;">
-                    <div style="display: flex; align-items: center; gap: 10px;">
-                        <span style="font-size: 14px; font-weight: 600; color: #334155;">📅 Sélectionner une date :</span>
-                        <select id="hourly-date-selector" style="padding: 10px 16px; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 14px; font-weight: 500; background: white; cursor: pointer; min-width: 150px;">
-                            ${allClientsHourlyMatrix.dates.map(date => {
-                                const isLastDate = date === allClientsHourlyMatrix.dates[allClientsHourlyMatrix.dates.length - 1];
-                                return `<option value="${date}" ${isLastDate ? 'selected' : ''}>${date}</option>`;
-                            }).join('')}
-                        </select>
+                <!-- FILTRE PAR PLAGE DE DATES (MAX 7 JOURS) -->
+                <div style="margin-bottom: 15px; padding: 12px 16px; background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0;">
+                    <!-- Ligne 1: contrôles sur la même ligne -->
+                    <div style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap;">
+                        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                            <span style="font-size: 13px; font-weight: 600; color: #334155;">📅 Plage de dates :</span>
+                            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                                <label style="font-size: 12px; color: #64748b;">
+                                    Début
+                                    <select id="energy-hourly-start-date" onchange="onEnergyHourlyStartDateChange()" style="margin-left: 4px; padding: 8px 12px; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 13px; font-weight: 500; background: #ffffff; cursor: pointer; min-width: 130px;">
+                                        ${allClientsHourlyMatrix.dates.map((date, index) => `
+                                            <option value="${date}" ${index === Math.max(0, allClientsHourlyMatrix.dates.length - 7) ? 'selected' : ''}>${date}</option>
+                                        `).join('')}
+                                    </select>
+                                </label>
+                                <label style="font-size: 12px; color: #64748b;">
+                                    Fin
+                                    <select id="energy-hourly-end-date" style="margin-left: 4px; padding: 8px 12px; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 13px; font-weight: 500; background: #ffffff; cursor: pointer; min-width: 130px;">
+                                        ${allClientsHourlyMatrix.dates.map((date, index, arr) => `
+                                            <option value="${date}" ${index === arr.length - 1 ? 'selected' : ''}>${date}</option>
+                                        `).join('')}
+                                    </select>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div style="display: flex; gap: 10px; margin-left: auto;">
+                            <button onclick="applyEnergyHourlyDateFilter()" style="padding: 9px 20px; background: #3b82f6; color: white; border: none; border-radius: 999px; font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 6px 12px rgba(59, 130, 246, 0.25);">
+                                <span>🔍</span> Appliquer le filtre
+                            </button>
+                            <button onclick="resetEnergyHourlyDateFilter()" style="padding: 9px 16px; background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; border-radius: 999px; font-size: 13px; font-weight: 600; cursor: pointer;">
+                                Réinitialiser
+                            </button>
+                        </div>
                     </div>
-                    <div style="display: flex; gap: 10px; margin-left: auto;">
-                        <button onclick="updateHourlyChartForSelectedDate()" style="padding: 10px 24px; background: #3b82f6; color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px;">
-                            <span>✅</span> Appliquer
-                        </button>
-                        <button onclick="resetToLastDate()" style="padding: 10px 20px; background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; border-radius: 8px; font-weight: 600; cursor: pointer;">
-                            Dernier jour
-                        </button>
+
+                    <!-- Ligne 2: info 7 jours uniquement -->
+                    <div style="margin-top: 8px; font-size: 11px; color: #64748b; display: flex; align-items: center; gap: 6px;">
+                        <span style="font-size: 12px;">ℹ️</span>
+                        <span>Période limitée à <strong style="color:#334155;">7 jours maximum</strong>. La date de fin s’ajuste automatiquement selon la date de début.</span>
+                    </div>
+
+                    <div id="energy-hourly-current-range-badge" style="margin-top: 10px; font-size: 12px; color: #1e40af;">
+                        <span style="padding: 4px 10px; background: #dbeafe; border-radius: 999px; display: inline-flex; align-items: center; gap: 6px;">
+                            📊 Période affichée :
+                            <strong>
+                                <span id="energy-hourly-range-start-label">${allClientsHourlyMatrix.dates[Math.max(0, allClientsHourlyMatrix.dates.length - 7)]}</span>
+                                &nbsp;→&nbsp;
+                                <span id="energy-hourly-range-end-label">${allClientsHourlyMatrix.dates[allClientsHourlyMatrix.dates.length - 1]}</span>
+                            </strong>
+                        </span>
                     </div>
                 </div>
                 
-                <!-- Indicateur de la date affichée -->
-                <div id="hourly-current-date-badge" style="margin-bottom: 15px; padding: 8px 16px; background: #dbeafe; border-radius: 30px; display: inline-block; font-size: 13px; font-weight: 600; color: #1e40af;">
-                    📊 Affichage du : <span id="selected-date-display">${allClientsHourlyMatrix.dates[allClientsHourlyMatrix.dates.length - 1]}</span>
-                </div>
-                
-                <div class="chart-container all-clients-hourly-chart-container" style="height: 300px;">
-                    <canvas id="allClientsHourlyChart"></canvas>
+                <div class="chart-container all-clients-hourly-chart-container" style="height: 300px; width: 100%;">
+                    <canvas id="allClientsHourlyChart" style="width: 100% !important; height: 100% !important;"></canvas>
                 </div>
                 
                 <div class="hourly-chart-footer" style="margin-top: 20px; padding: 16px 20px; background: #f8fafc; border-radius: 12px; border: 1px solid #e2e8f0;">
@@ -7971,96 +8154,127 @@ function displayAllClientsTab() {
                 </div>
             </div>
         <!-- ===== FIN CARTE PRINCIPALE ÉNERGIE ===== -->
-        
-        <div class="table-controls">
-            <div class="pagination-controls">
-                <div class="items-per-page">
-                    <label>Lignes par page:</label>
-                    <select class="items-per-page-select" onchange="changeAllClientsItemsPerPage(this.value)">
-                        <option value="50" ${itemsPerPage === 50 ? 'selected' : ''}>50</option>
-                        <option value="100" ${itemsPerPage === 100 ? 'selected' : ''}>100</option>
-                        <option value="200" ${itemsPerPage === 200 ? 'selected' : ''}>200</option>
-                        <option value="0" ${itemsPerPage === 0 ? 'selected' : ''}>Tous</option>
-                    </select>
-                </div>
-                ${window.filteredDates && window.filteredDates.length < allClientsHourlyMatrix.dates.length ? 
-                    `<div class="filter-info" style="margin-left: 20px; padding: 6px 12px; background: #dbeafe; border-radius: 6px; font-size: 12px; color: #1e40af;">
-                        <span>🔍</span>
-                        <span>Affichage des données filtrées (${window.filteredDates.length} jours)</span>
-                    </div>` : ''
-                }
-            </div>
+
+        <!-- BOUTON POUR AFFICHER/MASQUER LE TABLEAU -->
+        <div style="margin: 20px 0;">
+            <button id="toggle-matrix-table-btn" style="
+                width: 100%;
+                padding: 15px 20px;
+                background: ${matrixTableVisible ? 'linear-gradient(135deg, #64748b 0%, #475569 100%)' : 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)'};
+                color: white;
+                border: none;
+                border-radius: 12px;
+                font-size: 16px;
+                font-weight: 600;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 12px;
+                transition: all 0.3s ease;
+                box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);
+                border: 1px solid rgba(255, 255, 255, 0.2);
+            ">
+                <span style="font-size: 20px;">${matrixTableVisible ? '🔼' : '📊'}</span>
+                <span>${matrixTableVisible ? 'Masquer le tableau détaillé' : 'Afficher le tableau détaillé'}</span>
+                <span style="font-size: 12px; background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 30px;">
+                    ${window.filteredDates ? window.filteredDates.length : allClientsHourlyMatrix.dates.length} jours
+                </span>
+            </button>
         </div>
-        
-        <div class="table-container all-clients-matrix">
-            <div class="table-wrapper">
-                <table class="all-clients-table">
-                    <thead>
-                        <tr>
-                            <th class="sticky-header">#</th>
-                            <th class="sticky-header">Date</th>
-                            <th class="sticky-header">Heure</th>
-                            ${allClientsHourlyMatrix.clients.map(clientId => {
-                                const clientData = allResultsByClient[clientId];
-                                const clientLabel = `${clientId.padStart(2, '0')}-${clientData.forfait || 'N/A'}`;
-                                return `<th class="client-header" title="Client ${clientLabel}">Énergie ${clientId.padStart(2, '0')}</th>`;
-                            }).join('')}
-                            <th class="sticky-header tension-header">Tension (V)</th>
-                            <th class="sticky-header energy-sum-header">∑ Énergie (Wh)</th>
-                            <th class="sticky-header intensity-header">Intensité (A)</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${window.filteredDates ? generateFilteredTableRows() : generateAllClientsTableRows(startIndex, endIndex)}
-                    </tbody>
-                </table>
-            </div>
-            
-            ${totalPages > 1 ? `
-            <div class="table-footer">
-                <div class="pagination">
-                    <button class="pagination-btn first" 
-                            onclick="changeAllClientsMatrixPage(1)" 
-                            ${currentPage <= 1 ? 'disabled' : ''}>
-                        « Première
-                    </button>
-                    <button class="pagination-btn prev" 
-                            onclick="changeAllClientsMatrixPage(${currentPage - 1})" 
-                            ${currentPage <= 1 ? 'disabled' : ''}>
-                        ‹ Précédente
-                    </button>
-                    
-                    <div class="page-info">
-                        Page <strong>${currentPage}</strong> sur <strong>${totalPages}</strong>
-                        <span class="items-info">(${totalItems} point${totalItems !== 1 ? 's' : ''} de données)</span>
-                        ${window.filteredDates && window.filteredDates.length < allClientsHourlyMatrix.dates.length ? 
-                            `<span class="filter-info-badge" style="margin-left: 10px; padding: 2px 8px; background: #dbeafe; border-radius: 12px; font-size: 11px; color: #1e40af;">
-                                🔍 Filtre actif
-                            </span>` : ''
-                        }
+
+        <!-- TABLEAU (CACHÉ PAR DÉFAUT) -->
+        <div id="matrix-table-container" style="display: ${matrixTableVisible ? 'block' : 'none'};">
+            <div class="table-controls">
+                <div class="pagination-controls">
+                    <div class="items-per-page">
+                        <label>Lignes par page:</label>
+                        <select class="items-per-page-select" onchange="changeAllClientsItemsPerPage(this.value)">
+                            <option value="50" ${itemsPerPage === 50 ? 'selected' : ''}>50</option>
+                            <option value="100" ${itemsPerPage === 100 ? 'selected' : ''}>100</option>
+                            <option value="200" ${itemsPerPage === 200 ? 'selected' : ''}>200</option>
+                            <option value="0" ${itemsPerPage === 0 ? 'selected' : ''}>Tous</option>
+                        </select>
                     </div>
-                    
-                    <button class="pagination-btn next" 
-                            onclick="changeAllClientsMatrixPage(${currentPage + 1})" 
-                            ${currentPage >= totalPages ? 'disabled' : ''}>
-                        Suivante ›
-                    </button>
-                    <button class="pagination-btn last" 
-                            onclick="changeAllClientsMatrixPage(${totalPages})" 
-                            ${currentPage >= totalPages ? 'disabled' : ''}>
-                        Dernière »
-                    </button>
-                </div>
-                
-                <div class="table-info">
-                    📋 Lignes ${startIndex + 1} à ${endIndex} sur ${totalItems} au total
-                    | 👥 ${allClientsHourlyMatrix.clients.length} client${allClientsHourlyMatrix.clients.length !== 1 ? 's' : ''}
                     ${window.filteredDates && window.filteredDates.length < allClientsHourlyMatrix.dates.length ? 
-                        `| 📅 ${window.filteredDates.length} jour${window.filteredDates.length !== 1 ? 's' : ''} filtré${window.filteredDates.length !== 1 ? 's' : ''}` : ''
+                        `<div class="filter-info" style="margin-left: 20px; padding: 6px 12px; background: #dbeafe; border-radius: 6px; font-size: 12px; color: #1e40af;">
+                            <span>🔍</span>
+                            <span>Affichage des données filtrées (${window.filteredDates.length} jours)</span>
+                        </div>` : ''
                     }
                 </div>
             </div>
-            ` : ''}
+            
+            <div class="table-container all-clients-matrix">
+                <div class="table-wrapper">
+                    <table class="all-clients-table">
+                        <thead>
+                            <tr>
+                                <th class="sticky-header">#</th>
+                                <th class="sticky-header">Date</th>
+                                <th class="sticky-header">Heure</th>
+                                ${allClientsHourlyMatrix.clients.map(clientId => {
+                                    const clientData = allResultsByClient[clientId];
+                                    const clientLabel = `${clientId.padStart(2, '0')}-${clientData.forfait || 'N/A'}`;
+                                    return `<th class="client-header" title="Client ${clientLabel}">Énergie ${clientId.padStart(2, '0')}</th>`;
+                                }).join('')}
+                                <th class="sticky-header tension-header">Tension (V)</th>
+                                <th class="sticky-header energy-sum-header">∑ Énergie (Wh)</th>
+                                <th class="sticky-header intensity-header">Intensité (A)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${window.filteredDates ? generateFilteredTableRows() : generateAllClientsTableRows(startIndex, endIndex)}
+                        </tbody>
+                    </table>
+                </div>
+                
+                ${totalPages > 1 ? `
+                <div class="table-footer">
+                    <div class="pagination">
+                        <button class="pagination-btn first" 
+                                onclick="changeAllClientsMatrixPage(1)" 
+                                ${currentPage <= 1 ? 'disabled' : ''}>
+                            « Première
+                        </button>
+                        <button class="pagination-btn prev" 
+                                onclick="changeAllClientsMatrixPage(${currentPage - 1})" 
+                                ${currentPage <= 1 ? 'disabled' : ''}>
+                            ‹ Précédente
+                        </button>
+                        
+                        <div class="page-info">
+                            Page <strong>${currentPage}</strong> sur <strong>${totalPages}</strong>
+                            <span class="items-info">(${totalItems} point${totalItems !== 1 ? 's' : ''} de données)</span>
+                            ${window.filteredDates && window.filteredDates.length < allClientsHourlyMatrix.dates.length ? 
+                                `<span class="filter-info-badge" style="margin-left: 10px; padding: 2px 8px; background: #dbeafe; border-radius: 12px; font-size: 11px; color: #1e40af;">
+                                    🔍 Filtre actif
+                                </span>` : ''
+                            }
+                        </div>
+                        
+                        <button class="pagination-btn next" 
+                                onclick="changeAllClientsMatrixPage(${currentPage + 1})" 
+                                ${currentPage >= totalPages ? 'disabled' : ''}>
+                            Suivante ›
+                        </button>
+                        <button class="pagination-btn last" 
+                                onclick="changeAllClientsMatrixPage(${totalPages})" 
+                                ${currentPage >= totalPages ? 'disabled' : ''}>
+                            Dernière »
+                        </button>
+                    </div>
+                    
+                    <div class="table-info">
+                        📋 Lignes ${startIndex + 1} à ${endIndex} sur ${totalItems} au total
+                        | 👥 ${allClientsHourlyMatrix.clients.length} client${allClientsHourlyMatrix.clients.length !== 1 ? 's' : ''}
+                        ${window.filteredDates && window.filteredDates.length < allClientsHourlyMatrix.dates.length ? 
+                            `| 📅 ${window.filteredDates.length} jour${window.filteredDates.length !== 1 ? 's' : ''} filtré${window.filteredDates.length !== 1 ? 's' : ''}` : ''
+                        }
+                    </div>
+                </div>
+                ` : ''}
+            </div>
         </div>
     `;
 
@@ -8091,7 +8305,6 @@ function displayAllClientsTab() {
         if (stabilityData) {
             createStabilityChart('stability-analysis-container', stabilityData, filteredTensionResults);
             
-            // 4. TABLEAU DES TENSIONS NOMINALES
             setTimeout(() => {
                 const allDatesInPeriod = window.filteredDates || allClientsHourlyMatrix.dates;
                 const nominalTableHTML = createNominalTensionTable(
@@ -8108,27 +8321,109 @@ function displayAllClientsTab() {
         }
         
         // 5. Graphique horaire d'énergie
-        const hourlyChartData = calculateHourlyEnergyData(datesToUse, 15);
-        window.hourlyChartData = hourlyChartData;
-        // 5. Graphique horaire d'énergie (NOUVELLE VERSION)
         setTimeout(() => {
             initializeHourlyChartWithLastDate();
         }, 200);
         
         // 6. Graphique d'évolution de la tension
         if (tensionResults && tensionResults.length > 0) {
+            window.tensionEvolutionContext = {
+                tensionResults: tensionResults,
+                systemType: systemType,
+                allDates: datesToUse
+            };
+
             setTimeout(() => {
                 createTensionEvolutionChart(datesToUse, tensionResults, systemType);
             }, 300);
         }
 
-            // 8. Graphique journalier d'intensité
-            createDailyIntensityChart(dailyIntensityStats);
+        // 8. Graphique journalier d'intensité
+        createDailyIntensityChart(dailyIntensityStats);
 
         console.log(`✅ Onglet TECHNIQUE affiché avec ${datesToUse.length} jour(s)`);
         console.log(`📊 Énergie moyenne: ${averageEnergyValue} Wh sur ${daysWithEnergy} jours`);
         console.log(`⚡ Intensité moyenne: ${intensityStats.avgIntensity.toFixed(2)} A sur ${intensityStats.intensityCount} mesures`);
+        
+        // AJOUTEZ CES LIGNES ICI - juste avant la fermeture du setTimeout
+        initializeMatrixTableToggle();
+        
+        // Restaurer l'état du tableau
+        const tableContainer = document.getElementById('matrix-table-container');
+        const toggleBtn = document.getElementById('toggle-matrix-table-btn');
+        
+        if (tableContainer && toggleBtn) {
+            // Appliquer l'état sauvegardé
+            tableContainer.style.display = matrixTableVisible ? 'block' : 'none';
+            
+            // Mettre à jour le texte du bouton
+            toggleBtn.innerHTML = matrixTableVisible ? 
+                `<span style="font-size: 20px;">🔼</span>
+                <span>Masquer le tableau détaillé</span>
+                <span style="font-size: 12px; background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 30px;">
+                    ${getCurrentDaysCount()} jours
+                </span>` :
+                `<span style="font-size: 20px;">📊</span>
+                <span>Afficher le tableau détaillé</span>
+                <span style="font-size: 12px; background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 30px;">
+                    ${getCurrentDaysCount()} jours
+                </span>`;
+            
+            toggleBtn.style.background = matrixTableVisible ? 
+                'linear-gradient(135deg, #64748b 0%, #475569 100%)' : 
+                'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)';
+        }
     }, 100);
+}
+function getCurrentDaysCount() {
+    if (window.filteredDates && window.filteredDates.length > 0) {
+        return window.filteredDates.length;
+    }
+    return allClientsHourlyMatrix?.dates?.length || 0;
+}
+// ======================== GESTION DU BOUTON TOGGLE POUR LE TABLEAU MATRICIEL ========================
+function initializeMatrixTableToggle() {
+    const toggleBtn = document.getElementById('toggle-matrix-table-btn');
+    const tableContainer = document.getElementById('matrix-table-container');
+    
+    if (!toggleBtn || !tableContainer) return;
+    
+    // Éviter les doublons d'événements
+    toggleBtn.removeEventListener('click', handleMatrixTableToggle);
+    toggleBtn.addEventListener('click', handleMatrixTableToggle);
+}
+
+function handleMatrixTableToggle() {
+    const toggleBtn = document.getElementById('toggle-matrix-table-btn');
+    const tableContainer = document.getElementById('matrix-table-container');
+    
+    if (!toggleBtn || !tableContainer) return;
+    
+    if (tableContainer.style.display === 'none') {
+        // Afficher le tableau
+        tableContainer.style.display = 'block';
+        toggleBtn.innerHTML = `
+            <span style="font-size: 20px;">🔼</span>
+            <span>Masquer le tableau détaillé</span>
+            <span style="font-size: 12px; background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 30px;">
+                ${getCurrentDaysCount()} jours
+            </span>
+        `;
+        toggleBtn.style.background = 'linear-gradient(135deg, #64748b 0%, #475569 100%)';
+        matrixTableVisible = true; // ← AJOUTER CETTE LIGNE
+    } else {
+        // Cacher le tableau
+        tableContainer.style.display = 'none';
+        toggleBtn.innerHTML = `
+            <span style="font-size: 20px;">📊</span>
+            <span>Afficher le tableau détaillé</span>
+            <span style="font-size: 12px; background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 30px;">
+                ${getCurrentDaysCount()} jours
+            </span>
+        `;
+        toggleBtn.style.background = 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)';
+        matrixTableVisible = false; // ← AJOUTER CETTE LIGNE
+    }
 }
 
 // Fonction pour créer le graphique journalier d'intensité
@@ -9343,14 +9638,25 @@ function createTensionEvolutionChart(dates, tensionResults, systemType) {
     const chartCanvas = document.getElementById('tensionEvolutionChart');
     if (!chartCanvas) return;
 
+    // Récupérer le contexte global si les paramètres ne sont pas fournis (cas des filtres)
+    const savedContext = window.tensionEvolutionContext || {};
+    const effectiveTensionResults = tensionResults && tensionResults.length ? tensionResults : (savedContext.tensionResults || []);
+    const effectiveSystemType = systemType || savedContext.systemType;
+
+    // Si aucune donnée, ne rien faire
+    if (!effectiveTensionResults || effectiveTensionResults.length === 0) {
+        return;
+    }
+
     // Détruire le graphique existant s'il existe
     if (window.tensionEvolutionChartInstance) {
         window.tensionEvolutionChartInstance.destroy();
     }
 
     // Filtrer les dates si nécessaire
-    const datesToUse = dates || (window.filteredDates || allClientsHourlyMatrix.dates);
-    const filteredTensionResults = tensionResults.filter(item => datesToUse.includes(item.date));
+    const baseDates = savedContext.allDates || (window.filteredDates || allClientsHourlyMatrix.dates);
+    const datesToUse = (dates && dates.length) ? dates : baseDates;
+    const filteredTensionResults = effectiveTensionResults.filter(item => datesToUse.includes(item.date));
 
     if (filteredTensionResults.length === 0) {
         document.getElementById('tension-evolution-container').innerHTML = `
@@ -9451,16 +9757,16 @@ function createTensionEvolutionChart(dates, tensionResults, systemType) {
             label: date,
             data: data,
             borderColor: colorPalette[i],
-            backgroundColor: colorPalette[i] + '10',
-            borderWidth: 2,
-            tension: 0.3,
-            pointRadius: 3,
+            backgroundColor: colorPalette[i] + '20',
+            borderWidth: 3,
+            tension: 0.35,
+            pointRadius: 4,
             pointBackgroundColor: colorPalette[i],
-            pointBorderColor: '#fff',
-            pointBorderWidth: 1,
-            pointHoverRadius: 5,
+            pointBorderColor: '#ffffff',
+            pointBorderWidth: 1.5,
+            pointHoverRadius: 6,
             pointHoverBackgroundColor: colorPalette[i],
-            pointHoverBorderColor: '#fff',
+            pointHoverBorderColor: '#ffffff',
             pointHoverBorderWidth: 2,
             spanGaps: false,
             fill: false
@@ -9468,7 +9774,7 @@ function createTensionEvolutionChart(dates, tensionResults, systemType) {
     }
 
     // Déterminer les limites selon le système
-    const systemLimits = getSystemLimits(systemType);
+    const systemLimits = getSystemLimits(effectiveSystemType);
 
     // Calculer les statistiques globales
     const values = filteredTensionResults.map(item => parseFloat(item.tension || item.valeur || 0));
@@ -9489,7 +9795,7 @@ function createTensionEvolutionChart(dates, tensionResults, systemType) {
         },
         options: {
             responsive: true,
-            maintainAspectRatio: true,
+            maintainAspectRatio: false,
             interaction: {
                 mode: 'nearest',
                 axis: 'x',
@@ -9584,53 +9890,15 @@ function createTensionEvolutionChart(dates, tensionResults, systemType) {
             },
             elements: {
                 line: {
-                    tension: 0.3
+                    tension: 0.35
                 }
             }
         },
-        plugins: [
-            {
-                id: 'tensionIdealRange',
-                afterDatasetsDraw(chart) {
-                    const ctx = chart.ctx;
-                    const yScale = chart.scales.y;
-                    
-                    // Plage idéale
-                    ctx.save();
-                    ctx.fillStyle = 'rgba(34, 197, 94, 0.08)';
-                    ctx.fillRect(
-                        chart.chartArea.left,
-                        yScale.getPixelForValue(systemLimits.ideal.max),
-                        chart.chartArea.right - chart.chartArea.left,
-                        yScale.getPixelForValue(systemLimits.ideal.min) - yScale.getPixelForValue(systemLimits.ideal.max)
-                    );
-                    
-                    // Lignes de seuils
-                    ctx.strokeStyle = '#f59e0b';
-                    ctx.lineWidth = 1.5;
-                    ctx.setLineDash([5, 5]);
-                    
-                    // Seuil min
-                    ctx.beginPath();
-                    ctx.moveTo(chart.chartArea.left, yScale.getPixelForValue(systemLimits.min));
-                    ctx.lineTo(chart.chartArea.right, yScale.getPixelForValue(systemLimits.min));
-                    ctx.stroke();
-                    
-                    // Seuil max
-                    ctx.beginPath();
-                    ctx.moveTo(chart.chartArea.left, yScale.getPixelForValue(systemLimits.max));
-                    ctx.lineTo(chart.chartArea.right, yScale.getPixelForValue(systemLimits.max));
-                    ctx.stroke();
-                    
-                    ctx.setLineDash([]);
-                    ctx.restore();
-                }
-            }
-        ]
+        plugins: []
     });
 
     // Mettre à jour les statistiques
-    updateTensionEvolutionStats(filteredTensionResults, systemType);
+    updateTensionEvolutionStats(filteredTensionResults, effectiveSystemType);
 }
 
 // Fonction utilitaire pour convertir l'heure en minutes
@@ -9681,58 +9949,58 @@ function updateTensionEvolutionStats(tensionResults, systemType) {
     const totalMeasurements = values.length;
 
     statsContainer.innerHTML = `
-        <div style="display: flex; gap: 24px; margin-top: 20px; padding: 16px 20px; 
+        <div style="display: flex; gap: 20px; margin-top: 16px; padding: 12px 16px; 
                     background: linear-gradient(135deg, #f8fafc 0%, #ffffff 100%);
-                    border-radius: 16px; border: 1px solid #e2e8f0; flex-wrap: wrap; align-items: center;">
+                    border-radius: 14px; border: 1px solid #e2e8f0; flex-wrap: wrap; align-items: center;">
             
             <div style="display: flex; align-items: center; gap: 16px;">
-                <div style="width: 48px; height: 48px; background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
-                          border-radius: 14px; display: flex; align-items: center; justify-content: center;
-                          box-shadow: 0 8px 16px #8b5cf660;">
-                    <span style="font-size: 24px; color: white;">📊</span>
+                <div style="width: 40px; height: 40px; background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+                          border-radius: 12px; display: flex; align-items: center; justify-content: center;
+                          box-shadow: 0 6px 12px #8b5cf640;">
+                    <span style="font-size: 20px; color: white;">📊</span>
                 </div>
                 <div>
-                    <div style="font-size: 12px; color: #64748b; margin-bottom: 4px;">Tension moyenne</div>
-                    <div style="font-size: 28px; font-weight: 800; color: #1e293b;">${avg}V</div>
+                    <div style="font-size: 11px; color: #64748b; margin-bottom: 2px;">Tension moyenne</div>
+                    <div style="font-size: 20px; font-weight: 700; color: #1e293b;">${avg}V</div>
                 </div>
             </div>
             
             <div style="width: 1px; height: 50px; background: #e2e8f0;"></div>
             
             <div style="display: flex; align-items: center; gap: 16px;">
-                <div style="width: 48px; height: 48px; background: linear-gradient(135deg, #94a3b8 0%, #64748b 100%);
-                          border-radius: 14px; display: flex; align-items: center; justify-content: center;
-                          box-shadow: 0 8px 16px #94a3b860;">
-                    <span style="font-size: 24px; color: white;">⬇️⬆️</span>
+                <div style="width: 40px; height: 40px; background: linear-gradient(135deg, #94a3b8 0%, #64748b 100%);
+                          border-radius: 12px; display: flex; align-items: center; justify-content: center;
+                          box-shadow: 0 6px 12px #94a3b840;">
+                    <span style="font-size: 20px; color: white;">⬇️⬆️</span>
                 </div>
                 <div>
-                    <div style="font-size: 12px; color: #64748b; margin-bottom: 4px;">Min / Max</div>
-                    <div style="font-size: 28px; font-weight: 800; color: #1e293b;">${min}V / ${max}V</div>
+                    <div style="font-size: 11px; color: #64748b; margin-bottom: 2px;">Min / Max</div>
+                    <div style="font-size: 20px; font-weight: 700; color: #1e293b;">${min}V / ${max}V</div>
                 </div>
             </div>
             
             <div style="width: 1px; height: 50px; background: #e2e8f0;"></div>
             
-            <div style="display: flex; align-items: center; gap: 20px; flex-wrap: wrap;">
+            <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
                 <div style="display: flex; align-items: center; gap: 12px;">
-                    <span style="font-size: 20px;">📅</span>
+                    <span style="font-size: 18px;">📅</span>
                     <div>
-                        <div style="font-size: 11px; color: #64748b;">Jours</div>
-                        <div style="font-size: 20px; font-weight: 700; color: #1e293b;">${daysWithData}</div>
+                        <div style="font-size: 10px; color: #64748b;">Jours</div>
+                        <div style="font-size: 16px; font-weight: 600; color: #1e293b;">${daysWithData}</div>
                     </div>
                 </div>
                 <div style="display: flex; align-items: center; gap: 12px;">
-                    <span style="font-size: 20px;">⚡</span>
+                    <span style="font-size: 18px;">⚡</span>
                     <div>
-                        <div style="font-size: 11px; color: #64748b;">Mesures</div>
-                        <div style="font-size: 20px; font-weight: 700; color: #1e293b;">${totalMeasurements}</div>
+                        <div style="font-size: 10px; color: #64748b;">Mesures</div>
+                        <div style="font-size: 16px; font-weight: 600; color: #1e293b;">${totalMeasurements}</div>
                     </div>
                 </div>
                 <div style="display: flex; align-items: center; gap: 12px;">
-                    <span style="font-size: 20px;">🔧</span>
+                    <span style="font-size: 18px;">🔧</span>
                     <div>
-                        <div style="font-size: 11px; color: #64748b;">Système</div>
-                        <div style="font-size: 20px; font-weight: 700; color: #1e293b;">${systemType}</div>
+                        <div style="font-size: 10px; color: #64748b;">Système</div>
+                        <div style="font-size: 16px; font-weight: 600; color: #1e293b;">${systemType}</div>
                     </div>
                 </div>
             </div>
@@ -12547,8 +12815,7 @@ function initializeENRTabs() {
     });
 }
 
-// === FONCTION POUR CRÉER LE GRAPHIQUE EN BARRES ===
-// === FONCTION POUR CRÉER LE GRAPHIQUE EN BARRES AVEC POURCENTAGES DE DIMENSIONNEMENT ===
+// === FONCTION POUR CRÉER LE GRAPHIQUE D'ENERGIE MAX DU CLIENT AVEC DIMENSIONNEMENT DES KITS ===
 function createAllClientsEnergyChart(dates, energyDataByDay, maxEnergyDate) {
     const chartCanvas = document.getElementById('allClientsEnergyChart');
     if (!chartCanvas) return;
@@ -12639,13 +12906,6 @@ function createAllClientsEnergyChart(dates, energyDataByDay, maxEnergyDate) {
         return '#1f2933';
     });
 
-    // Déterminer un "kit recommandé" global pour la période
-    let recommendedKit = null;
-    if (nonZeroValues.length > 0) {
-        const maxValue = Math.max(...nonZeroValues);
-        recommendedKit = visibleKitThresholds.find(kit => maxValue <= kit.value) || null;
-    }
-
     // Calculer l'échelle Y maximale pour avoir de la marge
     const maxVisibleKit = visibleKitThresholds[visibleKitThresholds.length - 1];
     const maxYValue = Math.max(
@@ -12653,16 +12913,16 @@ function createAllClientsEnergyChart(dates, energyDataByDay, maxEnergyDate) {
         maxVisibleKit.value * 1.1
     );
 
-    // === CRÉER LE HTML DES STATISTIQUES DE DIMENSIONNEMENT ===
-    const dimensioningHTML = createDimensioningStatsHTML(dimensioningStats, kitThresholds, recommendedKit);
+    // === MODIFICATION : VERSION SIMPLIFIÉE DES STATISTIQUES (sans recommandation) ===
+    const simplifiedStatsHTML = createSimplifiedDimensioningHTML(dimensioningStats, kitThresholds);
     
     // Mettre à jour le texte de synthèse
     const summaryElement = document.getElementById('allClientsEnergySummary');
     if (summaryElement) {
-        summaryElement.innerHTML = dimensioningHTML;
+        summaryElement.innerHTML = simplifiedStatsHTML;
     }
 
-    // Créer le graphique
+    // Créer le graphique (le reste de la fonction reste identique)
     const ctx = chartCanvas.getContext('2d');
     window.allClientsEnergyChartInstance = new Chart(ctx, {
         type: 'line',
@@ -12830,7 +13090,61 @@ function createAllClientsEnergyChart(dates, energyDataByDay, maxEnergyDate) {
     });
 }
 
-// ======================== CALCUL DES POURCENTAGES DE DIMENSIONNEMENT ========================
+// === VERSION SIMPLIFIÉE DES STATISTIQUES (avec pourcentages cumulés) ===
+// === VERSION RECOMMANDÉE (une seule barre par kit, simple) ===
+function createSimplifiedDimensioningHTML(stats, kitThresholds) {
+    if (stats.totalDays === 0) {
+        return `
+            <div style="background: #f8fafc; padding: 12px; border-radius: 8px; margin-top: 12px;">
+                <span style="color: #64748b;">📊 Aucune consommation</span>
+            </div>
+        `;
+    }
+
+    const kitOrder = ['Kit 0', 'Kit 1', 'Kit 2', 'Kit 3', 'Kit 4', 'Kit 4+'];
+    
+    let html = '';
+    kitOrder.forEach(kitLabel => {
+        const percentage = stats.percentages[kitLabel] || 0;
+        const count = stats.distribution[kitLabel] || 0;
+        
+        if (percentage === 0 && count === 0) return;
+        
+        const kitInfo = kitLabel === 'Kit 4+' 
+            ? { color: '#dc2626' }
+            : kitThresholds.find(k => k.label === kitLabel);
+        
+        html += `
+            <div style="margin-bottom: 15px;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                    <span>
+                        <span style="display: inline-block; width: 12px; height: 12px; background: ${kitInfo.color}; border-radius: 4px; margin-right: 6px;"></span>
+                        <span style="font-weight: 500;">${kitLabel}</span>
+                        <span style="color: #64748b; font-size: 12px; margin-left: 8px;">${count}j</span>
+                    </span>
+                    <span style="font-weight: 600; color: ${kitInfo.color};">${percentage}%</span>
+                </div>
+                <div style="width: 100%; height: 16px; background: #edf2f7; border-radius: 8px; overflow: hidden;">
+                    <div style="width: ${percentage}%; height: 100%; background: ${kitInfo.color}; border-radius: 8px;"></div>
+                </div>
+            </div>
+        `;
+    });
+
+    return `
+        <div style="background: white; border-radius: 12px; border: 1px solid #e2e8f0; margin-top: 20px; overflow: hidden;">
+            <div style="background: #f8fafc; padding: 12px 16px; border-bottom: 1px solid #e2e8f0;">
+                <span style="font-weight: 600;">📊 Répartition cumulée par kit</span>
+                <span style="float: right; color: #64748b; font-size: 12px;">${stats.totalDays} jours</span>
+            </div>
+            <div style="padding: 16px;">
+                ${html}
+            </div>
+        </div>
+    `;
+}
+
+// ======================== CALCUL DES POURCENTAGES DE DIMENSIONNEMENT (VERSION CUMULÉE) ========================
 function calculateDimensioningPercentages(energyData, kitThresholds) {
     // Filtrer les jours avec consommation > 0
     const daysWithConsumption = energyData.filter(v => v && v > 0);
@@ -12896,12 +13210,30 @@ function calculateDimensioningPercentages(energyData, kitThresholds) {
         }
     });
     
-    // Calculer les pourcentages
-    Object.keys(distribution).forEach(kit => {
-        percentages[kit] = Math.round((distribution[kit] / totalDays) * 100);
+    // === MODIFICATION ICI : Calcul des pourcentages CUMULÉS ===
+    // Trier les kits par valeur croissante
+    const kitValueOrder = {
+        'Kit 0': 250,
+        'Kit 1': 360,
+        'Kit 2': 540,
+        'Kit 3': 720,
+        'Kit 4': 1080,
+        'Kit 4+': 9999
+    };
+    
+    // Trier les kits par leur valeur seuil (du plus petit au plus grand)
+    const sortedKits = Object.keys(distribution).sort((a, b) => {
+        return kitValueOrder[a] - kitValueOrder[b];
     });
     
-    // 🔴 CORRECTION ICI : Trouver le kit avec le PLUS GRAND NOMBRE DE JOURS
+    // Calculer les pourcentages cumulés
+    let cumulativeSum = 0;
+    sortedKits.forEach(kit => {
+        cumulativeSum += distribution[kit];
+        percentages[kit] = Math.round((cumulativeSum / totalDays) * 100);
+    });
+    
+    // 🔴 Trouver le kit avec le PLUS GRAND NOMBRE DE JOURS (pour référence)
     let maxCount = 0;
     let modeKit = null;
     let modePercentage = 0;
@@ -12910,21 +13242,21 @@ function calculateDimensioningPercentages(energyData, kitThresholds) {
         if (distribution[kit] > maxCount) {
             maxCount = distribution[kit];
             modeKit = kit;
-            modePercentage = percentages[kit];
+            modePercentage = percentages[kit]; // Maintenant c'est le pourcentage cumulé
         }
     });
     
-    // 🔴 CORRECTION ICI : S'assurer que le kit recommandé est celui avec le plus de jours
+    // Kit recommandé = celui avec le plus de jours
     const recommendedKit = modeKit;
     const recommendedKitPercentage = modePercentage;
     const recommendedKitCount = maxCount;
     
-    // Pourcentage moyen
+    // Pourcentage moyen (non cumulé, reste le même)
     const averagePercentage = totalDays > 0 ? Math.round(totalPercentageSum / totalDays) : 0;
     
-    console.log('📊 Analyse dimensionnement:', {
+    console.log('📊 Analyse dimensionnement (cumulée):', {
         distribution,
-        percentages,
+        percentages, // Maintenant ce sont des pourcentages cumulés
         modeKit,
         modePercentage,
         maxCount,
@@ -12934,21 +13266,20 @@ function calculateDimensioningPercentages(energyData, kitThresholds) {
     
     return {
         totalDays,
-        percentages,
-        distribution,
+        percentages,        // ✅ Pourcentages CUMULÉS
+        distribution,       // Distribution brute (non cumulée)
         averagePercentage,
         maxEnergy,
         maxKitReached,
         modeKit,
         modePercentage,
         maxCount,
-        recommendedKit,           // ✅ C'est celui avec le PLUS de jours
-        recommendedKitPercentage, // ✅ Son pourcentage
-        recommendedKitCount      // ✅ Son nombre de jours
+        recommendedKit,
+        recommendedKitPercentage,
+        recommendedKitCount
     };
 }
 
-// ======================== CRÉATION DU HTML DES STATISTIQUES DE DIMENSIONNEMENT ========================
 // ======================== CRÉATION DU HTML DES STATISTIQUES DE DIMENSIONNEMENT ========================
 function createDimensioningStatsHTML(stats, kitThresholds) {
     if (stats.totalDays === 0) {
@@ -13722,7 +14053,7 @@ function addDynamicKitStyles() {
     
     document.head.appendChild(styles);
 }
-// === FONCTION POUR CRÉER LE GRAPHIQUE TENSION (MIN/MAX PAR JOUR) ===
+// === FONCTION POUR CRÉER LE GRAPHIQUE TENSION (MIN/MAX/MOYENNE PAR JOUR) ===
 function createAllClientsTensionChart(dates, tensionByDay, systemType, systemLimits) {
     const chartCanvas = document.getElementById('allClientsTensionChart');
     if (!chartCanvas) return;
@@ -13736,6 +14067,15 @@ function createAllClientsTensionChart(dates, tensionByDay, systemType, systemLim
     const labels = dates;
     const minData = dates.map(date => tensionByDay[date] ? tensionByDay[date].min : null);
     const maxData = dates.map(date => tensionByDay[date] ? tensionByDay[date].max : null);
+    
+    // --- NOUVEAU : Calcul des données pour la tension moyenne ---
+    const avgData = dates.map(date => {
+        if (tensionByDay[date] && tensionByDay[date].min !== null && tensionByDay[date].max !== null) {
+            // Moyenne simple du min et du max du jour. Vous pouvez changer cette logique si vous avez une vraie moyenne journalière.
+            return ((tensionByDay[date].min + tensionByDay[date].max) / 2).toFixed(2);
+        }
+        return null;
+    });
 
     // Créer le graphique
     const ctx = chartCanvas.getContext('2d');
@@ -13745,94 +14085,105 @@ function createAllClientsTensionChart(dates, tensionByDay, systemType, systemLim
             labels: labels,
             datasets: [
                 {
-                    label: 'Tension Minimale (V)',
-                    data: minData,
-                    borderColor: '#a855f7',
-                    backgroundColor: 'transparent',
-                    borderWidth: 2.5,
-                    fill: false,
-                    tension: 0.4,
-                    pointRadius: 4,
-                    pointBackgroundColor: minData.map(value => {
-                        if (value === null) return '#a855f7';
-                        return value < systemLimits.min ? '#ef4444' : '#a855f7';
-                    }),
-                    pointBorderColor: minData.map(value => {
-                        if (value === null) return '#7e22ce';
-                        return value < systemLimits.min ? '#991b1b' : '#7e22ce';
-                    }),
-                    pointBorderWidth: minData.map(value => {
-                        if (value === null) return 2;
-                        return value < systemLimits.min ? 2.5 : 2;
-                    }),
-                    pointHoverRadius: 6
-                },
-                {
                     label: 'Tension Maximale (V)',
                     data: maxData,
-                    borderColor: '#3182ce',
+                    borderColor: '#f97316', // Orange plus vif
                     backgroundColor: 'transparent',
                     borderWidth: 2.5,
                     fill: false,
                     tension: 0.4,
-                    pointRadius: 4,
+                    pointRadius: 3,
                     pointBackgroundColor: maxData.map(value => {
-                        if (value === null) return '#3182ce';
-                        return value > systemLimits.max ? '#ef4444' : '#3182ce';
+                        if (value === null) return '#f97316';
+                        return value > systemLimits.max ? '#ef4444' : '#f97316';
                     }),
-                    pointBorderColor: maxData.map(value => {
-                        if (value === null) return '#2c5aa0';
-                        return value > systemLimits.max ? '#991b1b' : '#2c5aa0';
+                    pointBorderColor: '#fff',
+                    pointBorderWidth: 1.5,
+                    pointHoverRadius: 5
+                },
+                {
+                    label: 'Tension Minimale (V)',
+                    data: minData,
+                    borderColor: '#3b82f6', // Bleu plus vif
+                    backgroundColor: 'transparent',
+                    borderWidth: 2.5,
+                    fill: false,
+                    tension: 0.4,
+                    pointRadius: 3,
+                    pointBackgroundColor: minData.map(value => {
+                        if (value === null) return '#3b82f6';
+                        return value < systemLimits.min ? '#ef4444' : '#3b82f6';
                     }),
-                    pointBorderWidth: maxData.map(value => {
-                        if (value === null) return 2;
-                        return value > systemLimits.max ? 2.5 : 2;
-                    }),
-                    pointHoverRadius: 6
+                    pointBorderColor: '#fff',
+                    pointBorderWidth: 1.5,
+                    pointHoverRadius: 5
+                },
+                // --- NOUVEAU : Dataset pour la tension moyenne ---
+                {
+                    label: 'Tension Moyenne (V)',
+                    data: avgData,
+                    borderColor: '#22c55e', // Vert vif pour la moyenne
+                    backgroundColor: 'rgba(34, 197, 94, 0.05)', // Fond très léger
+                    borderWidth: 3, // Ligne légèrement plus épaisse
+                    borderDash: [8, 5], // Ligne en pointillés pour la différencier
+                    fill: false,
+                    tension: 0.4,
+                    pointRadius: 0, // Pas de points individuels pour une ligne plus propre
+                    pointHoverRadius: 4, // Un point apparaît au survol
+                    pointHoverBackgroundColor: '#22c55e',
+                    pointHoverBorderColor: '#fff',
+                    pointHoverBorderWidth: 2,
                 }
             ]
         },
         options: {
             responsive: true,
             maintainAspectRatio: true,
+            // --- AMÉLIORATION : Réduction des marges internes ---
+            layout: {
+                padding: {
+                    top: 5,
+                    bottom: 5,
+                    left: 5,
+                    right: 5
+                }
+            },
             interaction: {
                 mode: 'index',
                 intersect: false
             },
             animation: {
-                duration: 800,
+                duration: 500, // Animation plus rapide
                 easing: 'easeInOutQuart'
             },
             plugins: {
                 legend: {
                     display: true,
                     position: 'top',
+                    align: 'center', // Centrer la légende
                     labels: {
                         font: {
-                            size: 14,
-                            weight: 'bold'
+                            size: 11, // Police légèrement plus petite
+                            weight: '500'
                         },
-                        color: '#2c3e50',
-                        padding: 15,
-                        usePointStyle: true
+                        color: '#334155',
+                        padding: 10, // Moins d'espace autour des labels
+                        usePointStyle: true,
+                        boxWidth: 8,
+                        boxHeight: 8
                     }
                 },
                 tooltip: {
-                    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-                    padding: 12,
-                    titleFont: {
-                        size: 14,
-                        weight: 'bold'
-                    },
-                    bodyFont: {
-                        size: 13
-                    },
+                    backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                    padding: 10,
+                    titleFont: { size: 12, weight: 'bold' },
+                    bodyFont: { size: 11 },
                     cornerRadius: 6,
                     displayColors: true,
                     callbacks: {
                         label: function (context) {
                             const value = context.parsed.y;
-                            if (value === null) return 'Pas de données';
+                            if (value === null) return `${context.dataset.label}: Pas de données`;
                             return `${context.dataset.label}: ${value.toFixed(2)} V`;
                         }
                     }
@@ -13841,51 +14192,51 @@ function createAllClientsTensionChart(dates, tensionByDay, systemType, systemLim
             scales: {
                 y: {
                     beginAtZero: false,
-                    ticks: {
-                        font: {
-                            size: 12
-                        },
-                        color: '#718096',
-                        callback: function (value) {
-                            return value.toFixed(1) + ' V';
-                        }
-                    },
-                    grid: {
-                        color: 'rgba(113, 128, 150, 0.1)',
-                        lineWidth: 1
-                    },
+                    // --- AMÉLIORATION : Réduction de l'espace du titre Y ---
                     title: {
                         display: true,
                         text: 'Tension (V)',
-                        font: {
-                            size: 13,
-                            weight: 'bold'
-                        },
-                        color: '#2c3e50',
-                        padding: 10
-                    }
-                },
-                x: {
+                        font: { size: 11, weight: '500' },
+                        color: '#475569',
+                        padding: { top: 0, bottom: 5 } // Réduction du padding
+                    },
                     ticks: {
-                        font: {
-                            size: 12
+                        font: { size: 10 },
+                        color: '#64748b',
+                        callback: function (value) {
+                            return value.toFixed(1) + ' V';
                         },
-                        color: '#718096',
-                        maxRotation: 45,
-                        minRotation: 0
+                        padding: 5, // Réduction du padding
+                        stepSize: 2, // Suggestion : Force un pas plus grand pour moins de ticks
+                        autoSkip: true
                     },
                     grid: {
-                        display: false
+                        color: 'rgba(148, 163, 184, 0.1)',
+                        lineWidth: 0.8
                     },
+                    // --- AMÉLIORATION : Suggérer une plage pour éviter trop d'espace vide ---
+                    suggestedMin: systemLimits.min - 1,
+                    suggestedMax: systemLimits.max + 1
+                },
+                x: {
+                    // --- AMÉLIORATION : Réduction de l'espace du titre X ---
                     title: {
                         display: true,
                         text: 'Dates',
-                        font: {
-                            size: 13,
-                            weight: 'bold'
-                        },
-                        color: '#2c3e50',
-                        padding: 10
+                        font: { size: 11, weight: '500' },
+                        color: '#475569',
+                        padding: { top: 5, bottom: 0 } // Réduction du padding
+                    },
+                    ticks: {
+                        font: { size: 10 },
+                        color: '#64748b',
+                        maxRotation: 30,
+                        minRotation: 20,
+                        autoSkip: true,
+                        maxTicksLimit: 10 // Limite le nombre de dates affichées
+                    },
+                    grid: {
+                        display: false
                     }
                 }
             }
@@ -13899,9 +14250,10 @@ function createAllClientsTensionChart(dates, tensionByDay, systemType, systemLim
 
                     // Ligne min acceptable
                     const minPixel = yScale.getPixelForValue(systemLimits.min);
-                    ctx.strokeStyle = '#ed8936';
-                    ctx.lineWidth = 2;
-                    ctx.setLineDash([5, 5]);
+                    ctx.save();
+                    ctx.strokeStyle = '#f97316';
+                    ctx.lineWidth = 1.5;
+                    ctx.setLineDash([4, 4]);
                     ctx.beginPath();
                     ctx.moveTo(chart.chartArea.left, minPixel);
                     ctx.lineTo(chart.chartArea.right, minPixel);
@@ -13909,32 +14261,34 @@ function createAllClientsTensionChart(dates, tensionByDay, systemType, systemLim
 
                     // Ligne max acceptable
                     const maxPixel = yScale.getPixelForValue(systemLimits.max);
-                    ctx.strokeStyle = '#ed8936';
-                    ctx.lineWidth = 2;
-                    ctx.setLineDash([5, 5]);
+                    ctx.strokeStyle = '#f97316';
+                    ctx.lineWidth = 1.5;
+                    ctx.setLineDash([4, 4]);
                     ctx.beginPath();
                     ctx.moveTo(chart.chartArea.left, maxPixel);
                     ctx.lineTo(chart.chartArea.right, maxPixel);
                     ctx.stroke();
 
-                    // Plage idéale
-                    const idealMinPixel = yScale.getPixelForValue(systemLimits.ideal.min);
-                    const idealMaxPixel = yScale.getPixelForValue(systemLimits.ideal.max);
-                    ctx.fillStyle = 'rgba(56, 161, 105, 0.1)';
-                    ctx.fillRect(chart.chartArea.left, idealMaxPixel,
-                        chart.chartArea.right - chart.chartArea.left,
-                        idealMinPixel - idealMaxPixel);
+                    // Plage idéale (optionnel, peut être enlevé si trop chargé)
+                    // const idealMinPixel = yScale.getPixelForValue(systemLimits.ideal.min);
+                    // const idealMaxPixel = yScale.getPixelForValue(systemLimits.ideal.max);
+                    // ctx.fillStyle = 'rgba(56, 161, 105, 0.05)';
+                    // ctx.fillRect(chart.chartArea.left, idealMaxPixel,
+                    //     chart.chartArea.right - chart.chartArea.left,
+                    //     idealMinPixel - idealMaxPixel);
 
                     ctx.setLineDash([]);
+                    ctx.restore();
                 }
             }
         ],
+        // Garder l'interaction au clic si nécessaire
         onClick: (event, elements, chart) => {
             if (elements.length > 0) {
                 const element = elements[0];
                 const dateIndex = element.index;
                 const selectedDate = allClientsHourlyMatrix.dates[dateIndex];
-                if (selectedDate) {
+                if (selectedDate && typeof openTensionHourlyModal === 'function') {
                     openTensionHourlyModal(selectedDate);
                 }
             }
@@ -15021,24 +15375,591 @@ window.currentSelectedDate = null;
 
 // Initialiser le graphique avec la dernière date
 function initializeHourlyChartWithLastDate() {
-    const allDates = window.filteredDates || allClientsHourlyMatrix.dates;
+    const allDates = getSortedEnergyHourlyDates();
     if (!allDates || allDates.length === 0) return;
-    
-    // Prendre la dernière date
-    const lastDate = allDates[allDates.length - 1];
-    window.currentSelectedDate = lastDate;
-    
-    // Mettre à jour le graphique
-    updateHourlyChartForSingleDate(lastDate);
-    
-    // Mettre à jour le sélecteur
-    const selector = document.getElementById('hourly-date-selector');
-    if (selector) {
-        selector.value = lastDate;
+
+    const startIndex = Math.max(0, allDates.length - 7);
+    const startDate = allDates[startIndex];
+    const endDate = allDates[allDates.length - 1];
+
+    const startSelect = document.getElementById('energy-hourly-start-date');
+    const endSelect = document.getElementById('energy-hourly-end-date');
+    if (startSelect) startSelect.value = startDate;
+
+    // Mettre à jour la liste des fins (fenêtre 7 jours) et sélectionner la dernière
+    if (startSelect && endSelect) {
+        onEnergyHourlyStartDateChange();
+        endSelect.value = endDate;
     }
+
+    // Mettre à jour le badge de période
+    const startLabel = document.getElementById('energy-hourly-range-start-label');
+    const endLabel = document.getElementById('energy-hourly-range-end-label');
+    if (startLabel) startLabel.textContent = startDate;
+    if (endLabel) endLabel.textContent = endDate;
+
+    // Dessiner le graphique sur la plage initiale
+    const selectedRange = allDates.slice(startIndex);
+    const hourlyData = calculateHourlyDataForDateRange(selectedRange);
+    createEnergyHourlyRangeChart(hourlyData);
     
-    // Mettre à jour l'affichage
-    updateDateDisplay(lastDate);
+    // Afficher les statistiques avancées
+    updateAdvancedHourlyStats(hourlyData);
+}
+
+// ===== FILTRE PAR PLAGE DE DATES (MAX 7 JOURS) - GRAPH ÉNERGIE HORAIRE =====
+function getSortedEnergyHourlyDates() {
+    const allDates = (window.filteredDates || allClientsHourlyMatrix.dates || []).slice();
+    if (!allDates.length) return [];
+
+    allDates.sort((a, b) => {
+        const da = new Date(a.split('/').reverse().join('-'));
+        const db = new Date(b.split('/').reverse().join('-'));
+        return da - db;
+    });
+    return allDates;
+}
+
+function onEnergyHourlyStartDateChange() {
+    const startSelect = document.getElementById('energy-hourly-start-date');
+    const endSelect = document.getElementById('energy-hourly-end-date');
+    if (!startSelect || !endSelect) return;
+
+    const sortedDates = getSortedEnergyHourlyDates();
+    if (!sortedDates.length) return;
+
+    const startDate = startSelect.value || sortedDates[0];
+    let startIndex = sortedDates.indexOf(startDate);
+    if (startIndex === -1) startIndex = 0;
+
+    const allowedDates = sortedDates.slice(startIndex, startIndex + 7);
+
+    endSelect.innerHTML = allowedDates.map((date, index) => {
+        const isLast = index === allowedDates.length - 1;
+        return `<option value="${date}" ${isLast ? 'selected' : ''}>${date}</option>`;
+    }).join('');
+}
+
+// ======================== FONCTION À REMPLACER ========================
+function applyEnergyHourlyDateFilter() {
+    const startSelect = document.getElementById('energy-hourly-start-date');
+    const endSelect = document.getElementById('energy-hourly-end-date');
+    if (!startSelect || !endSelect) return;
+
+    const startDate = startSelect.value;
+    const endDate = endSelect.value;
+    if (!startDate || !endDate) return;
+
+    const allDates = getSortedEnergyHourlyDates();
+    if (!allDates.length) return;
+
+    const startIndex = allDates.indexOf(startDate);
+    const endIndex = allDates.indexOf(endDate);
+    if (startIndex === -1 || endIndex === -1) return;
+
+    const realStartIndex = Math.min(startIndex, endIndex);
+    const realEndIndex = Math.max(startIndex, endIndex);
+    const selectedRange = allDates.slice(realStartIndex, realEndIndex + 1);
+
+    const startLabel = document.getElementById('energy-hourly-range-start-label');
+    const endLabel = document.getElementById('energy-hourly-range-end-label');
+    if (startLabel) startLabel.textContent = selectedRange[0];
+    if (endLabel) endLabel.textContent = selectedRange[selectedRange.length - 1];
+
+    const hourlyData = calculateHourlyDataForDateRange(selectedRange);
+    createEnergyHourlyRangeChart(hourlyData);
+    
+    // Utiliser la nouvelle fonction de statistiques avancées
+    updateAdvancedHourlyStats(hourlyData);
+}
+
+// ======================== FONCTION À REMPLACER ========================
+function resetEnergyHourlyDateFilter() {
+    const allDates = getSortedEnergyHourlyDates();
+    if (!allDates.length) return;
+
+    const startIndex = Math.max(0, allDates.length - 7);
+    const startDate = allDates[startIndex];
+    const endDate = allDates[allDates.length - 1];
+
+    const startSelect = document.getElementById('energy-hourly-start-date');
+    const endSelect = document.getElementById('energy-hourly-end-date');
+    if (startSelect) startSelect.value = startDate;
+    if (startSelect && endSelect) {
+        onEnergyHourlyStartDateChange();
+        endSelect.value = endDate;
+    }
+
+    const startLabel = document.getElementById('energy-hourly-range-start-label');
+    const endLabel = document.getElementById('energy-hourly-range-end-label');
+    if (startLabel) startLabel.textContent = startDate;
+    if (endLabel) endLabel.textContent = endDate;
+
+    const selectedRange = allDates.slice(startIndex);
+    const hourlyData = calculateHourlyDataForDateRange(selectedRange);
+    createEnergyHourlyRangeChart(hourlyData);
+    
+    // Utiliser la nouvelle fonction de statistiques avancées
+    updateAdvancedHourlyStats(hourlyData);
+}
+
+function calculateHourlyDataForDateRange(dates) {
+    const hours = Array.from({ length: 24 }, (_, i) => `${i.toString().padStart(2, '0')}:00`);
+    const clients = (allClientsHourlyMatrix.clients || []).slice();
+    const daysCount = (dates && dates.length) ? dates.length : 0;
+
+    // Détails par date pour les tooltips (par client / par heure)
+    const detailsByDate = {};
+    const allDataPoints = [];
+
+    let totalEnergy = 0;
+    let total00_18 = 0;
+    let total18_23 = 0;
+    let maxEnergy = 0;
+    let peakHour = -1;
+
+    // Agrégats globaux (sur toutes les dates sélectionnées) pour les stats
+    const sumsAcrossDatesByHour = new Array(24).fill(0);
+
+    if (daysCount > 0) {
+        dates.forEach((date) => {
+            const totalsByHour = new Array(24).fill(0);
+            const perClientByHour = {};
+            clients.forEach(clientId => {
+                perClientByHour[clientId] = new Array(24).fill(0);
+            });
+
+            hours.forEach((hour, hourIndex) => {
+                const key = `${date}_${hour}`;
+                const rowData = allClientsHourlyMatrix.data[key] || {};
+
+                let hourTotal = 0;
+                clients.forEach(clientId => {
+                    const energy = rowData[`client_${clientId}`];
+                    const v = (energy !== null && energy !== undefined && !isNaN(energy)) ? parseFloat(energy) : 0;
+                    perClientByHour[clientId][hourIndex] = v;
+                    hourTotal += v;
+                });
+
+                totalsByHour[hourIndex] = hourTotal;
+                sumsAcrossDatesByHour[hourIndex] += hourTotal;
+
+                const timestamp = new Date(date.split('/').reverse().join('-') + 'T' + hour).getTime();
+                allDataPoints.push({
+                    date,
+                    hour,
+                    hourIndex,
+                    timestamp,
+                    label: `${date} ${hour}`,
+                    total: hourTotal,
+                    perClient: clients.reduce((acc, clientId) => {
+                        acc[clientId] = perClientByHour[clientId][hourIndex];
+                        return acc;
+                    }, {})
+                });
+            });
+
+            detailsByDate[date] = {
+                totalsByHour,
+                perClientByHour
+            };
+        });
+    }
+
+    // Stats globales sur la période sélectionnée
+    sumsAcrossDatesByHour.forEach((hourTotal, index) => {
+        totalEnergy += hourTotal;
+        if (index < 18) total00_18 += hourTotal;
+        else total18_23 += hourTotal;
+        if (hourTotal > maxEnergy) {
+            maxEnergy = hourTotal;
+            peakHour = index;
+        }
+    });
+
+    // Moyenne horaire par jour sur la période (utile pour le bloc stats)
+    const averageEnergy = (daysCount > 0) ? (totalEnergy / (24 * daysCount)) : 0;
+    const rangeLabel = dates.length ? `${dates[0]} → ${dates[dates.length - 1]}` : '';
+
+    return {
+        date: rangeLabel,
+        hours,
+        clients: clients,
+        detailsByDate: detailsByDate,
+        allDataPoints: allDataPoints.sort((a, b) => a.timestamp - b.timestamp),
+        daysCount: daysCount,
+        totalEnergy,
+        total00_18,
+        total18_23,
+        maxEnergy,
+        peakHour,
+        averageEnergy,
+        peakHourDisplay: peakHour >= 0 ? `${peakHour}:00` : '-'
+    };
+}
+// ======================== NOUVELLES FONCTIONS À AJOUTER ========================
+
+// Fonction pour calculer toutes les statistiques horaires avancées
+function calculateAdvancedHourlyStats(hourlyData) {
+    if (!hourlyData || !hourlyData.allDataPoints || hourlyData.allDataPoints.length === 0) {
+        return null;
+    }
+
+    const stats = {
+        // Statistiques globales
+        moyenneGlobale: 0,
+        maxGlobal: 0,
+        maxGlobalHeure: '',
+        maxGlobalDate: '',
+        
+        // Statistiques par période
+        periode: {
+            jour: { debut: 6, fin: 18, total: 0, moyenne: 0, pourcentage: 0 },
+            nuit: { debut: 18, fin: 6, total: 0, moyenne: 0, pourcentage: 0 }
+        },
+        
+        // Statistiques à 23h (pour la moyenne maximale journalière)
+        valeurs23h: [],
+        
+        // Statistiques journalières
+        journalier: {},
+        
+        // Statistiques de pointe
+        pic: {
+            valeur: 0,
+            heure: '',
+            date: '',
+            periode: ''
+        }
+    };
+
+    // Parcourir tous les points de données
+    hourlyData.allDataPoints.forEach(point => {
+        const date = point.date;
+        const hour = point.hour;
+        const hourIndex = parseInt(hour.split(':')[0]);
+        const value = point.total || 0;
+
+        if (value === 0) return;
+
+        // Statistiques globales
+        stats.moyenneGlobale += value;
+        
+        // Mise à jour du max global
+        if (value > stats.maxGlobal) {
+            stats.maxGlobal = value;
+            stats.maxGlobalHeure = hour;
+            stats.maxGlobalDate = date;
+        }
+
+        // Collecter les valeurs à 23h
+        if (hourIndex === 23) {
+            stats.valeurs23h.push({
+                date: date,
+                valeur: value
+            });
+        }
+
+        // Statistiques par période (jour/nuit)
+        const estNuit = (hourIndex >= 18 || hourIndex < 6);
+        if (estNuit) {
+            stats.periode.nuit.total += value;
+        } else {
+            stats.periode.jour.total += value;
+        }
+
+        // Mise à jour du pic
+        if (value > stats.pic.valeur) {
+            stats.pic.valeur = value;
+            stats.pic.heure = hour;
+            stats.pic.date = date;
+            stats.pic.periode = estNuit ? 'Nuit' : 'Jour';
+        }
+
+        // Statistiques journalières
+        if (!stats.journalier[date]) {
+            stats.journalier[date] = {
+                total: 0,
+                max: 0,
+                maxHeure: '',
+                count: 0
+            };
+        }
+
+        const dayStat = stats.journalier[date];
+        dayStat.total += value;
+        dayStat.count++;
+        
+        if (value > dayStat.max) {
+            dayStat.max = value;
+            dayStat.maxHeure = hour;
+        }
+    });
+
+    // Calculer la moyenne globale
+    const totalPoints = hourlyData.allDataPoints.filter(p => p.total > 0).length;
+    stats.moyenneGlobale = totalPoints > 0 ? stats.moyenneGlobale / totalPoints : 0;
+
+    // Moyennes par période
+    stats.periode.jour.moyenne = stats.periode.jour.total / (totalPoints || 1);
+    stats.periode.nuit.moyenne = stats.periode.nuit.total / (totalPoints || 1);
+
+    // Pourcentages par période
+    const totalEnergie = stats.periode.jour.total + stats.periode.nuit.total;
+    if (totalEnergie > 0) {
+        stats.periode.jour.pourcentage = (stats.periode.jour.total / totalEnergie) * 100;
+        stats.periode.nuit.pourcentage = (stats.periode.nuit.total / totalEnergie) * 100;
+    }
+
+    // Calculer la moyenne des valeurs à 23h
+    let somme23h = 0;
+    stats.valeurs23h.forEach(item => {
+        somme23h += item.valeur;
+    });
+    
+    stats.moyenne23h = stats.valeurs23h.length > 0 ? somme23h / stats.valeurs23h.length : 0;
+
+    // Statistiques journalières
+    stats.moyenneJournaliere = {
+        max: 0,
+        maxDate: '',
+        min: Infinity,
+        minDate: '',
+        moyenne: 0
+    };
+
+    const jours = Object.keys(stats.journalier);
+    if (jours.length > 0) {
+        let totalJournalier = 0;
+        
+        jours.forEach(date => {
+            const day = stats.journalier[date];
+            totalJournalier += day.total;
+            
+            if (day.total > stats.moyenneJournaliere.max) {
+                stats.moyenneJournaliere.max = day.total;
+                stats.moyenneJournaliere.maxDate = date;
+            }
+            if (day.total < stats.moyenneJournaliere.min) {
+                stats.moyenneJournaliere.min = day.total;
+                stats.moyenneJournaliere.minDate = date;
+            }
+        });
+        
+        stats.moyenneJournaliere.moyenne = totalJournalier / jours.length;
+    }
+
+    return stats;
+}
+
+// ======================== VERSION ULTRA-SIMPLIFIÉE ========================
+function updateAdvancedHourlyStats(hourlyData) {
+    const statsDiv = document.getElementById('hourly-quick-stats');
+    if (!statsDiv) return;
+
+    const stats = calculateAdvancedHourlyStats(hourlyData);
+    if (!stats) {
+        statsDiv.innerHTML = '<div style="color: #64748b; padding: 8px;">Aucune donnée disponible</div>';
+        return;
+    }
+
+    // Formatage des nombres
+    const formatNumber = (num) => {
+        if (num === undefined || num === null) return '0';
+        return num.toFixed(1);
+    };
+
+    const formatPercentage = (num) => {
+        if (num === undefined || num === null) return '0%';
+        return num.toFixed(1) + '%';
+    };
+
+    statsDiv.innerHTML = `
+        <!-- PREMIÈRE LIGNE : Statistiques globales -->
+        <div style="display: flex; align-items: center; gap: 20px; flex-wrap: wrap; padding: 8px 12px; background: #f8fafc; border-radius: 8px; margin-bottom: 8px;">
+            <div style="display: flex; align-items: center; gap: 6px;">
+                <span style="font-size: 13px;">📊</span>
+                <span><strong>Moy:</strong> ${formatNumber(stats.moyenneGlobale)} Wh/h</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 6px;">
+                <span style="font-size: 13px;">🔥</span>
+                <span><strong>Max:</strong> ${formatNumber(stats.maxGlobal)} Wh <span style="color: #64748b; font-size: 11px;">(${stats.maxGlobalHeure} - ${stats.maxGlobalDate})</span></span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 6px; background: #e0f2fe; padding: 4px 12px; border-radius: 20px;">
+                <span style="font-size: 13px;">🌅</span>
+                <span><strong>Jour (6h-18h):</strong> ${formatNumber(stats.periode.jour.moyenne)} Wh/h</span>
+                <span style="color: #0284c7; font-weight: 600;">${formatPercentage(stats.periode.jour.pourcentage)}</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 6px; background: #fff3cd; padding: 4px 12px; border-radius: 20px;">
+                <span style="font-size: 13px;">🌙</span>
+                <span><strong>Nuit (18h-6h):</strong> ${formatNumber(stats.periode.nuit.moyenne)} Wh/h</span>
+                <span style="color: #b45309; font-weight: 600;">${formatPercentage(stats.periode.nuit.pourcentage)}</span>
+            </div>
+        </div>
+
+        <!-- DEUXIÈME LIGNE : Statistiques simplifiées -->
+        <div style="display: flex; align-items: center; gap: 20px; flex-wrap: wrap; padding: 8px 12px; background: white; border-radius: 8px; border: 1px solid #e2e8f0;">
+            
+            <!-- Moyenne des valeurs à 23h (énergie maximale journalière) -->
+            <div style="display: flex; align-items: center; gap: 6px;">
+                <span style="font-size: 13px;">📅</span>
+                <span><strong>Moyenne énergie max journalière (23h):</strong> ${formatNumber(stats.moyenne23h)} Wh <span style="color: #64748b;">(${stats.valeurs23h.length} jour(s) à 23h)</span></span>
+            </div>
+
+            <!-- Jours analysés -->
+            <span style="font-size: 11px; color: #64748b; margin-left: auto;">📊 ${Object.keys(stats.journalier).length} jours</span>
+        </div>
+    `;
+}
+function createEnergyHourlyRangeChart(hourlyData) {
+    const chartCanvas = document.getElementById('allClientsHourlyChart');
+    if (!chartCanvas) return;
+
+    if (window.allClientsHourlyChartInstance) {
+        window.allClientsHourlyChartInstance.destroy();
+    }
+
+    const ctx = chartCanvas.getContext('2d');
+
+    const points = (hourlyData.allDataPoints || []).slice();
+    const dates = Object.keys(hourlyData.detailsByDate || {}).sort((a, b) => {
+        const da = new Date(a.split('/').reverse().join('-'));
+        const db = new Date(b.split('/').reverse().join('-'));
+        return da - db;
+    });
+    const palette = generateColorPalette(dates.length);
+
+    const labels = points.map(p => p.label);
+
+    // Une série par date, positionnée sur l'axe X (date+heure), null ailleurs
+    const datasets = dates.map((date, idx) => {
+        const color = palette[idx] || '#3b82f6';
+        const data = new Array(points.length).fill(null);
+        points.forEach((p, pointIndex) => {
+            if (p.date === date) data[pointIndex] = p.total;
+        });
+
+        return {
+            label: date,
+            data,
+            borderColor: color,
+            // Couleur pleine (sans transparence / dégradé)
+            backgroundColor: color,
+            borderWidth: 0,
+            borderRadius: 6,
+            // Barres plus épaisses/visibles
+            barThickness: 12,
+            maxBarThickness: 18,
+            barPercentage: 1.0,
+            categoryPercentage: 1.0
+        };
+    });
+
+    window.allClientsHourlyChartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: datasets
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: true,
+                    position: 'top',
+                    labels: {
+                        font: { size: 10 },
+                        color: '#334155',
+                        padding: 10,
+                        usePointStyle: true,
+                        boxWidth: 8
+                    }
+                },
+                tooltip: {
+                    backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                    padding: 12,
+                    titleFont: { size: 13, weight: 'bold' },
+                    bodyFont: { size: 12 },
+                    displayColors: false,
+                    callbacks: {
+                        title: (context) => {
+                            // context[0].label = "JJ/MM/AAAA HH:MM"
+                            return context[0].label;
+                        },
+                        label: (context) => {
+                            const value = context.parsed.y;
+                            return value > 0 ? `Total → ⚡ ${value.toFixed(1)} Wh` : 'Total → Aucune consommation';
+                        },
+                        afterBody: (tooltipItems) => {
+                            if (!tooltipItems || tooltipItems.length === 0) return [];
+
+                            // On affiche le détail des clients pour la date de la courbe survolée
+                            const item = tooltipItems[0];
+                            const date = item.dataset.label;
+                            const point = (hourlyData.allDataPoints && hourlyData.allDataPoints[item.dataIndex])
+                                ? hourlyData.allDataPoints[item.dataIndex]
+                                : null;
+                            if (!point) return [];
+                            const hourIndex = point.hourIndex;
+
+                            const details = (hourlyData.detailsByDate && hourlyData.detailsByDate[date])
+                                ? hourlyData.detailsByDate[date]
+                                : null;
+                            if (!details || !details.perClientByHour) return [];
+
+                            const lines = [' ', 'Détail par client:'];
+                            (hourlyData.clients || []).forEach((clientId) => {
+                                const v = details.perClientByHour[clientId] ? details.perClientByHour[clientId][hourIndex] : 0;
+                                const label = `Client ${String(clientId).padStart(2, '0')}`;
+                                lines.push(`${label}: ${v.toFixed(1)} Wh`);
+                            });
+
+                            return lines;
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Énergie (Wh)',
+                        font: { size: 12, weight: 'bold' },
+                        color: '#334155'
+                    },
+                    ticks: {
+                        callback: (value) => value + ' Wh',
+                        font: { size: 11 }
+                    },
+                    grid: {
+                        color: 'rgba(148, 163, 184, 0.1)'
+                    }
+                },
+                x: {
+                    title: {
+                        display: true,
+                        text: 'Date et Heure',
+                        font: { size: 12, weight: 'bold' },
+                        color: '#334155'
+                    },
+                    ticks: {
+                        maxRotation: 45,
+                        minRotation: 30,
+                        font: { size: 10 },
+                        callback: function (val, index) {
+                            // Afficher 1 label sur 6 pour éviter la surcharge
+                            return index % 6 === 0 ? this.getLabelForValue(val) : '';
+                        }
+                    },
+                    grid: {
+                        display: false
+                    }
+                }
+            }
+        }
+    });
 }
 
 // Mettre à jour le graphique pour une date spécifique
@@ -15133,11 +16054,8 @@ function createSingleDateHourlyChart(hourlyData) {
     // Points de données pour le graphique line
     const dataPoints = hourlyData.data;
     
-    // Créer un dégradé pour le remplissage
+    // Contexte canvas
     const ctx = chartCanvas.getContext('2d');
-    const gradient = ctx.createLinearGradient(0, 0, 0, 300);
-    gradient.addColorStop(0, 'rgba(59, 130, 246, 0.3)');
-    gradient.addColorStop(1, 'rgba(59, 130, 246, 0.05)');
     
     window.allClientsHourlyChartInstance = new Chart(ctx, {
         type: 'line',
@@ -15147,8 +16065,8 @@ function createSingleDateHourlyChart(hourlyData) {
                 label: `Énergie Totale - ${hourlyData.date}`,
                 data: dataPoints,
                 borderColor: '#3b82f6',
-                backgroundColor: gradient,
-                borderWidth: 3,
+                backgroundColor: 'transparent',
+                borderWidth: 4,
                 pointRadius: 4,
                 pointBackgroundColor: dataPoints.map((value, index) => {
                     if (value === 0) return '#94a3b8';
@@ -15162,13 +16080,13 @@ function createSingleDateHourlyChart(hourlyData) {
                     if (index === hourlyData.peakHour) return '#dc2626';
                     return '#2563eb';
                 }),
-                tension: 0.3,
-                fill: true
+                tension: 0.35,
+                fill: false
             }]
         },
         options: {
             responsive: true,
-            maintainAspectRatio: true,
+            maintainAspectRatio: false,
             plugins: {
                 legend: { display: false },
                 tooltip: {
