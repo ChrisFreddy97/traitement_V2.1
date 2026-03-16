@@ -4,6 +4,65 @@ import { VOLTAGE_NORMS } from '../../arduinoConstants.js';
 import { getEnergyStats, parseIntensiteForTable, parseTensionForTable, alignData } from '../../analytics/energyAnalytics.js';
 
 // ===========================================
+// STYLE UNIFIÉ POUR TOUS LES GRAPHIQUES
+// ===========================================
+
+const CHART_STYLE = {
+    colors: {
+        primary: '#3b82f6',     // Donnée principale (bleu)
+        secondary: '#f59e0b',   // Donnée secondaire (orange)
+        min: '#64748b',         // Minimum (gris)
+        max: '#ef4444',         // Maximum (rouge)
+        avg: '#10b981',         // Moyenne (vert)
+        threshold: '#94a3b8',   // Seuils (gris clair)
+        reference: '#6b7280',   // Lignes de référence (gris foncé)
+        excellent: '#22c55e',   // Excellent (vert vif)
+        bon: '#eab308',         // Bon (jaune)
+        mauvais: '#f97316',     // Mauvais (orange)
+        critique: '#ef4444'     // Critique (rouge)
+    },
+    
+    fonts: {
+        family: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+        size: 11,
+        weight: 400
+    },
+    
+    grid: {
+        color: '#e9ecef',
+        borderDash: [3, 3],
+        drawBorder: false
+    },
+    
+    tooltip: {
+        backgroundColor: '#1e293b',
+        titleColor: '#f8fafc',
+        titleFont: { size: 12, weight: 600 },
+        bodyColor: '#cbd5e1',
+        bodyFont: { size: 11 },
+        borderColor: '#334155',
+        borderWidth: 1,
+        padding: 10,
+        cornerRadius: 8,
+        displayColors: true,
+        boxWidth: 8,
+        boxHeight: 8,
+        boxPadding: 4
+    },
+    
+    legend: {
+        labels: {
+            font: { size: 11 },
+            usePointStyle: true,
+            boxWidth: 8,
+            pointStyle: 'circle'
+        },
+        position: 'top',
+        align: 'center'
+    }
+};
+
+// ===========================================
 // MANAGER DE GRAPHIQUES (ÉVITE LES FUITES MEMOIRE)
 // ===========================================
 
@@ -43,7 +102,7 @@ export function renderTechnicalDashboard() {
         return;
     }
 
-    container.innerHTML = `
+    container.innerHTML = `        
         <div class="section-title"><h2>🔧 DONNÉES TECHNIQUES</h2></div>
         <div id="infoCard" class="card"></div>
 
@@ -57,9 +116,13 @@ export function renderTechnicalDashboard() {
 
         <div class="section-title"><h2>⚡ ANALYSE ÉNERGIE</h2></div>
         <div id="energyBoard" class="card"></div>
+        <div id="energyCycleBoard" class="card"></div>
         <div id="combinedEnergyTable" class="card"></div>
+
     `;
 
+
+    // Vos render existants
     renderInfoCard();
     renderConformityCard();
     renderNormsCard();
@@ -69,6 +132,7 @@ export function renderTechnicalDashboard() {
     renderHourlyChart();
     renderEnergyBoard();
     renderCombinedEnergyTable();
+    renderDailyEnergyCycle();
 }
 
 // ===========================================
@@ -584,11 +648,81 @@ function renderHighVoltageBoard() {
     });
 }
 function createHighVoltageChart(dates, counts, seuil) {
-    const referenceLine = { label:`Seuil excellent (4x/jour)`, data:Array(dates.length).fill(4), borderColor:'#4CAF50', borderWidth:2, borderDash:[5,5], pointRadius:0, fill:false, tension:0 };
-    chartManager.create('highVoltageChart',{
-        type:'line',
-        data:{labels:dates,datasets:[{label:`Nombre ≥${seuil}V`,data:counts,borderColor:'#FF9800',backgroundColor:'rgba(255,152,0,0.1)',borderWidth:3,tension:0.3,pointBackgroundColor:counts.map(c=>c>=4?'#4CAF50':c>=2?'#FFD700':c===1?'#FF9800':'#F44336'),pointRadius:5,pointHoverRadius:8,fill:true},referenceLine]},
-        options:{responsive:true,maintainAspectRatio:false}
+    chartManager.destroy('highVoltageChart');
+    
+    const ctx = document.getElementById('highVoltageChart')?.getContext('2d');
+    if (!ctx) return;
+    
+    requestAnimationFrame(() => {
+        chartManager.create('highVoltageChart', {
+            type: 'line',
+            data: {
+                labels: dates,
+                datasets: [
+                    {
+                        label: 'Dépassements par jour',
+                        data: counts,
+                        borderColor: CHART_STYLE.colors.secondary,
+                        backgroundColor: 'rgba(245, 158, 11, 0.05)',
+                        borderWidth: 2,
+                        tension: 0.2,
+                        pointRadius: 4,
+                        pointHoverRadius: 6,
+                        pointBackgroundColor: counts.map(c => 
+                            c >= 4 ? CHART_STYLE.colors.excellent :
+                            c >= 2 ? CHART_STYLE.colors.bon :
+                            c === 1 ? CHART_STYLE.colors.mauvais : 
+                            CHART_STYLE.colors.critique
+                        ),
+                        pointBorderColor: 'white',
+                        pointBorderWidth: 2,
+                        fill: true,
+                        order: 1
+                    },
+                    {
+                        label: 'Seuil excellent (4x/jour)',
+                        data: Array(dates.length).fill(4),
+                        borderColor: CHART_STYLE.colors.reference,
+                        borderWidth: 1.5,
+                        borderDash: [5, 5],
+                        pointRadius: 0,
+                        fill: false,
+                        order: 2
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: CHART_STYLE.legend,
+                    tooltip: CHART_STYLE.tooltip
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        grid: CHART_STYLE.grid,
+                        title: {
+                            display: true,
+                            text: 'Nombre de dépassements',
+                            font: CHART_STYLE.fonts
+                        },
+                        ticks: {
+                            stepSize: 1,
+                            font: CHART_STYLE.fonts
+                        }
+                    },
+                    x: {
+                        grid: { display: false },
+                        ticks: {
+                            maxRotation: 45,
+                            minRotation: 45,
+                            font: CHART_STYLE.fonts
+                        }
+                    }
+                }
+            }
+        });
     });
 }
 
@@ -609,23 +743,114 @@ function renderDailyChart() {
 }
 
 function createDailyTensionChart(data) {
+    chartManager.destroy('dailyTensionChart');
+    
+    const ctx = document.getElementById('dailyTensionChart')?.getContext('2d');
+    if (!ctx) return;
+    
     const norms = VOLTAGE_NORMS[database.technicalData.normSystem || '12V'];
     const labels = data.dates;
-    const datasets = [
-        { label:'Tension min', data:data.mins, borderColor:'#64b5f6',pointRadius:4,fill:false },
-        { label:'Tension max', data:data.maxs, borderColor:'#ffb74d',pointRadius:4,fill:false },
-        { label:'Tension moyenne', data:data.avgs, borderColor:'#4CAF50',pointRadius:0,fill:false },
-        { label:'Seuil min', data:Array(labels.length).fill(norms.min), borderColor:'#f44336', borderDash:[5,5], pointRadius:0, fill:false },
-        { label:'Seuil max', data:Array(labels.length).fill(norms.max), borderColor:'#ff9800', borderDash:[5,5], pointRadius:0, fill:false },
-        { label:'Plage idéale', data:Array(labels.length).fill((norms.min+norms.max)/2), borderColor:'#4CAF50', borderDash:[5,5], pointRadius:0, fill:false }
-    ];
-
-    chartManager.create('dailyTensionChart',{
-        type:'line',
-        data:{labels,datasets},
-        options:{responsive:true,maintainAspectRatio:false}
+    
+    requestAnimationFrame(() => {
+        chartManager.create('dailyTensionChart', {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'Tension minimale',
+                        data: data.mins,
+                        borderColor: CHART_STYLE.colors.min,
+                        backgroundColor: 'transparent',
+                        borderWidth: 1.5,
+                        pointRadius: 3,
+                        pointHoverRadius: 5,
+                        pointBackgroundColor: CHART_STYLE.colors.min,
+                        pointBorderColor: 'white',
+                        pointBorderWidth: 1,
+                        tension: 0.2,
+                        order: 1
+                    },
+                    {
+                        label: 'Tension maximale',
+                        data: data.maxs,
+                        borderColor: CHART_STYLE.colors.max,
+                        backgroundColor: 'transparent',
+                        borderWidth: 1.5,
+                        pointRadius: 3,
+                        pointHoverRadius: 5,
+                        pointBackgroundColor: CHART_STYLE.colors.max,
+                        pointBorderColor: 'white',
+                        pointBorderWidth: 1,
+                        tension: 0.2,
+                        order: 1
+                    },
+                    {
+                        label: 'Tension moyenne',
+                        data: data.avgs,
+                        borderColor: CHART_STYLE.colors.avg,
+                        backgroundColor: 'transparent',
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        tension: 0.2,
+                        order: 1
+                    },
+                    {
+                        label: 'Seuil minimal',
+                        data: Array(labels.length).fill(norms.min),
+                        borderColor: CHART_STYLE.colors.threshold,
+                        borderWidth: 1,
+                        borderDash: [4, 4],
+                        pointRadius: 0,
+                        fill: false,
+                        order: 2
+                    },
+                    {
+                        label: 'Seuil maximal',
+                        data: Array(labels.length).fill(norms.max),
+                        borderColor: CHART_STYLE.colors.threshold,
+                        borderWidth: 1,
+                        borderDash: [4, 4],
+                        pointRadius: 0,
+                        fill: false,
+                        order: 2
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: CHART_STYLE.legend,
+                    tooltip: CHART_STYLE.tooltip
+                },
+                scales: {
+                    y: {
+                        beginAtZero: false,
+                        grid: CHART_STYLE.grid,
+                        title: {
+                            display: true,
+                            text: 'Tension (V)',
+                            font: CHART_STYLE.fonts
+                        },
+                        ticks: {
+                            font: CHART_STYLE.fonts
+                        }
+                    },
+                    x: {
+                        grid: { display: false },
+                        ticks: {
+                            maxRotation: 45,
+                            minRotation: 45,
+                            font: CHART_STYLE.fonts
+                        }
+                    }
+                }
+            }
+        });
     });
 }
+
 
 // ===========================================
 // II-7) HOURLY CHART AVEC SÉLECTEURS + JAUGE
@@ -779,49 +1004,70 @@ function updateChartData() {
             data: {
                 labels: labels,
                 datasets: [
-                    { 
-                        label: `Tension (${allDates[chartStartIndex]} → ${allDates[chartEndIndex]})`, 
-                        data: tensions, 
-                        borderColor: '#ff9800', 
-                        backgroundColor: 'rgba(255, 152, 0, 0.1)',
-                        fill: true, 
-                        pointRadius: 1,
-                        pointHoverRadius: 4,
-                        tension: 0.3
+                    {
+                        label: `Tension (${allDates[chartStartIndex]} → ${allDates[chartEndIndex]})`,
+                        data: tensions,
+                        borderColor: CHART_STYLE.colors.primary,
+                        backgroundColor: 'rgba(59, 130, 246, 0.05)',
+                        borderWidth: 2,
+                        tension: 0.2,
+                        pointRadius: 2,
+                        pointHoverRadius: 5,
+                        pointBackgroundColor: CHART_STYLE.colors.primary,
+                        pointBorderColor: 'white',
+                        pointBorderWidth: 1,
+                        fill: true,
+                        order: 1
                     },
-                    { 
-                        label: 'Seuil min', 
-                        data: Array(labels.length).fill(norms.min), 
-                        borderColor: '#f44336', 
-                        borderDash: [5, 5], 
-                        pointRadius: 0, 
-                        fill: false 
+                    {
+                        label: 'Seuil minimal',
+                        data: Array(labels.length).fill(norms.min),
+                        borderColor: CHART_STYLE.colors.threshold,
+                        borderWidth: 1,
+                        borderDash: [4, 4],
+                        pointRadius: 0,
+                        fill: false,
+                        order: 2
                     },
-                    { 
-                        label: 'Seuil max', 
-                        data: Array(labels.length).fill(norms.max), 
-                        borderColor: '#ff9800', 
-                        borderDash: [5, 5], 
-                        pointRadius: 0, 
-                        fill: false 
+                    {
+                        label: 'Seuil maximal',
+                        data: Array(labels.length).fill(norms.max),
+                        borderColor: CHART_STYLE.colors.threshold,
+                        borderWidth: 1,
+                        borderDash: [4, 4],
+                        pointRadius: 0,
+                        fill: false,
+                        order: 2
                     }
                 ]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                animation: false,
                 plugins: {
-                    tooltip: { mode: 'index', intersect: false },
-                    legend: { display: true, position: 'top' }
+                    legend: CHART_STYLE.legend,
+                    tooltip: CHART_STYLE.tooltip
                 },
                 scales: {
-                    y: { 
+                    y: {
                         beginAtZero: false,
-                        title: { display: true, text: 'Tension (V)' }
+                        grid: CHART_STYLE.grid,
+                        title: {
+                            display: true,
+                            text: 'Tension (V)',
+                            font: CHART_STYLE.fonts
+                        },
+                        ticks: {
+                            font: CHART_STYLE.fonts
+                        }
                     },
-                    x: { 
-                        ticks: { maxRotation: 45, minRotation: 45 }
+                    x: {
+                        grid: { display: false },
+                        ticks: {
+                            maxRotation: 45,
+                            minRotation: 45,
+                            font: CHART_STYLE.fonts
+                        }
                     }
                 }
             }
@@ -838,6 +1084,7 @@ function updateChartData() {
     if (startSelect) startSelect.value = chartStartIndex;
     if (endSelect) endSelect.value = chartEndIndex;
 }
+
 
 function attachFilterEvents() {
     const track = document.getElementById('filterTrack');
@@ -1110,16 +1357,57 @@ function renderCombinedEnergyTable() {
     `;
 }
 
+// ===========================================
+// BILAN ÉNERGÉTIQUE AVEC ÉVOLUTION TEMPORELLE
+// ===========================================
+
 function renderEnergyBoard() {
     const container = document.getElementById('energyBoard');
     if (!container) return;
     
     const energyStats = getEnergyStats();
+    const energyData = database.energyData?.parDate || {};
+    
+    // ===== RÉCUPÉRER TOUTES LES DATES DISPONIBLES =====
+    const sortedDates = Object.keys(energyData)
+        .sort((a, b) => new Date(a) - new Date(b));  // Pas de limite !
+    
+    const totalDays = sortedDates.length;
+    const values = sortedDates.map(date => energyData[date]?.total || 0);
+    const maxValue = Math.max(...values, 1);
+    
+    // Format des dates pour l'affichage
+    const labels = sortedDates.map(date => {
+        const d = new Date(date);
+        return `${d.getDate()}/${d.getMonth()+1}`;
+    });
+    
+    // Adapter l'affichage si trop de dates
+    // On veut environ 20 dates sur l'axe X pour lisibilité
+    const step = totalDays > 30 ? Math.ceil(totalDays / 15) : 1;
+    
+    // ===== CALCUL DES STATISTIQUES TEMPORELLES =====
+    let totalEnergy = 0;
+    let daysWithData = 0;
+    values.forEach(v => {
+        if (v > 0) {
+            totalEnergy += v;
+            daysWithData++;
+        }
+    });
+    const avgDaily = daysWithData > 0 ? totalEnergy / daysWithData : 0;
+    
+    // Trouver le jour avec le max
+    const maxIndex = values.indexOf(maxValue);
+    const maxDate = maxIndex >= 0 ? sortedDates[maxIndex] : null;
     
     container.innerHTML = `
         <div class="card">
-            <div class="card-header">
+            <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
                 <span class="card-title">⚡ BILAN ÉNERGÉTIQUE</span>
+                <span style="background: #e2e8f0; padding: 4px 12px; border-radius: 100px; font-size: 0.8rem;">
+                    ${totalDays} jours analysés
+                </span>
             </div>
             
             <div class="stats-grid">
@@ -1127,6 +1415,7 @@ function renderEnergyBoard() {
                     <span class="stat-label">ÉNERGIE MAX</span>
                     <span class="stat-number warning">${energyStats.max}</span>
                     <span class="stat-unit">Wh</span>
+                    ${maxDate ? `<div style="font-size: 0.7rem; color: #64748b;">le ${maxDate}</div>` : ''}
                 </div>
                 <div class="stat-item">
                     <span class="stat-label">ÉNERGIE MIN</span>
@@ -1134,13 +1423,116 @@ function renderEnergyBoard() {
                     <span class="stat-unit">Wh</span>
                 </div>
                 <div class="stat-item">
-                    <span class="stat-label">ÉNERGIE MOY</span>
+                    <span class="stat-label">MOYENNE</span>
                     <span class="stat-number success">${energyStats.avg}</span>
                     <span class="stat-unit">Wh</span>
                 </div>
             </div>
+            
+            <!-- Moyenne journalière -->
+            <div style="margin: 10px 0; padding: 8px 12px; background: #f8fafc; border-radius: 8px; display: flex; justify-content: space-between; font-size: 0.85rem;">
+                <span>📊 Moyenne journalière</span>
+                <span style="font-weight: 600;">${avgDaily.toFixed(0)} Wh/jour</span>
+            </div>
+            
+            <!-- Graphique d'évolution -->
+            <div style="margin-top: 20px; height: 120px;">
+                <canvas id="energyTrendChart"></canvas>
+            </div>
+            
+            ${createDetailButton('energy-trend-details', '📊 Voir le détail jour par jour')}
+            <div id="energy-trend-details" style="display: none; margin-top: 15px;">
+                <div style="max-height: 350px; overflow-y: auto; border: 1px solid var(--gray-200); border-radius: var(--radius-lg);">
+                    <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
+                        <thead style="position: sticky; top: 0; background: var(--gray-100);">
+                            <tr>
+                                <th style="padding: 10px; text-align: left;">Date</th>
+                                <th style="padding: 10px; text-align: right;">Énergie (Wh)</th>
+                                <th style="padding: 10px; text-align: right;">Variation</th>
+                                <th style="padding: 10px; text-align: right;">%</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${sortedDates.map((date, i) => {
+                                const val = energyData[date]?.total || 0;
+                                const prevVal = i > 0 ? energyData[sortedDates[i-1]]?.total || 0 : val;
+                                const variation = i > 0 ? val - prevVal : 0;
+                                const varClass = variation > 0 ? 'color-danger' : variation < 0 ? 'color-success' : '';
+                                const percent = i > 0 && prevVal > 0 ? ((variation / prevVal) * 100).toFixed(1) : '—';
+                                
+                                return `
+                                    <tr>
+                                        <td style="padding: 8px 10px;">${date}</td>
+                                        <td style="padding: 8px 10px; text-align: right; font-weight: 500;">${val.toFixed(0)}</td>
+                                        <td style="padding: 8px 10px; text-align: right; ${varClass};">
+                                            ${i > 0 ? (variation > 0 ? '+' : '') + variation.toFixed(0) : '—'}
+                                        </td>
+                                        <td style="padding: 8px 10px; text-align: right; ${varClass};">
+                                            ${percent !== '—' ? (variation > 0 ? '+' : '') + percent + '%' : '—'}
+                                        </td>
+                                    </tr>
+                                `;
+                            }).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
     `;
+    
+    // ===== CRÉER LE GRAPHIQUE DE TENDANCE =====
+    chartManager.destroy('energyTrendChart');
+    requestAnimationFrame(() => {
+        chartManager.create('energyTrendChart', {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Énergie (Wh)',
+                    data: values,
+                    borderColor: '#3b82f6',
+                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                    fill: true,
+                    tension: 0.3,
+                    pointRadius: 2,
+                    pointHoverRadius: 5,
+                    pointBackgroundColor: values.map(v => 
+                        v === maxValue ? '#ef4444' : '#3b82f6'
+                    )
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: (context) => {
+                                const date = sortedDates[context.dataIndex];
+                                return [`${date}: ${context.raw.toFixed(0)} Wh`];
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: { 
+                        beginAtZero: true,
+                        grid: { color: '#e2e8f0' },
+                        title: { display: true, text: 'Wh' }
+                    },
+                    x: { 
+                        grid: { display: false },
+                        ticks: { 
+                            maxRotation: 45,
+                            callback: (val, idx) => idx % step === 0 ? labels[idx] : ''
+                        }
+                    }
+                },
+                elements: { point: { radius: 2 } }
+            }
+        });
+    });
 }
 
 // ===========================================
@@ -1167,3 +1559,528 @@ window.scrollToHourlyChart = function(date) {
         }
     }, 200);
 };
+
+// ===========================================
+// CYCLE DE CONSOMMATION QUOTIDIEN (avec UX améliorée)
+// ===========================================
+
+let selectedDay = 'all'; // 'all' ou une date spécifique
+
+function renderDailyEnergyCycle() {
+    const container = document.getElementById('energyCycleBoard');
+    if (!container) return;
+    
+    // ===== 1. RÉCUPÉRER LES DONNÉES =====
+    const energyData = database.energyData;
+    if (!energyData || !energyData.data || energyData.data.length === 0) {
+        container.innerHTML = '<p class="no-data">Aucune donnée énergie disponible</p>';
+        return;
+    }
+    
+    // ===== 2. DÉTERMINER LA PÉRIODE À AFFICHER =====
+    const startDate = allDates && allDates.length > 0 ? allDates[chartStartIndex] : null;
+    const endDate = allDates && allDates.length > 0 ? allDates[chartEndIndex] : null;
+    
+    // Filtrer les données selon le sélecteur
+    let filteredData = energyData.data;
+    let periodText = '';
+    
+    if (selectedDay && selectedDay !== 'all') {
+        // Mode "jour spécifique"
+        filteredData = energyData.data.filter(point => point.date === selectedDay);
+        periodText = `📅 Jour du ${selectedDay}`;
+    } else {
+        // Mode "période" (utilise la jauge)
+        if (startDate && endDate) {
+            filteredData = energyData.data.filter(point => {
+                return point.date >= startDate && point.date <= endDate;
+            });
+            periodText = `📅 Période: ${startDate} → ${endDate} (${chartEndIndex - chartStartIndex + 1} jours)`;
+        } else {
+            periodText = '📅 Toutes les données';
+        }
+    }
+    
+    // ===== 3. GROUPER PAR HEURE =====
+    const hourlyMap = {};
+    let totalPoints = 0;
+    let firstPoint = null;
+    
+    filteredData.forEach(point => {
+        if (!point.timestamp || !point.energie) return;
+        
+        // Garder un échantillon pour debug
+        if (!firstPoint) firstPoint = point;
+        
+        // Extraire l'heure du timestamp (format attendu: "2024-03-15 14:30:00")
+        const hourMatch = point.timestamp.match(/\d{4}-\d{2}-\d{2} (\d{2}):\d{2}:\d{2}/);
+        if (!hourMatch) return;
+        
+        const hour = parseInt(hourMatch[1]);
+        const hourKey = hour.toString().padStart(2, '0') + 'h';
+        totalPoints++;
+        
+        if (!hourlyMap[hourKey]) {
+            hourlyMap[hourKey] = {
+                label: hourKey,
+                hour: hour,
+                total: 0,
+                count: 0,
+                values: []
+            };
+        }
+        
+        // UNITÉ EXPLICITE: Les données sont en Wh par pas de 10 minutes
+        // Pour convertir en Wh/heure, multiplier par 6
+        const energieValue = point.energie; // Wh/10min
+        
+        hourlyMap[hourKey].total += energieValue;
+        hourlyMap[hourKey].count++;
+        hourlyMap[hourKey].values.push(energieValue);
+    });
+    
+    // Log de debug dans la console
+    if (firstPoint) {
+        console.log('🔍 [Cycle] Échantillon de donnée:', {
+            timestamp: firstPoint.timestamp,
+            energie: firstPoint.energie,
+            unité: 'Wh/10min'
+        });
+    }
+    
+    // ===== 4. VÉRIFICATION =====
+    if (totalPoints === 0) {
+        container.innerHTML = `
+            <h3 class="card-title">⚡ CYCLE DE CONSOMMATION QUOTIDIEN</h3>
+            <p class="no-data">Aucun point de données pour cette période</p>
+        `;
+        return;
+    }
+    
+    // ===== 5. TRIER PAR HEURE =====
+    const hourlyData = Object.keys(hourlyMap)
+        .sort((a, b) => {
+            const hourA = parseInt(a);
+            const hourB = parseInt(b);
+            return hourA - hourB;
+        })
+        .map(key => ({
+            ...hourlyMap[key],
+            value: hourlyMap[key].count > 0 ? hourlyMap[key].total / hourlyMap[key].count : 0,
+            min: Math.min(...(hourlyMap[key].values.length ? hourlyMap[key].values : [0])),
+            max: Math.max(...(hourlyMap[key].values.length ? hourlyMap[key].values : [0]))
+        }));
+    
+    // ===== 6. CALCULER LES STATS PAR PÉRIODE =====
+    const periods = {
+        morning: { hours: [6,7,8,9,10,11], total: 0, count: 0, label: 'Matin', icon: '🌤️', color: '#ffc107', desc: '6h-11h' },
+        afternoon: { hours: [12,13,14,15,16,17], total: 0, count: 0, label: 'Après-midi', icon: '☀️', color: '#ff5722', desc: '12h-17h' },
+        evening: { hours: [18,19,20,21], total: 0, count: 0, label: 'Soir', icon: '🌙', color: '#673ab7', desc: '18h-21h' },
+        night: { hours: [22,23,0,1,2,3,4,5], total: 0, count: 0, label: 'Nuit', icon: '🌃', color: '#2196f3', desc: '22h-5h' }
+    };
+    
+    hourlyData.forEach(h => {
+        const hour = h.hour;
+        if (hour >= 6 && hour < 12) {
+            periods.morning.total += h.value;
+            periods.morning.count++;
+        } else if (hour >= 12 && hour < 18) {
+            periods.afternoon.total += h.value;
+            periods.afternoon.count++;
+        } else if (hour >= 18 && hour < 22) {
+            periods.evening.total += h.value;
+            periods.evening.count++;
+        } else {
+            periods.night.total += h.value;
+            periods.night.count++;
+        }
+    });
+    
+    // Moyennes par période
+    const periodAverages = {
+        morning: periods.morning.count > 0 ? periods.morning.total / periods.morning.count : 0,
+        afternoon: periods.afternoon.count > 0 ? periods.afternoon.total / periods.afternoon.count : 0,
+        evening: periods.evening.count > 0 ? periods.evening.total / periods.evening.count : 0,
+        night: periods.night.count > 0 ? periods.night.total / periods.night.count : 0
+    };
+    
+    // ===== 7. STATISTIQUES GLOBALES =====
+    const values = hourlyData.map(h => h.value).filter(v => v > 0);
+    const maxValue = values.length > 0 ? Math.max(...values) : 0;
+    const maxHour = hourlyData.find(h => h.value === maxValue);
+    const avgValue = values.length > 0 ? values.reduce((a,b) => a+b,0) / values.length : 0;
+    
+    // ===== 8. CALCULER LES VARIATIONS HORAIRES =====
+    const differences = [];
+    for (let i = 1; i < hourlyData.length; i++) {
+        const prev = hourlyData[i-1];
+        const curr = hourlyData[i];
+        const diff = curr.value - prev.value;
+        differences.push({
+            fromHour: prev.label,
+            toHour: curr.label,
+            consumption: diff > 0 ? diff : 0,
+            trend: diff > 0 ? 'hausse' : diff < 0 ? 'baisse' : 'stable',
+            diffValue: diff
+        });
+    }
+    
+    // Trier pour trouver les pics d'augmentation
+    const peakHours = [...differences]
+        .filter(d => d.consumption > 0)
+        .sort((a, b) => b.consumption - a.consumption)
+        .slice(0, 3);
+    
+    // ===== 9. CONSTRUCTION DU HTML =====
+    container.innerHTML = `
+        <h3 class="card-title">⚡ CYCLE DE CONSOMMATION QUOTIDIEN</h3>
+        
+        <!-- LÉGENDE EXPLICATIVE -->
+        <div style="margin-bottom: 15px; padding: 12px; background: #f0f9ff; border-radius: 8px; font-size: 0.85rem; border-left: 4px solid #3b82f6;">
+            <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+                <span><span style="color:#f59e0b;">●</span> <strong>Courbe</strong> = consommation moyenne par heure</span>
+                <span><span style="color:#ef4444;">🔥 Pic</span> = heure avec la consommation maximale</span>
+                <span><span style="color:#8b5cf6;">⚡ Plus active</span> = plus forte augmentation entre deux heures consécutives</span>
+            </div>
+        </div>
+        
+        <!-- SÉLECTEUR DE JOUR -->
+        <div style="margin-bottom: 20px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+            <select id="daySelect" style="padding: 8px 12px; border-radius: 6px; border: 1px solid #cbd5e1; background: white; min-width: 200px;">
+                <option value="all" ${selectedDay === 'all' ? 'selected' : ''}>📊 Tous les jours (moyenne)</option>
+                ${allDates.map(date => `
+                    <option value="${date}" ${selectedDay === date ? 'selected' : ''}>${date}</option>
+                `).join('')}
+            </select>
+            <button onclick="applyDayFilter()" style="padding: 8px 16px; background: #3b82f6; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 500;">
+                Appliquer
+            </button>
+            ${selectedDay !== 'all' ? `
+                <span style="background: #e2e8f0; padding: 4px 10px; border-radius: 20px; font-size: 0.8rem;">
+                    🔍 Mode jour spécifique
+                </span>
+            ` : ''}
+        </div>
+        
+        <!-- Indicateur de période avec UNITÉ EXPLICITE -->
+        <div style="margin-bottom: 15px; padding: 8px 12px; background: #e6f0ff; border-radius: 8px; font-size: 0.9rem; color: var(--primary-dark); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
+            <span>${periodText}</span>
+            <span style="font-family: monospace; background: white; padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: 600;">
+                ⚡ Unité: Wh/10min
+            </span>
+            <span style="font-size: 0.8rem; color: #475569;">
+                ${filteredData.length} points
+            </span>
+        </div>
+        
+        <!-- NIVEAU 1: VUE D'ENSEMBLE -->
+        <div class="energy-cycle-summary">
+            <div style="margin-bottom: 10px; font-weight: 600; color: #475569;">Consommation moyenne par période (Wh/10min)</div>
+            <div class="period-stats">
+                ${Object.entries(periods).map(([key, period]) => `
+                    <div class="period-item ${key}" style="border-top-color: ${period.color};" title="${period.desc}">
+                        <span class="period-icon">${period.icon}</span>
+                        <span class="period-label">${period.label}</span>
+                        <span class="period-value">${periodAverages[key].toFixed(1)}</span>
+                    </div>
+                `).join('')}
+            </div>
+            
+            <div style="margin: 15px 0 5px; font-weight: 600; color: #475569;">Indicateurs clés</div>
+            <div class="cycle-highlights">
+                <div class="highlight-item" title="Heure avec la consommation la plus élevée">
+                    <span class="highlight-icon">🔥</span>
+                    <span class="highlight-label">Pic de conso</span>
+                    <span class="highlight-value">${maxHour ? maxHour.label : '—'} (${maxValue.toFixed(1)} Wh/10min)</span>
+                </div>
+                <div class="highlight-item" title="Consommation moyenne par heure sur la période">
+                    <span class="highlight-icon">📈</span>
+                    <span class="highlight-label">Moyenne</span>
+                    <span class="highlight-value">${avgValue.toFixed(1)} Wh/10min</span>
+                </div>
+                <div class="highlight-item" title="Plus forte augmentation entre deux heures consécutives">
+                    <span class="highlight-icon">⚡</span>
+                    <span class="highlight-label">Hausse max</span>
+                    <span class="highlight-value">${peakHours[0] ? `${peakHours[0].fromHour}→${peakHours[0].toHour} (+${peakHours[0].consumption.toFixed(1)} Wh/10min)` : '—'}</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- NIVEAU 2: BOUTON DÉTAIL + TABLEAU HORAIRE -->
+        ${createDetailButton('hourly-details-table', '📋 Voir le détail heure par heure')}
+        <div id="hourly-details-table" style="display: none; margin: 15px 0;">
+            <div style="max-height: 350px; overflow-y: auto; border: 1px solid var(--gray-200); border-radius: var(--radius-lg);">
+                <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+                    <thead style="position: sticky; top: 0; background: var(--gray-100); z-index: 10;">
+                        <tr>
+                            <th style="padding: 12px; text-align: left;">Heure</th>
+                            <th style="padding: 12px; text-align: right;">Moy (Wh/10min)</th>
+                            <th style="padding: 12px; text-align: right;">Min (Wh/10min)</th>
+                            <th style="padding: 12px; text-align: right;">Max (Wh/10min)</th>
+                            <th style="padding: 12px; text-align: right;">Variation</th>
+                            <th style="padding: 12px; text-align: center;">Tendance</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${hourlyData.map((hour, i) => {
+                            const diff = i > 0 ? differences[i-1] : null;
+                            const trendColor = diff?.trend === 'hausse' ? '#ef4444' : diff?.trend === 'baisse' ? '#22c55e' : '#64748b';
+                            const trendIcon = diff?.trend === 'hausse' ? '↑' : diff?.trend === 'baisse' ? '↓' : '→';
+                            const isPeak = maxHour && hour.label === maxHour.label;
+                            
+                            return `
+                                <tr style="${isPeak ? 'background: #fff3e0;' : ''}">
+                                    <td style="padding: 8px 12px; font-weight: ${isPeak ? '700' : '600'};">
+                                        ${hour.label} ${isPeak ? '🔥' : ''}
+                                    </td>
+                                    <td style="padding: 8px 12px; text-align: right; font-weight: ${isPeak ? '700' : '400'};">
+                                        ${hour.value.toFixed(1)}
+                                    </td>
+                                    <td style="padding: 8px 12px; text-align: right; color: #64748b;">
+                                        ${hour.min.toFixed(1)}
+                                    </td>
+                                    <td style="padding: 8px 12px; text-align: right; color: #f59e0b;">
+                                        ${hour.max.toFixed(1)}
+                                    </td>
+                                    <td style="padding: 8px 12px; text-align: right; color: ${trendColor};">
+                                        ${diff ? (diff.diffValue > 0 ? '+' : '') + diff.diffValue.toFixed(1) : '—'}
+                                    </td>
+                                    <td style="padding: 8px 12px; text-align: center; color: ${trendColor}; font-size: 1.2rem;">
+                                        ${diff ? trendIcon : '—'}
+                                    </td>
+                                </tr>
+                            `;
+                        }).join('')}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        <!-- NIVEAU 3: GRAPHIQUE -->
+        <div class="chart-container" style="margin-top: 15px;">
+            <div class="chart-wrapper" style="height: 250px;">
+                <canvas id="dailyEnergyCycleChart"></canvas>
+            </div>
+        </div>
+    `;
+    
+    // ===== 10. CRÉER LE GRAPHIQUE =====
+    createDailyEnergyCycleChart(hourlyData, periods, maxValue);
+}
+// ===========================================
+// CRÉATION DU GRAPHIQUE SUPERPOSÉ (cumul + horaire)
+// ===========================================
+
+function createDailyEnergyCycleChart(hourlyData, periods, maxValue) {
+    chartManager.destroy('dailyEnergyCycleChart');
+    
+    const ctx = document.getElementById('dailyEnergyCycleChart')?.getContext('2d');
+    if (!ctx) return;
+    
+    const labels = hourlyData.map(h => h.label);
+    const hourlyValues = hourlyData.map(h => h.value);
+    
+    let cumul = 0;
+    const cumulValues = hourlyData.map(h => {
+        cumul += h.value;
+        return cumul;
+    });
+    
+    const maxCumul = Math.max(...cumulValues);
+    
+    const backgroundColors = hourlyData.map(h => {
+        const hour = h.hour;
+        if (hour >= 6 && hour < 12) return 'rgba(255, 193, 7, 0.1)';
+        if (hour >= 12 && hour < 18) return 'rgba(255, 87, 34, 0.1)';
+        if (hour >= 18 && hour < 22) return 'rgba(103, 58, 183, 0.1)';
+        return 'rgba(33, 150, 243, 0.1)';
+    });
+    
+    requestAnimationFrame(() => {
+        chartManager.create('dailyEnergyCycleChart', {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'Consommation horaire',
+                        data: hourlyValues,
+                        type: 'bar',
+                        backgroundColor: 'rgba(59, 130, 246, 0.5)',
+                        borderColor: CHART_STYLE.colors.primary,
+                        borderWidth: 1,
+                        barPercentage: 0.7,
+                        categoryPercentage: 0.8,
+                        yAxisID: 'y-horaire',
+                        order: 2
+                    },
+                    {
+                        label: 'Consommation cumulée',
+                        data: cumulValues,
+                        borderColor: CHART_STYLE.colors.secondary,
+                        backgroundColor: 'transparent',
+                        borderWidth: 2.5,
+                        tension: 0.2,
+                        pointRadius: 3,
+                        pointHoverRadius: 5,
+                        pointBackgroundColor: CHART_STYLE.colors.secondary,
+                        pointBorderColor: 'white',
+                        pointBorderWidth: 2,
+                        yAxisID: 'y-cumul',
+                        order: 1
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: CHART_STYLE.legend,
+                    tooltip: {
+                        ...CHART_STYLE.tooltip,
+                        callbacks: {
+                            label: (context) => {
+                                const label = context.dataset.label || '';
+                                const value = context.raw;
+                                return `${label}: ${value.toFixed(1)} Wh/10min`;
+                            },
+                            afterBody: (context) => {
+                                if (context[0].datasetIndex === 0) {
+                                    const index = context[0].dataIndex;
+                                    const hour = hourlyData[index];
+                                    return [
+                                        `Min: ${hour.min.toFixed(1)} Wh/10min`,
+                                        `Max: ${hour.max.toFixed(1)} Wh/10min`
+                                    ];
+                                }
+                                return [];
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    'y-horaire': {
+                        type: 'linear',
+                        display: true,
+                        position: 'left',
+                        title: {
+                            display: true,
+                            text: 'Wh/10min',
+                            font: CHART_STYLE.fonts
+                        },
+                        grid: CHART_STYLE.grid,
+                        beginAtZero: true,
+                        ticks: { font: CHART_STYLE.fonts }
+                    },
+                    'y-cumul': {
+                        type: 'linear',
+                        display: true,
+                        position: 'right',
+                        title: {
+                            display: true,
+                            text: 'Wh (cumul)',
+                            font: CHART_STYLE.fonts
+                        },
+                        grid: { drawOnChartArea: false },
+                        beginAtZero: true,
+                        max: maxCumul * 1.1,
+                        ticks: { font: CHART_STYLE.fonts }
+                    },
+                    x: {
+                        grid: { display: false },
+                        ticks: {
+                            maxRotation: 45,
+                            minRotation: 45,
+                            font: CHART_STYLE.fonts
+                        }
+                    }
+                }
+            }
+        });
+    });
+}
+// ===========================================
+// FONCTION D'APPLICATION DU FILTRE JOUR
+// ===========================================
+
+window.applyDayFilter = function() {
+    const select = document.getElementById('daySelect');
+    if (select) {
+        selectedDay = select.value;
+        renderDailyEnergyCycle();
+    }
+};
+
+// ===========================================
+// FONCTION DE MISE À JOUR (liée à la jauge)
+// ===========================================
+
+function updateDailyEnergyCycle() {
+    // Si on est en mode "jour spécifique", on le garde
+    // Sinon on met à jour avec la nouvelle période de la jauge
+    if (selectedDay === 'all') {
+        renderDailyEnergyCycle();
+    }
+}
+chartManager.destroy('energyTrendChart');
+requestAnimationFrame(() => {
+    chartManager.create('energyTrendChart', {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Énergie journalière',
+                data: values,
+                borderColor: CHART_STYLE.colors.primary,
+                backgroundColor: 'rgba(59, 130, 246, 0.05)',
+                borderWidth: 2,
+                tension: 0.2,
+                pointRadius: 3,
+                pointHoverRadius: 6,
+                pointBackgroundColor: values.map(v => 
+                    v === maxValue ? CHART_STYLE.colors.max : CHART_STYLE.colors.primary
+                ),
+                pointBorderColor: 'white',
+                pointBorderWidth: 2,
+                fill: true
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: CHART_STYLE.legend,
+                tooltip: {
+                    ...CHART_STYLE.tooltip,
+                    callbacks: {
+                        label: (context) => {
+                            const date = sortedDates[context.dataIndex];
+                            return [`${date}: ${context.raw.toFixed(0)} Wh`];
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    grid: CHART_STYLE.grid,
+                    title: {
+                        display: true,
+                        text: 'Énergie (Wh)',
+                        font: CHART_STYLE.fonts
+                    },
+                    ticks: { font: CHART_STYLE.fonts }
+                },
+                x: {
+                    grid: { display: false },
+                    ticks: {
+                        maxRotation: 45,
+                        minRotation: 45,
+                        font: CHART_STYLE.fonts,
+                        callback: (val, idx) => idx % step === 0 ? labels[idx] : ''
+                    }
+                }
+            }
+        }
+    });
+});
