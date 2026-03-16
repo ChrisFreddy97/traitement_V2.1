@@ -483,37 +483,76 @@ function analyzeConsumptionVsForfait(client) {
     const limits = FORFAIT_LIMITS?.[forfaitName];
     const forfaitMax = limits?.max || 1;
     
+    // ✅ Récupérer les données journalières
+    const consoJournaliere = client.consommation?.journaliere || [];
+    
+    // ✅ Calculer le pourcentage de jours où la conso > forfaitMax
+    const joursDepassement = consoJournaliere.filter(j => j.valeur > forfaitMax).length;
+    const totalJours = consoJournaliere.length || 1;
+    const pourcentageDepassement = ((joursDepassement / totalJours) * 100).toFixed(1);
+    
+    // Ratio moyen
     const ratio = (consoMoyenne / forfaitMax) * 100;
     
+    // Déterminer l'adéquation avec les nouveaux critères
     let adequation = "NON DÉTERMINÉ";
     let recommandation = "";
     let couleur = "#999";
+    let priorite = "basse";
     
-    if (ratio > 90) {
-        adequation = "SOUS-DIMENSIONNÉ";
-        recommandation = "📈 Passer au forfait supérieur";
+    // Cas 1: Fort dépassement fréquent (>20% des jours)
+    if (pourcentageDepassement > 20) {
+        adequation = "FORFAIT CRITIQUE";
+        recommandation = "🔴 URGENT: Passer au forfait supérieur immédiatement";
         couleur = "#f44336";
-    } else if (ratio > 70) {
-        adequation = "ADAPTÉ (forte utilisation)";
-        recommandation = "👍 Forfait bien choisi";
+        priorite = "urgente";
+    }
+    // Cas 2: Ratio élevé + dépassements occasionnels
+    else if (ratio > 90 && pourcentageDepassement > 5) {
+        adequation = "SOUS-DIMENSIONNÉ";
+        recommandation = "📈 Passer au forfait supérieur (dépassements fréquents)";
         couleur = "#ff9800";
-    } else if (ratio > 30) {
+        priorite = "haute";
+    }
+    // Cas 3: Ratio élevé sans dépassement
+    else if (ratio > 90) {
+        adequation = "LIMITE";
+        recommandation = "⚠️ Surveiller - Proche de la limite";
+        couleur = "#ffc107";
+        priorite = "moyenne";
+    }
+    // Cas 4: Ratio moyen
+    else if (ratio > 70) {
         adequation = "ADAPTÉ";
-        recommandation = "✅ Forfait adapté";
+        recommandation = "✅ Forfait bien choisi";
         couleur = "#4CAF50";
-    } else if (ratio > 0) {
+        priorite = "basse";
+    }
+    // Cas 5: Ratio faible
+    else if (ratio > 30) {
         adequation = "SUR-DIMENSIONNÉ";
-        recommandation = "📉 Proposer forfait économique";
+        recommandation = "📉 Envisager forfait économique";
         couleur = "#2196F3";
+        priorite = "basse";
+    }
+    // Cas 6: Très faible consommation
+    else {
+        adequation = "TRÈS SUR-DIMENSIONNÉ";
+        recommandation = "📉 Proposer petit forfait";
+        couleur = "#9C27B0";
+        priorite = "info";
     }
     
     client.consumptionAnalysis = {
         consoMoyenne: consoMoyenne.toFixed(2),
         forfaitMax,
         ratio: ratio.toFixed(1) + "%",
+        joursDepassement,
+        pourcentageDepassement: pourcentageDepassement + "%",
         adequation,
         recommandation,
-        couleur
+        couleur,
+        priorite
     };
 }
 
@@ -750,30 +789,50 @@ export function calculateConsumptionFromEnergy(energyData) {
     let joursSansConso = 0;
     
     clients.forEach(client => {
-        const consoJournaliere = energyData[client.id] || [];
-        client.consommation.journaliere = consoJournaliere;
+        const rawData = energyData[client.id] || [];
+        
+        // ✅ On garde TOUS les jours, y compris ceux à 0
+        const consoJournaliere = [];
+        const joursAvecConso = [];
+        
+        for (let i = 0; i < rawData.length; i++) {
+            const jour = rawData[i];
+            consoJournaliere.push(jour); // On garde tout, même si valeur = 0
+            
+            if (jour.valeur > 0) {
+                joursAvecConso.push(jour);
+            }
+        }
+        
+        client.consommation.journaliere = consoJournaliere; // ✅ TOUS les jours
         
         if (consoJournaliere.length > 0) {
             let clientMax = 0;
             let clientSum = 0;
             let clientJoursSans = 0;
             
+            // Stats sur TOUS les jours
             for (let i = 0; i < consoJournaliere.length; i++) {
                 const val = consoJournaliere[i].valeur;
-                clientSum += val;
+                if (val > 0) {
+                    clientSum += val;
+                }
                 if (val > clientMax) clientMax = val;
                 if (val < 0.1) clientJoursSans++;
             }
             
-            const clientMoy = clientSum / consoJournaliere.length;
+            const clientMoy = joursAvecConso.length > 0 
+                ? clientSum / joursAvecConso.length 
+                : 0;
             
             client.consommation.max = clientMax;
             client.consommation.moyenne = clientMoy;
             client.consommation.joursSans = clientJoursSans;
+            client.consommation.totalJours = consoJournaliere.length;
             
             maxConso = Math.max(maxConso, clientMax);
-            minConso = Math.min(minConso, clientMoy);
-            totalConso += clientMoy;
+            minConso = Math.min(minConso, clientMoy || Infinity);
+            totalConso += clientMoy || 0;
             countConso++;
             joursSansConso += clientJoursSans;
         }

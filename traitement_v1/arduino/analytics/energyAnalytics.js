@@ -43,119 +43,6 @@ export function analyzeEnergyData() {
 }
 
 // ===========================================
-// CAS UNIQUE : CALCUL À PARTIR DE TENSION ET INTENSITÉ
-// ===========================================
-
-function calculateEnergyFromTI(tensionTable, intensiteTable) {
-    // parser et indexer tensions
-    let tensions = parseTensionData(tensionTable);
-    if (tensions.length > 1) {
-        tensions.sort((a, b) => a.timestampMs - b.timestampMs);
-    }
-
-    const intensites = parseIntensiteData(intensiteTable);
-
-    if (tensions.length === 0 || intensites.length === 0) {
-        console.warn("⚠️ Pas de données de tension ou d'intensité");
-        database.energyData = {
-            source: 'empty',
-            data: [],
-            parClient: {},
-            parDate: {},
-            stats: { max: 0, min: 0, avg: 0, total: 0 }
-        };
-        return;
-    }
-
-    // build lookup structures
-    const tensionMap = new Map(tensions.map(t => [t.timestamp, t]));
-    const sortedTimes = tensions.map(t => t.timestampMs);
-
-    const energyData = [];
-    const PAS_TEMPS = 10 / 60; // 10 minutes en heures
-    const nanoreseau = document.getElementById('nanoreseauValue')?.textContent;
-
-    intensites.forEach(intensitePoint => {
-        const timestamp = intensitePoint.timestamp;
-        const date = timestamp.split(' ')[0];
-
-        let tensionPoint = tensionMap.get(timestamp);
-        if (!tensionPoint) {
-            // recherche binaire sur le tableau trié
-            const targetMs = new Date(timestamp).getTime();
-            let lo = 0, hi = sortedTimes.length - 1;
-            let closestIdx = -1;
-            let minDiff = Infinity;
-            while (lo <= hi) {
-                const mid = Math.floor((lo + hi) / 2);
-                const diff = sortedTimes[mid] - targetMs;
-                if (Math.abs(diff) < minDiff) {
-                    minDiff = Math.abs(diff);
-                    closestIdx = mid;
-                }
-                if (diff === 0) break;
-                if (diff < 0) lo = mid + 1;
-                else hi = mid - 1;
-            }
-            if (minDiff < 3600000 && closestIdx !== -1) {
-                tensionPoint = tensions[closestIdx];
-            }
-        }
-
-        if (tensionPoint && intensitePoint.parClient) {
-            Object.entries(intensitePoint.parClient).forEach(([clientId, intensite]) => {
-                const vraiClientId = extractClientId(clientId, nanoreseau);
-                const tension = tensionPoint.parClient[clientId] || tensionPoint.moyenne;
-                if (tension && intensite > 0) {
-                    const puissance = tension * intensite;
-                    const energie = puissance * PAS_TEMPS;
-                    energyData.push({
-                        clientId: vraiClientId,
-                        originalId: clientId,
-                        timestamp,
-                        date,
-                        tension,
-                        intensite,
-                        puissance,
-                        energie: parseFloat(energie.toFixed(3))
-                    });
-                }
-            });
-        }
-    });
-
-    console.log(`✅ ${energyData.length} points d'énergie calculés`);
-    const parJour = {};
-    const parClient = {};
-
-    energyData.forEach(point => {
-        if (point.clientId === 'total') return;
-        if (!parJour[point.date]) {
-            parJour[point.date] = { total: 0, parClient: {} };
-        }
-        parJour[point.date].total += point.energie;
-        if (!parClient[point.clientId]) {
-            parClient[point.clientId] = [];
-        }
-        parClient[point.clientId].push(point);
-        if (!parJour[point.date].parClient[point.clientId]) {
-            parJour[point.date].parClient[point.clientId] = 0;
-        }
-        parJour[point.date].parClient[point.clientId] += point.energie;
-    });
-
-    database.energyData = {
-        source: 'calculated',
-        data: energyData,
-        parClient: parClient,
-        parDate: parJour,
-        stats: calculateEnergyStats(energyData)
-    };
-
-    console.log(`✅ Énergie liée à ${Object.keys(parClient).length} clients`);
-}
-
-// ===========================================
 // FONCTIONS UTILITAIRES
 // ===========================================
 
@@ -205,41 +92,7 @@ function parseTensionData(tensionTable) {
     return result;
 }
 
-function parseIntensiteData(intensiteTable) {
-    const result = [];
-    const headers = intensiteTable.header.split(';');
-    const nanoreseau = document.getElementById('nanoreseauValue')?.textContent;
-    
-    // Identifier les colonnes clients
-    const clientColumns = [];
-    headers.forEach((header, index) => {
-        const match = header.match(/Client (\d+)/i);
-        if (match) {
-            const fullId = match[1];
-            const vraiId = extractClientId(fullId, nanoreseau);
-            clientColumns.push({ index, clientId: vraiId });
-        }
-    });
-    
-    intensiteTable.data.forEach(row => {
-        const cells = row.split(';');
-        const timestamp = cells[1];
-        
-        const point = {
-            timestamp,
-            parClient: {}
-        };
-        
-        clientColumns.forEach(col => {
-            const val = parseFloat(cells[col.index]) || 0;
-            if (val > 0) point.parClient[col.clientId] = val;
-        });
-        
-        result.push(point);
-    });
-    
-    return result;
-}
+
 
 function findClosestTension(tensions, timestamp) {
     // Supposé que `tensions` est trié par timestampMs.
@@ -338,14 +191,6 @@ export function getDailyEnergy(date) {
     return parseFloat(total.toFixed(2));
 }
 
-/**
- * ============================================================================
- * ALTERNATIVE ENERGY CALCULATION (from energyCalculator.js consolidation)
- * ============================================================================
- * Alternative approach supporting direct calculation with energyPerClient
- * structure - kept for backward compatibility
- */
-
 export function getEnergyForClient(clientId) {
     // Use energyData if available (primary source), otherwise energyPerClient
     if (database.energyData?.parClient?.[clientId]) {
@@ -433,4 +278,148 @@ export function alignData(tensions, intensites) {
     });
     
     return result.sort((a, b) => `${a.date} ${a.time}`.localeCompare(`${b.date} ${b.time}`));
+}
+function parseIntensiteData(intensiteTable) {
+    const result = [];
+    const headers = intensiteTable.header.split(';');
+    const nanoreseau = document.getElementById('nanoreseauValue')?.textContent;
+    
+    // Identifier les colonnes clients
+    const clientColumns = [];
+    headers.forEach((header, index) => {
+        const match = header.match(/Client (\d+)/i);
+        if (match) {
+            const fullId = match[1];
+            const vraiId = extractClientId(fullId, nanoreseau);
+            clientColumns.push({ index, clientId: vraiId });
+        }
+    });
+    
+    intensiteTable.data.forEach(row => {
+        const cells = row.split(';');
+        const timestamp = cells[1];
+        
+        const point = {
+            timestamp,
+            parClient: {}
+        };
+        
+        clientColumns.forEach(col => {
+            const val = parseFloat(cells[col.index]) || 0;
+            point.parClient[col.clientId] = val;  // ✅ Garde même les 0
+        });
+        
+        result.push(point);
+    });
+    
+    return result;
+}
+
+function calculateEnergyFromTI(tensionTable, intensiteTable) {
+    // parser et indexer tensions
+    let tensions = parseTensionData(tensionTable);
+    if (tensions.length > 1) {
+        tensions.sort((a, b) => a.timestampMs - b.timestampMs);
+    }
+
+    const intensites = parseIntensiteData(intensiteTable);
+
+    if (tensions.length === 0 || intensites.length === 0) {
+        console.warn("⚠️ Pas de données de tension ou d'intensité");
+        database.energyData = {
+            source: 'empty',
+            data: [],
+            parClient: {},
+            parDate: {},
+            stats: { max: 0, min: 0, avg: 0, total: 0 }
+        };
+        return;
+    }
+
+    // build lookup structures
+    const tensionMap = new Map(tensions.map(t => [t.timestamp, t]));
+    const sortedTimes = tensions.map(t => t.timestampMs);
+
+    const energyData = [];
+    const PAS_TEMPS = 10 / 60; // 10 minutes en heures
+    const nanoreseau = document.getElementById('nanoreseauValue')?.textContent;
+
+    intensites.forEach(intensitePoint => {
+        const timestamp = intensitePoint.timestamp;
+        const date = timestamp.split(' ')[0];
+
+        let tensionPoint = tensionMap.get(timestamp);
+        if (!tensionPoint) {
+            // recherche binaire sur le tableau trié
+            const targetMs = new Date(timestamp).getTime();
+            let lo = 0, hi = sortedTimes.length - 1;
+            let closestIdx = -1;
+            let minDiff = Infinity;
+            while (lo <= hi) {
+                const mid = Math.floor((lo + hi) / 2);
+                const diff = sortedTimes[mid] - targetMs;
+                if (Math.abs(diff) < minDiff) {
+                    minDiff = Math.abs(diff);
+                    closestIdx = mid;
+                }
+                if (diff === 0) break;
+                if (diff < 0) lo = mid + 1;
+                else hi = mid - 1;
+            }
+            if (minDiff < 3600000 && closestIdx !== -1) {
+                tensionPoint = tensions[closestIdx];
+            }
+        }
+
+        if (tensionPoint) {  // ✅ Plus de condition intensite > 0
+            Object.entries(intensitePoint.parClient).forEach(([clientId, intensite]) => {
+                const vraiClientId = extractClientId(clientId, nanoreseau);
+                const tension = tensionPoint.parClient[clientId] || tensionPoint.moyenne;
+                if (tension) {  // On garde juste la vérification que tension existe
+                    const puissance = tension * intensite;  // intensite peut être 0
+                    const energie = puissance * PAS_TEMPS;
+                    energyData.push({
+                        clientId: vraiClientId,
+                        originalId: clientId,
+                        timestamp,
+                        date,
+                        tension,
+                        intensite,
+                        puissance,
+                        energie: parseFloat(energie.toFixed(3))
+                    });
+                }
+            });
+        }
+    });
+
+    console.log(`✅ ${energyData.length} points d'énergie calculés`);
+    const parJour = {};
+    const parClient = {};
+
+    energyData.forEach(point => {
+        if (point.clientId === 'total') return;
+        if (!parJour[point.date]) {
+            parJour[point.date] = { total: 0, parClient: {} };
+        }
+        parJour[point.date].total += point.energie;
+        if (!parClient[point.clientId]) {
+            parClient[point.clientId] = [];
+        }
+        parClient[point.clientId].push(point);
+        if (!parJour[point.date].parClient[point.clientId]) {
+            parJour[point.date].parClient[point.clientId] = 0;
+        }
+        parJour[point.date].parClient[point.clientId] += point.energie;
+    });
+
+    database.energyData = {
+        source: 'calculated',
+        data: energyData,
+        parClient: parClient,
+        parDate: parJour,
+        stats: calculateEnergyStats(energyData)
+    };
+
+    console.log(`✅ Énergie liée à ${Object.keys(parClient).length} clients`);
 }

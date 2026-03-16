@@ -8,6 +8,56 @@ import { renderCommercialDashboard } from './dashboards/commercial/CommercialDas
 import { renderEventDashboard } from './dashboards/eventDashboard.js';
 import { FORFAIT_NAMES } from './arduinoConstants.js';
 
+// Variable pour suivre l'état d'affichage des tableaux
+let tablesVisible = false;
+
+// Fonction pour afficher/masquer les tableaux
+window.toggleTablesContainer = function() {
+    const container = document.getElementById('tablesContainer');
+    const buttons = document.querySelectorAll('.toggle-tables-btn');
+    
+    if (!tablesVisible) {
+        container.style.display = 'block';
+        buttons.forEach(btn => {
+            btn.innerHTML = '📋 Masquer les tableaux détaillés';
+        });
+        tablesVisible = true;
+    } else {
+        container.style.display = 'none';
+        buttons.forEach(btn => {
+            btn.innerHTML = '📋 Afficher les tableaux détaillés';
+        });
+        tablesVisible = false;
+    }
+};
+
+// Au chargement initial, cacher les tableaux
+document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('tablesContainer').style.display = 'none';
+});
+
+// Variable pour suivre l'état d'affichage des tableaux
+window.tablesVisible = false;
+
+window.toggleTablesContainer = function() {
+    const container = document.getElementById('tablesContainer');
+    const buttons = document.querySelectorAll('.toggle-tables-btn');
+    
+    window.tablesVisible = !window.tablesVisible;
+    
+    if (window.tablesVisible) {
+        container.style.display = 'block';
+        buttons.forEach(btn => {
+            btn.innerHTML = '📋 Masquer les tableaux détaillés';
+        });
+    } else {
+        container.style.display = 'none';
+        buttons.forEach(btn => {
+            btn.innerHTML = '📋 Afficher les tableaux détaillés';
+        });
+    }
+};
+
 export function renderByTab() {
     const currentTab = document.querySelector('.tab.active')?.dataset.tab || 'Technique';
     const visibleTableIndices = [];
@@ -20,7 +70,7 @@ export function renderByTab() {
     // 🔴 1. D'ABORD sauvegarder la position de scroll
     const scrollPos = window.scrollY;
     
-    // 🔴 2. ENSUITE vider les dashboards (optionnel, mais propre)
+    // 🔴 2. ENSUITE vider les dashboards
     document.getElementById('technicalDashboard').innerHTML = '';
     document.getElementById('commercialDashboard').innerHTML = '';
     const eventDashboard = document.getElementById('eventDashboard');
@@ -38,11 +88,24 @@ export function renderByTab() {
     // 🔴 4. Rendre les tableaux
     displayTables(visibleTableIndices);
     
-    // 🔴 5. RESTAURER la position de scroll
+    // 🔴 5. MASQUER LES TABLEAUX PAR DÉFAUT À CHAQUE CHANGEMENT D'ONGLET
+    const tablesContainer = document.getElementById('tablesContainer');
+    if (tablesContainer) {
+        tablesContainer.style.display = 'none';
+    }
+    
+    // Réinitialiser l'état du bouton
+    window.tablesVisible = false;
+    const buttons = document.querySelectorAll('.toggle-tables-btn');
+    buttons.forEach(btn => {
+        btn.innerHTML = '📋 Afficher les tableaux détaillés';
+    });
+    
+    // 🔴 6. RESTAURER la position de scroll
     setTimeout(() => {
         window.scrollTo({
             top: scrollPos,
-            behavior: 'auto' // 'smooth' si vous voulez un effet doux
+            behavior: 'auto'
         });
     }, 10);
 }
