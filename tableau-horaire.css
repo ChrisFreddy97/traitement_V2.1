@@ -3353,3 +3353,80 @@ body {
         width: 100%;
     }
 }
+/* FORCER LA RÉDUCTION DE HAUTEUR POUR LE GRAPHIQUE DE TENSION */
+.all-clients-line-chart-container {
+    height: 400px !important;  /* Force 180px au lieu de 500px */
+    min-height: 400px !important;
+    max-height: 400px !important;
+    padding: 10px !important;   /* Réduit le padding */
+}
+
+/* Réduire l'espace dans le card parent */
+.main-tension-card .sub-card,
+.main-energy-card .sub-card {
+    padding: 15px !important;    /* Réduit le padding interne */
+    margin-bottom: 15px !important;
+}
+
+/* Réduire l'espace des en-têtes */
+.main-tension-card .sub-card-header,
+.main-energy-card .sub-card-header {
+    margin-bottom: 10px !important;
+    gap: 8px !important;
+}
+
+.main-tension-card .sub-card-header .sub-card-icon {
+    width: 36px !important;
+    height: 36px !important;
+}
+
+.main-tension-card .sub-card-header h4 {
+    font-size: 15px !important;
+}
+
+/* Réduire l'espace des informations système */
+.system-info {
+    padding: 6px 0 !important;
+    margin-bottom: 8px !important;
+    font-size: 11px !important;
+    gap: 12px !important;
+}
+
+/* Réduire le padding du card principal */
+.main-tension-card {
+    padding: 18px !important;
+}
+/* Animation pour l'apparition du tableau */
+#matrix-table-container {
+    animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Style pour le bouton toggle */
+#toggle-matrix-table-btn {
+    transition: all 0.3s ease;
+}
+
+#toggle-matrix-table-btn:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 20px rgba(59, 130, 246, 0.5) !important;
+}
+
+/* Style pour le compteur dans le bouton */
+#toggle-matrix-table-btn span:last-child {
+    background: rgba(255, 255, 255, 0.2);
+    padding: 4px 12px;
+    border-radius: 30px;
+    font-size: 12px;
+    font-weight: 500;
+}
