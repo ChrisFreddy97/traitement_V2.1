@@ -18,7 +18,9 @@ function createWindow() {
     },
     icon: path.join(__dirname, 'img/logo.jpg'),
     title: 'Analyseur V2',
-    show: false
+    show: false,
+    autoHideMenuBar: true,  // Cache automatiquement la barre de menu
+    menu: null              // Supprime complètement le menu
   });
 
   mainWindow.loadFile('index.html');
@@ -152,6 +154,9 @@ ipcMain.handle('upload-folder-structure', async (event, folderPath) => {
     let totalFiles = 0;
     let totalSubfolders = 0;
     let totalSize = 0;
+
+    // Dossiers autorisés (on ignore les autres + on ignore les .txt à la racine)
+    const ALLOWED_DATA_DIRS = new Set(['ENERGIE', 'EVENT', 'INT', 'RECHARGE', 'SOLDE', 'TENS']);
     
     function scanDirectory(dirPath, maxDepth = 100, currentDepth = 0) {
       if (currentDepth > maxDepth) {
@@ -174,15 +179,17 @@ ipcMain.handle('upload-folder-structure', async (event, folderPath) => {
           const stats = fs.statSync(itemPath);
           
           if (stats.isFile()) {
-            // Accepter uniquement les fichiers .txt
-            if (item.toLowerCase().endsWith('.txt')) {
-              structure.files.push(item);
-              totalFiles++;
-              totalSize += stats.size;
-            }
+            // On n'accepte PAS les .txt hors des dossiers autorisés (donc pas de fichiers à la racine)
+            continue;
           } else if (stats.isDirectory()) {
+            const dirName = String(item).toUpperCase();
+            if (!ALLOWED_DATA_DIRS.has(dirName)) {
+              // Ignorer tous les autres dossiers
+              continue;
+            }
+
             totalSubfolders++;
-            const substructure = scanDirectory(itemPath, maxDepth, currentDepth + 1);
+            const substructure = scanDirectoryAllowedTxt(itemPath, maxDepth, currentDepth + 1);
             structure.subdirs.push(substructure);
           }
         }
@@ -190,6 +197,44 @@ ipcMain.handle('upload-folder-structure', async (event, folderPath) => {
         console.error('Erreur lors de la lecture de', dirPath, error);
       }
       
+      return structure;
+    }
+
+    // Scan d'un dossier autorisé: on prend uniquement les .txt et on ignore les sous-dossiers
+    function scanDirectoryAllowedTxt(dirPath, maxDepth = 100, currentDepth = 0) {
+      if (currentDepth > maxDepth) {
+        return { name: '', files: [], subdirs: [] };
+      }
+
+      const structure = {
+        name: path.basename(dirPath),
+        files: [],
+        subdirs: []
+      };
+
+      try {
+        const items = fs.readdirSync(dirPath);
+        for (const item of items) {
+          if (item.startsWith('.')) continue;
+
+          const itemPath = path.join(dirPath, item);
+          const stats = fs.statSync(itemPath);
+
+          if (stats.isFile()) {
+            if (item.toLowerCase().endsWith('.txt')) {
+              structure.files.push(item);
+              totalFiles++;
+              totalSize += stats.size;
+            }
+          } else if (stats.isDirectory()) {
+            // Ignorer sous-dossiers (on ne prend que les dossiers autorisés de premier niveau)
+            continue;
+          }
+        }
+      } catch (error) {
+        console.error('Erreur lors de la lecture de', dirPath, error);
+      }
+
       return structure;
     }
     

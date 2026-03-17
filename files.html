@@ -30,15 +30,27 @@
                 </button>
             </div>
 
-            <!-- Section Liste des Dossiers -->
+            <!-- Section Liste des Dossiers - VERSION TABLEAU -->
             <div id="folders-list-section" class="folders-section">
                 <h2>📁 Dossiers Relèves Créés</h2>
-                <div id="folders-list" class="folders-grid">
-                    <!-- Les dossiers seront ajoutés dynamiquement ici -->
+                <div class="table-container">
+                    <table class="folders-table">
+                        <thead>
+                            <tr>
+                                <th>Dossier</th>
+                                <th>Fichiers</th>
+                                <th>Date d'ajout</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="folders-list">
+                            <!-- Les dossiers seront ajoutés dynamiquement ici -->
+                        </tbody>
+                    </table>
                 </div>
                 <div id="no-folders-message" class="no-data">
                     <p>Aucun dossier créé pour le moment</p>
-                    <p>Cliquez sur "Ajouter un nouveau dossier" pour commencer</p>
+                    <p>Cliquez sur "Ajouter un nouveau relève" pour commencer</p>
                 </div>
             </div>
         </main>

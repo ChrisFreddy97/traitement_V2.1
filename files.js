@@ -57,7 +57,7 @@ function initializeDOMElements() {
     validationHint = document.getElementById('validation-hint');
     
     // Main page elements
-    backToHomeBtn = document.getElementById('back-to-home-btn');
+    backToHomeBtn = document.getElementById('back-to-home-btn'); 
     foldersListSection = document.getElementById('folders-list-section');
     foldersListDiv = document.getElementById('folders-list');
     noFoldersMessage = document.getElementById('no-folders-message');
@@ -68,7 +68,7 @@ function initializeDOMElements() {
 
 function setupEventListeners() {
     // Modal events
-    openAddModalBtn.addEventListener('click', openAddModal);
+    openAddModalBtn.addEventListener('click', openAddModal); 
     closeModal.addEventListener('click', closeAddModal);
     cancelModalBtn.addEventListener('click', closeAddModal);
     
@@ -170,71 +170,94 @@ function displayFoldersList() {
     
     // Trier par date (plus récent en premier)
     savedFolders.sort((a, b) => new Date(b.date) - new Date(a.date));
-    updateFolderColors();
     
-    savedFolders.forEach((folder, index) => {
-        const folderCard = createFolderCard(folder);
-        if (index === 0) {
-            folderCard.classList.add('new-folder');
-        }
-        foldersListDiv.appendChild(folderCard);
+    savedFolders.forEach((folder) => {
+        const folderRow = createFolderRow(folder);
+        foldersListDiv.appendChild(folderRow);
+    });
+    
+    // Ajouter les écouteurs d'événements
+    addTableEventListeners();
+}
+function addTableEventListeners() {
+    // Écouteurs pour les boutons Analyser
+    document.querySelectorAll('.analyze-folder-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const nr = btn.dataset.nr;
+            analyzeExistingFolder(nr);
+        });
+    });
+    
+    // Écouteurs pour les boutons Avancée
+    document.querySelectorAll('.advanced-folder-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const nr = btn.dataset.nr;
+            openAdvancedAnalysis(nr);
+        });
+    });
+    
+    // Écouteurs pour les boutons Supprimer
+    document.querySelectorAll('.delete-folder-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const nr = btn.dataset.nr;
+            deleteFolder(nr);
+        });
     });
 }
-
-function createFolderCard(folder) {
-    const folderCard = document.createElement('div');
-    folderCard.className = 'folder-card';
+function createFolderRow(folder) {
+    const row = document.createElement('tr');
+    row.className = 'folder-row';
     
-    // Appliquer la couleur si le nom est en double
-    const backgroundColor = folderColors.get(folder.nr);
-    if (backgroundColor) {
-        folderCard.style.borderLeft = `4px solid ${darkenColor(backgroundColor, 30)}`;
-        folderCard.style.background = `linear-gradient(135deg, ${lightenColor(backgroundColor, 95)} 0%, ${lightenColor(backgroundColor, 90)} 100%)`;
+    // Formatage de la date
+    let displayDate = folder.date;
+    try {
+        const dateObj = new Date(folder.date);
+        if (!isNaN(dateObj.getTime())) {
+            displayDate = dateObj.toLocaleDateString('fr-FR', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+    } catch (e) {
+        // Garder la date originale en cas d'erreur
     }
     
-    folderCard.innerHTML = `
-        <div class="folder-header">
-            <div class="folder-main-info">
-                <div class="folder-icon">📁</div>
-                <div class="folder-info">
-                    <div class="folder-name">Dossier NR${folder.nr}</div>
-                    <div class="folder-details">
-                        <div class="folder-date">${folder.date}</div>
-                        <div class="folder-stats">${folder.filesCount} fichier(s)</div>
-                    </div>
-                </div>
-            </div>
-            <div class="folder-actions">
-                <button class="btn btn-primary btn-small analyze-folder-btn" data-nr="${folder.nr}">
-                    📊 Analyser
-                </button>
-                <button class="btn btn-warning btn-small advanced-folder-btn" data-nr="${folder.nr}">
-                    📈 Avancée
-                </button>
-                <button class="btn btn-danger btn-small delete-folder-btn" data-nr="${folder.nr}">
-                    🗑️ Supprimer
-                </button>
-            </div>
-        </div>
+    const fileText = folder.filesCount === 1 ? 'fichier' : 'fichiers';
+    
+    row.innerHTML = `
+        <td class="folder-name-cell">
+            <span class="folder-icon">📁</span>
+            <span class="folder-name">NR${folder.nr}</span>
+        </td>
+        <td class="folder-files-cell">
+            ${folder.filesCount} ${fileText}
+        </td>
+        <td class="folder-date-cell">
+            ${displayDate}
+        </td>
+        <td class="folder-actions-cell">
+            <button class="btn btn-primary btn-small advanced-folder-btn" data-nr="${folder.nr}" title="Analyse avancée">
+                📈 Avancée
+            </button>
+            <button class="btn btn-danger btn-small delete-folder-btn" data-nr="${folder.nr}" title="Supprimer ce dossier">
+                🗑️ Supprimer
+            </button>
+            <button class="btn btn-primary btn-small analyze-folder-btn" data-nr="${folder.nr}" title="Analyser ce dossier" disabled>
+                ▶️ Analyser 
+            </button>
+        </td>
     `;
     
-    // Événements
-    folderCard.querySelector('.analyze-folder-btn').addEventListener('click', (e) => {
-        e.stopPropagation();
-        analyzeExistingFolder(folder.nr);
-    });
-    
-    folderCard.querySelector('.advanced-folder-btn').addEventListener('click', (e) => {
-        e.stopPropagation();
-        openAdvancedAnalysis(folder.nr);
-    });
-    
-    folderCard.querySelector('.delete-folder-btn').addEventListener('click', (e) => {
-        e.stopPropagation();
-        deleteFolder(folder.nr);
-    });
-    
-    return folderCard;
+    return row;
 }
 
 function updateFolderColors() {
@@ -455,7 +478,7 @@ function askNRConfirmation(nr) {
         confirmModal.innerHTML = `
             <div class="modal confirm-modal">
                 <div class="modal-header">
-                    <h3>⚠️ Confirmation du numéro NR</h3>
+                    <h3>Confirmation du numéro NR</h3>
                 </div>
                 <div class="modal-body">
                     <div class="confirm-content">
@@ -468,10 +491,10 @@ function askNRConfirmation(nr) {
                 </div>
                 <div class="modal-footer">
                     <button id="confirm-nr-yes" class="btn btn-success">
-                        ✅ Oui, c'est le bon numéro
+                        Oui, c'est le bon numéro
                     </button>
                     <button id="confirm-nr-no" class="btn btn-danger">
-                        ❌ Non, annuler
+                        Non, annuler
                     </button>
                 </div>
             </div>
@@ -1078,7 +1101,7 @@ function askFinalConfirmation(nr) {
         confirmModal.innerHTML = `
             <div class="modal confirm-modal final-confirm">
                 <div class="modal-header">
-                    <h3>⚠️ Confirmation finale</h3>
+                    <h3>Confirmation finale</h3>
                 </div>
                 <div class="modal-body">
                     <div class="confirm-content">

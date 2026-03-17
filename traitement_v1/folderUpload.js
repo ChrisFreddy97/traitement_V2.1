@@ -7,9 +7,9 @@ let selectedFiles = new Set();
 let detectedNrNumber = null;
 
 // Éléments DOM
-let openUploadModalBtn, openArduinoPageBtn, uploadFolderModal, closeModal, cancelUploadModalBtn; // AJOUT: openArduinoPageBtn
+let openUploadModalBtn, uploadFolderModal, closeModal, cancelUploadModalBtn;
 let selectFolderBtn, selectedFolderInfo, folderAnalysisSection;
-let folderNameInput, validateUploadBtn; // RETIRÉ: folderDescriptionInput
+let folderNameInput, validateUploadBtn; // RETIRÉ: folderDescriptionInput 
 let foldersListDiv, noFoldersMessage, folderSearchInput;
 let subfolderCountEl, fileCountEl, selectedFilesCountEl, folderTreeEl;
 let progressContainer, progressFill, progressText;
@@ -18,6 +18,13 @@ let detailsFolderName, detailsDate, detailsFileCount, detailsSize, detailsFileLi
 let selectAllFilesBtn, deselectAllFilesBtn, selectLastThreeBtn;
 let nrExtractionInfo, detectedNrEl, useDetectedNrBtn;
 let nrConfirmationModal, confirmNrYesBtn, confirmNrNoBtn, confirmationNrNumberEl;
+
+const ALLOWED_DATA_DIRS = ['ENERGIE', 'EVENT', 'INT', 'RECHARGE', 'SOLDE', 'TENS'];
+
+// Gestion confirmation NR (une seule confirmation par valeur)
+let nrConfirmedValue = null; // ex: "NR1234"
+let pendingUploadAfterNrConfirm = false;
+let pendingNrValue = null; // ex: "NR1234"
 
 // ==================== INITIALISATION ====================
 
@@ -37,7 +44,6 @@ function initializeApp() {
 function initializeDOMElements() {
     // Modal elements
     openUploadModalBtn = document.getElementById('open-upload-modal-btn');
-    openArduinoPageBtn = document.getElementById('open-arduino-page-btn'); // NOUVEAU
     uploadFolderModal = document.getElementById('upload-folder-modal');
     closeModal = uploadFolderModal.querySelector('.close');
     cancelUploadModalBtn = document.getElementById('cancel-upload-modal-btn');
@@ -97,14 +103,13 @@ function initializeDOMElements() {
     const backBtn = document.getElementById('back-to-home-btn');
     if (backBtn) {
         backBtn.addEventListener('click', () => {
-            window.location.href = '../home.html';
+            window.location.href = 'index.html';
         });
     }
 }
 function setupEventListeners() {
     // Modal
     openUploadModalBtn.addEventListener('click', openUploadModal);
-    openArduinoPageBtn.addEventListener('click', openArduinoPage); // NOUVEAU
     closeModal.addEventListener('click', closeUploadModal);
     cancelUploadModalBtn.addEventListener('click', closeUploadModal);
     uploadFolderModal.addEventListener('click', (e) => {
@@ -113,7 +118,11 @@ function setupEventListeners() {
     
     // Upload
     selectFolderBtn.addEventListener('click', selectFolder);
-    folderNameInput.addEventListener('input', validateForm);
+    folderNameInput.addEventListener('input', () => {
+        // Si l'utilisateur modifie le NR, on invalide la confirmation précédente
+        nrConfirmedValue = null;
+        validateForm();
+    });
     validateUploadBtn.addEventListener('click', uploadFolder);
     
     // Selection buttons
@@ -160,6 +169,9 @@ function resetUploadForm() {
     folderStructure = null;
     selectedFiles.clear();
     detectedNrNumber = null;
+    nrConfirmedValue = null;
+    pendingUploadAfterNrConfirm = false;
+    pendingNrValue = null;
     selectedFolderInfo.innerHTML = '';
     folderAnalysisSection.classList.remove('show');
     folderNameInput.value = '';
@@ -250,14 +262,30 @@ function closeNrConfirmationModal() {
 }
 
 function confirmNrYes() {
-    console.log('✅ Utilisateur a confirmé le NR:', detectedNrNumber);
+    const current = normalizeNrInput(folderNameInput.value);
+    console.log('✅ Utilisateur a confirmé le NR:', current);
     closeNrConfirmationModal();
-    showSuccessMessage(`N°NR ${detectedNrNumber} confirmé`);
+    nrConfirmedValue = current;
+
+    // Si on était en train de valider un upload, on continue directement
+    if (pendingUploadAfterNrConfirm) {
+        pendingUploadAfterNrConfirm = false;
+        const nrToUse = pendingNrValue || current;
+        pendingNrValue = null;
+        void uploadFolderCore(nrToUse);
+        return;
+    }
+
+    const nrNumber = current.replace(/NR/i, '');
+    showSuccessMessage(`N°NR ${nrNumber} confirmé`);
 }
 
 function confirmNrNo() {
     console.log('❌ Utilisateur veut modifier le NR');
     closeNrConfirmationModal();
+    nrConfirmedValue = null;
+    pendingUploadAfterNrConfirm = false;
+    pendingNrValue = null;
     folderNameInput.focus();
     folderNameInput.select();
 }
@@ -345,7 +373,8 @@ async function addFileDatesToStructure(structure, basePath) {
       })
     );
     
-    structure.filesWithDates.sort((a, b) => b.timestamp - a.timestamp);
+    // Tri: par numéro croissant (ENERGIE2 < ENERGIE10), puis fallback
+    structure.filesWithDates.sort((a, b) => compareDataFilenames(a.name, b.name));
   }
   
   if (structure.subdirs && structure.subdirs.length > 0) {
@@ -354,6 +383,52 @@ async function addFileDatesToStructure(structure, basePath) {
       await addFileDatesToStructure(subdir, subdirPath);
     }
   }
+}
+
+function parseDataFilename(filename) {
+  const m = String(filename).match(/^(ENERGIE|EVENT|INT|RECHARGE|SOLDE|TENS)\s*(\d+)\.txt$/i);
+  if (!m) return null;
+  return { type: m[1].toUpperCase(), num: Number(m[2]) };
+}
+
+function compareDataFilenames(aName, bName) {
+  const a = parseDataFilename(aName);
+  const b = parseDataFilename(bName);
+
+  // Si on est bien sur des fichiers typés, on trie numériquement croissant
+  if (a && b && a.type === b.type) {
+    const diff = a.num - b.num;
+    if (diff !== 0) return diff;
+  }
+
+  // Sinon, tri "naturel" (ENERGIE2 < ENERGIE10) + insensitive
+  return String(aName).localeCompare(String(bName), 'fr-FR', { numeric: true, sensitivity: 'base' });
+}
+
+function buildFileIndexFromStructure(structure, basePath) {
+  const index = new Map();
+
+  function walk(node, currentPath) {
+    if (node?.filesWithDates?.length) {
+      for (const f of node.filesWithDates) {
+        const absPath = `${currentPath}/${f.name}`;
+        index.set(absPath, {
+          name: f.name,
+          date: f.date,
+          timestamp: f.timestamp
+        });
+      }
+    }
+
+    if (node?.subdirs?.length) {
+      for (const sub of node.subdirs) {
+        walk(sub, `${currentPath}/${sub.name}`);
+      }
+    }
+  }
+
+  walk(structure, basePath);
+  return index;
 }
 
 function displaySelectedFolder() {
@@ -374,17 +449,20 @@ function displayFolderAnalysis(analysisData) {
     displayFolderTreeWithCheckboxes(folderStructure, currentSelectedFolder);
     
     folderAnalysisSection.classList.add('show');
+
+    // Par défaut: sélectionner tous les fichiers automatiquement (sans popup)
+    selectAllFiles({ silent: true });
     
     validateForm();
 }
 
 function displayFolderTreeWithCheckboxes(structure, basePath, indent = '') {
     let html = '';
-    
-    const systemFolders = ['Racine', 'DEBUG', 'FONC', 'INIT', 'SERIAL', 'SYSTEM'];
+
+    const allowedFoldersSet = new Set(ALLOWED_DATA_DIRS);
     
     function renderSubdir(subdir, path, level = 0) {
-        if (systemFolders.includes(subdir.name)) {
+        if (!allowedFoldersSet.has(String(subdir.name).toUpperCase())) {
             return;
         }
         
@@ -441,51 +519,9 @@ function displayFolderTreeWithCheckboxes(structure, basePath, indent = '') {
         html += `</div>`;
     }
     
-    if (structure.name && systemFolders.includes(structure.name)) {
-        return;
-    }
-    
-    if (structure.filesWithDates && structure.filesWithDates.length > 0) {
-        html += `<div class="tree-folder-item">`;
-        html += `<div class="tree-folder-header">`;
-        html += `<span>📁 ${structure.name}</span>`;
-        html += `<span class="tree-folder-name"></span>`;
-        
-        html += `<label class="checkbox-container folder-checkbox">
-            <input type="checkbox" class="folder-select-all" data-folder-path="${basePath}">
-            <span class="checkmark"></span>
-            <span style="margin-left: 5px; font-size: 11px;">Tout sélectionner</span>
-        </label>`;
-        
-        html += `</div>`;
-        html += `<div class="tree-files-list">`;
-        
-        structure.filesWithDates.forEach((file) => {
-            const filePath = `${basePath}/${file.name}`;
-            const displayPath = file.name;
-            const formattedDate = file.date !== 'Date inconnue' 
-                ? new Date(file.date).toLocaleDateString('fr-FR') 
-                : 'Date inconnue';
-            
-            html += `<div class="tree-file-item">`;
-            html += `<label class="checkbox-container file-checkbox">
-                <input type="checkbox" class="file-select" 
-                       data-file-path="${filePath}" 
-                       data-display-path="${displayPath}">
-                <span class="checkmark"></span>
-            </label>`;
-            html += `<span class="file-name">📄 ${file.name}</span>`;
-            html += `<span class="file-date">${formattedDate}</span>`;
-            html += `</div>`;
-        });
-        
-        html += `</div>`;
-        html += `</div>`;
-    }
-    
     if (structure.subdirs && structure.subdirs.length > 0) {
-        const filteredSubdirs = structure.subdirs.filter(subdir => 
-            !systemFolders.includes(subdir.name)
+        const filteredSubdirs = structure.subdirs.filter(subdir =>
+            allowedFoldersSet.has(String(subdir.name).toUpperCase())
         );
         
         filteredSubdirs.forEach(subdir => {
@@ -561,7 +597,8 @@ function addCheckboxEventListeners() {
 
 // ==================== SÉLECTION DE FICHIERS ====================
 
-function selectAllFiles() {
+function selectAllFiles(options = {}) {
+    const { silent = false } = options;
     const fileCheckboxes = document.querySelectorAll('.file-select');
     fileCheckboxes.forEach(checkbox => {
         checkbox.checked = true;
@@ -591,7 +628,9 @@ function selectAllFiles() {
     
     updateSelectedFilesCount();
     validateForm();
-    showSuccessMessage(`${selectedFiles.size} fichiers sélectionnés`);
+    if (!silent) {
+        showSuccessMessage(`${selectedFiles.size} fichiers sélectionnés`);
+    }
 }
 
 function deselectAllFiles() {
@@ -614,10 +653,10 @@ function deselectAllFiles() {
 function selectLastThreeFiles() {
     deselectAllFiles();
     
-    const systemFolders = ['Racine', 'DEBUG', 'FONC', 'INIT', 'SERIAL', 'SYSTEM'];
+    const allowedFoldersSet = new Set(ALLOWED_DATA_DIRS);
     
     function selectLastThreeInStructure(structure) {
-        if (systemFolders.includes(structure.name)) {
+        if (!allowedFoldersSet.has(String(structure.name).toUpperCase())) {
             return;
         }
         
@@ -720,8 +759,15 @@ function validateForm() {
 }
 
 function validateNrFormat(nrValue) {
-    const nrRegex = /^NR\d{1,4}$/i;
-    return nrRegex.test(nrValue);
+    const nrRegex = /^NR\s*\d{1,4}$/i;
+    return nrRegex.test(String(nrValue || '').trim());
+}
+
+function normalizeNrInput(nrValue) {
+    const v = String(nrValue || '').trim();
+    const m = v.match(/^NR\s*(\d{1,4})$/i);
+    if (!m) return v.toUpperCase();
+    return `NR${m[1]}`;
 }
 
 // ==================== UPLOAD DOSSIER ====================
@@ -733,79 +779,103 @@ async function uploadFolder() {
             return;
         }
         
-        const nrValue = folderNameInput.value.trim();
-        if (!validateNrFormat(nrValue)) {
+        const nrRaw = folderNameInput.value.trim();
+        if (!validateNrFormat(nrRaw)) {
             showErrorMessage('Format NR incorrect. Utilisez "NR" suivi de 1 à 4 chiffres (ex: NR3125)');
             return;
         }
+
+        const nrValue = normalizeNrInput(nrRaw);
+        folderNameInput.value = nrValue; // normaliser visuellement (NR 1234 -> NR1234)
         
-        const nrNumber = nrValue.replace(/NR/i, '');
-        const confirmUpload = confirm(`Confirmez-vous que le N°NR ${nrNumber} est correct pour ce dossier ?\n\nSi ce n'est pas le bon numéro, cliquez sur "Annuler" pour modifier.`);
-        
-        if (!confirmUpload) {
-            console.log('❌ Upload annulé par l\'utilisateur');
+        // Une seule confirmation: si pas encore confirmé (ou NR changé), on affiche le modal puis on reprend l'upload
+        if (!nrConfirmedValue || nrConfirmedValue !== nrValue) {
+            pendingUploadAfterNrConfirm = true;
+            pendingNrValue = nrValue;
+            showNrConfirmationModal(nrValue.replace(/NR/i, ''));
             return;
         }
-        
-        console.log('📤 Début de l\'upload...');
-        console.log(`📄 ${selectedFiles.size} fichiers à uploader`);
-        console.log(`🔢 N°NR: ${nrValue}`);
-        
-        const filesCount = selectedFiles.size;
-        
-        const filteredStructure = filterStructureToSelectedFiles(folderStructure, selectedFiles);
-        
-        // STRUCTURE SIMPLIFIÉE - PAS DE DESCRIPTION
-        const folderData = {
-            name: nrValue, // Juste le NR
-            folderPath: currentSelectedFolder,
-            selectedFiles: Array.from(selectedFiles),
-            structure: filteredStructure,
-            date: new Date().toLocaleString('fr-FR'),
-            totalFiles: filesCount,
-            totalSize: await calculateTotalSize(),
-            id: generateID()
-        };
-        
-        progressContainer.classList.add('show');
-        progressFill.style.width = '0%';
-        progressText.textContent = 'Préparation de l\'upload...';
-        
-        let progress = 0;
-        const progressInterval = setInterval(() => {
-            progress += Math.random() * 30;
-            if (progress > 90) progress = 90;
-            updateProgress(progress);
-        }, 300);
-        
-        const result = await window.electronAPI.uploadSelectedFiles(folderData);
-        
-        clearInterval(progressInterval);
-        
-        if (!result.success) {
-            throw new Error(result.error || 'Erreur lors de l\'upload');
-        }
-        
-        updateProgress(100);
-        progressText.textContent = '✅ Upload réussi!';
-        
-        const storageKey = `upload_folder_${folderData.id}`;
-        localStorage.setItem(storageKey, JSON.stringify(folderData));
-        
-        setTimeout(() => {
-            closeUploadModal();
-            loadUploadedFolders();
-            updateStats();
-            showSuccessMessage(`${filesCount} fichiers uploadés avec succès sous le N°NR ${nrNumber}! 🎉`);
-        }, 1000);
-        
-        console.log('✅ Upload réussi');
+
+        await uploadFolderCore(nrValue);
         
     } catch (error) {
         console.error('❌ Erreur upload:', error);
         progressContainer.classList.remove('show');
         showErrorMessage('Erreur lors de l\'upload: ' + error.message);
     }
+}
+
+async function uploadFolderCore(nrValue) {
+    console.log('📤 Début de l\'upload...');
+    console.log(`📄 ${selectedFiles.size} fichiers à uploader`);
+    console.log(`🔢 N°NR: ${nrValue}`);
+
+    const nrNumber = nrValue.replace(/NR/i, '');
+    const filesCount = selectedFiles.size;
+
+    const filteredStructure = filterStructureToSelectedFiles(folderStructure, selectedFiles);
+
+    // Enrichir + trier la liste des fichiers sélectionnés
+    const fileIndex = buildFileIndexFromStructure(folderStructure, currentSelectedFolder);
+    const selectedFilesSorted = Array.from(selectedFiles)
+      .map((f) => {
+        const meta = fileIndex.get(f.path);
+        return {
+          ...f,
+          date: meta?.date ?? null,
+          timestamp: meta?.timestamp ?? 0
+        };
+      })
+      .sort((a, b) => {
+        const aName = String(a.displayPath || a.path || '').split(/[\\/]/).pop();
+        const bName = String(b.displayPath || b.path || '').split(/[\\/]/).pop();
+        return compareDataFilenames(aName, bName);
+      });
+
+    const folderData = {
+        name: nrValue, // normalisé (NR1234)
+        folderPath: currentSelectedFolder,
+        selectedFiles: selectedFilesSorted,
+        structure: filteredStructure,
+        date: new Date().toLocaleString('fr-FR'),
+        totalFiles: filesCount,
+        totalSize: await calculateTotalSize(),
+        id: generateID()
+    };
+
+    progressContainer.classList.add('show');
+    progressFill.style.width = '0%';
+    progressText.textContent = 'Préparation de l\'upload...';
+
+    let progress = 0;
+    const progressInterval = setInterval(() => {
+        progress += Math.random() * 30;
+        if (progress > 90) progress = 90;
+        updateProgress(progress);
+    }, 300);
+
+    const result = await window.electronAPI.uploadSelectedFiles(folderData);
+
+    clearInterval(progressInterval);
+
+    if (!result.success) {
+        throw new Error(result.error || 'Erreur lors de l\'upload');
+    }
+
+    updateProgress(100);
+    progressText.textContent = '✅ Upload réussi!';
+
+    const storageKey = `upload_folder_${folderData.id}`;
+    localStorage.setItem(storageKey, JSON.stringify(folderData));
+
+    setTimeout(() => {
+        closeUploadModal();
+        loadUploadedFolders();
+        updateStats();
+        showSuccessMessage(`${filesCount} fichiers uploadés avec succès sous le N°NR ${nrNumber}! 🎉`);
+    }, 1000);
+
+    console.log('✅ Upload réussi');
 }
 
 function filterStructureToSelectedFiles(structure, selectedFilesSet) {
@@ -930,9 +1000,91 @@ function displayFoldersList() {
     noFoldersMessage.style.display = 'none';
     
     uploadedFolders.forEach((folder) => {
-        const folderCard = createFolderCard(folder);
-        foldersListDiv.appendChild(folderCard);
+        const folderRow = createFolderRow(folder);
+        foldersListDiv.appendChild(folderRow);
     });
+    
+    // Ajouter les écouteurs d'événements APRÈS avoir ajouté les lignes au DOM
+    addTableEventListeners();
+}
+function addTableEventListeners() {
+    // Écouteurs pour les boutons Analyser
+    document.querySelectorAll('.analyze-folder-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const folderId = btn.dataset.folderId;
+            const folder = uploadedFolders.find(f => f.id === folderId);
+            if (folder) {
+                openAnalyzeFolder(folder);
+            } else {
+                console.error('Dossier non trouvé:', folderId);
+                showErrorMessage('Dossier non trouvé');
+            }
+        });
+    });
+    
+    // Écouteurs pour les boutons Supprimer
+    document.querySelectorAll('.delete-folder-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const folderId = btn.dataset.folderId;
+            if (folderId) {
+                confirmDeleteFolder(folderId);
+            } else {
+                console.error('ID de dossier manquant');
+                showErrorMessage('Erreur: ID de dossier manquant');
+            }
+        });
+    });
+}
+function createFolderRow(folder) {
+    const row = document.createElement('tr');
+    row.className = 'folder-row';
+    
+    const nrNumber = folder.name.replace(/NR/i, '');
+    const fileText = folder.totalFiles === 1 ? 'fichier' : 'fichiers';
+    
+    // Formatage de la date
+    let displayDate = folder.date;
+    try {
+        const dateObj = new Date(folder.date);
+        if (!isNaN(dateObj.getTime())) {
+            displayDate = dateObj.toLocaleDateString('fr-FR', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+    } catch (e) {
+        // Garder la date originale en cas d'erreur
+    }
+    
+    row.innerHTML = `
+        <td class="folder-name-cell">
+            <span class="folder-icon">📁</span>
+            <span class="folder-name">NR${nrNumber}</span>
+        </td>
+        <td class="folder-files-cell">
+            ${folder.totalFiles} ${fileText}
+        </td>
+        <td class="folder-date-cell">
+            ${displayDate}
+        </td>
+        <td class="folder-actions-cell">
+            <button class="btn btn-primary btn-small analyze-folder-btn" data-folder-id="${folder.id}" title="Analyser ce dossier">
+                📊 Analyser
+            </button>
+            <button class="btn btn-danger btn-small delete-folder-btn" data-folder-id="${folder.id}" title="Supprimer ce dossier">
+                🗑️ Supprimer
+            </button>
+        </td>
+    `;
+    
+    return row;
 }
 
 function createFolderCard(folder) {
@@ -1027,7 +1179,14 @@ function displaySelectedFilesInDetails(selectedFiles) {
     let html = '';
     
     if (selectedFiles && selectedFiles.length > 0) {
-        selectedFiles.forEach(file => {
+        const sorted = [...selectedFiles].sort((a, b) => {
+            // Si les displayPath sont du type ENERGIE12.txt, EVENT3.txt, etc, on trie numériquement
+            const aName = String(a.displayPath || a.path || '');
+            const bName = String(b.displayPath || b.path || '');
+            return compareDataFilenames(aName.split(/[\\/]/).pop(), bName.split(/[\\/]/).pop());
+        });
+        
+        sorted.forEach(file => {
             html += `
                 <div class="file-item">
                     📄 ${escapeHtml(file.displayPath)}
@@ -1047,31 +1206,49 @@ function closeFolderDetailsModal() {
 }
 
 // ==================== SUPPRESSION ====================
-
 function confirmDeleteFolder(folderId) {
-    if (confirm('Êtes-vous sûr de vouloir supprimer ce dossier? Cette action est irréversible.')) {
-        deleteFolder(folderId);
+    console.log('🗑️ Tentative de suppression du dossier:', folderId);
+    
+    // Trouver le dossier pour afficher son nom dans la confirmation
+    const folder = uploadedFolders.find(f => f.id === folderId);
+    const folderName = folder ? folder.name : 'ce dossier';
+    
+    if (confirm(`Êtes-vous sûr de vouloir supprimer ${folderName} ? Cette action est irréversible.`)) {
+        deleteFolderById(folderId);
     }
 }
-
-function deleteFolder() {
-    const folderId = deleteFolderBtn.dataset.folderId;
-    if (!folderId) return;
+// Nouvelle fonction pour supprimer par ID
+function deleteFolderById(folderId) {
+    console.log('🗑️ Suppression du dossier:', folderId);
     
     try {
+        // Supprimer du localStorage
         const key = `upload_folder_${folderId}`;
         localStorage.removeItem(key);
         
-        closeFolderDetailsModal();
+        // Mettre à jour la liste des dossiers
         loadUploadedFolders();
+        
+        // Mettre à jour les statistiques
         updateStats();
         
+        // Fermer le modal de détails s'il est ouvert
+        if (folderDetailsModal && !folderDetailsModal.classList.contains('hidden')) {
+            closeFolderDetailsModal();
+        }
+        
         showSuccessMessage('Dossier supprimé avec succès');
-        console.log('✅ Dossier supprimé:', folderId);
+        console.log('✅ Dossier supprimé avec succès');
         
     } catch (error) {
-        console.error('❌ Erreur suppression:', error);
-        showErrorMessage('Erreur lors de la suppression du dossier');
+        console.error('❌ Erreur lors de la suppression:', error);
+        showErrorMessage('Erreur lors de la suppression du dossier: ' + error.message);
+    }
+}
+function deleteFolder() {
+    const folderId = deleteFolderBtn.dataset.folderId;
+    if (folderId) {
+        deleteFolderById(folderId);
     }
 }
 

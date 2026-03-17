@@ -8,7 +8,7 @@
 </head>
 <body>
     <div class="container">
-        <header class="upload-header">
+        <header class="upload-header"> 
             <div class="header-content">
                 <h1>📊 Gestion des Relèves V1</h1>
                 <button id="back-to-home-btn" class="btn btn-secondary">
@@ -39,27 +39,36 @@
             <div class="add-folder-section">
                 <div class="upload-mode-buttons">
                     <button id="open-upload-modal-btn" class="btn btn-primary btn-large">
-                        ➕ Relève Copie carte SD
-                    </button>
-                    <button id="open-arduino-page-btn" class="btn btn-info btn-large">
-                        🔧 Relève Arduino IDE
+                        ➕ Ajouter un nouveau relève
                     </button>
                 </div>
             </div>
 
-            <!-- Section Liste des Dossiers uploadés -->
+            <!-- Section Liste des Dossiers uploadés - VERSION SIMPLIFIÉE -->
             <div id="folders-list-section" class="folders-section">
                 <h2>📁 Dossiers Relèves Créés</h2>
-                <div id="folders-list" class="folders-grid">
-                    <!-- Les dossiers seront ajoutés dynamiquement ici -->
+                <div class="table-container">
+                    <table class="folders-table">
+                        <thead>
+                            <tr>
+                                <th>Dossier</th>
+                                <th>Fichiers</th>
+                                <th>Date d'ajout</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="folders-list">
+                            <!-- Les dossiers seront ajoutés dynamiquement ici -->
+                        </tbody>
+                    </table>
                 </div>
                 <div id="no-folders-message" class="no-data">
                     <p>Aucun dossier uploadé pour le moment</p>
-                    <p>Cliquez sur un bouton ci-dessus pour commencer</p>
+                    <p>Cliquez sur "Ajouter un nouveau relève" pour commencer</p>
                 </div>
             </div>
         </main>
-    </div>
+    </div> 
 
     <!-- Modal d'upload de dossier -->
     <div id="upload-folder-modal" class="modal hidden">
