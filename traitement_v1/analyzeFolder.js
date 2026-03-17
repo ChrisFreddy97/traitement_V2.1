@@ -6331,35 +6331,30 @@ function storeEnergyFile(filename, fullPath, content) {
     const folderPath = fullPath.substring(0, fullPath.lastIndexOf('/'));
     const lines = parseCSVContent(content, 'ENERGIE');
     energyData.push({ filename, path: fullPath, folder: folderPath || 'Racine', content, lines, type: 'ENERGIE' });
-    if (lines.length > 0) updateCombinedTables();
 }
 
 function storeTensionFile(filename, fullPath, content) {
     const folderPath = fullPath.substring(0, fullPath.lastIndexOf('/'));
     const lines = parseCSVContent(content, 'TENSION');
     tensionData.push({ filename, path: fullPath, folder: folderPath || 'Racine', content, lines, type: 'TENSION' });
-    if (lines.length > 0) updateCombinedTables();
 }
 
 function storeEventFile(filename, fullPath, content) {
     const folderPath = fullPath.substring(0, fullPath.lastIndexOf('/'));
     const lines = parseCSVContent(content, 'EVENT');
     eventData.push({ filename, path: fullPath, folder: folderPath || 'Racine', content, lines, type: 'EVENT' });
-    if (lines.length > 0) updateCombinedTables();
 }
 
 function storeSoldeFile(filename, fullPath, content) {
     const folderPath = fullPath.substring(0, fullPath.lastIndexOf('/'));
     const lines = parseCSVContent(content, 'SOLDE');
     soldeData.push({ filename, path: fullPath, folder: folderPath || 'Racine', content, lines, type: 'SOLDE' });
-    if (lines.length > 0) updateCombinedTables();
 }
 
 function storeRechargeFile(filename, fullPath, content) {
     const folderPath = fullPath.substring(0, fullPath.lastIndexOf('/'));
     const lines = parseCSVContent(content, 'RECHARGE');
     rechargeData.push({ filename, path: fullPath, folder: folderPath || 'Racine', content, lines, type: 'RECHARGE' });
-    if (lines.length > 0) updateCombinedTables();
 }
 
 function parseAndCombineData() {
@@ -6952,6 +6947,9 @@ async function initializeAnalyzePage() {
         createCombinedTables();
         setupEventListeners();
         await loadFilesContent();
+        // Important: pour les gros volumes (ex: 300 fichiers), on combine/rafraîchit UNE seule fois
+        // afin d'éviter un recalcul + rerender complet à chaque fichier.
+        updateCombinedTables();
         setTimeout(() => {
             hideLoadingScreen();
             setTimeout(() => {
