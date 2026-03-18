@@ -168,19 +168,84 @@ function createDetailButton(targetId, label = "Voir détails") {
 function renderInfoCard() {
     const container = document.getElementById('infoCard');
     if (!container) return;
+    
     const data = database.technicalData;
     if (!data) {
         container.innerHTML = '<p class="no-data">Aucune donnée technique</p>';
         return;
     }
-
+    
+    // ===== RÉCUPÉRER LES STATS ÉNERGIE =====
+    let maxEnergy = 0;
+    let maxEnergyDate = '—';
+    let avgEnergy = 0;
+    
+    const energyData = database.energyData?.parDate || {};
+    const entries = Object.entries(energyData);
+    
+    if (entries.length > 0) {
+        // Trouver le max et sa date
+        let maxEntry = entries[0];
+        entries.forEach(([date, data]) => {
+            if (data.total > maxEntry[1].total) {
+                maxEntry = [date, data];
+            }
+        });
+        
+        maxEnergy = maxEntry[1].total || 0;
+        maxEnergyDate = maxEntry[0];
+        
+        // Calculer la moyenne
+        const values = entries.map(([_, d]) => d.total || 0);
+        avgEnergy = values.reduce((a, b) => a + b, 0) / values.length;
+    }
+    
     container.innerHTML = `
-        <div class="info-grid">
-            <div class="info-item"><span class="info-label">📅 Période</span><span class="info-value">${data.daysCount || 0} jours</span><span class="info-sub">${data.chartData?.dates[0] || '??'} au ${data.chartData?.dates[data.daysCount-1] || '??'}</span></div>
-            <div class="info-item"><span class="info-label">👥 Clients</span><span class="info-value">${data.clientCount || 0}</span></div>
-            <div class="info-item"><span class="info-label">⚡ Tension moyenne</span><span class="info-value">${data.globalAvg?.toFixed(2) || 0} V</span></div>
-            <div class="info-item"><span class="info-label">⬇️ Tension minimale</span><span class="info-value min">${data.globalMin?.toFixed(2) || 0} V</span></div>
-            <div class="info-item"><span class="info-label">⬆️ Tension maximale</span><span class="info-value max">${data.globalMax?.toFixed(2) || 0} V</span></div>
+        <div class="info-grid" style="display: flex; flex-wrap: wrap; gap: 20px; align-items: center; justify-content: space-between;">
+            <!-- Période -->
+            <div class="info-item" style="flex: 1; min-width: 120px;">
+                <span class="info-label">📅 Période</span>
+                <span class="info-value">${data.daysCount || 0} j</span>
+                <span class="info-sub">${data.chartData?.dates[0] || '??'}</span>
+            </div>
+            
+            <!-- Clients -->
+            <div class="info-item" style="flex: 1; min-width: 80px;">
+                <span class="info-label">👥 Clients</span>
+                <span class="info-value">${data.clientCount || 0}</span>
+            </div>
+            
+            <!-- Tension moyenne -->
+            <div class="info-item" style="flex: 1; min-width: 100px;">
+                <span class="info-label">⚡ Tension moy</span>
+                <span class="info-value">${data.globalAvg?.toFixed(1) || 0} V</span>
+            </div>
+            
+            <!-- Tension min -->
+            <div class="info-item" style="flex: 1; min-width: 90px;">
+                <span class="info-label">⬇️ Min</span>
+                <span class="info-value min">${data.globalMin?.toFixed(1) || 0} V</span>
+            </div>
+            
+            <!-- Tension max -->
+            <div class="info-item" style="flex: 1; min-width: 90px;">
+                <span class="info-label">⬆️ Max</span>
+                <span class="info-value max">${data.globalMax?.toFixed(1) || 0} V</span>
+            </div>
+            
+            <!-- Énergie max + date -->
+            <div class="info-item" style="flex: 1; min-width: 140px; background: #fff3e0; border-radius: 8px; padding: 5px 10px;">
+                <span class="info-label">⚡ Énergie max</span>
+                <span class="info-value warning">${maxEnergy.toFixed(0)} Wh</span>
+                <span class="info-sub" style="font-size: 0.7rem;">${maxEnergyDate}</span>
+            </div>
+            
+            <!-- Énergie moyenne -->
+            <div class="info-item" style="flex: 1; min-width: 100px;">
+                <span class="info-label">📊 Énergie moy</span>
+                <span class="info-value success">${avgEnergy.toFixed(0)} Wh</span>
+                <span class="info-sub">/jour</span>
+            </div>
         </div>
     `;
 }
@@ -1536,397 +1601,459 @@ function renderEnergyBoard() {
 }
 
 // ===========================================
-// FONCTION DE DÉFILEMENT VERS LE GRAPHIQUE HORAIRE
+// ENERGY CYCLE MANAGER (État centralisé)
 // ===========================================
 
-window.scrollToHourlyChart = function(date) {
-    // Mettre à jour le graphique avec la date sélectionnée
-    if (typeof renderHourlyChart === 'function') {
-        renderHourlyChart(date);
+class EnergyCycleManager {
+    constructor(energyData) {
+        this.rawData = energyData;
+        this.allDates = [];
+        this.allHoursData = []; // { date, hours: [{ hour, cumul, value }] }
+        this.startIndex = 0;
+        this.endIndex = 0;
+        this.maxDaysRange = 7;
+        
+        this.prepareData();
+        this.initIndices();
     }
     
-    // Attendre que le graphique soit rendu puis défiler
-    setTimeout(() => {
-        const chartCard = document.getElementById('hourlyChartCard');
-        if (chartCard) {
-            chartCard.classList.add('hourly-chart-highlight');
-            chartCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    prepareData() {
+        if (!this.rawData?.data) return;
+        
+        const dateMap = new Map();
+        
+        this.rawData.data.forEach(point => {
+            if (!point.timestamp || !point.energie) return;
             
-            // Retirer la classe après l'animation
-            setTimeout(() => {
-                chartCard.classList.remove('hourly-chart-highlight');
-            }, 1000);
+            const date = point.date;
+            const hourMatch = point.timestamp.match(/\d{4}-\d{2}-\d{2} (\d{2}):\d{2}:\d{2}/);
+            if (!hourMatch) return;
+            
+            const hour = parseInt(hourMatch[1]);
+            
+            if (!dateMap.has(date)) {
+                dateMap.set(date, []);
+            }
+            dateMap.get(date).push({ hour, energie: point.energie });
+        });
+        
+        this.allDates = Array.from(dateMap.keys()).sort();
+        this.allHoursData = this.allDates.map(date => {
+            const points = dateMap.get(date);
+            const hours = [];
+            let cumul = 0;
+            
+            points.sort((a, b) => a.hour - b.hour);
+            
+            for (let h = 0; h < 24; h++) {
+                const hourPoints = points.filter(p => p.hour === h);
+                const whHour = hourPoints.reduce((sum, p) => sum + p.energie, 0);
+                cumul += whHour;
+                
+                hours.push({
+                    hour: h,
+                    label: `${h}h`.padStart(3, '0'),
+                    cumul: cumul,
+                    value: whHour
+                });
+            }
+            
+            return { date, hours };
+        });
+    }
+    
+    initIndices() {
+        if (this.allDates.length === 0) return;
+        this.endIndex = this.allDates.length - 1;
+        this.startIndex = Math.max(0, this.endIndex - (this.maxDaysRange - 1));
+    }
+    
+    setRange(start, end) {
+        if (start < 0 || end >= this.allDates.length || start > end) return false;
+        if (end - start + 1 > this.maxDaysRange) return false;
+        
+        this.startIndex = start;
+        this.endIndex = end;
+        return true;
+    }
+    
+    setRangeFromPercents(leftPercent, rightPercent) {
+        const newStart = Math.floor(leftPercent * this.allDates.length);
+        let newEnd = Math.floor(rightPercent * this.allDates.length) - 1;
+        
+        newEnd = Math.min(this.allDates.length - 1, Math.max(newStart, newEnd));
+        
+        // Forcer la limite à 7 jours
+        if (newEnd - newStart + 1 > this.maxDaysRange) {
+            newEnd = newStart + this.maxDaysRange - 1;
         }
-    }, 200);
-};
+        
+        return this.setRange(newStart, newEnd);
+    }
+    
+    // ===== GETTERS POUR LES DONNÉES =====
+    
+    getCurrentDates() {
+        return {
+            start: this.allDates[this.startIndex],
+            end: this.allDates[this.endIndex],
+            all: this.allDates,
+            count: this.endIndex - this.startIndex + 1
+        };
+    }
+    
+    getChartData() {
+        const labels = [];
+        const cumulValues = [];
+        const hourlyValues = [];
+        
+        for (let i = this.startIndex; i <= this.endIndex; i++) {
+            const dayData = this.allHoursData[i];
+            dayData.hours.forEach(h => {
+                labels.push(`${dayData.date} ${h.label}`);
+                cumulValues.push(h.cumul);
+                hourlyValues.push(h.value);
+            });
+        }
+        
+        return { labels, cumulValues, hourlyValues };
+    }
+    
+    getVariations() {
+        const { hourlyValues } = this.getChartData();
+        const variations = [];
+        
+        for (let i = 1; i < hourlyValues.length; i++) {
+            variations.push(hourlyValues[i] - hourlyValues[i-1]);
+        }
+        
+        if (variations.length === 0) {
+            return { avg: 0, max: 0, min: 0, maxHour: '—', minHour: '—' };
+        }
+        
+        const avg = variations.reduce((a, b) => a + b, 0) / variations.length;
+        const max = Math.max(...variations);
+        const min = Math.min(...variations);
+        
+        // Trouver les heures des extrêmes
+        const maxIdx = variations.indexOf(max);
+        const minIdx = variations.indexOf(min);
+        
+        return {
+            avg,
+            max,
+            min,
+            maxHour: this.formatHourRange(maxIdx),
+            minHour: this.formatHourRange(minIdx)
+        };
+    }
+    
+    formatHourRange(index) {
+        const { labels } = this.getChartData();
+        if (!labels || index < 0 || index + 1 >= labels.length) return '—';
+        return `${labels[index]} → ${labels[index + 1]}`;
+    }
+    
+    getDayNightStats() {
+        let dayTotal = 0, nightTotal = 0;
+        let dayCount = 0, nightCount = 0;
+        
+        for (let i = this.startIndex; i <= this.endIndex; i++) {
+            const dayData = this.allHoursData[i];
+            let daySum = 0, nightSum = 0;
+            
+            dayData.hours.forEach(h => {
+                if (h.hour >= 6 && h.hour < 18) {
+                    daySum += h.value;
+                } else {
+                    nightSum += h.value;
+                }
+            });
+            
+            dayTotal += daySum;
+            nightTotal += nightSum;
+            dayCount++;
+            nightCount++;
+        }
+        
+        const total = dayTotal + nightTotal;
+        
+        return {
+            day: {
+                total: dayTotal,
+                avg: dayCount > 0 ? dayTotal / dayCount : 0,
+                percent: total > 0 ? (dayTotal / total) * 100 : 0
+            },
+            night: {
+                total: nightTotal,
+                avg: nightCount > 0 ? nightTotal / nightCount : 0,
+                percent: total > 0 ? (nightTotal / total) * 100 : 0
+            }
+        };
+    }
+    
+    getAmplitudeBands(hourlyValues) {
+        const minValues = [];
+        const maxValues = [];
+        
+        for (let i = 0; i < hourlyValues.length; i++) {
+            const start = Math.max(0, i - 1);
+            const end = Math.min(hourlyValues.length - 1, i + 1);
+            const slice = hourlyValues.slice(start, end + 1);
+            minValues.push(Math.min(...slice));
+            maxValues.push(Math.max(...slice));
+        }
+        
+        return maxValues.map((max, i) => [minValues[i], max]);
+    }
+}
 
 // ===========================================
-// CYCLE DE CONSOMMATION QUOTIDIEN (avec UX améliorée)
+// COMPOSANT UI (sans état, juste du rendu)
 // ===========================================
 
-let selectedDay = 'all'; // 'all' ou une date spécifique
 
-function renderDailyEnergyCycle() {
+let currentManager = null;
+
+export function renderDailyEnergyCycle() {
     const container = document.getElementById('energyCycleBoard');
     if (!container) return;
     
-    // ===== 1. RÉCUPÉRER LES DONNÉES =====
     const energyData = database.energyData;
-    if (!energyData || !energyData.data || energyData.data.length === 0) {
+    if (!energyData?.data?.length) {
         container.innerHTML = '<p class="no-data">Aucune donnée énergie disponible</p>';
         return;
     }
     
-    // ===== 2. DÉTERMINER LA PÉRIODE À AFFICHER =====
-    const startDate = allDates && allDates.length > 0 ? allDates[chartStartIndex] : null;
-    const endDate = allDates && allDates.length > 0 ? allDates[chartEndIndex] : null;
-    
-    // Filtrer les données selon le sélecteur
-    let filteredData = energyData.data;
-    let periodText = '';
-    
-    if (selectedDay && selectedDay !== 'all') {
-        // Mode "jour spécifique"
-        filteredData = energyData.data.filter(point => point.date === selectedDay);
-        periodText = `📅 Jour du ${selectedDay}`;
-    } else {
-        // Mode "période" (utilise la jauge)
-        if (startDate && endDate) {
-            filteredData = energyData.data.filter(point => {
-                return point.date >= startDate && point.date <= endDate;
-            });
-            periodText = `📅 Période: ${startDate} → ${endDate} (${chartEndIndex - chartStartIndex + 1} jours)`;
-        } else {
-            periodText = '📅 Toutes les données';
-        }
+    if (!currentManager || currentManager.rawData !== energyData) {
+        currentManager = new EnergyCycleManager(energyData);
     }
     
-    // ===== 3. GROUPER PAR HEURE =====
-    const hourlyMap = {};
-    let totalPoints = 0;
-    let firstPoint = null;
-    
-    filteredData.forEach(point => {
-        if (!point.timestamp || !point.energie) return;
-        
-        // Garder un échantillon pour debug
-        if (!firstPoint) firstPoint = point;
-        
-        // Extraire l'heure du timestamp (format attendu: "2024-03-15 14:30:00")
-        const hourMatch = point.timestamp.match(/\d{4}-\d{2}-\d{2} (\d{2}):\d{2}:\d{2}/);
-        if (!hourMatch) return;
-        
-        const hour = parseInt(hourMatch[1]);
-        const hourKey = hour.toString().padStart(2, '0') + 'h';
-        totalPoints++;
-        
-        if (!hourlyMap[hourKey]) {
-            hourlyMap[hourKey] = {
-                label: hourKey,
-                hour: hour,
-                total: 0,
-                count: 0,
-                values: []
-            };
-        }
-        
-        // UNITÉ EXPLICITE: Les données sont en Wh par pas de 10 minutes
-        // Pour convertir en Wh/heure, multiplier par 6
-        const energieValue = point.energie; // Wh/10min
-        
-        hourlyMap[hourKey].total += energieValue;
-        hourlyMap[hourKey].count++;
-        hourlyMap[hourKey].values.push(energieValue);
-    });
-    
-    // Log de debug dans la console
-    if (firstPoint) {
-        console.log('🔍 [Cycle] Échantillon de donnée:', {
-            timestamp: firstPoint.timestamp,
-            energie: firstPoint.energie,
-            unité: 'Wh/10min'
-        });
-    }
-    
-    // ===== 4. VÉRIFICATION =====
-    if (totalPoints === 0) {
-        container.innerHTML = `
-            <h3 class="card-title">⚡ CYCLE DE CONSOMMATION QUOTIDIEN</h3>
-            <p class="no-data">Aucun point de données pour cette période</p>
-        `;
+    if (currentManager.allDates.length === 0) {
+        container.innerHTML = '<p class="no-data">Aucune donnée disponible</p>';
         return;
     }
     
-    // ===== 5. TRIER PAR HEURE =====
-    const hourlyData = Object.keys(hourlyMap)
-        .sort((a, b) => {
-            const hourA = parseInt(a);
-            const hourB = parseInt(b);
-            return hourA - hourB;
-        })
-        .map(key => ({
-            ...hourlyMap[key],
-            value: hourlyMap[key].count > 0 ? hourlyMap[key].total / hourlyMap[key].count : 0,
-            min: Math.min(...(hourlyMap[key].values.length ? hourlyMap[key].values : [0])),
-            max: Math.max(...(hourlyMap[key].values.length ? hourlyMap[key].values : [0]))
-        }));
+    renderCycleUI(container);
+    updateCycleChart();
+    attachCycleEvents();
+}
+
+function renderCycleUI(container) {
+    const dates = currentManager.getCurrentDates();
+    const variations = currentManager.getVariations();
+    const dayNight = currentManager.getDayNightStats();
     
-    // ===== 6. CALCULER LES STATS PAR PÉRIODE =====
-    const periods = {
-        morning: { hours: [6,7,8,9,10,11], total: 0, count: 0, label: 'Matin', icon: '🌤️', color: '#ffc107', desc: '6h-11h' },
-        afternoon: { hours: [12,13,14,15,16,17], total: 0, count: 0, label: 'Après-midi', icon: '☀️', color: '#ff5722', desc: '12h-17h' },
-        evening: { hours: [18,19,20,21], total: 0, count: 0, label: 'Soir', icon: '🌙', color: '#673ab7', desc: '18h-21h' },
-        night: { hours: [22,23,0,1,2,3,4,5], total: 0, count: 0, label: 'Nuit', icon: '🌃', color: '#2196f3', desc: '22h-5h' }
-    };
-    
-    hourlyData.forEach(h => {
-        const hour = h.hour;
-        if (hour >= 6 && hour < 12) {
-            periods.morning.total += h.value;
-            periods.morning.count++;
-        } else if (hour >= 12 && hour < 18) {
-            periods.afternoon.total += h.value;
-            periods.afternoon.count++;
-        } else if (hour >= 18 && hour < 22) {
-            periods.evening.total += h.value;
-            periods.evening.count++;
-        } else {
-            periods.night.total += h.value;
-            periods.night.count++;
-        }
-    });
-    
-    // Moyennes par période
-    const periodAverages = {
-        morning: periods.morning.count > 0 ? periods.morning.total / periods.morning.count : 0,
-        afternoon: periods.afternoon.count > 0 ? periods.afternoon.total / periods.afternoon.count : 0,
-        evening: periods.evening.count > 0 ? periods.evening.total / periods.evening.count : 0,
-        night: periods.night.count > 0 ? periods.night.total / periods.night.count : 0
-    };
-    
-    // ===== 7. STATISTIQUES GLOBALES =====
-    const values = hourlyData.map(h => h.value).filter(v => v > 0);
-    const maxValue = values.length > 0 ? Math.max(...values) : 0;
-    const maxHour = hourlyData.find(h => h.value === maxValue);
-    const avgValue = values.length > 0 ? values.reduce((a,b) => a+b,0) / values.length : 0;
-    
-    // ===== 8. CALCULER LES VARIATIONS HORAIRES =====
-    const differences = [];
-    for (let i = 1; i < hourlyData.length; i++) {
-        const prev = hourlyData[i-1];
-        const curr = hourlyData[i];
-        const diff = curr.value - prev.value;
-        differences.push({
-            fromHour: prev.label,
-            toHour: curr.label,
-            consumption: diff > 0 ? diff : 0,
-            trend: diff > 0 ? 'hausse' : diff < 0 ? 'baisse' : 'stable',
-            diffValue: diff
-        });
-    }
-    
-    // Trier pour trouver les pics d'augmentation
-    const peakHours = [...differences]
-        .filter(d => d.consumption > 0)
-        .sort((a, b) => b.consumption - a.consumption)
-        .slice(0, 3);
-    
-    // ===== 9. CONSTRUCTION DU HTML =====
     container.innerHTML = `
-        <h3 class="card-title">⚡ CYCLE DE CONSOMMATION QUOTIDIEN</h3>
-        
-        <!-- LÉGENDE EXPLICATIVE -->
-        <div style="margin-bottom: 15px; padding: 12px; background: #f0f9ff; border-radius: 8px; font-size: 0.85rem; border-left: 4px solid #3b82f6;">
-            <div style="display: flex; gap: 20px; flex-wrap: wrap;">
-                <span><span style="color:#f59e0b;">●</span> <strong>Courbe</strong> = consommation moyenne par heure</span>
-                <span><span style="color:#ef4444;">🔥 Pic</span> = heure avec la consommation maximale</span>
-                <span><span style="color:#8b5cf6;">⚡ Plus active</span> = plus forte augmentation entre deux heures consécutives</span>
-            </div>
-        </div>
-        
-        <!-- SÉLECTEUR DE JOUR -->
-        <div style="margin-bottom: 20px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-            <select id="daySelect" style="padding: 8px 12px; border-radius: 6px; border: 1px solid #cbd5e1; background: white; min-width: 200px;">
-                <option value="all" ${selectedDay === 'all' ? 'selected' : ''}>📊 Tous les jours (moyenne)</option>
-                ${allDates.map(date => `
-                    <option value="${date}" ${selectedDay === date ? 'selected' : ''}>${date}</option>
-                `).join('')}
-            </select>
-            <button onclick="applyDayFilter()" style="padding: 8px 16px; background: #3b82f6; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 500;">
-                Appliquer
-            </button>
-            ${selectedDay !== 'all' ? `
-                <span style="background: #e2e8f0; padding: 4px 10px; border-radius: 20px; font-size: 0.8rem;">
-                    🔍 Mode jour spécifique
+        <div class="card" style="padding: 0;">
+            <!-- HEADER avec titre et badge -->
+            <div style="padding: 20px 24px; border-bottom: 1px solid #e9ecef; display: flex; justify-content: space-between; align-items: center;">
+                <h3 style="margin: 0; font-size: 1.1rem; font-weight: 600; color: #1e293b; display: flex; align-items: center; gap: 8px;">
+                    <span style="font-size: 1.3rem;">⚡</span>
+                    CYCLE DE CONSOMMATION QUOTIDIEN
+                </h3>
+                <span style="background: #e9ecef; color: #495057; padding: 4px 12px; border-radius: 100px; font-size: 0.75rem; font-weight: 600;">
+                    ${dates.count} JOURS SÉLECTIONNÉS
                 </span>
-            ` : ''}
-        </div>
-        
-        <!-- Indicateur de période avec UNITÉ EXPLICITE -->
-        <div style="margin-bottom: 15px; padding: 8px 12px; background: #e6f0ff; border-radius: 8px; font-size: 0.9rem; color: var(--primary-dark); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
-            <span>${periodText}</span>
-            <span style="font-family: monospace; background: white; padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: 600;">
-                ⚡ Unité: Wh/10min
-            </span>
-            <span style="font-size: 0.8rem; color: #475569;">
-                ${filteredData.length} points
-            </span>
-        </div>
-        
-        <!-- NIVEAU 1: VUE D'ENSEMBLE -->
-        <div class="energy-cycle-summary">
-            <div style="margin-bottom: 10px; font-weight: 600; color: #475569;">Consommation moyenne par période (Wh/10min)</div>
-            <div class="period-stats">
-                ${Object.entries(periods).map(([key, period]) => `
-                    <div class="period-item ${key}" style="border-top-color: ${period.color};" title="${period.desc}">
-                        <span class="period-icon">${period.icon}</span>
-                        <span class="period-label">${period.label}</span>
-                        <span class="period-value">${periodAverages[key].toFixed(1)}</span>
+            </div>
+
+            <!-- PANEL DE CONTRÔLE - Style comme l'autre dashboard -->
+            <div style="padding: 20px 24px; background: #f8f9fa; border-bottom: 1px solid #e9ecef;">
+                <div style="display: flex; gap: 16px; align-items: flex-end; flex-wrap: wrap;">
+                    
+                    <!-- Date de début -->
+                    <div style="flex: 1; min-width: 200px;">
+                        <label style="display: block; font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: #6c757d; margin-bottom: 6px;">
+                            📅 DATE DE DÉBUT
+                        </label>
+                        <select id="cycleStartSelect" style="width: 100%; padding: 10px 14px; border: 2px solid #dee2e6; border-radius: 12px; font-size: 0.9rem; font-weight: 500; background: white; cursor: pointer; transition: all 0.2s;">
+                            ${currentManager.allDates.map((date, i) => `
+                                <option value="${i}" ${i === currentManager.startIndex ? 'selected' : ''}>
+                                    ${date}
+                                </option>
+                            `).join('')}
+                        </select>
                     </div>
-                `).join('')}
-            </div>
-            
-            <div style="margin: 15px 0 5px; font-weight: 600; color: #475569;">Indicateurs clés</div>
-            <div class="cycle-highlights">
-                <div class="highlight-item" title="Heure avec la consommation la plus élevée">
-                    <span class="highlight-icon">🔥</span>
-                    <span class="highlight-label">Pic de conso</span>
-                    <span class="highlight-value">${maxHour ? maxHour.label : '—'} (${maxValue.toFixed(1)} Wh/10min)</span>
+                    
+                    <!-- Date de fin -->
+                    <div style="flex: 1; min-width: 200px;">
+                        <label style="display: block; font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: #6c757d; margin-bottom: 6px;">
+                            📅 DATE DE FIN
+                        </label>
+                        <select id="cycleEndSelect" style="width: 100%; padding: 10px 14px; border: 2px solid #dee2e6; border-radius: 12px; font-size: 0.9rem; font-weight: 500; background: white; cursor: pointer;">
+                            ${currentManager.allDates.map((date, i) => `
+                                <option value="${i}" ${i === currentManager.endIndex ? 'selected' : ''}>
+                                    ${date}
+                                </option>
+                            `).join('')}
+                        </select>
+                    </div>
+                    
+                    <!-- Bouton appliquer -->
+                    <button id="cycleApplyBtn" style="background: #3b82f6; color: white; border: none; padding: 10px 28px; border-radius: 12px; font-weight: 600; font-size: 0.9rem; cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 6px rgba(59,130,246,0.25);">
+                        APPLIQUER
+                    </button>
                 </div>
-                <div class="highlight-item" title="Consommation moyenne par heure sur la période">
-                    <span class="highlight-icon">📈</span>
-                    <span class="highlight-label">Moyenne</span>
-                    <span class="highlight-value">${avgValue.toFixed(1)} Wh/10min</span>
+            </div>
+
+            <!-- JAUGE INTERACTIVE - Style épuré -->
+            <div style="padding: 24px 24px 16px 24px;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 12px; font-size: 0.75rem; color: #6c757d;">
+                    <span>${currentManager.allDates[0]}</span>
+                    <span id="cycleJaugeRange" style="font-weight: 600; color: #3b82f6; background: #e9ecef; padding: 4px 16px; border-radius: 100px; font-size: 0.7rem;">
+                        ${dates.start} → ${dates.end}
+                    </span>
+                    <span>${currentManager.allDates[currentManager.allDates.length-1]}</span>
                 </div>
-                <div class="highlight-item" title="Plus forte augmentation entre deux heures consécutives">
-                    <span class="highlight-icon">⚡</span>
-                    <span class="highlight-label">Hausse max</span>
-                    <span class="highlight-value">${peakHours[0] ? `${peakHours[0].fromHour}→${peakHours[0].toHour} (+${peakHours[0].consumption.toFixed(1)} Wh/10min)` : '—'}</span>
+                
+                <div id="cycleTrack" style="position: relative; width: 100%; height: 36px; background: #e9ecef; border-radius: 18px; cursor: pointer; box-shadow: inset 0 2px 4px rgba(0,0,0,0.05);">
+                    <div id="cycleSelection" style="position: absolute; height: 36px; background: linear-gradient(90deg, #3b82f6, #8b5cf6); border-radius: 18px; border: 3px solid white; box-shadow: 0 4px 12px rgba(59,130,246,0.3); left: ${(currentManager.startIndex/currentManager.allDates.length)*100}%; width: ${(dates.count/currentManager.allDates.length)*100}%;">
+                        <div class="gauge-handle left" style="position: absolute; width: 12px; height: 30px; background: white; left: -6px; top: 0; border-radius: 20px; cursor: ew-resize; box-shadow: 0 2px 8px rgba(0,0,0,0.15);"></div>
+                        <div class="gauge-handle right" style="position: absolute; width: 12px; height: 30px; background: white; right: -6px; top: 0; border-radius: 20px; cursor: ew-resize; box-shadow: 0 2px 8px rgba(0,0,0,0.15);"></div>
+                    </div>
+                </div>
+                
+                <!-- Mini repères de dates -->
+                <div style="display: flex; justify-content: space-between; margin-top: 8px; padding: 0 4px;">
+                    ${currentManager.allDates.map((date, i) => {
+                        if (i % Math.ceil(currentManager.allDates.length / 10) === 0) {
+                            return `<span style="font-size: 0.6rem; color: #adb5bd;">${date.slice(5)}</span>`;
+                        }
+                        return '<span></span>';
+                    }).join('')}
                 </div>
             </div>
-        </div>
-        
-        <!-- NIVEAU 2: BOUTON DÉTAIL + TABLEAU HORAIRE -->
-        ${createDetailButton('hourly-details-table', '📋 Voir le détail heure par heure')}
-        <div id="hourly-details-table" style="display: none; margin: 15px 0;">
-            <div style="max-height: 350px; overflow-y: auto; border: 1px solid var(--gray-200); border-radius: var(--radius-lg);">
-                <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
-                    <thead style="position: sticky; top: 0; background: var(--gray-100); z-index: 10;">
-                        <tr>
-                            <th style="padding: 12px; text-align: left;">Heure</th>
-                            <th style="padding: 12px; text-align: right;">Moy (Wh/10min)</th>
-                            <th style="padding: 12px; text-align: right;">Min (Wh/10min)</th>
-                            <th style="padding: 12px; text-align: right;">Max (Wh/10min)</th>
-                            <th style="padding: 12px; text-align: right;">Variation</th>
-                            <th style="padding: 12px; text-align: center;">Tendance</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${hourlyData.map((hour, i) => {
-                            const diff = i > 0 ? differences[i-1] : null;
-                            const trendColor = diff?.trend === 'hausse' ? '#ef4444' : diff?.trend === 'baisse' ? '#22c55e' : '#64748b';
-                            const trendIcon = diff?.trend === 'hausse' ? '↑' : diff?.trend === 'baisse' ? '↓' : '→';
-                            const isPeak = maxHour && hour.label === maxHour.label;
-                            
-                            return `
-                                <tr style="${isPeak ? 'background: #fff3e0;' : ''}">
-                                    <td style="padding: 8px 12px; font-weight: ${isPeak ? '700' : '600'};">
-                                        ${hour.label} ${isPeak ? '🔥' : ''}
-                                    </td>
-                                    <td style="padding: 8px 12px; text-align: right; font-weight: ${isPeak ? '700' : '400'};">
-                                        ${hour.value.toFixed(1)}
-                                    </td>
-                                    <td style="padding: 8px 12px; text-align: right; color: #64748b;">
-                                        ${hour.min.toFixed(1)}
-                                    </td>
-                                    <td style="padding: 8px 12px; text-align: right; color: #f59e0b;">
-                                        ${hour.max.toFixed(1)}
-                                    </td>
-                                    <td style="padding: 8px 12px; text-align: right; color: ${trendColor};">
-                                        ${diff ? (diff.diffValue > 0 ? '+' : '') + diff.diffValue.toFixed(1) : '—'}
-                                    </td>
-                                    <td style="padding: 8px 12px; text-align: center; color: ${trendColor}; font-size: 1.2rem;">
-                                        ${diff ? trendIcon : '—'}
-                                    </td>
-                                </tr>
-                            `;
-                        }).join('')}
-                    </tbody>
-                </table>
+
+            <!-- STATS CARD - Variations (comme l'autre dashboard) -->
+            <div style="padding: 16px 24px;">
+                <h4 style="margin: 0 0 16px 0; font-size: 0.85rem; font-weight: 600; color: #495057; display: flex; align-items: center; gap: 6px;">
+                    <span style="color: #3b82f6;">📊</span>
+                    VARIATIONS HORAIRES
+                </h4>
+                
+                <div id="variationStats" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;">
+                    ${renderVariationStats(variations)}
+                </div>
             </div>
-        </div>
-        
-        <!-- NIVEAU 3: GRAPHIQUE -->
-        <div class="chart-container" style="margin-top: 15px;">
-            <div class="chart-wrapper" style="height: 250px;">
-                <canvas id="dailyEnergyCycleChart"></canvas>
+
+            <!-- STATS CARD - Jour/Nuit avec design épuré -->
+            <div style="padding: 16px 24px;">
+                <h4 style="margin: 0 0 16px 0; font-size: 0.85rem; font-weight: 600; color: #495057; display: flex; align-items: center; gap: 6px;">
+                    <span style="color: #3b82f6;">⏱</span>
+                    CONSOMMATION MOYENNE
+                </h4>
+                
+                <div id="dayNightStats" style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                    ${renderDayNightStats(dayNight)}
+                </div>
+            </div>
+
+            <!-- GRAPHIQUE avec padding -->
+            <div style="padding: 16px 24px 24px 24px;">
+                <div style="height: 280px; width: 100%;">
+                    <canvas id="dailyEnergyCycleChart"></canvas>
+                </div>
             </div>
         </div>
     `;
-    
-    // ===== 10. CRÉER LE GRAPHIQUE =====
-    createDailyEnergyCycleChart(hourlyData, periods, maxValue);
 }
+
+function renderVariationStats(v) {
+    return `
+        <div style="background: #f8f9fa; border-radius: 16px; padding: 16px; border: 1px solid #e9ecef;">
+            <div style="font-size: 0.7rem; color: #6c757d; margin-bottom: 4px;">MOYENNE</div>
+            <div style="font-size: 1.6rem; font-weight: 700; color: #3b82f6; line-height: 1.2;">${v.avg.toFixed(1)}</div>
+            <div style="font-size: 0.7rem; color: #6c757d;">Wh</div>
+        </div>
+        <div style="background: #f8f9fa; border-radius: 16px; padding: 16px; border: 1px solid #e9ecef;">
+            <div style="font-size: 0.7rem; color: #6c757d; margin-bottom: 4px;">MAX</div>
+            <div style="font-size: 1.6rem; font-weight: 700; color: #ef4444; line-height: 1.2;">+${v.max.toFixed(1)}</div>
+            <div style="font-size: 0.65rem; color: #6c757d; margin-top: 6px;">${v.maxHour}</div>
+        </div>
+        <div style="background: #f8f9fa; border-radius: 16px; padding: 16px; border: 1px solid #e9ecef;">
+            <div style="font-size: 0.7rem; color: #6c757d; margin-bottom: 4px;">MIN</div>
+            <div style="font-size: 1.6rem; font-weight: 700; color: #22c55e; line-height: 1.2;">${v.min.toFixed(1)}</div>
+            <div style="font-size: 0.65rem; color: #6c757d; margin-top: 6px;">${v.minHour}</div>
+        </div>
+    `;
+}
+
+function renderDayNightStats(dn) {
+    return `
+        <div style="background: linear-gradient(135deg, #fff3e0, #fff9f0); border-radius: 16px; padding: 16px; border-left: 4px solid #f59e0b;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <span style="font-size: 2rem; line-height: 1;">☀️</span>
+                <div>
+                    <div style="font-size: 0.7rem; color: #f59e0b; font-weight: 600; margin-bottom: 2px;">JOUR (6h-17h)</div>
+                    <div style="font-size: 1.4rem; font-weight: 700; color: #1e293b;">${dn.day.avg.toFixed(0)} <span style="font-size: 0.8rem; font-weight: 400; color: #6c757d;">Wh/j</span></div>
+                    <div style="font-size: 0.7rem; color: #6c757d;">${dn.day.percent.toFixed(1)}% du total</div>
+                </div>
+            </div>
+        </div>
+        <div style="background: linear-gradient(135deg, #e8f0fe, #f0f4ff); border-radius: 16px; padding: 16px; border-left: 4px solid #3b82f6;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <span style="font-size: 2rem; line-height: 1;">🌙</span>
+                <div>
+                    <div style="font-size: 0.7rem; color: #3b82f6; font-weight: 600; margin-bottom: 2px;">NUIT (18h-5h)</div>
+                    <div style="font-size: 1.4rem; font-weight: 700; color: #1e293b;">${dn.night.avg.toFixed(0)} <span style="font-size: 0.8rem; font-weight: 400; color: #6c757d;">Wh/j</span></div>
+                    <div style="font-size: 0.7rem; color: #6c757d;">${dn.night.percent.toFixed(1)}% du total</div>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
 // ===========================================
-// CRÉATION DU GRAPHIQUE SUPERPOSÉ (cumul + horaire)
+// MISE À JOUR DU GRAPHIQUE ET DES STATS
 // ===========================================
 
-function createDailyEnergyCycleChart(hourlyData, periods, maxValue) {
-    chartManager.destroy('dailyEnergyCycleChart');
+function updateCycleChart() {
+    if (!currentManager) return;
     
+    const chartData = currentManager.getChartData();
     const ctx = document.getElementById('dailyEnergyCycleChart')?.getContext('2d');
     if (!ctx) return;
     
-    const labels = hourlyData.map(h => h.label);
-    const hourlyValues = hourlyData.map(h => h.value);
+    // Calcul de l'amplitude pour les barres
+    const amplitudeData = [];
+    for (let i = 0; i < chartData.hourlyValues.length; i++) {
+        const start = Math.max(0, i - 1);
+        const end = Math.min(chartData.hourlyValues.length - 1, i + 1);
+        const slice = chartData.hourlyValues.slice(start, end + 1);
+        amplitudeData.push([Math.min(...slice), Math.max(...slice)]);
+    }
     
-    let cumul = 0;
-    const cumulValues = hourlyData.map(h => {
-        cumul += h.value;
-        return cumul;
-    });
-    
-    const maxCumul = Math.max(...cumulValues);
-    
-    const backgroundColors = hourlyData.map(h => {
-        const hour = h.hour;
-        if (hour >= 6 && hour < 12) return 'rgba(255, 193, 7, 0.1)';
-        if (hour >= 12 && hour < 18) return 'rgba(255, 87, 34, 0.1)';
-        if (hour >= 18 && hour < 22) return 'rgba(103, 58, 183, 0.1)';
-        return 'rgba(33, 150, 243, 0.1)';
-    });
+    chartManager.destroy('dailyEnergyCycleChart');
     
     requestAnimationFrame(() => {
         chartManager.create('dailyEnergyCycleChart', {
             type: 'line',
             data: {
-                labels: labels,
+                labels: chartData.labels,
                 datasets: [
                     {
-                        label: 'Consommation horaire',
-                        data: hourlyValues,
+                        label: 'Amplitude',
+                        data: amplitudeData,
                         type: 'bar',
-                        backgroundColor: 'rgba(59, 130, 246, 0.5)',
-                        borderColor: CHART_STYLE.colors.primary,
-                        borderWidth: 1,
-                        barPercentage: 0.7,
-                        categoryPercentage: 0.8,
-                        yAxisID: 'y-horaire',
+                        backgroundColor: 'rgba(59, 130, 246, 0.08)',
+                        borderColor: 'transparent',
+                        barPercentage: 0.9,
+                        categoryPercentage: 0.95,
                         order: 2
                     },
                     {
                         label: 'Consommation cumulée',
-                        data: cumulValues,
-                        borderColor: CHART_STYLE.colors.secondary,
+                        data: chartData.cumulValues,
+                        borderColor: '#3b82f6',
                         backgroundColor: 'transparent',
                         borderWidth: 2.5,
                         tension: 0.2,
-                        pointRadius: 3,
+                        pointRadius: 2,
                         pointHoverRadius: 5,
-                        pointBackgroundColor: CHART_STYLE.colors.secondary,
+                        pointBackgroundColor: '#3b82f6',
                         pointBorderColor: 'white',
                         pointBorderWidth: 2,
-                        yAxisID: 'y-cumul',
+                        fill: false,
                         order: 1
                     }
                 ]
@@ -1935,152 +2062,232 @@ function createDailyEnergyCycleChart(hourlyData, periods, maxValue) {
                 responsive: true,
                 maintainAspectRatio: false,
                 plugins: {
-                    legend: CHART_STYLE.legend,
+                    legend: { display: false },
                     tooltip: {
-                        ...CHART_STYLE.tooltip,
+                        backgroundColor: '#1e293b',
+                        titleColor: '#f8fafc',
+                        bodyColor: '#cbd5e1',
+                        borderColor: '#334155',
+                        borderWidth: 1,
+                        padding: 12,
+                        cornerRadius: 8,
                         callbacks: {
                             label: (context) => {
-                                const label = context.dataset.label || '';
-                                const value = context.raw;
-                                return `${label}: ${value.toFixed(1)} Wh/10min`;
-                            },
-                            afterBody: (context) => {
-                                if (context[0].datasetIndex === 0) {
-                                    const index = context[0].dataIndex;
-                                    const hour = hourlyData[index];
+                                if (context.dataset.label === 'Amplitude') {
+                                    const [min, max] = context.raw;
                                     return [
-                                        `Min: ${hour.min.toFixed(1)} Wh/10min`,
-                                        `Max: ${hour.max.toFixed(1)} Wh/10min`
+                                        `Min: ${min.toFixed(0)} Wh`,
+                                        `Max: ${max.toFixed(0)} Wh`
                                     ];
                                 }
-                                return [];
+                                return `Cumul: ${context.raw.toFixed(0)} Wh`;
                             }
                         }
                     }
                 },
                 scales: {
-                    'y-horaire': {
-                        type: 'linear',
-                        display: true,
-                        position: 'left',
+                    y: {
+                        beginAtZero: true,
+                        grid: { color: '#e9ecef', drawBorder: false },
                         title: {
                             display: true,
-                            text: 'Wh/10min',
-                            font: CHART_STYLE.fonts
+                            text: 'Wh',
+                            color: '#6c757d',
+                            font: { size: 10, weight: 500 }
                         },
-                        grid: CHART_STYLE.grid,
-                        beginAtZero: true,
-                        ticks: { font: CHART_STYLE.fonts }
-                    },
-                    'y-cumul': {
-                        type: 'linear',
-                        display: true,
-                        position: 'right',
-                        title: {
-                            display: true,
-                            text: 'Wh (cumul)',
-                            font: CHART_STYLE.fonts
-                        },
-                        grid: { drawOnChartArea: false },
-                        beginAtZero: true,
-                        max: maxCumul * 1.1,
-                        ticks: { font: CHART_STYLE.fonts }
+                        ticks: { font: { size: 9 } }
                     },
                     x: {
                         grid: { display: false },
                         ticks: {
                             maxRotation: 45,
                             minRotation: 45,
-                            font: CHART_STYLE.fonts
+                            font: { size: 8 },
+                            callback: (val, idx) => {
+                                if (idx % 12 === 0) {
+                                    const label = chartData.labels[idx];
+                                    return label ? label.split(' ')[1] : '';
+                                }
+                                return '';
+                            }
                         }
                     }
                 }
             }
         });
     });
+    
+    updateStatsDisplay();
 }
-// ===========================================
-// FONCTION D'APPLICATION DU FILTRE JOUR
-// ===========================================
 
-window.applyDayFilter = function() {
-    const select = document.getElementById('daySelect');
-    if (select) {
-        selectedDay = select.value;
-        renderDailyEnergyCycle();
+function updateStatsDisplay() {
+    if (!currentManager) return;
+    
+    const jaugeRange = document.getElementById('cycleJaugeRange');
+    const dates = currentManager.getCurrentDates();
+    if (jaugeRange) {
+        jaugeRange.textContent = `${dates.start} → ${dates.end}`;
     }
-};
-
-// ===========================================
-// FONCTION DE MISE À JOUR (liée à la jauge)
-// ===========================================
-
-function updateDailyEnergyCycle() {
-    // Si on est en mode "jour spécifique", on le garde
-    // Sinon on met à jour avec la nouvelle période de la jauge
-    if (selectedDay === 'all') {
-        renderDailyEnergyCycle();
+    
+    const variationContainer = document.getElementById('variationStats');
+    if (variationContainer) {
+        variationContainer.innerHTML = renderVariationStats(currentManager.getVariations());
+    }
+    
+    const dayNightContainer = document.getElementById('dayNightStats');
+    if (dayNightContainer) {
+        dayNightContainer.innerHTML = renderDayNightStats(currentManager.getDayNightStats());
     }
 }
-chartManager.destroy('energyTrendChart');
-requestAnimationFrame(() => {
-    chartManager.create('energyTrendChart', {
-        type: 'line',
-        data: {
-            labels: labels,
-            datasets: [{
-                label: 'Énergie journalière',
-                data: values,
-                borderColor: CHART_STYLE.colors.primary,
-                backgroundColor: 'rgba(59, 130, 246, 0.05)',
-                borderWidth: 2,
-                tension: 0.2,
-                pointRadius: 3,
-                pointHoverRadius: 6,
-                pointBackgroundColor: values.map(v => 
-                    v === maxValue ? CHART_STYLE.colors.max : CHART_STYLE.colors.primary
-                ),
-                pointBorderColor: 'white',
-                pointBorderWidth: 2,
-                fill: true
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: CHART_STYLE.legend,
-                tooltip: {
-                    ...CHART_STYLE.tooltip,
-                    callbacks: {
-                        label: (context) => {
-                            const date = sortedDates[context.dataIndex];
-                            return [`${date}: ${context.raw.toFixed(0)} Wh`];
-                        }
-                    }
-                }
-            },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    grid: CHART_STYLE.grid,
-                    title: {
-                        display: true,
-                        text: 'Énergie (Wh)',
-                        font: CHART_STYLE.fonts
-                    },
-                    ticks: { font: CHART_STYLE.fonts }
-                },
-                x: {
-                    grid: { display: false },
-                    ticks: {
-                        maxRotation: 45,
-                        minRotation: 45,
-                        font: CHART_STYLE.fonts,
-                        callback: (val, idx) => idx % step === 0 ? labels[idx] : ''
-                    }
-                }
-            }
+
+// ===========================================
+// GESTIONNAIRE D'ÉVÉNEMENTS (avec cleanup)
+// ===========================================
+
+let dragState = null;
+
+function attachCycleEvents() {
+    cleanupDragEvents();
+    
+    const startSelect = document.getElementById('cycleStartSelect');
+    const endSelect = document.getElementById('cycleEndSelect');
+    const applyBtn = document.getElementById('cycleApplyBtn');
+    const track = document.getElementById('cycleTrack');
+    const selection = document.getElementById('cycleSelection');
+    
+    if (!startSelect || !endSelect || !applyBtn || !track || !selection) return;
+    
+    const leftHandle = selection.querySelector('.gauge-handle.left');
+    const rightHandle = selection.querySelector('.gauge-handle.right');
+    
+    // Update end select options based on start
+    function updateEndOptions() {
+        const startIdx = parseInt(startSelect.value);
+        const maxEnd = Math.min(startIdx + 6, currentManager.allDates.length - 1);
+        
+        endSelect.innerHTML = '';
+        for (let i = startIdx; i <= maxEnd; i++) {
+            const option = document.createElement('option');
+            option.value = i;
+            option.textContent = currentManager.allDates[i];
+            if (i === currentManager.endIndex) option.selected = true;
+            endSelect.appendChild(option);
+        }
+    }
+    
+    startSelect.addEventListener('change', updateEndOptions);
+    updateEndOptions();
+    
+    // Apply button
+    applyBtn.addEventListener('click', () => {
+        const newStart = parseInt(startSelect.value);
+        const newEnd = parseInt(endSelect.value);
+        
+        if (currentManager.setRange(newStart, newEnd)) {
+            selection.style.left = (currentManager.startIndex / currentManager.allDates.length) * 100 + '%';
+            selection.style.width = ((currentManager.endIndex - currentManager.startIndex + 1) / currentManager.allDates.length) * 100 + '%';
+            updateCycleChart();
         }
     });
-});
+    
+    // Gauge events
+    function getMousePercent(e) {
+        const rect = track.getBoundingClientRect();
+        return Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    }
+    
+    function onMouseMove(e) {
+        if (!dragState) return;
+        
+        const currentX = getMousePercent(e);
+        const delta = currentX - dragState.startX;
+        
+        if (dragState.type === 'drag') {
+            const newLeft = dragState.startLeft + delta;
+            const newRight = dragState.startRight + delta;
+            if (newLeft >= 0 && newRight <= 1) {
+                if (currentManager.setRangeFromPercents(newLeft, newRight)) {
+                    selection.style.left = (currentManager.startIndex / currentManager.allDates.length) * 100 + '%';
+                    selection.style.width = ((currentManager.endIndex - currentManager.startIndex + 1) / currentManager.allDates.length) * 100 + '%';
+                    updateCycleChart();
+                }
+            }
+        } else if (dragState.type === 'resize-left') {
+            const newLeft = dragState.startLeft + delta;
+            if (currentManager.setRangeFromPercents(newLeft, (currentManager.endIndex + 1) / currentManager.allDates.length)) {
+                selection.style.left = (currentManager.startIndex / currentManager.allDates.length) * 100 + '%';
+                selection.style.width = ((currentManager.endIndex - currentManager.startIndex + 1) / currentManager.allDates.length) * 100 + '%';
+                updateCycleChart();
+            }
+        } else if (dragState.type === 'resize-right') {
+            const newRight = dragState.startRight + delta;
+            if (currentManager.setRangeFromPercents(currentManager.startIndex / currentManager.allDates.length, newRight)) {
+                selection.style.width = ((currentManager.endIndex - currentManager.startIndex + 1) / currentManager.allDates.length) * 100 + '%';
+                updateCycleChart();
+            }
+        }
+    }
+    
+    function onMouseUp() {
+        if (dragState) {
+            dragState = null;
+            selection.style.cursor = 'grab';
+            window.removeEventListener('mousemove', onMouseMove);
+            window.removeEventListener('mouseup', onMouseUp);
+        }
+    }
+    
+    selection.addEventListener('mousedown', (e) => {
+        if (e.target.classList.contains('gauge-handle')) return;
+        
+        dragState = {
+            type: 'drag',
+            startX: getMousePercent(e),
+            startLeft: currentManager.startIndex / currentManager.allDates.length,
+            startRight: (currentManager.endIndex + 1) / currentManager.allDates.length
+        };
+        selection.style.cursor = 'grabbing';
+        
+        window.addEventListener('mousemove', onMouseMove);
+        window.addEventListener('mouseup', onMouseUp);
+        e.preventDefault();
+    });
+    
+    leftHandle?.addEventListener('mousedown', (e) => {
+        dragState = {
+            type: 'resize-left',
+            startX: getMousePercent(e),
+            startLeft: currentManager.startIndex / currentManager.allDates.length
+        };
+        
+        window.addEventListener('mousemove', onMouseMove);
+        window.addEventListener('mouseup', onMouseUp);
+        e.preventDefault();
+    });
+    
+    rightHandle?.addEventListener('mousedown', (e) => {
+        dragState = {
+            type: 'resize-right',
+            startX: getMousePercent(e),
+            startRight: (currentManager.endIndex + 1) / currentManager.allDates.length
+        };
+        
+        window.addEventListener('mousemove', onMouseMove);
+        window.addEventListener('mouseup', onMouseUp);
+        e.preventDefault();
+    });
+}
+
+function cleanupDragEvents() {
+    if (dragState) {
+        window.removeEventListener('mousemove', dragState.onMouseMove);
+        window.removeEventListener('mouseup', dragState.onMouseUp);
+        dragState = null;
+    }
+}
+
+export function destroyEnergyCycle() {
+    cleanupDragEvents();
+    chartManager.destroy('dailyEnergyCycleChart');
+    currentManager = null;
+}
