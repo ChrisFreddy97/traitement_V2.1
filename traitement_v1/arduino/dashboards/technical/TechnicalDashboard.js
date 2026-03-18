@@ -937,11 +937,29 @@ export function renderHourlyChart(selectedDate = null) {
     }
 
     if (allDates.length === 0) {
+        // Déterminer les 7 derniers jours disponibles (sans charger toute la période)
+        let targetDates = (database.technicalData?.chartData?.dates || []).slice(-7);
+        if (!targetDates || targetDates.length === 0) {
+            // Fallback : extraire les dates depuis la table T, puis garder les 7 dernières
+            const dateSet = new Set();
+            for (const row of table.data) {
+                const cells = row.split(';');
+                const datetime = cells[1];
+                const date = datetime?.split(' ')?.[0];
+                if (date) dateSet.add(date);
+            }
+            targetDates = Array.from(dateSet).sort().slice(-7);
+        }
+        const targetSet = new Set(targetDates);
+
         const dateMap = new Map();
         table.data.forEach(row => {
             const cells = row.split(';');
             const datetime = cells[1];
             const date = datetime.split(' ')[0];
+
+            // Pour la perf : ne préparer que les 7 derniers jours
+            if (!targetSet.has(date)) return;
             
             if (!dateMap.has(date)) {
                 dateMap.set(date, []);
@@ -949,7 +967,7 @@ export function renderHourlyChart(selectedDate = null) {
             dateMap.get(date).push({
                 datetime,
                 hour: datetime.split(' ')[1].substring(0,5),
-                tension: parseFloat(cells[4])
+                tension: parseFloat(cells[4]),
             });
         });
         
