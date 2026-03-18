@@ -1,6 +1,6 @@
 // dashboards/technical/TechnicalDashboard.js
 import { database } from '../../arduinoCore.js';
-import { VOLTAGE_NORMS } from '../../arduinoConstants.js';
+import { VOLTAGE_NORMS,KitDefinitions } from '../../arduinoConstants.js';
 import { getEnergyStats, parseIntensiteForTable, parseTensionForTable, alignData } from '../../analytics/energyAnalytics.js';
 
 // ===========================================
@@ -115,10 +115,9 @@ export function renderTechnicalDashboard() {
         <div id="hourlyChartCard" class="card"></div>
 
         <div class="section-title"><h2>⚡ ANALYSE ÉNERGIE</h2></div>
-        <div id="energyBoard" class="card"></div>
+        <div id="clientConsumptionBoard" class="card"></div>
         <div id="energyCycleBoard" class="card"></div>
-        <div id="combinedEnergyTable" class="card"></div>
-
+        
     `;
 
 
@@ -130,8 +129,7 @@ export function renderTechnicalDashboard() {
     renderHighVoltageBoard();
     renderDailyChart();
     renderHourlyChart();
-    renderEnergyBoard();
-    renderCombinedEnergyTable();
+    renderClientConsumptionBoard()
     renderDailyEnergyCycle();
 }
 
@@ -1311,230 +1309,411 @@ function attachDateSelectors() {
 // III) ÉNERGIE
 // ===========================================
 
-function renderCombinedEnergyTable() {
-    const container = document.getElementById('combinedEnergyTable');
-    if (!container) return;
-    
-    const tensionTable = database.tables.find(t => t.type === 'T');
-    const intensiteTable = database.tables.find(t => t.type === 'I');
-    
-    if (!tensionTable || !intensiteTable) {
-        container.innerHTML = '<p class="no-data">Données insuffisantes</p>';
-        return;
-    }
-    
-    const tensions = parseTensionForTable(tensionTable);
-    const intensites = parseIntensiteForTable(intensiteTable);
-    const combinedData = alignData(tensions, intensites);
-    
-    if (!combinedData || combinedData.length === 0) {
-        container.innerHTML = '<p class="no-data">Aucune donnée combinée</p>';
-        return;
-    }
-    
-    const dailyEnergy = {};
-    const clientIds = new Set();
-    
-    combinedData.forEach(row => {
-        const date = row.date;
+// ===========================================
+// SITE ENERGY MANAGER (version corrigée)
+// ===========================================
+
+class ClientEnergyAnalytics {
+    constructor(energyData) {
+        this.rawData = energyData;
+        this.processedDates = [];
+        this.processedClients = [];
+        this.clientDaily = {};
+        this.siteDaily = {};
+        this.clientStatistics = {};
+        this.siteStatistics = {};
         
-        if (!dailyEnergy[date]) {
-            dailyEnergy[date] = {
-                total: 0,
-                clients: {}
+        this.processData();
+    }
+    
+    processData() {
+        if (!this.rawData?.data) return;
+        
+        const dailyMap = new Map();
+        const siteMap = new Map();
+        const clientSet = new Set();
+        
+        this.rawData.data.forEach(point => {
+            if (!point.timestamp || !point.energie || !point.clientId) return;
+            
+            const date = point.date;
+            const clientId = point.clientId;
+            const energie = point.energie;
+            
+            clientSet.add(clientId);
+            
+            if (!dailyMap.has(date)) {
+                dailyMap.set(date, new Map());
+            }
+            const dayMap = dailyMap.get(date);
+            const current = dayMap.get(clientId) || 0;
+            dayMap.set(clientId, current + energie);
+            
+            const siteCurrent = siteMap.get(date) || 0;
+            siteMap.set(date, siteCurrent + energie);
+        });
+        
+        this.processedClients = Array.from(clientSet).sort((a, b) => parseInt(a) - parseInt(b));
+        this.processedDates = Array.from(dailyMap.keys()).sort();
+        
+        this.clientDaily = {};
+        this.processedDates.forEach(date => {
+            this.clientDaily[date] = {};
+            const dayMap = dailyMap.get(date);
+            
+            this.processedClients.forEach(clientId => {
+                this.clientDaily[date][clientId] = dayMap.get(clientId) || 0;
+            });
+        });
+        
+        this.siteDaily = {};
+        this.processedDates.forEach(date => {
+            this.siteDaily[date] = siteMap.get(date) || 0;
+        });
+        
+        this.calculateClientStats();
+        this.calculateSiteStats();
+    }
+    
+    calculatePercentile(values, p) {
+        if (values.length === 0) return 0;
+        const sorted = [...values].sort((a, b) => a - b);
+        const index = Math.ceil((p / 100) * sorted.length) - 1;
+        return sorted[Math.min(index, sorted.length - 1)];
+    }
+    
+    // Dans ClientEnergyAnalytics, on remplace recommendKit() par :
+
+    recommendKit(values) {
+        if (values.length === 0) return { 
+            id: 0, 
+            label: 'Kit 0', 
+            capacity: 250, 
+            confidence: 0,
+            raison: 'Données insuffisantes'
+        };
+        
+        const validValues = values.filter(v => v > 0);
+        if (validValues.length === 0) return { 
+            id: 0, 
+            label: 'Kit 0', 
+            capacity: 250, 
+            confidence: 0,
+            raison: 'Aucune consommation détectée'
+        };
+        
+        const totalJours = validValues.length;
+        
+        // ===== 1. CHARGE CRITIQUE (technique) =====
+        const depassements = {
+            seuil250: validValues.filter(v => v > 250).length,
+            seuil360: validValues.filter(v => v > 360).length,
+            seuil540: validValues.filter(v => v > 540).length,
+            seuil720: validValues.filter(v => v > 720).length,
+            seuil1080: validValues.filter(v => v > 1080).length
+        };
+        
+        const tauxCritique = 0.2; // 20% de dépassement = critique
+        let kitMinimumTechnique = 0;
+        
+        if (depassements.seuil1080 / totalJours > tauxCritique) {
+            return { 
+                id: null, 
+                label: 'Aucun kit adapté', 
+                capacity: null,
+                message: 'Besoin supérieur au Kit 4 - Contacter le commercial',
+                raison: 'Dépassements fréquents même du plus gros kit',
+                confidence: 0
             };
         }
         
-        const tension = row.tension;
+        if (depassements.seuil720 / totalJours > tauxCritique) kitMinimumTechnique = 4;
+        else if (depassements.seuil540 / totalJours > tauxCritique) kitMinimumTechnique = 3;
+        else if (depassements.seuil360 / totalJours > tauxCritique) kitMinimumTechnique = 2;
+        else if (depassements.seuil250 / totalJours > tauxCritique) kitMinimumTechnique = 1;
         
-        Object.entries(row.intensites).forEach(([clientId, intensite]) => {
-            if (intensite === 0) return;
+        // ===== 2. ÉNERGIE PERDUE (économique) =====
+        // Coûts fictifs (à ajuster selon vos prix réels)
+        const coutKits = [100, 200, 300, 500, 800]; // Kit 0 à 4
+        const coutDepassement = 30; // Coût par jour de dépassement
+        const coutGaspillage = 0.05; // Coût par Wh de capacité inutilisée
+        
+        let meilleurKit = 0;
+        let coutMinimal = Infinity;
+        const capacites = [250, 360, 540, 720, 1080];
+        
+        for (let kitId = 0; kitId <= 4; kitId++) {
+            const capacite = capacites[kitId];
             
-            clientIds.add(clientId);
+            // Coût des dépassements
+            const joursDepassement = validValues.filter(v => v > capacite).length;
+            const coutDepassements = joursDepassement * coutDepassement;
             
-            const energieHeure = tension * intensite * 1;
+            // Coût de l'énergie perdue (surdimensionnement)
+            let energiePerdue = 0;
+            validValues.forEach(v => {
+                if (v < capacite * 0.7) { // Si on utilise moins de 70% de la capacité
+                    energiePerdue += (capacite - v) * 0.3; // Pénalité progressive
+                }
+            });
+            const coutGaspillageTotal = energiePerdue * coutGaspillage;
             
-            if (!dailyEnergy[date].clients[clientId]) {
-                dailyEnergy[date].clients[clientId] = 0;
+            // Coût total
+            const coutTotal = coutKits[kitId] + coutDepassements + coutGaspillageTotal;
+            
+            if (coutTotal < coutMinimal) {
+                coutMinimal = coutTotal;
+                meilleurKit = kitId;
             }
-            dailyEnergy[date].clients[clientId] += energieHeure;
-            dailyEnergy[date].total += energieHeure;
+        }
+        
+        // ===== 3. DÉCISION FINALE =====
+        const kitFinal = Math.max(meilleurKit, kitMinimumTechnique);
+        const capaciteFinale = capacites[kitFinal];
+        
+        // Calculer la confiance
+        let confiance = 95;
+        let raison = '';
+        
+        if (kitFinal > meilleurKit) {
+            confiance = 85;
+            raison = 'Choix technique (trop de dépassements pour le kit économique)';
+        } else if (kitFinal < kitMinimumTechnique) {
+            confiance = 80;
+            raison = 'Choix économique (risque de dépassements accepté)';
+        } else {
+            raison = 'Équilibre optimal technique/économique';
+        }
+        
+        // Valeur de référence pour l'affichage
+        const p95 = this.calculatePercentile(validValues, 95);
+        const referenceValue = Math.max(p95, Math.max(...validValues) * 0.9);
+        
+        return {
+            id: kitFinal,
+            label: `Kit ${kitFinal}`,
+            capacity: capaciteFinale,
+            required: Math.ceil(referenceValue * 1.1), // Besoin estimé (marge 10%)
+            confidence: confiance,
+            raison: raison,
+            details: {
+                technique: kitMinimumTechnique,
+                economique: meilleurKit,
+                depassements: depassements,
+                coutEstime: coutMinimal
+            }
+        };
+    }    
+    calculateSiteStats() {
+        const values = this.processedDates.map(date => this.siteDaily[date] || 0);
+        const validValues = values.filter(v => v > 0);
+        
+        const recommendation = this.recommendKit(validValues);
+        
+        this.siteStatistics = {
+            average: validValues.length > 0 ? validValues.reduce((a, b) => a + b, 0) / validValues.length : 0,
+            maximum: Math.max(...values, 0),
+            percentile95: this.calculatePercentile(validValues, 95),
+            activeDays: validValues.length,
+            recommendation: recommendation,
+            totalEnergy: validValues.reduce((a, b) => a + b, 0)
+        };
+    }
+    
+    calculateClientStats() {
+        this.processedClients.forEach(clientId => {
+            const values = this.processedDates.map(date => this.clientDaily[date][clientId] || 0);
+            const validValues = values.filter(v => v > 0);
+            
+            this.clientStatistics[clientId] = {
+                average: validValues.length > 0 ? validValues.reduce((a, b) => a + b, 0) / validValues.length : 0,
+                maximum: Math.max(...values, 0),
+                total: validValues.reduce((a, b) => a + b, 0),
+                percentage: this.siteStatistics.totalEnergy ? 
+                    (validValues.reduce((a, b) => a + b, 0) / this.siteStatistics.totalEnergy) * 100 : 0,
+                activeDays: validValues.length
+            };
         });
-    });
+    }
     
-    const sortedClients = Array.from(clientIds).sort((a, b) => parseInt(a) - parseInt(b));
-    const sortedDates = Object.keys(dailyEnergy).sort((a, b) => new Date(b) - new Date(a));
+    getSiteProfile() {
+        return {
+            history: this.processedDates.map(date => ({
+                date,
+                consumption: this.siteDaily[date] || 0
+            })),
+            stats: this.siteStatistics
+        };
+    }
     
-    container.innerHTML = `
-        <h3 class="card-title">📊 CONSOMMATION JOURNALIÈRE PAR CLIENT</h3>
-        <div style="margin-bottom: 0.5rem; font-size:0.8rem; color:var(--gray-500);">${sortedDates.length} jours analysés</div>
-        ${createDetailButton('energy-table-details', 'Afficher le tableau détaillé')}
-        <div id="energy-table-details" style="display:none; margin-top:15px;">
-            <div class="table-wrapper">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Date</th>
-                            ${sortedClients.map(id => `<th>Client ${id}<br><span style="font-weight:normal;font-size:0.7rem;">Wh</span></th>`).join('')}
-                            <th>Total<br><span style="font-weight:normal;font-size:0.7rem;">Wh</span></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${sortedDates.map(date => {
-                            const jour = dailyEnergy[date];
-                            let sommeJour = 0;
-                            return `
-                                <tr>
-                                    <td style="font-weight: 600;">${date}</td>
-                                    ${sortedClients.map(id => {
-                                        const val = jour.clients[id] || 0;
-                                        sommeJour += val;
-                                        return `<td style="text-align: right;">${val.toFixed(0)}</td>`;
-                                    }).join('')}
-                                    <td style="text-align: right; font-weight: 700; background: var(--gray-100);">${sommeJour.toFixed(0)}</td>
-                                </tr>
-                            `;
-                        }).join('')}
-                        ${sortedDates.length > 0 ? `
-                            <tr style="border-top: 2px solid var(--gray-400); background: var(--gray-50);">
-                                <td style="font-weight: 600;">MOYENNE</td>
-                                ${sortedClients.map(id => {
-                                    let sommeClient = 0;
-                                    sortedDates.forEach(date => {
-                                        sommeClient += dailyEnergy[date].clients[id] || 0;
-                                    });
-                                    const moyenneClient = sommeClient / sortedDates.length;
-                                    return `<td style="text-align: right; font-weight: 600;">${moyenneClient.toFixed(0)}</td>`;
-                                }).join('')}
-                                <td style="text-align: right; font-weight: 700;">${(sortedClients.reduce((acc, id) => {
-                                    let sommeClient = 0;
-                                    sortedDates.forEach(date => {
-                                        sommeClient += dailyEnergy[date].clients[id] || 0;
-                                    });
-                                    return acc + (sommeClient / sortedDates.length);
-                                }, 0)).toFixed(0)}</td>
-                            </tr>
-                        ` : ''}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    `;
+    getClientProfile(clientId) {
+        return {
+            id: clientId,
+            history: this.processedDates.map(date => ({
+                date,
+                consumption: this.clientDaily[date][clientId] || 0
+            })),
+            stats: this.clientStatistics[clientId]
+        };
+    }
+    
+    getAllClientProfiles() {
+        return this.processedClients.map(clientId => this.getClientProfile(clientId));
+    }
+    
+    getDateRange() {
+        return {
+            start: this.processedDates[0],
+            end: this.processedDates[this.processedDates.length - 1],
+            total: this.processedDates.length
+        };
+    }
 }
 
 // ===========================================
-// BILAN ÉNERGÉTIQUE AVEC ÉVOLUTION TEMPORELLE
+// RENDER CLIENT DASHBOARD
 // ===========================================
 
-function renderEnergyBoard() {
-    const container = document.getElementById('energyBoard');
+let clientAnalyticsInstance = null;
+
+export function renderClientConsumptionBoard() {
+    const container = document.getElementById('clientConsumptionBoard');
     if (!container) return;
     
-    const energyStats = getEnergyStats();
-    const energyData = database.energyData?.parDate || {};
+    const energyData = database.energyData;
+    if (!energyData?.data?.length) {
+        container.innerHTML = '<p class="no-data">Aucune donnée client disponible</p>';
+        return;
+    }
     
-    // ===== RÉCUPÉRER TOUTES LES DATES DISPONIBLES =====
-    const sortedDates = Object.keys(energyData)
-        .sort((a, b) => new Date(a) - new Date(b));  // Pas de limite !
+    if (!clientAnalyticsInstance || clientAnalyticsInstance.rawData !== energyData) {
+        clientAnalyticsInstance = new ClientEnergyAnalytics(energyData);
+    }
     
-    const totalDays = sortedDates.length;
-    const values = sortedDates.map(date => energyData[date]?.total || 0);
-    const maxValue = Math.max(...values, 1);
-    
-    // Format des dates pour l'affichage
-    const labels = sortedDates.map(date => {
-        const d = new Date(date);
-        return `${d.getDate()}/${d.getMonth()+1}`;
-    });
-    
-    // Adapter l'affichage si trop de dates
-    // On veut environ 20 dates sur l'axe X pour lisibilité
-    const step = totalDays > 30 ? Math.ceil(totalDays / 15) : 1;
-    
-    // ===== CALCUL DES STATISTIQUES TEMPORELLES =====
-    let totalEnergy = 0;
-    let daysWithData = 0;
-    values.forEach(v => {
-        if (v > 0) {
-            totalEnergy += v;
-            daysWithData++;
-        }
-    });
-    const avgDaily = daysWithData > 0 ? totalEnergy / daysWithData : 0;
-    
-    // Trouver le jour avec le max
-    const maxIndex = values.indexOf(maxValue);
-    const maxDate = maxIndex >= 0 ? sortedDates[maxIndex] : null;
+    renderClientBoardUI(container);
+    createClientTrendChart();
+}
+
+function renderClientBoardUI(container) {
+    const siteProfile = clientAnalyticsInstance.getSiteProfile();
+    const clients = clientAnalyticsInstance.getAllClientProfiles();
+    const dateRange = clientAnalyticsInstance.getDateRange();
+    const stats = siteProfile.stats;
+    const recommendation = stats.recommendation;
     
     container.innerHTML = `
-        <div class="card">
-            <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
-                <span class="card-title">⚡ BILAN ÉNERGÉTIQUE</span>
-                <span style="background: #e2e8f0; padding: 4px 12px; border-radius: 100px; font-size: 0.8rem;">
-                    ${totalDays} jours analysés
-                </span>
-            </div>
-            
-            <div class="stats-grid">
-                <div class="stat-item">
-                    <span class="stat-label">ÉNERGIE MAX</span>
-                    <span class="stat-number warning">${energyStats.max}</span>
-                    <span class="stat-unit">Wh</span>
-                    ${maxDate ? `<div style="font-size: 0.7rem; color: #64748b;">le ${maxDate}</div>` : ''}
-                </div>
-                <div class="stat-item">
-                    <span class="stat-label">ÉNERGIE MIN</span>
-                    <span class="stat-number info">${energyStats.min}</span>
-                    <span class="stat-unit">Wh</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-label">MOYENNE</span>
-                    <span class="stat-number success">${energyStats.avg}</span>
-                    <span class="stat-unit">Wh</span>
+        <div class="card" style="padding: 0;">
+            <!-- Header -->
+            <div style="padding: 20px 24px; border-bottom: 1px solid #e9ecef;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <h3 style="margin: 0; font-size: 1.1rem; font-weight: 600; color: #1e293b; display: flex; align-items: center; gap: 8px;">
+                        <span style="font-size: 1.3rem;">🏭</span>
+                        CONSOMMATION TOTALE DU SITE
+                    </h3>
+                    <span style="background: #e9ecef; color: #495057; padding: 4px 12px; border-radius: 100px; font-size: 0.75rem; font-weight: 600;">
+                        ${dateRange.total} JOURS • ${clients.length} CLIENTS
+                    </span>
                 </div>
             </div>
             
-            <!-- Moyenne journalière -->
-            <div style="margin: 10px 0; padding: 8px 12px; background: #f8fafc; border-radius: 8px; display: flex; justify-content: space-between; font-size: 0.85rem;">
-                <span>📊 Moyenne journalière</span>
-                <span style="font-weight: 600;">${avgDaily.toFixed(0)} Wh/jour</span>
+            <!-- Légende des kits -->
+            <div style="padding: 12px 24px; background: #f8f9fa; border-bottom: 1px solid #e9ecef; display: flex; gap: 20px; flex-wrap: wrap;">
+                ${Object.values(KitDefinitions).map(kit => `
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        <span style="width: 20px; height: 3px; background: ${kit.color}; border-radius: 2px;"></span>
+                        <span style="font-size: 0.75rem; font-weight: 500;">${kit.label}</span>
+                        <span style="font-size: 0.65rem; color: #6c757d;">${kit.power}Wh</span>
+                    </div>
+                `).join('')}
             </div>
             
-            <!-- Graphique d'évolution -->
-            <div style="margin-top: 20px; height: 120px;">
-                <canvas id="energyTrendChart"></canvas>
+            <!-- Graphique avec LIGNES DES KITS -->
+            <div style="padding: 24px;">
+                <div style="height: 300px; width: 100%;">
+                    <canvas id="clientTrendChart"></canvas>
+                </div>
             </div>
             
-            ${createDetailButton('energy-trend-details', '📊 Voir le détail jour par jour')}
-            <div id="energy-trend-details" style="display: none; margin-top: 15px;">
-                <div style="max-height: 350px; overflow-y: auto; border: 1px solid var(--gray-200); border-radius: var(--radius-lg);">
-                    <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
-                        <thead style="position: sticky; top: 0; background: var(--gray-100);">
+            <!-- RECOMMANDATION KIT (UN SEUL) -->
+            <div style="padding: 16px 24px; background: #f8f9fa; border-top: 1px solid #e9ecef; border-bottom: 1px solid #e9ecef;">
+                <h4 style="margin: 0 0 16px 0; font-size: 0.9rem; font-weight: 600; color: #495057;">
+                    🎯 RECOMMANDATION D'INSTALLATION
+                </h4>
+                
+                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 16px;">
+                    <div>
+                        <div style="font-size: 0.7rem; color: #6c757d;">PIC JOURNALIER</div>
+                        <div style="font-size: 1.5rem; font-weight: 700;">${stats.maximum.toFixed(0)} <span style="font-size: 0.8rem;">Wh</span></div>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.7rem; color: #6c757d;">PERCENTILE 95%</div>
+                        <div style="font-size: 1.5rem; font-weight: 700;">${stats.percentile95.toFixed(0)} <span style="font-size: 0.8rem;">Wh</span></div>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.7rem; color: #6c757d;">BESOIN (+20%)</div>
+                        <div style="font-size: 1.5rem; font-weight: 700;">${recommendation.required || '—'} <span style="font-size: 0.8rem;">Wh</span></div>
+                    </div>
+                </div>
+                
+                ${recommendation.id !== null ? `
+                    <!-- Cas normal : un kit adapté -->
+                    <div style="background: ${KitDefinitions[recommendation.id].color}20; border: 1px solid ${KitDefinitions[recommendation.id].color}; border-radius: 12px; padding: 16px;">
+                        <div style="display: flex; align-items: center; gap: 16px;">
+                            <div style="width: 48px; height: 48px; background: ${KitDefinitions[recommendation.id].color}; border-radius: 12px; display: flex; align-items: center; justify-content: center; color: white; font-weight: 700; font-size: 1.2rem;">
+                                ${recommendation.id}
+                            </div>
+                            <div style="flex: 1;">
+                                <div style="font-weight: 700; font-size: 1.2rem; margin-bottom: 4px;">${recommendation.label}</div>
+                                <div style="font-size: 0.8rem; color: #495057;">Capacité: ${recommendation.capacity}Wh • Marge: ${((recommendation.capacity - (recommendation.required/1.2)) / (recommendation.required/1.2) * 100).toFixed(0)}%</div>
+                            </div>
+                            <div style="background: ${recommendation.capacity >= recommendation.required ? '#d1fae5' : '#fee2e2'}; color: ${recommendation.capacity >= recommendation.required ? '#065f46' : '#b91c1c'}; padding: 8px 16px; border-radius: 100px; font-size: 0.8rem; font-weight: 600;">
+                                ${recommendation.capacity >= recommendation.required ? '✅ ADAPTÉ' : '⚠️ LIMITE'}
+                            </div>
+                        </div>
+                    </div>
+                ` : `
+                    <!-- Cas critique : besoin > Kit 4 -->
+                    <div style="background: #fee2e2; border: 1px solid #ef4444; border-radius: 12px; padding: 20px; text-align: center;">
+                        <div style="font-size: 2rem; margin-bottom: 8px;">🔴</div>
+                        <div style="font-weight: 700; color: #b91c1c; margin-bottom: 4px;">Aucun kit individuel ne suffit</div>
+                        <div style="color: #b91c1c; margin-bottom: 12px;">Besoin: ${recommendation.required}Wh (max kit: 1080Wh)</div>
+                        <div style="background: white; padding: 12px; border-radius: 8px; font-size: 0.9rem;">
+                            ⚡ Recommandation: <strong>Contacter le commercial</strong> pour une installation sur-mesure
+                        </div>
+                    </div>
+                `}
+            </div>
+            
+            <!-- BOUTON TABLEAU DÉTAIL -->
+            <div style="padding: 16px 24px;">
+                ${createDetailButton('clientDetailTable', '📋 AFFICHER LE DÉTAIL CLIENT')}
+            </div>
+            
+            <!-- TABLEAU DÉTAIL (masqué) -->
+            <div id="clientDetailTable" style="display: none; padding: 0 24px 24px 24px;">
+                <div style="max-height: 400px; overflow-y: auto; border: 1px solid #e9ecef; border-radius: 12px;">
+                    <table style="width: 100%; border-collapse: collapse; font-size: 0.8rem;">
+                        <thead style="position: sticky; top: 0; background: #f8f9fa;">
                             <tr>
-                                <th style="padding: 10px; text-align: left;">Date</th>
-                                <th style="padding: 10px; text-align: right;">Énergie (Wh)</th>
-                                <th style="padding: 10px; text-align: right;">Variation</th>
-                                <th style="padding: 10px; text-align: right;">%</th>
+                                <th style="padding: 12px; text-align: left;">Date</th>
+                                ${clientAnalyticsInstance.processedClients.map(id => 
+                                    `<th style="padding: 12px; text-align: right;">Client ${id}</th>`
+                                ).join('')}
+                                <th style="padding: 12px; text-align: right; background: #e9ecef;">Total</th>
                             </tr>
                         </thead>
                         <tbody>
-                            ${sortedDates.map((date, i) => {
-                                const val = energyData[date]?.total || 0;
-                                const prevVal = i > 0 ? energyData[sortedDates[i-1]]?.total || 0 : val;
-                                const variation = i > 0 ? val - prevVal : 0;
-                                const varClass = variation > 0 ? 'color-danger' : variation < 0 ? 'color-success' : '';
-                                const percent = i > 0 && prevVal > 0 ? ((variation / prevVal) * 100).toFixed(1) : '—';
-                                
+                            ${clientAnalyticsInstance.processedDates.map(date => {
+                                let rowTotal = 0;
                                 return `
                                     <tr>
-                                        <td style="padding: 8px 10px;">${date}</td>
-                                        <td style="padding: 8px 10px; text-align: right; font-weight: 500;">${val.toFixed(0)}</td>
-                                        <td style="padding: 8px 10px; text-align: right; ${varClass};">
-                                            ${i > 0 ? (variation > 0 ? '+' : '') + variation.toFixed(0) : '—'}
-                                        </td>
-                                        <td style="padding: 8px 10px; text-align: right; ${varClass};">
-                                            ${percent !== '—' ? (variation > 0 ? '+' : '') + percent + '%' : '—'}
-                                        </td>
+                                        <td style="padding: 8px 12px; font-weight: 500;">${date}</td>
+                                        ${clientAnalyticsInstance.processedClients.map(id => {
+                                            const val = clientAnalyticsInstance.clientDaily[date][id] || 0;
+                                            rowTotal += val;
+                                            return `<td style="padding: 8px 12px; text-align: right;">${val.toFixed(0)}</td>`;
+                                        }).join('')}
+                                        <td style="padding: 8px 12px; text-align: right; font-weight: 700; background: #f1f3f5;">${rowTotal.toFixed(0)}</td>
                                     </tr>
                                 `;
                             }).join('')}
@@ -1544,27 +1723,62 @@ function renderEnergyBoard() {
             </div>
         </div>
     `;
+}
+
+function createClientTrendChart() {
+    chartManager.destroy('clientTrendChart');
     
-    // ===== CRÉER LE GRAPHIQUE DE TENDANCE =====
-    chartManager.destroy('energyTrendChart');
+    const ctx = document.getElementById('clientTrendChart')?.getContext('2d');
+    if (!ctx) return;
+    
+    const siteProfile = clientAnalyticsInstance.getSiteProfile();
+    const dates = clientAnalyticsInstance.processedDates;
+    
+    // Calculer la conso max pour filtrer les kits pertinents
+    const maxConsumption = Math.max(...siteProfile.history.map(d => d.consumption));
+    
+    // Filtrer les kits : seulement ceux jusqu'à 1.5× le max (marge visuelle)
+    const relevantKits = Object.values(KitDefinitions).filter(kit => 
+        kit.power <= maxConsumption * 1.5
+    );
+    
+    // Créer les datasets des lignes de kits (seulement les pertinents)
+    const kitLines = relevantKits.map(kit => ({
+        label: kit.label,
+        data: Array(dates.length).fill(kit.power),
+        borderColor: kit.color,
+        borderWidth: 1.5,
+        borderDash: [5, 5],
+        pointRadius: 0,
+        fill: false,
+        order: 2
+    }));
+    
     requestAnimationFrame(() => {
-        chartManager.create('energyTrendChart', {
+        chartManager.create('clientTrendChart', {
             type: 'line',
             data: {
-                labels: labels,
-                datasets: [{
-                    label: 'Énergie (Wh)',
-                    data: values,
-                    borderColor: '#3b82f6',
-                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                    fill: true,
-                    tension: 0.3,
-                    pointRadius: 2,
-                    pointHoverRadius: 5,
-                    pointBackgroundColor: values.map(v => 
-                        v === maxValue ? '#ef4444' : '#3b82f6'
-                    )
-                }]
+                labels: dates.map(d => d.slice(5)),
+                datasets: [
+                    // Lignes des kits (seulement les pertinents)
+                    ...kitLines,
+                    // Courbe de consommation
+                    {
+                        label: 'Consommation totale',
+                        data: siteProfile.history.map(d => d.consumption),
+                        borderColor: '#1e293b',
+                        backgroundColor: 'rgba(59, 130, 246, 0.05)',
+                        borderWidth: 3,
+                        tension: 0.2,
+                        pointRadius: 4,
+                        pointHoverRadius: 8,
+                        pointBackgroundColor: '#3b82f6',
+                        pointBorderColor: 'white',
+                        pointBorderWidth: 2,
+                        fill: false,
+                        order: 1
+                    }
+                ]
             },
             options: {
                 responsive: true,
@@ -1572,34 +1786,51 @@ function renderEnergyBoard() {
                 plugins: {
                     legend: { display: false },
                     tooltip: {
+                        backgroundColor: '#1e293b',
+                        titleColor: '#f8fafc',
+                        bodyColor: '#cbd5e1',
                         callbacks: {
                             label: (context) => {
-                                const date = sortedDates[context.dataIndex];
-                                return [`${date}: ${context.raw.toFixed(0)} Wh`];
+                                if (context.dataset.label === 'Consommation totale') {
+                                    const value = context.raw;
+                                    // Trouver le kit correspondant
+                                    let kit = '> Kit 4';
+                                    if (value <= 250) kit = 'Kit 0';
+                                    else if (value <= 360) kit = 'Kit 1';
+                                    else if (value <= 540) kit = 'Kit 2';
+                                    else if (value <= 720) kit = 'Kit 3';
+                                    else if (value <= 1080) kit = 'Kit 4';
+                                    
+                                    return [
+                                        `Consommation: ${value.toFixed(0)} Wh`,
+                                        `Seuil: ${kit}`
+                                    ];
+                                }
+                                return null;
                             }
                         }
                     }
                 },
                 scales: {
-                    y: { 
+                    y: {
                         beginAtZero: true,
-                        grid: { color: '#e2e8f0' },
+                        grid: { color: '#e9ecef' },
                         title: { display: true, text: 'Wh' }
                     },
-                    x: { 
+                    x: {
                         grid: { display: false },
-                        ticks: { 
-                            maxRotation: 45,
-                            callback: (val, idx) => idx % step === 0 ? labels[idx] : ''
-                        }
+                        ticks: { maxRotation: 45 }
                     }
-                },
-                elements: { point: { radius: 2 } }
+                }
             }
         });
     });
 }
 
+export function destroyClientBoard() {
+    chartManager.destroy('clientTrendChart');
+    clientAnalyticsInstance = null;
+}
 // ===========================================
 // ENERGY CYCLE MANAGER (État centralisé)
 // ===========================================

@@ -121,3 +121,17 @@ export function getConsumptionStatus(consumption, maxLimit) {
         };
     }
 }
+
+
+// ===========================================
+// NORMES KITS
+// ===========================================
+
+export const KitDefinitions = {
+    0: { id: 0, label: 'Kit 0', description: 'Base', color: '#94a3b8', power: 250 },
+    1: { id: 1, label: 'Kit 1', description: 'Standard', color: '#3b82f6', power: 360 },
+    2: { id: 2, label: 'Kit 2', description: 'Confort', color: '#8b5cf6', power: 540 },
+    3: { id: 3, label: 'Kit 3', description: 'Duo Standard', color: '#f59e0b', power: 720 },
+    4: { id: 4, label: 'Kit 4', description: 'Duo Confort', color: '#ef4444', power: 1080 }
+};
+
