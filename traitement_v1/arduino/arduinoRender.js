@@ -81,10 +81,7 @@ export function renderByTab() {
         renderTechnicalDashboard();
     } else if (currentTab === 'Commercial') {
         renderCommercialDashboard();
-    } else if (currentTab === 'Evenement') {
-        renderEventDashboard();
     }
-    
     // 🔴 4. Rendre les tableaux
     displayTables(visibleTableIndices);
     
