@@ -1689,23 +1689,9 @@ function createTensionAnalysisContent() {
         analysisDiv.appendChild(noExceedanceMsg);
     }
     
-    // Conclusion
-    const stablePercent = stabilityData.days > 0 ? Math.round((stabilityData.stable/stabilityData.days)*100) : 0;
-    let conclusionMessage = '';
-    if (stabilityData.stabilityPercentage >= 90) conclusionMessage = `La tension du système ${stabilityData.systemType} est <strong>excellente</strong> avec ${stablePercent}% de jours conformes. La variation moyenne de ${stabilityData.averageVariation} V/h est bien en dessous du seuil d'alerte. `;
-    else if (stabilityData.stabilityPercentage >= 80) conclusionMessage = `La tension est <strong>globalement stable</strong> (${stablePercent}% de jours conformes) mais présente des variations importantes certains jours. `;
-    else if (stabilityData.stabilityPercentage >= 60) conclusionMessage = `La tension est <strong>préoccupante</strong> avec seulement ${stablePercent}% de jours conformes. `;
-    else conclusionMessage = `⚠️ <strong>ALERTE CRITIQUE</strong> ⚠️ La tension est <strong>non conforme</strong> (${stablePercent}% de jours conformes seulement). `;
     
-    if (exceedanceData.daysWithExceedance > 0) {
-        conclusionMessage += `<span style="color: #ef4444;">🚨 ${exceedanceData.daysWithExceedance} jour${exceedanceData.daysWithExceedance !== 1 ? 's' : ''} hors limites (${exceedanceData.totalHoursOutOfLimits}h).</span> `;
-        if (stabilityData.stabilityPercentage < 60) conclusionMessage += `<strong>Intervention technique URGENTE requise.</strong>`;
-    }
     
-    const conclusionDiv = document.createElement('div');
-    conclusionDiv.style.cssText = `background: ${stabilityData.stabilityPercentage >= 90 ? '#dcfce7' : stabilityData.stabilityPercentage >= 80 ? '#dbeafe' : stabilityData.stabilityPercentage >= 60 ? '#fef3c7' : '#fee2e2'}; border: 2px solid ${stabilityData.stabilityPercentage >= 90 ? '#22c55e' : stabilityData.stabilityPercentage >= 80 ? '#3b82f6' : stabilityData.stabilityPercentage >= 60 ? '#f59e0b' : '#ef4444'}; border-radius: 10px; padding: 16px;`;
-    conclusionDiv.innerHTML = `<div style="display: flex; align-items: flex-start; gap: 12px;"><span style="font-size: 24px; line-height: 1.2;">${stabilityData.stabilityPercentage >= 90 ? '✅' : stabilityData.stabilityPercentage >= 80 ? '⚠️' : stabilityData.stabilityPercentage >= 60 ? '🔴' : '🚫'}</span><div style="flex: 1;"><div style="font-weight: 700; color: ${stabilityData.stabilityPercentage >= 90 ? '#166534' : stabilityData.stabilityPercentage >= 80 ? '#1e40af' : stabilityData.stabilityPercentage >= 60 ? '#92400e' : '#991b1b'}; margin-bottom: 6px; font-size: 14px;">${stabilityData.stabilityPercentage >= 90 ? 'EXCELLENTE' : stabilityData.stabilityPercentage >= 80 ? 'SATISFAISANTE' : stabilityData.stabilityPercentage >= 60 ? 'PRÉOCCUPANTE' : 'CRITIQUE'}</div><div style="color: ${stabilityData.stabilityPercentage >= 90 ? '#166534' : stabilityData.stabilityPercentage >= 80 ? '#1e40af' : stabilityData.stabilityPercentage >= 60 ? '#92400e' : '#991b1b'}; font-size: 13px; line-height: 1.5;">${conclusionMessage}</div></div></div>`;
-    analysisDiv.appendChild(conclusionDiv);
+    
     
     // Normes système
     const normsDiv = document.createElement('div');
@@ -8011,7 +7997,7 @@ function displayClientCommercialAnalysis(container, clientNumber) {
             <div style="margin-top: 15px;">
                 <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 15px;">
                     <span style="font-size: 18px;">📊</span>
-                    <span style="font-weight: 600; color: #1e293b;">Répartition par rapport au forfait (seuils 85% et 115%)</span>
+                    <span style="font-weight: 600; color: #1e293b;">Répartition de l'énergie consommée (seuils 85% et 115%)</span>
                 </div>
                 
                 ${forfaitStats.map((stat, index) => {
@@ -9567,7 +9553,7 @@ function createClientEnergyAnalysis(clientNumber) {
         `;
         repartitionTitle.innerHTML = `
             <span style="font-size: 20px;">📈</span>
-            <span>Répartition par rapport au forfait (seuils 85% et 115%)</span>
+            <span>Répartition de l'énergie consommée (seuils 85% et 115%)</span>
         `;
         forfaitCard.appendChild(repartitionTitle);
         
