@@ -234,7 +234,7 @@ window.refreshCurrentTab = function() {
 console.log("✅ ArduinoMain initialisé - Prêt pour l'import");
 
 // ===========================================
-// FONCTION DE FILTRAGE CORRIGÉE (avec dates basées sur les données)
+// FONCTION DE FILTRAGE
 // ===========================================
 export function applyFilter(newFilter) {
     // ===== 1. CRÉER UNE COPIE DU FILTRE =====
@@ -323,7 +323,7 @@ export function applyFilter(newFilter) {
 }
 
 // ===========================================
-// FONCTION DE FILTRAGE PAR DATE (inchangée)
+// FONCTION DE FILTRAGE PAR DATE 
 // ===========================================
 function filterTablesByDate(tables, filter) {
     // Si pas de filtre actif, retourner toutes les tables
@@ -336,13 +336,16 @@ function filterTablesByDate(tables, filter) {
     
     // Filtrer chaque table
     filteredTables.forEach(table => {
-        if (table.type === 'T' || table.type === 'I') {
+        // Filtrer les tables qui ont des dates (T, I, E)
+        if (table.type === 'T' || table.type === 'I' || table.type === 'E' || table.type === 'S' || table.type === 'R') {
+            const originalCount = table.data.length;
+            
             table.data = table.data.filter(row => {
                 const cells = row.split(';');
                 const timestamp = cells[1];
                 if (!timestamp) return false;
                 
-                // Extraire la date (sans l'heure) - COMME DANS analyzeTensionData
+                // Extraire la date (sans l'heure)
                 const dateStr = timestamp.split(' ')[0];
                 const rowDate = new Date(dateStr);
                 rowDate.setHours(0, 0, 0, 0);
@@ -369,7 +372,12 @@ function filterTablesByDate(tables, filter) {
                 
                 return true;
             });
+            
+            if (originalCount !== table.data.length) {
+                console.log(`Table ${table.type}: ${originalCount} → ${table.data.length} lignes`);
+            }
         }
+        // Autres tables (N, D, etc.) on les garde telles quelles
     });
     
     return filteredTables;

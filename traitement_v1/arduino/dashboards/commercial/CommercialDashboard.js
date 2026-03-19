@@ -2,6 +2,7 @@
 import { database } from '../../arduinoCore.js';
 import { FORFAIT_LIMITS } from '../../arduinoConstants.js';
 import { FORFAIT_NAMES } from '../../arduinoConstants.js';
+import {renderFilterPanel}from '../technical/TechnicalDashboard.js';
 
 // Variable globale pour suivre le client actif
 let activeClientId = null;
@@ -20,6 +21,8 @@ export function renderCommercialDashboard() {
     
     // Structure avec onglet client en haut
     const html = `
+        ${renderFilterPanel()}
+
         <!-- Onglet client global en haut -->
         <div class="global-client-tabs-container">
             <h3>👥 Sélection client</h3>

@@ -120,7 +120,6 @@ export function renderTechnicalDashboard() {
         <div id="clientConsumptionBoard" class="card"></div>
         <div id="energyCycleBoard" class="card"></div>
     `;
-
     renderInfoCard();
     renderConformityCard();
     renderNormsCard();
@@ -2543,7 +2542,7 @@ let currentFilter = {
 /**
  * Crée et retourne le HTML du panneau de filtre
  */
-function renderFilterPanel() {
+export function renderFilterPanel() {
     const lastDate = getLastDateFromData();
     const lastYear = lastDate.getFullYear();
     
