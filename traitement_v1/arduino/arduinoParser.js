@@ -57,14 +57,14 @@ export function parseRawTables(content) {
     return tables;
 }
 
-export function buildDatabase(rawTables) {
-    database.tables = rawTables;
+export function buildDatabase(tablesToUse) { 
+    database.tables = tablesToUse;  
     database.pages = [];
     database.currentPages = {};
 
     let pageIndex = 0;
 
-    rawTables.forEach((table, tableIdx) => {
+    tablesToUse.forEach((table, tableIdx) => {  // ← utiliser le paramètre
         const totalRows = table.data.length;
         const totalPages = Math.ceil(totalRows / ROWS_PER_PAGE);
         database.currentPages[tableIdx] = 1;

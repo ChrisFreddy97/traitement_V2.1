@@ -90,7 +90,7 @@ const chartManager = {
 };
 
 // ===========================================
-// RENDER DASHBOARD PRINCIPAL
+// renderTechnicalDashboard
 // ===========================================
 
 export function renderTechnicalDashboard() {
@@ -103,6 +103,8 @@ export function renderTechnicalDashboard() {
     }
 
     container.innerHTML = `        
+        ${renderFilterPanel()}  <!-- ← NOUVEAU : le filtre en haut -->
+        
         <div class="section-title"><h2>🔧 DONNÉES TECHNIQUES</h2></div>
         <div id="infoCard" class="card"></div>
 
@@ -117,11 +119,8 @@ export function renderTechnicalDashboard() {
         <div class="section-title"><h2>⚡ ANALYSE ÉNERGIE</h2></div>
         <div id="clientConsumptionBoard" class="card"></div>
         <div id="energyCycleBoard" class="card"></div>
-        
     `;
 
-
-    // Vos render existants
     renderInfoCard();
     renderConformityCard();
     renderNormsCard();
@@ -129,10 +128,14 @@ export function renderTechnicalDashboard() {
     renderHighVoltageBoard();
     renderDailyChart();
     renderHourlyChart();
-    renderClientConsumptionBoard()
+    renderClientConsumptionBoard();
     renderDailyEnergyCycle();
+    
+    // Initialiser l'UI du filtre
+    setTimeout(() => {
+        updateFilterUI();
+    }, 100);
 }
-
 // ===========================================
 // FONCTIONS UTILITAIRES POUR LES BOUTONS DE DÉTAIL
 // ===========================================
@@ -2521,4 +2524,433 @@ export function destroyEnergyCycle() {
     cleanupDragEvents();
     chartManager.destroy('dailyEnergyCycleChart');
     currentManager = null;
+}
+
+
+// ===========================================
+// AJOUTER CES VARIABLES GLOBALES
+// ===========================================
+
+let currentFilter = {
+    period: 'all',
+    startDate: null,
+    endDate: null,
+    month: null,
+    year: null
+};
+
+
+/**
+ * Crée et retourne le HTML du panneau de filtre
+ */
+function renderFilterPanel() {
+    const lastDate = getLastDateFromData();
+    const lastYear = lastDate.getFullYear();
+    
+    // ===== RÉCUPÉRER TOUTES LES ANNÉES DISPONIBLES DANS LES DONNÉES =====
+    const availableYears = new Set();
+    
+    // Parcourir les tables de tension
+    const tensionTable = database.tables?.find(t => t.type === 'T');
+    if (tensionTable) {
+        tensionTable.data.forEach(row => {
+            const cells = row.split(';');
+            const timestamp = cells[1];
+            if (timestamp) {
+                const year = new Date(timestamp.split(' ')[0]).getFullYear();
+                if (!isNaN(year)) availableYears.add(year);
+            }
+        });
+    }
+    
+    // Parcourir les tables d'intensité
+    const intensiteTable = database.tables?.find(t => t.type === 'I');
+    if (intensiteTable) {
+        intensiteTable.data.forEach(row => {
+            const cells = row.split(';');
+            const timestamp = cells[1];
+            if (timestamp) {
+                const year = new Date(timestamp.split(' ')[0]).getFullYear();
+                if (!isNaN(year)) availableYears.add(year);
+            }
+        });
+    }
+    
+    // Convertir en tableau et trier (du plus récent au plus ancien)
+    const sortedYears = Array.from(availableYears).sort((a, b) => b - a);
+    
+    return `
+        <div class="filter-panel">
+            <div class="filter-header" onclick="toggleFilterPanel()">
+                <span class="filter-icon">🔍</span>
+                <span class="filter-title">Filtres</span>
+                <span class="filter-badge" id="filterActiveBadge" style="display: none;">Actif</span>
+                <span class="filter-toggle">▼</span>
+            </div>
+            
+            <div class="filter-content" id="filterContent">
+                <!-- Ligne 1: Périodes prédéfinies -->
+                <div class="filter-row">
+                    <div class="filter-label">Période rapide</div>
+                    <div class="filter-options">
+                        <button class="filter-btn ${currentFilter.period === '7days' ? 'active' : ''}" onclick="applyFilterPeriod('7days')">7 jours</button>
+                        <button class="filter-btn ${currentFilter.period === '15days' ? 'active' : ''}" onclick="applyFilterPeriod('15days')">15 jours</button>
+                        <button class="filter-btn ${currentFilter.period === '30days' ? 'active' : ''}" onclick="applyFilterPeriod('30days')">30 jours</button>
+                        <button class="filter-btn ${currentFilter.period === '2months' ? 'active' : ''}" onclick="applyFilterPeriod('2months')">2 mois</button>
+                        <button class="filter-btn ${currentFilter.period === '3months' ? 'active' : ''}" onclick="applyFilterPeriod('3months')">3 mois</button>
+                        <button class="filter-btn ${currentFilter.period === '6months' ? 'active' : ''}" onclick="applyFilterPeriod('6months')">6 mois</button>
+                        <button class="filter-btn ${currentFilter.period === '1year' ? 'active' : ''}" onclick="applyFilterPeriod('1year')">1 an</button>
+                        <button class="filter-btn ${currentFilter.period === 'all' ? 'active' : ''}" onclick="applyFilterPeriod('all')">Tout</button>
+                    </div>
+                </div>
+                
+                <!-- Ligne 2: Sélection mois/année -->
+                <div class="filter-row">
+                    <div class="filter-label">Mois spécifique</div>
+                    <div class="filter-options">
+                        <select class="filter-select" id="filterMonthSelect">
+                            <option value="">-- Mois --</option>
+                            ${Array.from({length: 12}, (_, i) => {
+                                const monthNum = i + 1;
+                                const monthName = new Date(2000, i, 1).toLocaleDateString('fr-FR', { month: 'long' });
+                                return `<option value="${monthNum}" ${currentFilter.month === monthNum ? 'selected' : ''}>${monthName}</option>`;
+                            }).join('')}
+                        </select>
+                        
+                        <select class="filter-select" id="filterYearSelect">
+                            <option value="">-- Année --</option>
+                            ${sortedYears.map(year => 
+                                `<option value="${year}" ${currentFilter.year === year ? 'selected' : ''}>${year}</option>`
+                            ).join('')}
+                        </select>
+                        
+                        <button class="filter-btn filter-btn-primary" onclick="applyFilterMonthYear()">Appliquer</button>
+                    </div>
+                </div>
+                
+                <!-- Ligne 3: Dates personnalisées -->
+                <div class="filter-row">
+                    <div class="filter-label">Dates personnalisées</div>
+                    <div class="filter-options">
+                        <div class="filter-date-group">
+                            <span>Du</span>
+                            <input type="date" class="filter-date-input" id="filterStartDate" value="${currentFilter.startDate ? formatDateForInput(currentFilter.startDate) : ''}">
+                        </div>
+                        <div class="filter-date-group">
+                            <span>Au</span>
+                            <input type="date" class="filter-date-input" id="filterEndDate" value="${currentFilter.endDate ? formatDateForInput(currentFilter.endDate) : ''}">
+                        </div>
+                        <button class="filter-btn filter-btn-primary" onclick="applyFilterCustomDates()">Appliquer</button>
+                        <button class="filter-btn" onclick="clearFilter()">Réinitialiser</button>
+                    </div>
+                </div>
+                
+                <!-- Résumé du filtre actif -->
+                <div class="filter-summary" id="filterSummary">
+                    📊 Aucun filtre actif
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+/**
+ * Fonction pour basculer l'affichage du panneau
+ */
+window.toggleFilterPanel = function() {
+    const content = document.getElementById('filterContent');
+    const toggle = document.querySelector('.filter-toggle');
+    if (content && toggle) {
+        if (content.style.display === 'none') {
+            content.style.display = 'block';
+            toggle.textContent = '▼';
+        } else {
+            content.style.display = 'none';
+            toggle.textContent = '▶';
+        }
+    }
+};
+
+
+/**
+ * Formate une date pour input type="date"
+ */
+function formatDateForInput(date) {
+    if (!date) return '';
+    const d = new Date(date);
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
+
+/**
+ * Récupère la dernière date disponible dans les données
+ */
+function getLastDateFromData() {
+    const allDates = [];
+    
+    const tensionTable = database.tables?.find(t => t.type === 'T');
+    if (tensionTable) {
+        tensionTable.data.forEach(row => {
+            const date = row.split(';')[1]?.split(' ')[0];
+            if (date) allDates.push(new Date(date));
+        });
+    }
+    
+    if (allDates.length > 0) {
+        return new Date(Math.max(...allDates));
+    }
+    return new Date();
+}
+
+/**
+ * Met à jour le résumé du filtre
+ */
+function updateFilterSummary() {
+    const summary = document.getElementById('filterSummary');
+    const badge = document.getElementById('filterActiveBadge');
+    
+    if (!summary) return;
+    
+    if (!currentFilter.period && !currentFilter.startDate && !currentFilter.endDate && !currentFilter.month && !currentFilter.year) {
+        summary.innerHTML = '📊 Aucun filtre actif - Affichage de toutes les données';
+        if (badge) badge.style.display = 'none';
+        return;
+    }
+    
+    let description = '';
+    
+    if (currentFilter.period && currentFilter.period !== 'all') {
+        const periodMap = {
+            '7days': '7 derniers jours',
+            '15days': '15 derniers jours',
+            '30days': '30 derniers jours',
+            '2months': '2 derniers mois',
+            '3months': '3 derniers mois',
+            '6months': '6 derniers mois',
+            '1year': '1 dernière année'
+        };
+        description = `📅 ${periodMap[currentFilter.period] || currentFilter.period}`;
+    } else if (currentFilter.month && currentFilter.year) {
+        const monthName = new Date(2000, currentFilter.month - 1, 1).toLocaleDateString('fr-FR', { month: 'long' });
+        description = `📅 ${monthName} ${currentFilter.year}`;
+    } else if (currentFilter.year && !currentFilter.month) {
+        description = `📅 Année ${currentFilter.year}`;
+    } else if (currentFilter.startDate || currentFilter.endDate) {
+        const startStr = currentFilter.startDate ? new Date(currentFilter.startDate).toLocaleDateString('fr-FR') : 'début';
+        const endStr = currentFilter.endDate ? new Date(currentFilter.endDate).toLocaleDateString('fr-FR') : 'fin';
+        description = `📅 Du ${startStr} au ${endStr}`;
+    } else if (currentFilter.period === 'all') {
+        description = '📊 Toutes les données';
+    }
+    
+    summary.innerHTML = description;
+    if (badge) badge.style.display = 'inline-block';
+}
+
+/**
+ * Applique un filtre par période
+ */
+window.applyFilterPeriod = function(period) {
+    currentFilter = {
+        period: period,
+        startDate: null,
+        endDate: null,
+        month: null,
+        year: null
+    };
+    
+    updateFilterUI();
+    
+    // Appeler la fonction d'application dans arduinoMain
+    if (window.parent && window.parent.applyFilter) {
+        window.parent.applyFilter(currentFilter);
+    } else {
+        // Fallback si pas dans un iframe
+        import('../../arduinoMain.js').then(module => {
+            module.applyFilter(currentFilter);
+        });
+    }
+};
+
+/**
+ * Applique un filtre par mois/année
+ */
+window.applyFilterMonthYear = function() {
+    const monthSelect = document.getElementById('filterMonthSelect');
+    const yearSelect = document.getElementById('filterYearSelect');
+    
+    const month = monthSelect.value ? parseInt(monthSelect.value) : null;
+    const year = yearSelect.value ? parseInt(yearSelect.value) : null;
+    
+    if (!month || !year) {
+        alert('Veuillez sélectionner un mois et une année');
+        return;
+    }
+    
+    currentFilter = {
+        period: null,
+        startDate: null,
+        endDate: null,
+        month: month,
+        year: year
+    };
+    
+    updateFilterUI();
+    
+    if (window.parent && window.parent.applyFilter) {
+        window.parent.applyFilter(currentFilter);
+    } else {
+        import('../../arduinoMain.js').then(module => {
+            module.applyFilter(currentFilter);
+        });
+    }
+};
+
+/**
+ * Applique un filtre par dates personnalisées
+ */
+window.applyFilterCustomDates = function() {
+    const startInput = document.getElementById('filterStartDate');
+    const endInput = document.getElementById('filterEndDate');
+    
+    const startDate = startInput.value ? new Date(startInput.value) : null;
+    const endDate = endInput.value ? new Date(endInput.value) : null;
+    
+    if (!startDate && !endDate) {
+        alert('Veuillez sélectionner au moins une date');
+        return;
+    }
+    
+    if (startDate && endDate && startDate > endDate) {
+        alert('La date de début doit être antérieure à la date de fin');
+        return;
+    }
+    
+    currentFilter = {
+        period: null,
+        startDate: startDate,
+        endDate: endDate,
+        month: null,
+        year: null
+    };
+    
+    updateFilterUI();
+    
+    if (window.parent && window.parent.applyFilter) {
+        window.parent.applyFilter(currentFilter);
+    } else {
+        import('../../arduinoMain.js').then(module => {
+            module.applyFilter(currentFilter);
+        });
+    }
+};
+
+/**
+ * Réinitialise tous les filtres
+ */
+window.clearFilter = function() {
+    currentFilter = {
+        period: 'all',
+        startDate: null,
+        endDate: null,
+        month: null,
+        year: null
+    };
+    
+    updateFilterUI();
+    
+    if (window.parent && window.parent.applyFilter) {
+        window.parent.applyFilter(currentFilter);
+    } else {
+        import('../../arduinoMain.js').then(module => {
+            module.applyFilter(currentFilter);
+        });
+    }
+};
+
+/**
+ * Met à jour l'interface du filtre
+ */
+function updateFilterUI() {
+    document.querySelectorAll('.filter-btn').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    
+    if (currentFilter.period) {
+        document.querySelectorAll(`.filter-btn[onclick*="'${currentFilter.period}'"]`).forEach(btn => {
+            btn.classList.add('active');
+        });
+    }
+    
+    const monthSelect = document.getElementById('filterMonthSelect');
+    const yearSelect = document.getElementById('filterYearSelect');
+    
+    if (monthSelect) monthSelect.value = currentFilter.month || '';
+    if (yearSelect) yearSelect.value = currentFilter.year || '';
+    
+    const startInput = document.getElementById('filterStartDate');
+    const endInput = document.getElementById('filterEndDate');
+    
+    if (startInput) startInput.value = currentFilter.startDate ? formatDateForInput(currentFilter.startDate) : '';
+    if (endInput) endInput.value = currentFilter.endDate ? formatDateForInput(currentFilter.endDate) : '';
+    
+    updateFilterSummary();
+}
+
+
+/**
+ * Applique le filtre à tout le dashboard
+ */
+function applyFilterToDashboard() {
+    console.log('🔍 Filtre appliqué:', currentFilter);
+    
+    // Afficher un indicateur de chargement
+    showFilterLoading(true);
+    
+    // Re-rendre tous les composants avec le filtre
+    setTimeout(() => {
+        // Rerender les composants qui doivent être filtrés
+        renderInfoCard();
+        renderConformityCard();
+        renderNormsCard();
+        renderLoadSheddingBoard();
+        renderHighVoltageBoard();
+        renderDailyChart();
+        
+        // Pour le graphique horaire, on réinitialise les données
+        chartStartIndex = 0;
+        chartEndIndex = 0;
+        allDates = [];
+        allTensionData = [];
+        renderHourlyChart();
+        
+        renderEnergyBoard();
+        renderCombinedEnergyTable();
+        
+        showFilterLoading(false);
+    }, 300);
+}
+
+
+/**
+ * Affiche/masque l'indicateur de chargement du filtre
+ */
+function showFilterLoading(show) {
+    let loader = document.getElementById('filterLoader');
+    
+    if (show) {
+        if (!loader) {
+            loader = document.createElement('div');
+            loader.id = 'filterLoader';
+            loader.className = 'filter-loader';
+            loader.innerHTML = '🔄 Mise à jour...';
+            document.querySelector('.filter-panel').appendChild(loader);
+        }
+        loader.style.display = 'block';
+    } else if (loader) {
+        loader.style.display = 'none';
+    }
 }

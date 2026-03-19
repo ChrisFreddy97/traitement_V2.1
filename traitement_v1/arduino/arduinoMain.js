@@ -9,8 +9,20 @@ import { handleCellClick } from './arduinoEvents.js';
 import { renderByTab } from './arduinoRender.js';
 
 
+
+// ===========================================
+// VARIABLE GLOBALE
+// ===========================================
+let currentFilter = {
+    period: 'all',
+    startDate: null,
+    endDate: null,
+    month: null,
+    year: null
+};
+
 // ============================================
-// DÉTECTION PLATEFORME (À METTRE TOUT EN HAUT)
+// DÉTECTION PLATEFORME
 // ============================================
 
 function detectPlatform() {
@@ -100,10 +112,8 @@ async function handleFileSelect() {
     simulateProgress();
 
     try {
-        // Lecture du fichier
         const content = await readFileAsync(file);
 
-        // Extraction du numéro NANORESEAU
         const nanoreseauMatch = content.match(/<#NANORESEAU:(\d+)>/);
         if (!nanoreseauMatch) {
             showError('Numéro NANORESEAU non trouvé');
@@ -111,40 +121,37 @@ async function handleFileSelect() {
         }
         nanoreseauValue.textContent = nanoreseauMatch[1];
 
-        // Parsing des tables brutes
+        // 1. Parser les tables brutes
         const rawTables = parseRawTables(content);
-        if (rawTables.length === 0) {
-            showError('Aucune donnée valide');
-            return;
-        }
-
-        // Construction de la base de données
-        buildDatabase(rawTables);
         
-        // ANALYSES - Dans l'ordre logique et dépendances
+        // 2. STOCKER LES TABLES BRUTES
+        database.rawTables = JSON.parse(JSON.stringify(rawTables)); // Copie profonde
+        
+        // 3. Appliquer le filtre par défaut
+        const tablesToUse = filterTablesByDate(rawTables, currentFilter);
+        
+        // 4. Build database avec les tables filtrées
+        buildDatabase(tablesToUse);
+        
+        // 5. Analyses
         console.log("🚀 Lancement des analyses...");
         
-        // 1. Événements (nécessaires pour les autres analyses)
         buildEventMap();
         const eventCount = database.eventMap.size;
         console.log(`✅ Étape 1/5 : ${eventCount} événements chargés`);
         
-        // 2. Analyses techniques
         analyzeTechnicalData();
         const hasTechData = database.technicalData && database.technicalData.daysCount > 0;
         console.log(`✅ Étape 2/5 : Analyse technique - ${hasTechData ? database.technicalData.daysCount + ' jours' : 'INCOMPLÈTE'}`);
         
-        // 3. Analyses énergie (dépend de T et I)
         analyzeEnergyData();
         const energyClients = Object.keys(database.energyData?.parClient || {}).length;
         console.log(`✅ Étape 3/5 : Analyse énergie - ${energyClients} clients ou 0 si incomplète`);
         
-        // 4. Analyses commerciales (dépend des événements et va utiliser énergie)
         analyzeCommercialData();
         const commercialClients = database.commercialData?.clients?.size || 0;
         console.log(`✅ Étape 4/5 : Analyse commerciale - ${commercialClients} clients analysés`);
         
-        // 5. CRITICAL: Lier l'énergie aux clients commerciaux
         const energyLinked = linkEnergyToCommercial();
         if (!energyLinked && energyClients > 0) {
             console.warn("⚠️ Attention : données énergétiques perte lors de la liaison");
@@ -153,10 +160,8 @@ async function handleFileSelect() {
         }
         console.log(`✅ Étape 5/5 : Liaison énergie-clients - ${energyLinked ? 'Réussie' : 'N/A'}`);
         
-        // Rendu final
         renderByTab();
         
-        // Afficher les sections
         document.getElementById('infoSection').classList.add('show');
         hideError();
         
@@ -171,7 +176,6 @@ async function handleFileSelect() {
         hideLoader();
     }
 }
-
 // ===========================================
 // ÉVÉNEMENTS D'IMPORT
 // ===========================================
@@ -228,3 +232,145 @@ window.refreshCurrentTab = function() {
 };
 
 console.log("✅ ArduinoMain initialisé - Prêt pour l'import");
+
+// ===========================================
+// FONCTION DE FILTRAGE CORRIGÉE (avec dates basées sur les données)
+// ===========================================
+export function applyFilter(newFilter) {
+    // ===== 1. CRÉER UNE COPIE DU FILTRE =====
+    let filterToApply = { ...newFilter };
+    
+    // ===== 2. RÉCUPÉRER LES DATES DISPONIBLES =====
+    let lastAvailableDate = new Date();
+    
+    if (database.technicalData?.dailyStats) {
+        const availableDates = Object.keys(database.technicalData.dailyStats).sort();
+        if (availableDates.length > 0) {
+            lastAvailableDate = new Date(availableDates[availableDates.length - 1]);
+            console.log(`📅 Dernière date disponible: ${lastAvailableDate.toLocaleDateString()}`);
+        }
+    }
+    
+    // ===== 3. TRADUIRE LA PÉRIODE EN DATES (basées sur la dernière date dispo) =====
+    if (filterToApply.period && filterToApply.period !== 'all') {
+        const endDate = new Date(lastAvailableDate); // Fin = dernière date dispo
+        const startDate = new Date(lastAvailableDate);
+        
+        switch(filterToApply.period) {
+            case '7days':
+                startDate.setDate(lastAvailableDate.getDate() - 7);
+                break;
+            case '15days':
+                startDate.setDate(lastAvailableDate.getDate() - 15);
+                break;
+            case '30days':
+                startDate.setDate(lastAvailableDate.getDate() - 30);
+                break;
+            case '2months':
+                startDate.setMonth(lastAvailableDate.getMonth() - 2);
+                break;
+            case '3months':
+                startDate.setMonth(lastAvailableDate.getMonth() - 3);
+                break;
+            case '6months':
+                startDate.setMonth(lastAvailableDate.getMonth() - 6);
+                break;
+            case '1year':
+                startDate.setFullYear(lastAvailableDate.getFullYear() - 1);
+                break;
+        }
+        
+        // Remplacer period par de vraies dates
+        filterToApply = {
+            period: null,
+            startDate: startDate,
+            endDate: endDate,
+            month: null,
+            year: null
+        };
+        
+        console.log(`📅 Période "${newFilter.period}" traduite en dates:`, 
+                    startDate.toLocaleDateString(), '→', endDate.toLocaleDateString());
+    }
+    
+    // ===== 4. APPLIQUER LE FILTRE =====
+    if (!database.rawTables || database.rawTables.length === 0) {
+        console.warn("Pas de données brutes disponibles");
+        return;
+    }
+    
+    showLoader();
+    
+    setTimeout(() => {
+        // Filtrer les tables brutes
+        const filteredTables = filterTablesByDate(database.rawTables, filterToApply);
+        
+        // Reconstruire la database avec les tables filtrées
+        buildDatabase(filteredTables);
+        
+        // Relancer les analyses
+        buildEventMap();
+        analyzeTechnicalData();
+        analyzeEnergyData();
+        analyzeCommercialData();
+        linkEnergyToCommercial();
+        
+        // Re-rendre
+        renderByTab();
+        
+        hideLoader();
+    }, 50);
+}
+
+// ===========================================
+// FONCTION DE FILTRAGE PAR DATE (inchangée)
+// ===========================================
+function filterTablesByDate(tables, filter) {
+    // Si pas de filtre actif, retourner toutes les tables
+    if (!filter.startDate && !filter.endDate && !filter.month && !filter.year) {
+        return tables;
+    }
+    
+    // Créer une copie profonde des tables
+    const filteredTables = JSON.parse(JSON.stringify(tables));
+    
+    // Filtrer chaque table
+    filteredTables.forEach(table => {
+        if (table.type === 'T' || table.type === 'I') {
+            table.data = table.data.filter(row => {
+                const cells = row.split(';');
+                const timestamp = cells[1];
+                if (!timestamp) return false;
+                
+                // Extraire la date (sans l'heure) - COMME DANS analyzeTensionData
+                const dateStr = timestamp.split(' ')[0];
+                const rowDate = new Date(dateStr);
+                rowDate.setHours(0, 0, 0, 0);
+                
+                // Appliquer les filtres
+                if (filter.startDate) {
+                    const start = new Date(filter.startDate);
+                    start.setHours(0, 0, 0, 0);
+                    if (rowDate < start) return false;
+                }
+                
+                if (filter.endDate) {
+                    const end = new Date(filter.endDate);
+                    end.setHours(0, 0, 0, 0);
+                    if (rowDate > end) return false;
+                }
+                
+                if (filter.month && filter.year) {
+                    if (rowDate.getMonth() + 1 !== filter.month || 
+                        rowDate.getFullYear() !== filter.year) return false;
+                } else if (filter.year && !filter.month) {
+                    if (rowDate.getFullYear() !== filter.year) return false;
+                }
+                
+                return true;
+            });
+        }
+    });
+    
+    return filteredTables;
+}
