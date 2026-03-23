@@ -15559,8 +15559,6 @@ function calculateHourlyDataForDateRange(dates) {
         peakHourDisplay: peakHour >= 0 ? `${peakHour}:00` : '-'
     };
 }
-// ======================== NOUVELLES FONCTIONS À AJOUTER ========================
-
 // ======================== CALCUL DES STATISTIQUES HORAIRES AVANCÉES ========================
 function calculateAdvancedHourlyStats(hourlyData) {
     if (!hourlyData || !hourlyData.allDataPoints || hourlyData.allDataPoints.length === 0) {
@@ -15807,7 +15805,7 @@ function updateAdvancedHourlyStats(hourlyData) {
                 </div>
                 <div>
                     <div style="font-size: 11px; color: #64748b; font-weight: 500; letter-spacing: 0.3px;">MOYENNE À 23H</div>
-                    <div style="font-weight: 800; font-size: 22px; color: #7e22ce; line-height: 1.2;">${formatNumber(stats.moyenne23h)} <span style="font-size: 14px; font-weight: 500; color: #7e22ce;">Wh</span></div>
+                    <div style="font-weight: 800; font-size: 22px; color: #7e22ce; line-height: 1.2;">${formatNumber(stats.moyenne23h)} <span style="font-size: 14px; font-weight: 500; color: #7e22ce;">Wh/h</span></div>
                 </div>
             </div>
             
@@ -15820,7 +15818,7 @@ function updateAdvancedHourlyStats(hourlyData) {
                 </div>
                 <div>
                     <div style="font-size: 11px; color: #64748b; font-weight: 500; letter-spacing: 0.3px;">MAX OBSERVÉ</div>
-                    <div style="font-weight: 800; font-size: 22px; color: #b91c1c; line-height: 1.2;">${formatNumber(stats.picMax.valeur)} <span style="font-size: 14px; font-weight: 500; color: #b91c1c;">Wh</span></div>
+                    <div style="font-weight: 800; font-size: 22px; color: #b91c1c; line-height: 1.2;">${formatNumber(stats.picMax.valeur)} <span style="font-size: 14px; font-weight: 500; color: #b91c1c;">Wh/h</span></div>
                     <div style="font-size: 10px; color: #991b1b; margin-top: 2px;">${stats.picMax.heure} · ${stats.picMax.date}</div>
                 </div>
             </div>
@@ -15834,7 +15832,7 @@ function updateAdvancedHourlyStats(hourlyData) {
                 </div>
                 <div>
                     <div style="font-size: 11px; color: #64748b; font-weight: 500; letter-spacing: 0.3px;">MOYENNE DES MAX</div>
-                    <div style="font-weight: 800; font-size: 22px; color: #c2410c; line-height: 1.2;">${formatNumber(stats.moyenneMaxJournalier)} <span style="font-size: 14px; font-weight: 500; color: #c2410c;">Wh</span></div>
+                    <div style="font-weight: 800; font-size: 22px; color: #c2410c; line-height: 1.2;">${formatNumber(stats.moyenneMaxJournalier)} <span style="font-size: 14px; font-weight: 500; color: #c2410c;">Wh/h</span></div>
                 </div>
             </div>
         </div>

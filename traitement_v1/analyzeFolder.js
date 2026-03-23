@@ -3873,7 +3873,7 @@ function createTotalEnergyChart() {
         <div style="width: 56px; height: 56px; background: ${dominantColor}; border-radius: 16px; display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 16px ${dominantColor}60;"><span style="font-size: 28px; color: white;">📊</span></div>
         <div style="flex: 1;">
             <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 8px; flex-wrap: wrap;">
-                <span style="font-size: 14px; color: #475569; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase;">Répartition par kit (sans recommandation)</span>
+                <span style="font-size: 14px; color: #475569; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase;">Répartition par kit</span>
             </div>
             <div style="display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap;">
                 <span style="font-size: 14px; color: #475569; background: white; padding: 6px 14px; border-radius: 40px; border: 1px solid ${dominantColor}20; font-weight: 600;">
