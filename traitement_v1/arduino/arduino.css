@@ -278,22 +278,22 @@
     background: #f0f4ff; /* Remplacé gradient */
 }
 
-.day-badge.surtension {
-    background: #fff3e0;
-    color: #e65100;
-    border-color: #ffb74d;
+.day-badge.surtension { 
+    background: #fff3e0; 
+    color: #e65100; 
+    border-color: #ffb74d; 
 }
 
-.day-badge.soustension {
-    background: #e3f2fd;
-    color: #0d47a1;
-    border-color: #64b5f6;
+.day-badge.soustension { 
+    background: #e3f2fd; 
+    color: #0d47a1; 
+    border-color: #64b5f6; 
 }
 
-.day-badge.variation {
-    background: #f3e5f5;
-    color: #4a148c;
-    border-color: #ba68c8;
+.day-badge.variation { 
+    background: #f3e5f5; 
+    color: #4a148c; 
+    border-color: #ba68c8; 
 }
 
 /* ----- NORMS GRID ----- */
@@ -624,7 +624,7 @@ tr:nth-child(even) {
     .grid-2, .grid-3, .grid-4 {
         grid-template-columns: 1fr;
     }
-
+    
     .stats-grid {
         grid-template-columns: 1fr;
     }
@@ -882,7 +882,7 @@ html {
     .stats-grid-4 {
         flex-direction: column;
     }
-
+    
     .stats-grid-4 .stat-card {
         width: 100%;
     }
