@@ -10225,7 +10225,7 @@ function createClientCreditAnalysis(clientNumber) {
                 <div style="margin-top: 10px;">
                     <div style="display: flex; align-items: center; gap: 5px; margin-bottom: 8px;">
                         <span style="font-size: 14px;">📈</span>
-                        <span style="font-weight: 600; font-size: 12px;">Répartition par intervalle</span>
+                        <span style="font-weight: 600; font-size: 12px;">Habitude d'achat</span>
                     </div>
                     
                     <div style="height: 36px; background: #f1f5f9; border-radius: 18px; overflow: hidden; display: flex; margin-bottom: 10px; box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);">
@@ -10269,7 +10269,7 @@ function createClientCreditAnalysis(clientNumber) {
                     
                     <div style="background: #f1f5f9; padding: 6px 10px; border-radius: 6px; font-size: 11px; display: flex; align-items: center; gap: 8px;">
                         <span style="font-size: 14px;">🏆</span>
-                        <span><strong>Intervalle principal :</strong> <span style="background: ${mainInterval.color}20; color: ${mainInterval.color}; padding: 2px 12px; border-radius: 20px; font-weight: 700;">${mainInterval.name}</span> (${mainInterval.percent}%, ${mainInterval.range})</span>
+                        <span><strong>Habitude :</strong> <span style="background: ${mainInterval.color}20; color: ${mainInterval.color}; padding: 2px 12px; border-radius: 20px; font-weight: 700;">${mainInterval.name}</span> (${mainInterval.percent}%, ${mainInterval.range})</span>
                     </div>
                 </div>
                 
