@@ -5734,53 +5734,6 @@ function createNominalTensionTable(tensionResults, systemType, allDates) {
                     </div>
                 </div>
             </div>
-
-            <!-- Synthèse rapide -->
-            <div style="background: #f8fafc; border-radius: 14px; padding: 16px; margin-top: 15px;
-                      border: 1px solid #e2e8f0; display: flex; align-items: center; gap: 20px; flex-wrap: wrap;">
-                <div style="display: flex; align-items: center; gap: 10px;">
-                    <span style="font-size: 24px;">📈</span>
-                    <div>
-                        <div style="font-size: 13px; color: #475569;">Performance globale</div>
-                        <div style="font-size: 18px; font-weight: 700; color: #0f172a;">
-                            ${(parseFloat(percent4Plus) + parseFloat(percent3) + parseFloat(percent2) + parseFloat(percent1)).toFixed(1)}% des jours
-                        </div>
-                    </div>
-                </div>
-                <div style="width: 1px; height: 40px; background: #cbd5e1;"></div>
-                <div style="display: flex; align-items: center; gap: 10px;">
-                    <span style="font-size: 24px;">🎯</span>
-                    <div>
-                        <div style="font-size: 13px; color: #475569;">Atteinte moyenne</div>
-                        <div style="font-size: 18px; font-weight: 700; color: #0f172a;">
-                            ${daysWithData > 0 ? (totalNominalHits / daysWithData).toFixed(1) : '0'} par jour
-                        </div>
-                    </div>
-                </div>
-                <div style="width: 1px; height: 40px; background: #cbd5e1;"></div>
-                <div style="display: flex; align-items: center; gap: 10px;">
-                    <span style="font-size: 24px;">⚡</span>
-                    <div>
-                        <div style="font-size: 13px; color: #475569;">Jours sans atteinte</div>
-                        <div style="font-size: 18px; font-weight: 700; color: #ef4444;">
-                            ${daysWith0} jour(s) (${percent0}%)
-                        </div>
-                    </div>
-                </div>
-                ${daysWithoutData > 0 ? `
-                <div style="width: 1px; height: 40px; background: #cbd5e1;"></div>
-                <div style="display: flex; align-items: center; gap: 10px;">
-                    <span style="font-size: 24px;">📭</span>
-                    <div>
-                        <div style="font-size: 13px; color: #475569;">Sans données</div>
-                        <div style="font-size: 18px; font-weight: 700; color: #94a3b8;">
-                            ${daysWithoutData} jour(s) (${percentWithoutData}%)
-                        </div>
-                    </div>
-                </div>
-                ` : ''}
-            </div>
-        </div>
     `;
 
     return `
