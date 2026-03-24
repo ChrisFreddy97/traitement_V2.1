@@ -1607,7 +1607,6 @@ function createTechnicalDataCard() {
 }
 
 // ==================== CARD 3 : ANALYSE TOTALE TENSION ====================
-
 function createTensionAnalysisContent() {
     const dataToUse = filteredTensionData.length > 0 ? filteredTensionData : combinedTensionData;
     if (dataToUse.length === 0) return null;
@@ -1618,7 +1617,7 @@ function createTensionAnalysisContent() {
     const analysisDiv = document.createElement('div');
     analysisDiv.style.cssText = `display: flex; flex-direction: column; gap: 20px;`;
     
-    // Statistiques 4 cartes
+    // Statistiques 4 cartes (inchangé)
     const statsRow = document.createElement('div');
     statsRow.style.cssText = `display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px;`;
     statsRow.innerHTML = `
@@ -1645,25 +1644,74 @@ function createTensionAnalysisContent() {
     `;
     analysisDiv.appendChild(statsRow);
     
-    // Tableau des dépassements
+    // ========== SECTION TABLEAU DES DÉPASSEMENTS AVEC BOUTON ==========
+    const exceedanceSection = document.createElement('div');
+    exceedanceSection.style.cssText = `border: 1px solid #fee2e2; border-radius: 10px; overflow: hidden;`;
+    
+    // En-tête avec bouton pour cacher/afficher
+    const exceedanceHeader = document.createElement('div');
+    exceedanceHeader.style.cssText = `background: #fef2f2; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #fee2e2; cursor: pointer; transition: all 0.2s ease;`;
+    
+    // Partie gauche du header (titre et statistiques)
+    const headerLeft = document.createElement('div');
+    headerLeft.style.cssText = `display: flex; align-items: center; gap: 10px;`;
+    headerLeft.innerHTML = `
+        <span style="font-size: 18px;">📅</span>
+        <span style="font-weight: 700; color: #991b1b;">JOURS AVEC DÉPASSEMENT DE SEUIL (${exceedanceData.exceedanceDays.length})</span>
+        <span style="font-size: 12px; color: #64748b; margin-left: 10px;">Total: ${exceedanceData.totalExceedances} dépassement${exceedanceData.totalExceedances !== 1 ? 's' : ''}</span>
+    `;
+    
+    // Bouton toggle
+    const toggleBtn = document.createElement('button');
+    toggleBtn.style.cssText = `
+        background: rgba(239, 68, 68, 0.15);
+        border: 1px solid #ef4444;
+        color: #991b1b;
+        padding: 6px 14px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 12px;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        transition: all 0.2s ease;
+    `;
+    toggleBtn.innerHTML = `
+        <span style="font-size: 12px;">🔽</span>
+        <span>Afficher le tableau</span>
+    `;
+    toggleBtn.onmouseover = () => {
+        toggleBtn.style.background = 'rgba(239, 68, 68, 0.25)';
+    };
+    toggleBtn.onmouseout = () => {
+        toggleBtn.style.background = 'rgba(239, 68, 68, 0.15)';
+    };
+    
+    exceedanceHeader.appendChild(headerLeft);
+    exceedanceHeader.appendChild(toggleBtn);
+    
+    // Conteneur du tableau (caché par défaut)
+    const tableWrapper = document.createElement('div');
+    tableWrapper.style.cssText = `
+        overflow-x: auto;
+        overflow-y: auto;
+        max-height: 260px;
+        padding: 16px;
+        background: white;
+        overscroll-behavior: contain;
+        display: none; /* ✅ CACHÉ PAR DÉFAUT */
+    `;
+    
+    // Générer le contenu du tableau
+    let tableHTML = `<table style="width: 100%; border-collapse: collapse; font-size: 12px;"><thead style="background: #f1f5f9;">`;
+    tableHTML += `<tr><th style="padding: 12px 8px; text-align: left; color: #475569; font-weight: 600; border-bottom: 2px solid #cbd5e1;">Date</th>`;
+    tableHTML += `<th style="padding: 12px 8px; text-align: center; color: #475569; font-weight: 600; border-bottom: 2px solid #cbd5e1;">Variation</th>`;
+    tableHTML += `<th style="padding: 12px 8px; text-align: center; color: #475569; font-weight: 600; border-bottom: 2px solid #cbd5e1;">Heures alerte</th>`;
+    tableHTML += `<th style="padding: 12px 8px; text-align: center; color: #475569; font-weight: 600; border-bottom: 2px solid #cbd5e1;">Min / Max</th>`;
+    tableHTML += `<th style="padding: 12px 8px; text-align: center; color: #475569; font-weight: 600; border-bottom: 2px solid #cbd5e1;">Valeurs hors seuil</th></tr></thead><tbody>`;
+    
     if (exceedanceData.exceedanceDays.length > 0) {
-        const exceedanceSection = document.createElement('div');
-        exceedanceSection.style.cssText = `border: 1px solid #fee2e2; border-radius: 10px; overflow: hidden;`;
-        const exceedanceHeader = document.createElement('div');
-        exceedanceHeader.style.cssText = `background: #fef2f2; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #fee2e2;`;
-        exceedanceHeader.innerHTML = `<div style="display: flex; align-items: center; gap: 10px;"><span style="font-size: 18px;">📅</span><span style="font-weight: 700; color: #991b1b;">JOURS AVEC DÉPASSEMENT DE SEUIL (${exceedanceData.exceedanceDays.length})</span></div><span style="font-size: 12px; color: #64748b;">Total: ${exceedanceData.totalExceedances} dépassement${exceedanceData.totalExceedances !== 1 ? 's' : ''}</span>`;
-        
-        const tableWrapper = document.createElement('div');
-        tableWrapper.style.cssText = `
-            overflow-x: auto;
-            overflow-y: auto;
-            max-height: 260px;
-            padding: 16px;
-            background: white;
-            overscroll-behavior: contain;
-        `;
-        let tableHTML = `<table style="width: 100%; border-collapse: collapse; font-size: 12px;"><thead style="background: #f1f5f9;"><tr><th style="padding: 12px 8px; text-align: left; color: #475569; font-weight: 600; border-bottom: 2px solid #cbd5e1;">Date</th><th style="padding: 12px 8px; text-align: center; color: #475569; font-weight: 600; border-bottom: 2px solid #cbd5e1;">Variation</th><th style="padding: 12px 8px; text-align: center; color: #475569; font-weight: 600; border-bottom: 2px solid #cbd5e1;">Heures alerte</th><th style="padding: 12px 8px; text-align: center; color: #475569; font-weight: 600; border-bottom: 2px solid #cbd5e1;">Min / Max</th><th style="padding: 12px 8px; text-align: center; color: #475569; font-weight: 600; border-bottom: 2px solid #cbd5e1;">Valeurs hors seuil</th></tr></thead><tbody>`;
-        
         exceedanceData.exceedanceDays.forEach((day, index) => {
             let rowBgColor = index % 2 === 0 ? '#ffffff' : '#fafbfc';
             if (day.hoursOutOfLimits >= 3) rowBgColor = '#fff5f5';
@@ -1675,25 +1723,49 @@ function createTensionAnalysisContent() {
             if (day.maxOutOfLimit !== '-') exceedanceValues.push(`Max: ${day.maxOutOfLimit}V`);
             const exceedanceText = exceedanceValues.length > 0 ? exceedanceValues.join(' • ') : '-';
             
-            tableHTML += `<tr style="border-bottom: 1px solid #e2e8f0; background: ${rowBgColor};"><td style="padding: 10px 8px; text-align: left; color: #1e293b; font-weight: 500;"><div style="display: flex; flex-direction: column;"><span>${day.formattedDate}</span><span style="font-size: 10px; color: #64748b;">${day.date}</span></div></td><td style="padding: 10px 8px; text-align: center; color: ${day.dailyVariation > exceedanceData.limits.maxVariation ? '#f59e0b' : '#1e293b'}; font-weight: ${day.dailyVariation > exceedanceData.limits.maxVariation ? '700' : '400'};">${day.dailyVariation}V</td><td style="padding: 10px 8px; text-align: center;"><span style="background: ${day.hoursOutOfLimits > 0 ? 'rgba(239, 68, 68, 0.1)' : 'transparent'}; color: ${day.hoursOutOfLimits > 0 ? '#ef4444' : '#64748b'}; padding: 4px 8px; border-radius: 4px; font-weight: ${day.hoursOutOfLimits > 0 ? '600' : '400'};">${day.hoursOutOfLimits}h</span></td><td style="padding: 10px 8px; text-align: center; color: #1e293b;">${minMaxDisplay}</td><td style="padding: 10px 8px; text-align: center;"><span style="background: rgba(239, 68, 68, 0.1); color: #ef4444; padding: 4px 8px; border-radius: 4px; font-weight: 600;">${exceedanceText}</span></td></tr>`;
+            tableHTML += `<tr style="border-bottom: 1px solid #e2e8f0; background: ${rowBgColor};"><td style="padding: 10px 8px; text-align: left; color: #1e293b; font-weight: 500;"><div style="display: flex; flex-direction: column;"><span>${day.formattedDate}</span><span style="font-size: 10px; color: #64748b;">${day.date}</span></div>`;
+            tableHTML += `<td style="padding: 10px 8px; text-align: center; color: ${day.dailyVariation > exceedanceData.limits.maxVariation ? '#f59e0b' : '#1e293b'}; font-weight: ${day.dailyVariation > exceedanceData.limits.maxVariation ? '700' : '400'};">${day.dailyVariation}V`;
+            tableHTML += `<td style="padding: 10px 8px; text-align: center;"><span style="background: ${day.hoursOutOfLimits > 0 ? 'rgba(239, 68, 68, 0.1)' : 'transparent'}; color: ${day.hoursOutOfLimits > 0 ? '#ef4444' : '#64748b'}; padding: 4px 8px; border-radius: 4px; font-weight: ${day.hoursOutOfLimits > 0 ? '600' : '400'};">${day.hoursOutOfLimits}h</span>`;
+            tableHTML += `<td style="padding: 10px 8px; text-align: center; color: #1e293b;">${minMaxDisplay}`;
+            tableHTML += `<td style="padding: 10px 8px; text-align: center;"><span style="background: rgba(239, 68, 68, 0.1); color: #ef4444; padding: 4px 8px; border-radius: 4px; font-weight: 600;">${exceedanceText}</span></td></tr>`;
         });
-        tableHTML += `</tbody></table>`;
-        tableWrapper.innerHTML = tableHTML;
-        exceedanceSection.appendChild(exceedanceHeader);
-        exceedanceSection.appendChild(tableWrapper);
-        analysisDiv.appendChild(exceedanceSection);
-    } else {
-        const noExceedanceMsg = document.createElement('div');
-        noExceedanceMsg.style.cssText = `padding: 20px; background: #f0fff4; border: 1px solid #22c55e; border-radius: 10px; text-align: center; display: flex; align-items: center; justify-content: center; gap: 10px;`;
-        noExceedanceMsg.innerHTML = `<span style="font-size: 24px;">✅</span><div><span style="font-weight: 700; color: #15803d;">Aucun dépassement de seuil détecté</span><div style="font-size: 12px; color: #64748b; margin-top: 4px;">La tension est restée dans les limites ${exceedanceData.systemType} (${exceedanceData.limits.min}V - ${exceedanceData.limits.max}V) pendant toute la période</div></div>`;
-        analysisDiv.appendChild(noExceedanceMsg);
     }
+    tableHTML += `</tbody>`;
+    tableHTML += `</table>`;
+    tableWrapper.innerHTML = tableHTML;
     
+    exceedanceSection.appendChild(exceedanceHeader);
+    exceedanceSection.appendChild(tableWrapper);
+    analysisDiv.appendChild(exceedanceSection);
     
+    // ========== ÉVÉNEMENT DU BOUTON ==========
+    let isTableVisible = false;
+    toggleBtn.onclick = (e) => {
+        e.stopPropagation();
+        isTableVisible = !isTableVisible;
+        if (isTableVisible) {
+            tableWrapper.style.display = 'block';
+            toggleBtn.innerHTML = `
+                <span style="font-size: 12px;">🔼</span>
+                <span>Masquer le tableau</span>
+            `;
+        } else {
+            tableWrapper.style.display = 'none';
+            toggleBtn.innerHTML = `
+                <span style="font-size: 12px;">🔽</span>
+                <span>Afficher le tableau</span>
+            `;
+        }
+    };
     
+    // Optionnel: cliquer sur l'en-tête fait aussi toggle
+    exceedanceHeader.onclick = (e) => {
+        // Éviter de déclencher si on a cliqué sur le bouton
+        if (e.target === toggleBtn || toggleBtn.contains(e.target)) return;
+        toggleBtn.click();
+    };
     
-    
-    // Normes système
+    // Normes système (inchangé)
     const normsDiv = document.createElement('div');
     normsDiv.style.cssText = `background: #f8fafc; border-radius: 10px; padding: 16px; border: 1px solid #e2e8f0;`;
     normsDiv.innerHTML = `
@@ -1744,13 +1816,30 @@ function displayTensionStabilityAnalysis() {
     setTimeout(() => {
         createTensionChart();
         
-        // ✅ CRÉER LE FILTRE DE PÉRIODE UNE SEULE FOIS
+        // CRÉER LE FILTRE DE PÉRIODE UNE SEULE FOIS
         if (!document.getElementById('hourly-tension-period-filter')) {
             createHourlyTensionPeriodFilter();
         }
         
-        // ✅ APPELER LE GRAPHIQUE SANS CRÉER LE FILTRE À L'INTÉRIEUR
+        // APPELER LE GRAPHIQUE SANS CRÉER LE FILTRE À L'INTÉRIEUR
         createHourlyTensionChart('all');
+        
+        // ✅ AFFICHER LE TABLEAU DES DÉLESTAGES DANS LA CARD DÉDIÉE
+        const delestageContainer = document.getElementById('card-delestage-content');
+        if (delestageContainer) {
+            if (combinedEventData.length > 0) {
+                delestageContainer.innerHTML = '';
+                const delestageTable = createDelestageEventsTable();
+                delestageContainer.appendChild(delestageTable);
+            } else {
+                delestageContainer.innerHTML = `
+                    <div style="padding: 40px; text-align: center; color: #64748b; background: #f8fafc;">
+                        <span style="font-size: 48px; display: block; margin-bottom: 15px;">📭</span>
+                        <p style="margin: 0;">Aucune donnée d'événement disponible pour l'analyse des délestages</p>
+                    </div>
+                `;
+            }
+        }
     }, 100);
 }
 function analyzeDelestageEvents() {
@@ -1761,7 +1850,8 @@ function analyzeDelestageEvents() {
             totalEvents: 0, 
             totalPartiel: 0, 
             totalTotal: 0,
-            totalDuration: '0h'
+            totalDuration: '0h',
+            totalDiagnosticDays: 0
         };
     }
     
@@ -1937,32 +2027,9 @@ function analyzeDelestageEvents() {
         `${totalHours}h${totalMins > 0 ? totalMins + 'min' : ''}` : 
         `${totalMins}min`;
     
-    return {
-        eventsByDay: eventsByDay,
-        totalEvents: totalPartiel + totalTotal,
-        totalPartiel: totalPartiel,
-        totalTotal: totalTotal,
-        totalDuration: totalDuration || '0h'
-    };
-}
-function createDelestageEventsTable() {
-    const container = document.createElement('div');
-    container.id = 'delestage-events-table-container';
-    container.style.cssText = `
-        margin-top: 25px;
-        background: white;
-        border-radius: 16px;
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-        overflow: hidden;
-        border: 1px solid #e2e8f0;
-    `;
-    
-    const delestageData = analyzeDelestageEvents();
-    
-    // ✅ Calculer le nombre total de jours avec diagnostic (données)
+    // ✅ CALCULER LE NOMBRE TOTAL DE JOURS DE DIAGNOSTIC
     const totalDiagnosticDays = new Set();
     
-    // Récupérer tous les jours des données d'énergie
     if (combinedEnergyData.length > 0) {
         combinedEnergyData.forEach(row => {
             if (row['Date et Heure']) {
@@ -1972,7 +2039,6 @@ function createDelestageEventsTable() {
         });
     }
     
-    // Récupérer tous les jours des données de tension
     if (combinedTensionData.length > 0) {
         combinedTensionData.forEach(row => {
             if (row['Date et Heure']) {
@@ -1982,7 +2048,30 @@ function createDelestageEventsTable() {
         });
     }
     
-    const totalDays = totalDiagnosticDays.size;
+    return {
+        eventsByDay: eventsByDay,
+        totalEvents: totalPartiel + totalTotal,
+        totalPartiel: totalPartiel,
+        totalTotal: totalTotal,
+        totalDuration: totalDuration || '0h',
+        totalDiagnosticDays: totalDiagnosticDays.size
+    };
+}
+function createDelestageEventsTable() {
+    const container = document.createElement('div');
+    container.id = 'delestage-events-table-container';
+    container.style.cssText = `
+        background: white;
+        border-radius: 16px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+        overflow: hidden;
+        border: 1px solid #e2e8f0;
+    `;
+    
+    const delestageData = analyzeDelestageEvents();
+    
+    // ✅ Utiliser les jours de diagnostic calculés dans analyzeDelestageEvents
+    const totalDays = delestageData.totalDiagnosticDays;
     
     // Vérifier si des données existent
     if (!delestageData || delestageData.totalEvents === 0) {
@@ -2012,7 +2101,7 @@ function createDelestageEventsTable() {
     const percentTotal = totalDays > 0 ? ((daysWithTotal / totalDays) * 100).toFixed(1) : 0;
     const percentBoth = totalDays > 0 ? ((daysWithBoth / totalDays) * 100).toFixed(1) : 0;
     
-    // En-tête
+    // ========== EN-TÊTE AVEC BOUTON ==========
     const header = document.createElement('div');
     header.style.cssText = `
         background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%);
@@ -2027,27 +2116,66 @@ function createDelestageEventsTable() {
         gap: 15px;
     `;
     
-    header.innerHTML = `
-        <div style="display: flex; align-items: center; gap: 12px;">
-            <span style="font-size: 24px;">🔌</span>
-            <span>Événements de Délestage - Analyse détaillée</span>
-        </div>
-        <div style="display: flex; align-items: center; gap: 15px;">
-            <span style="background: rgba(255,255,255,0.15); padding: 6px 16px; border-radius: 30px; font-size: 12px; font-weight: 600;">
-                📅 ${totalDays} jour(s) de diagnostic
-            </span>
-            <span style="background: #ea580c80; padding: 6px 16px; border-radius: 30px; font-size: 12px; font-weight: 600;">
-                🔌 Partiel: ${delestageData.totalPartiel}
-            </span>
-            <span style="background: #991b1b80; padding: 6px 16px; border-radius: 30px; font-size: 12px; font-weight: 600;">
-                🔋 Total: ${delestageData.totalTotal}
-            </span>
-        </div>
+    // Partie gauche de l'en-tête
+    const headerLeft = document.createElement('div');
+    headerLeft.style.cssText = `display: flex; align-items: center; gap: 12px;`;
+    headerLeft.innerHTML = `
+        <span style="font-size: 24px;">🔌</span>
+        <span>Événements de Délestage - Analyse détaillée</span>
     `;
     
+    // Badges de statistiques
+    const headerStats = document.createElement('div');
+    headerStats.style.cssText = `display: flex; align-items: center; gap: 15px;`;
+    headerStats.innerHTML = `
+        <span style="background: rgba(255,255,255,0.15); padding: 6px 16px; border-radius: 30px; font-size: 12px; font-weight: 600;">
+            📅 ${totalDays} jour(s) de diagnostic
+        </span>
+        <span style="background: #ea580c80; padding: 6px 16px; border-radius: 30px; font-size: 12px; font-weight: 600;">
+            🔌 Partiel: ${delestageData.totalPartiel}
+        </span>
+        <span style="background: #991b1b80; padding: 6px 16px; border-radius: 30px; font-size: 12px; font-weight: 600;">
+            🔋 Total: ${delestageData.totalTotal}
+        </span>
+    `;
+    
+    // Bouton pour afficher/masquer le tableau
+    const toggleBtn = document.createElement('button');
+    toggleBtn.style.cssText = `
+        background: rgba(255,255,255,0.2);
+        border: 1px solid rgba(255,255,255,0.4);
+        color: white;
+        padding: 8px 16px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 13px;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        transition: all 0.2s ease;
+    `;
+    toggleBtn.innerHTML = `
+        <span style="font-size: 14px;">🔽</span>
+        <span>Afficher le tableau détaillé</span>
+    `;
+    toggleBtn.onmouseover = () => {
+        toggleBtn.style.background = 'rgba(255,255,255,0.3)';
+    };
+    toggleBtn.onmouseout = () => {
+        toggleBtn.style.background = 'rgba(255,255,255,0.2)';
+    };
+    
+    const headerWrapper = document.createElement('div');
+    headerWrapper.style.cssText = `display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 15px; width: 100%;`;
+    headerWrapper.appendChild(headerLeft);
+    headerWrapper.appendChild(headerStats);
+    headerWrapper.appendChild(toggleBtn);
+    
+    header.appendChild(headerWrapper);
     container.appendChild(header);
     
-    // ✅ CARTES DE POURCENTAGES
+    // ========== CARTES DE POURCENTAGES (TOUJOURS VISIBLES) ==========
     const statsCards = document.createElement('div');
     statsCards.style.cssText = `
         padding: 20px 25px;
@@ -2127,7 +2255,7 @@ function createDelestageEventsTable() {
     
     container.appendChild(statsCards);
     
-    // Légende
+    // ========== LÉGENDE (TOUJOURS VISIBLE) ==========
     const legend = document.createElement('div');
     legend.style.cssText = `
         padding: 12px 25px;
@@ -2156,8 +2284,9 @@ function createDelestageEventsTable() {
     
     container.appendChild(legend);
     
-    // Tableau avec hauteur fixe de 350px
+    // ========== TABLEAU (CACHÉ PAR DÉFAUT) ==========
     const tableWrapper = document.createElement('div');
+    tableWrapper.id = 'delestage-table-wrapper';
     tableWrapper.style.cssText = `
         max-height: 350px;
         overflow-y: auto;
@@ -2165,6 +2294,7 @@ function createDelestageEventsTable() {
         position: relative;
         scrollbar-width: thin;
         background: white;
+        display: none; /* ✅ CACHÉ PAR DÉFAUT */
     `;
     
     let tableHTML = `
@@ -2174,7 +2304,7 @@ function createDelestageEventsTable() {
                     <th style="padding: 14px 10px; text-align: left; border-bottom: 3px solid #1e293b; position: sticky; left: 0; background: #334155; color: white; font-weight: 700;">📅 DATE</th>
                     <th style="padding: 14px 10px; text-align: center; border-bottom: 3px solid #1e293b; background: #334155; color: white; font-weight: 700;" colspan="3">🔌 DÉLESTAGE PARTIEL</th>
                     <th style="padding: 14px 10px; text-align: center; border-bottom: 3px solid #1e293b; background: #334155; color: white; font-weight: 700;" colspan="3">🔋 DÉLESTAGE TOTAL</th>
-                </tr>
+                  </tr>
                 <tr style="background: #f1f5f9;">
                     <th style="padding: 12px 10px; text-align: left; border-bottom: 2px solid #cbd5e1; position: sticky; left: 0; background: #f1f5f9;"></th>
                     <th style="padding: 12px 10px; text-align: center; border-bottom: 2px solid #cbd5e1; background: #f1f5f9;">Début</th>
@@ -2203,7 +2333,7 @@ function createDelestageEventsTable() {
                     <span style="font-size: 13px;">${day.date}</span>
                     <span style="font-size: 9px; color: #64748b; margin-top: 2px;">${day.dateObj}</span>
                 </div>
-            </td>
+             </td>
         `;
         
         // Délestage Partiel - première occurrence
@@ -2302,7 +2432,7 @@ function createDelestageEventsTable() {
     tableWrapper.innerHTML = tableHTML;
     container.appendChild(tableWrapper);
     
-    // Pied de tableau avec statistiques
+    // Pied de tableau (caché avec le tableau)
     const footer = document.createElement('div');
     footer.style.cssText = `
         padding: 15px 25px;
@@ -2315,7 +2445,9 @@ function createDelestageEventsTable() {
         color: #475569;
         flex-wrap: wrap;
         gap: 15px;
+        display: none; /* ✅ CACHÉ PAR DÉFAUT AVEC LE TABLEAU */
     `;
+    footer.id = 'delestage-table-footer';
     
     footer.innerHTML = `
         <div style="display: flex; align-items: center; gap: 20px;">
@@ -2329,6 +2461,28 @@ function createDelestageEventsTable() {
     `;
     
     container.appendChild(footer);
+    
+    // ========== ÉVÉNEMENT DU BOUTON ==========
+    let isTableVisible = false;
+    toggleBtn.onclick = (e) => {
+        e.stopPropagation();
+        isTableVisible = !isTableVisible;
+        if (isTableVisible) {
+            tableWrapper.style.display = 'block';
+            footer.style.display = 'flex';
+            toggleBtn.innerHTML = `
+                <span style="font-size: 14px;">🔼</span>
+                <span>Masquer le tableau détaillé</span>
+            `;
+        } else {
+            tableWrapper.style.display = 'none';
+            footer.style.display = 'none';
+            toggleBtn.innerHTML = `
+                <span style="font-size: 14px;">🔽</span>
+                <span>Afficher le tableau détaillé</span>
+            `;
+        }
+    };
     
     return container;
 }
@@ -3999,7 +4153,7 @@ const DAY_COLORS = [
     '#06b6d4'  // Cyan
 ];
 
-// ==================== GRAPHIQUE ÉNERGIE TOTALE PAR HEURE (STYLE BARRES ÉPAISSES) ====================
+// ==================== GRAPHIQUE ÉNERGIE TOTALE PAR HEURE ====================
 function createHourlyEnergyChart(dateFilter = 'all', startDate = null, endDate = null) {
     const container = document.getElementById('hourly-energy-chart-placeholder');
     if (!container) return;
@@ -4125,8 +4279,7 @@ function createHourlyEnergyChart(dateFilter = 'all', startDate = null, endDate =
         }
     }
     
-    // ===== ORGANISER LES DONNÉES PAR POINT TEMPOREL POUR TOUS LES JOURS =====
-    // Comme dans votre fonction createEnergyHourlyRangeChart, on va créer une liste de tous les points
+    // ===== 1. ORGANISER LES DONNÉES POUR LE GRAPHIQUE CUMULÉ (barres avec contour) =====
     const allDataPoints = [];
     const detailsByDate = {};
     const allDates = [];
@@ -4144,7 +4297,6 @@ function createHourlyEnergyChart(dateFilter = 'all', startDate = null, endDate =
         const timestamp = dateTime.getTime();
         const label = `${dateStr} ${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
         
-        // Initialiser la date si nécessaire
         if (!detailsByDate[dateStr]) {
             detailsByDate[dateStr] = {
                 totalsByHour: {},
@@ -4153,28 +4305,23 @@ function createHourlyEnergyChart(dateFilter = 'all', startDate = null, endDate =
             allDates.push(dateStr);
         }
         
-        // Initialiser le tableau des clients pour cette date
         if (!detailsByDate[dateStr].perClientByHour[label]) {
             detailsByDate[dateStr].perClientByHour[label] = {};
         }
         
-        // Sommer l'énergie des 6 clients
         let hourTotal = 0;
         for (let i = 1; i <= 6; i++) {
             const energyKey = `Energie${i}`;
             const cellValue = row[energyKey];
-            
             if (cellValue && cellValue.toString().trim() !== '' && cellValue.toString().trim() !== '-') {
                 const energyValue = parseFloat(cellValue.toString().replace(',', '.'));
                 if (!isNaN(energyValue)) {
                     hourTotal += energyValue;
-                    // Stocker par client
                     detailsByDate[dateStr].perClientByHour[label][`client_${i}`] = energyValue;
                 }
             }
         }
         
-        // Stocker le point de données
         allDataPoints.push({
             date: dateStr,
             time: timeStr,
@@ -4185,17 +4332,13 @@ function createHourlyEnergyChart(dateFilter = 'all', startDate = null, endDate =
             total: hourTotal
         });
         
-        // Stocker le total par heure pour cette date
         if (!detailsByDate[dateStr].totalsByHour[label]) {
             detailsByDate[dateStr].totalsByHour[label] = 0;
         }
         detailsByDate[dateStr].totalsByHour[label] = hourTotal;
     });
     
-    // Trier les dates
     allDates.sort((a, b) => new Date(a) - new Date(b));
-    
-    // Trier tous les points par timestamp
     allDataPoints.sort((a, b) => a.timestamp - b.timestamp);
     
     if (allDataPoints.length === 0) {
@@ -4203,45 +4346,192 @@ function createHourlyEnergyChart(dateFilter = 'all', startDate = null, endDate =
         return;
     }
     
-    // Générer une palette de couleurs distinctes pour chaque date
     const palette = generateColorPalette(allDates.length);
-    
-    // Créer les labels (tous les points dans l'ordre chronologique)
     const labels = allDataPoints.map(p => p.label);
     
-    // Créer les datasets - un dataset par date
-    const datasets = allDates.map((date, idx) => {
+    // Graphique 1: Barres avec contour seulement (pas de remplissage)
+    const datasetsCumul = allDates.map((date, idx) => {
         const color = palette[idx] || '#f59e0b';
-        
-        // Créer un tableau de données avec null partout sauf pour les points de cette date
         const data = new Array(allDataPoints.length).fill(null);
-        
         allDataPoints.forEach((point, pointIndex) => {
             if (point.date === date) {
                 data[pointIndex] = point.total;
+            }
+        });
+        return {
+            label: date,
+            data: data,
+            backgroundColor: 'transparent',  // ✅ Intérieur transparent
+            borderColor: color,              // ✅ Contour coloré
+            borderWidth: 2,                  // ✅ Épaisseur du contour
+            borderRadius: 4,
+            barThickness: 14,
+            maxBarThickness: 20,
+            barPercentage: 1.0,
+            categoryPercentage: 1.0
+        };
+    });
+    
+    const maxValue = Math.max(...allDataPoints.map(p => p.total), 0);
+    const yMax = Math.ceil(maxValue * 1.15);
+    
+    // ===== 2. ORGANISER LES DONNÉES POUR LE GRAPHIQUE CONSOMMATION HORAIRE (barres avec contour) =====
+    // Pour chaque jour, on calcule la consommation par intervalle horaire (différence entre deux heures)
+    const hourlyConsumptionPoints = [];
+    const hourlyConsumptionByDate = {};
+    const allHourlyConsumptionPoints = [];
+    
+    allDates.forEach(date => {
+        // Récupérer tous les points de cette date
+        const datePoints = allDataPoints.filter(p => p.date === date).sort((a, b) => a.hour - b.hour);
+        
+        // Créer un tableau des valeurs par heure (24 heures)
+        const hourlyValues = Array(24).fill(null);
+        datePoints.forEach(point => {
+            hourlyValues[point.hour] = point.total;
+        });
+        
+        // Calculer la consommation par intervalle horaire (différence entre heure n et heure n+1)
+        // On crée des points pour chaque intervalle: de 00h-01h, 01h-02h, ..., 22h-23h
+        const intervalConsumptions = [];
+        const intervalLabels = [];
+        
+        for (let h = 0; h < 23; h++) {
+            const currentValue = hourlyValues[h];
+            const nextValue = hourlyValues[h + 1];
+            
+            let consumption = null;
+            if (currentValue !== null && nextValue !== null) {
+                consumption = nextValue - currentValue;
+                // Si la consommation est négative, on la considère comme 0
+                if (consumption < 0) consumption = 0;
+            }
+            
+            const intervalLabel = `${h}h-${h+1}h`;
+            intervalLabels.push(intervalLabel);
+            intervalConsumptions.push(consumption);
+        }
+        
+        // Stocker les points pour ce jour
+        hourlyConsumptionByDate[date] = {
+            date: date,
+            intervalLabels: intervalLabels,
+            consumptions: intervalConsumptions,
+            formattedDate: new Date(date).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+        };
+        
+        // Ajouter tous les points pour la liste continue
+        intervalConsumptions.forEach((consumption, idx) => {
+            allHourlyConsumptionPoints.push({
+                date: date,
+                interval: idx,
+                intervalLabel: intervalLabels[idx],
+                consumption: consumption,
+                displayLabel: `${date} ${intervalLabels[idx]}`
+            });
+        });
+    });
+    
+    // Trier les points par date puis par intervalle
+    allHourlyConsumptionPoints.sort((a, b) => {
+        const dateCompare = new Date(a.date) - new Date(b.date);
+        if (dateCompare !== 0) return dateCompare;
+        return a.interval - b.interval;
+    });
+    
+    // Créer les labels pour le graphique 2 (continu)
+    const consumptionLabels = allHourlyConsumptionPoints.map(p => p.displayLabel);
+    
+    // Graphique 2: Barres avec contour seulement (pas de remplissage) - un dataset par jour
+    const hourlyConsumptionDatasets = allDates.map((date, idx) => {
+        const color = palette[idx % palette.length];
+        const dayData = hourlyConsumptionByDate[date];
+        
+        // Créer un tableau de données avec null partout sauf pour les points de ce jour
+        const data = new Array(consumptionLabels.length).fill(null);
+        allHourlyConsumptionPoints.forEach((point, pointIndex) => {
+            if (point.date === date) {
+                data[pointIndex] = point.consumption;
             }
         });
         
         return {
             label: date,
             data: data,
-            backgroundColor: color,           // Couleur pleine
-            borderColor: color,
-            borderWidth: 0,                    // Pas de bordure
-            borderRadius: 6,                    // Coins arrondis
-            // === BARRES ÉPAISSES ===
-            barThickness: 14,                   // Épaisseur fixe en pixels
-            maxBarThickness: 20,                 // Épaisseur maximum
-            barPercentage: 1.0,                   // Utiliser tout l'espace
-            categoryPercentage: 1.0                // Utiliser toute la catégorie
+            backgroundColor: 'transparent',  // ✅ Intérieur transparent
+            borderColor: color,              // ✅ Contour coloré
+            borderWidth: 2,                  // ✅ Épaisseur du contour
+            borderRadius: 4,
+            barThickness: 14,
+            maxBarThickness: 20,
+            barPercentage: 0.9,
+            categoryPercentage: 0.9,
+            type: 'bar'                      // ✅ Type barre
         };
     });
     
-    // Calculer le max pour l'échelle Y
-    const maxValue = Math.max(...allDataPoints.map(p => p.total), 0);
-    const yMax = Math.ceil(maxValue * 1.15);
+    // Calculer les statistiques pour les cartes
+    // Filtrer les consommations valides (non nulles)
+    const validConsumptions = allHourlyConsumptionPoints.filter(p => p.consumption !== null && p.consumption > 0).map(p => p.consumption);
+    const totalConsumption = validConsumptions.reduce((sum, v) => sum + v, 0);
+    const avgConsumptionPerInterval = validConsumptions.length > 0 ? totalConsumption / validConsumptions.length : 0;
     
-    // Créer le conteneur du graphique
+    // Calculer la consommation par plage horaire (jour/nuit)
+    let dayConsumption = 0, nightConsumption = 0;
+    let dayCount = 0, nightCount = 0;
+    
+    allHourlyConsumptionPoints.forEach(point => {
+        if (point.consumption === null || point.consumption <= 0) return;
+        const hourStart = parseInt(point.intervalLabel.split('-')[0]);
+        if (hourStart >= 6 && hourStart < 18) {
+            dayConsumption += point.consumption;
+            dayCount++;
+        } else {
+            nightConsumption += point.consumption;
+            nightCount++;
+        }
+    });
+    
+    const dayAvg = dayCount > 0 ? dayConsumption / dayCount : 0;
+    const nightAvg = nightCount > 0 ? nightConsumption / nightCount : 0;
+    const totalEnergy = dayConsumption + nightConsumption;
+    const dayPercentage = totalEnergy > 0 ? (dayConsumption / totalEnergy * 100).toFixed(1) : 0;
+    const nightPercentage = totalEnergy > 0 ? (nightConsumption / totalEnergy * 100).toFixed(1) : 0;
+    
+    // Moyenne à l'intervalle 22h-23h (dernier intervalle)
+    let lastIntervalTotal = 0, lastIntervalCount = 0;
+    allHourlyConsumptionPoints.forEach(point => {
+        if (point.intervalLabel === '22h-23h' && point.consumption !== null && point.consumption > 0) {
+            lastIntervalTotal += point.consumption;
+            lastIntervalCount++;
+        }
+    });
+    const avgAtLastInterval = lastIntervalCount > 0 ? lastIntervalTotal / lastIntervalCount : 0;
+    
+    // Max observé
+    let globalMaxValue = 0, globalMaxInterval = '', globalMaxDate = '';
+    allHourlyConsumptionPoints.forEach(point => {
+        if (point.consumption !== null && point.consumption > globalMaxValue) {
+            globalMaxValue = point.consumption;
+            globalMaxInterval = point.intervalLabel;
+            globalMaxDate = point.date;
+        }
+    });
+    const maxDateFormatted = globalMaxDate ? new Date(globalMaxDate).toLocaleDateString('fr-FR') : '-';
+    
+    // Moyenne des max par jour
+    let sumDailyMax = 0, dailyMaxCount = 0;
+    allDates.forEach(date => {
+        const dayPoints = allHourlyConsumptionPoints.filter(p => p.date === date && p.consumption !== null && p.consumption > 0);
+        const maxOfDay = Math.max(...dayPoints.map(p => p.consumption), 0);
+        if (maxOfDay > 0) {
+            sumDailyMax += maxOfDay;
+            dailyMaxCount++;
+        }
+    });
+    const avgDailyMax = dailyMaxCount > 0 ? sumDailyMax / dailyMaxCount : 0;
+    
+    // ===== CRÉER LA CARD UNIQUE =====
     const chartContainer = document.createElement('div');
     chartContainer.id = 'hourly-energy-chart-container';
     chartContainer.style.cssText = `
@@ -4283,178 +4573,233 @@ function createHourlyEnergyChart(dateFilter = 'all', startDate = null, endDate =
             <span style="font-size: 16px;">📅</span>
             <span>${selectedDateFormatted}</span>
             <span style="font-size: 12px; background: rgba(255,255,255,0.2); padding: 2px 8px; border-radius: 20px;">
-                ${allDates.length}j · ${allDataPoints.length} points
+                ${allDates.length}j
             </span>
         `;
     } else {
         periodBadge.innerHTML = `
             <span style="font-size: 16px;">📊</span>
             <span>Toutes les données (${allDates.length} jours)</span>
-            <span style="font-size: 12px; background: rgba(255,255,255,0.2); padding: 2px 8px; border-radius: 20px;">
-                ${allDataPoints.length} points
-            </span>
         `;
     }
     
-    // Badges pour les filtres globaux
     const globalFiltersBadge = document.createElement('div');
-    globalFiltersBadge.style.cssText = `
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        flex-wrap: wrap;
-        margin-left: auto;
-    `;
-    
+    globalFiltersBadge.style.cssText = `display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-left: auto;`;
     if (activeFilters.length > 0) {
         activeFilters.forEach(filter => {
             const filterChip = document.createElement('span');
-            filterChip.style.cssText = `
-                background: #e2e8f0;
-                color: #475569;
-                padding: 4px 10px;
-                border-radius: 20px;
-                font-size: 11px;
-                font-weight: 500;
-                display: flex;
-                align-items: center;
-                gap: 5px;
-            `;
+            filterChip.style.cssText = `background: #e2e8f0; color: #475569; padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 500; display: flex; align-items: center; gap: 5px;`;
             filterChip.innerHTML = `<span style="font-size: 12px;">🔍</span> ${filter}`;
             globalFiltersBadge.appendChild(filterChip);
         });
     }
     
     badgeContainer.appendChild(periodBadge);
-    if (globalFiltersBadge.children.length > 0) {
-        badgeContainer.appendChild(globalFiltersBadge);
-    }
+    if (globalFiltersBadge.children.length > 0) badgeContainer.appendChild(globalFiltersBadge);
+    chartContainer.appendChild(badgeContainer);
     
-    // En-tête principal
-    const header = document.createElement('div');
-    header.style.cssText = `
+    // ===== STATISTIQUES (6 cartes) =====
+    const statsGrid = document.createElement('div');
+    statsGrid.style.cssText = `
+        display: grid;
+        grid-template-columns: repeat(6, 1fr);
+        gap: 12px;
+        padding: 20px 25px;
+        background: #f8fafc;
+        border-bottom: 1px solid #e2e8f0;
+    `;
+    
+    statsGrid.innerHTML = `
+        <div style="background: white; border-radius: 10px; padding: 12px; text-align: center; border-left: 4px solid #f59e0b;">
+            <div style="font-size: 11px; color: #64748b; margin-bottom: 5px;">📊 MOYENNE PAR INTERVALLE</div>
+            <div style="font-size: 22px; font-weight: 800; color: #f59e0b;">${avgConsumptionPerInterval.toFixed(1)}</div>
+            <div style="font-size: 10px; color: #475569;">Wh/h</div>
+        </div>
+        <div style="background: white; border-radius: 10px; padding: 12px; text-align: center; border-left: 4px solid #f97316;">
+            <div style="font-size: 11px; color: #64748b; margin-bottom: 5px;">🌅 JOUR (6h-18h)</div>
+            <div style="font-size: 22px; font-weight: 800; color: #f97316;">${dayAvg.toFixed(1)}</div>
+            <div style="font-size: 10px; color: #475569;">Wh/h · ${dayPercentage}%</div>
+        </div>
+        <div style="background: white; border-radius: 10px; padding: 12px; text-align: center; border-left: 4px solid #3b82f6;">
+            <div style="font-size: 11px; color: #64748b; margin-bottom: 5px;">🌙 NUIT (18h-6h)</div>
+            <div style="font-size: 22px; font-weight: 800; color: #3b82f6;">${nightAvg.toFixed(1)}</div>
+            <div style="font-size: 10px; color: #475569;">Wh/h · ${nightPercentage}%</div>
+        </div>
+        <div style="background: white; border-radius: 10px; padding: 12px; text-align: center; border-left: 4px solid #22c55e;">
+            <div style="font-size: 11px; color: #64748b; margin-bottom: 5px;">📅 MOYENNE 22h-23h</div>
+            <div style="font-size: 22px; font-weight: 800; color: #22c55e;">${avgAtLastInterval.toFixed(1)}</div>
+            <div style="font-size: 10px; color: #475569;">Wh/h</div>
+        </div>
+        <div style="background: white; border-radius: 10px; padding: 12px; text-align: center; border-left: 4px solid #ef4444;">
+            <div style="font-size: 11px; color: #64748b; margin-bottom: 5px;">🔥 MAX OBSERVÉ</div>
+            <div style="font-size: 22px; font-weight: 800; color: #ef4444;">${globalMaxValue.toFixed(1)}</div>
+            <div style="font-size: 10px; color: #475569;">Wh/h</div>
+            <div style="font-size: 8px; color: #94a3b8;">${globalMaxInterval} · ${maxDateFormatted}</div>
+        </div>
+        <div style="background: white; border-radius: 10px; padding: 12px; text-align: center; border-left: 4px solid #8b5cf6;">
+            <div style="font-size: 11px; color: #64748b; margin-bottom: 5px;">📈 MOYENNE DES MAX</div>
+            <div style="font-size: 22px; font-weight: 800; color: #8b5cf6;">${avgDailyMax.toFixed(1)}</div>
+            <div style="font-size: 10px; color: #475569;">Wh/h</div>
+        </div>
+    `;
+    chartContainer.appendChild(statsGrid);
+    
+    // ===== GRAPHIQUE 1 : CUMULÉ (BARRES AVEC CONTOUR SEULEMENT) =====
+    const header1 = document.createElement('div');
+    header1.style.cssText = `
         background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
         color: white;
-        padding: 15px 25px;
-        font-size: 16px;
+        padding: 12px 25px;
+        font-size: 14px;
         font-weight: 700;
         display: flex;
         align-items: center;
-        justify-content: space-between;
-        flex-wrap: wrap;
         gap: 10px;
     `;
+    header1.innerHTML = `<span style="font-size: 18px;">📊</span> ÉNERGIE TOTALE PAR HEURE - Évolution temporelle (cumul par date)`;
+    chartContainer.appendChild(header1);
     
-    header.innerHTML = `
-        <div style="display: flex; align-items: center; gap: 12px;">
-            <span style="font-size: 20px;">⏰</span>
-            <span>ÉNERGIE TOTALE PAR HEURE (Somme des 6 clients)</span>
+    const chartWrapper1 = document.createElement('div');
+    chartWrapper1.style.cssText = `padding: 20px; height: 450px; position: relative;`;
+    const canvasContainer1 = document.createElement('div');
+    canvasContainer1.style.cssText = `height: 400px; position: relative;`;
+    chartWrapper1.appendChild(canvasContainer1);
+    chartContainer.appendChild(chartWrapper1);
+    
+    const ctx1 = document.createElement('canvas');
+    ctx1.id = 'hourly-energy-chart-canvas-cumul';
+    ctx1.style.width = '100%';
+    ctx1.style.height = '100%';
+    canvasContainer1.appendChild(ctx1);
+    
+    // ===== GRAPHIQUE 2 : CONSOMMATION HORAIRE PAR INTERVALLE (BARRES AVEC CONTOUR SEULEMENT) =====
+    const header2 = document.createElement('div');
+    header2.style.cssText = `
+        background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+        color: white;
+        padding: 12px 25px;
+        font-size: 14px;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-top: 10px;
+    `;
+    header2.innerHTML = `<span style="font-size: 18px;">📈</span> CONSOMMATION HORAIRE PAR INTERVALLE (Wh) - Différence entre heures consécutives`;
+    chartContainer.appendChild(header2);
+    
+    const chartWrapper2 = document.createElement('div');
+    chartWrapper2.style.cssText = `padding: 20px; height: 450px; position: relative;`;
+    const canvasContainer2 = document.createElement('div');
+    canvasContainer2.style.cssText = `height: 400px; position: relative;`;
+    chartWrapper2.appendChild(canvasContainer2);
+    chartContainer.appendChild(chartWrapper2);
+    
+    const ctx2 = document.createElement('canvas');
+    ctx2.id = 'hourly-energy-chart-canvas-horaire';
+    ctx2.style.width = '100%';
+    ctx2.style.height = '100%';
+    canvasContainer2.appendChild(ctx2);
+    
+    // Légende finale
+    const legendFooter = document.createElement('div');
+    legendFooter.style.cssText = `
+        padding: 15px 25px;
+        background: #f8fafc;
+        border-top: 1px solid #e2e8f0;
+        font-size: 11px;
+        color: #475569;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 20px;
+        justify-content: center;
+    `;
+    legendFooter.innerHTML = `
+        <div style="display: flex; align-items: center; gap: 8px;">
+            <div style="width: 16px; height: 16px; border: 2px solid #f59e0b; border-radius: 4px; background: transparent;"></div>
+            <span>Graphique 1: Énergie cumulée par heure (contour seulement)</span>
         </div>
-        <div style="display: flex; align-items: center; gap: 15px;">
-            <span style="font-size: 12px; background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 20px;">
-                ${allDates.length} jours
-            </span>
-            <span style="font-size: 12px; background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 20px;">
-                Max: ${maxValue.toFixed(2)} Wh
-            </span>
+        <div style="display: flex; align-items: center; gap: 8px;">
+            <div style="width: 16px; height: 16px; border: 2px solid #22c55e; border-radius: 4px; background: transparent;"></div>
+            <span>Graphique 2: Consommation horaire = différence entre heure n et heure n+1 (contour seulement)</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 14px;">📊</span>
+            <span>Exemple: 01h=2Wh, 02h=10Wh → consommation 01h-02h = 8Wh</span>
         </div>
     `;
+    chartContainer.appendChild(legendFooter);
     
-    const chartWrapper = document.createElement('div');
-    chartWrapper.style.cssText = `padding: 20px; height: 500px; position: relative;`;
-    
-    const canvasContainer = document.createElement('div');
-    canvasContainer.style.cssText = `
-        height: 430px;
-        position: relative;
-        margin-bottom: 10px;
-    `;
-    
-    // Assemblage
-    chartContainer.appendChild(badgeContainer);
-    chartContainer.appendChild(header);
-    chartWrapper.appendChild(canvasContainer);
-    chartContainer.appendChild(chartWrapper);
     container.appendChild(chartContainer);
     
-    // Créer le canvas
-    const ctx = document.createElement('canvas');
-    ctx.id = 'hourly-energy-chart-canvas';
-    ctx.style.width = '100%';
-    ctx.style.height = '100%';
-    canvasContainer.appendChild(ctx);
-    
-    // Créer le graphique en barres (style identique à votre fonction)
+    // ===== CRÉER LES GRAPHIQUES =====
     setTimeout(() => {
         if (typeof Chart === 'undefined') return;
         
         try {
-            const existingChart = Chart.getChart(ctx);
-            if (existingChart) existingChart.destroy();
+            // Graphique 1: Barres cumulées par date (contour seulement)
+            const existingChart1 = Chart.getChart(ctx1);
+            if (existingChart1) existingChart1.destroy();
             
-            new Chart(ctx, {
+            new Chart(ctx1, {
+                type: 'bar',
+                data: { labels: labels, datasets: datasetsCumul },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: true, position: 'top', labels: { font: { size: 10, weight: 'bold' }, usePointStyle: true, boxWidth: 8 } },
+                        tooltip: {
+                            callbacks: {
+                                title: (context) => context[0].label,
+                                label: (context) => `⚡ ${context.parsed.y?.toFixed(2) || 0} Wh`,
+                                afterBody: (context) => {
+                                    const point = allDataPoints[context[0].dataIndex];
+                                    if (!point) return [];
+                                    const details = detailsByDate[point.date];
+                                    if (!details?.perClientByHour?.[point.label]) return [];
+                                    const lines = ['📊 Détail par client:'];
+                                    for (let i = 1; i <= 6; i++) {
+                                        const v = details.perClientByHour[point.label][`client_${i}`];
+                                        if (v) lines.push(`   Client ${i}: ${v.toFixed(2)} Wh`);
+                                    }
+                                    return lines;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: { beginAtZero: true, max: yMax, title: { display: true, text: 'Énergie (Wh)' }, ticks: { callback: v => v.toFixed(0) + ' Wh' } },
+                        x: { ticks: { maxRotation: 45, minRotation: 30, maxTicksLimit: 30, callback: (val, idx) => idx % 6 === 0 ? labels[idx] : '' }, title: { display: true, text: 'Date et Heure' } }
+                    }
+                }
+            });
+            
+            // Graphique 2: Barres de consommation horaire (contour seulement)
+            const existingChart2 = Chart.getChart(ctx2);
+            if (existingChart2) existingChart2.destroy();
+            
+            new Chart(ctx2, {
                 type: 'bar',
                 data: {
-                    labels: labels,
-                    datasets: datasets
+                    labels: consumptionLabels,
+                    datasets: hourlyConsumptionDatasets
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    animation: {
-                        duration: 800,
-                        easing: 'easeInOutQuart'
-                    },
                     plugins: {
                         legend: {
                             display: true,
                             position: 'top',
-                            labels: {
-                                font: { size: 11, weight: 'bold' },
-                                color: '#1e293b',
-                                usePointStyle: true,
-                                padding: 15,
-                                boxWidth: 8
-                            }
+                            labels: { font: { size: 10, weight: 'bold' }, usePointStyle: true, boxWidth: 8 }
                         },
                         tooltip: {
-                            backgroundColor: 'rgba(15, 23, 42, 0.95)',
-                            padding: 12,
-                            titleFont: { size: 13, weight: 'bold' },
-                            bodyFont: { size: 12 },
-                            cornerRadius: 8,
-                            displayColors: false,
                             callbacks: {
-                                title: function(context) {
-                                    return context[0].label;
-                                },
-                                label: function(context) {
+                                label: (context) => {
                                     const value = context.parsed.y;
-                                    if (value === null || value === 0) return '⚡ Aucune consommation';
-                                    return `⚡ Énergie totale: ${value.toFixed(2)} Wh`;
-                                },
-                                afterBody: function(context) {
-                                    const item = context[0];
-                                    const point = allDataPoints[item.dataIndex];
-                                    if (!point) return [];
-                                    
-                                    const date = point.date;
-                                    const label = point.label;
-                                    const details = detailsByDate[date];
-                                    
-                                    if (!details || !details.perClientByHour || !details.perClientByHour[label]) return [];
-                                    
-                                    const clientData = details.perClientByHour[label];
-                                    const lines = [' ', '📊 Détail par client:'];
-                                    
-                                    for (let i = 1; i <= 6; i++) {
-                                        const clientValue = clientData[`client_${i}`];
-                                        if (clientValue && clientValue > 0) {
-                                            lines.push(`   Client ${i.toString().padStart(2, '0')}: ${clientValue.toFixed(2)} Wh`);
-                                        }
-                                    }
-                                    
-                                    return lines;
+                                    if (value === null) return '⚡ Aucune donnée';
+                                    return `⚡ ${value.toFixed(2)} Wh consommés sur cet intervalle`;
                                 }
                             }
                         }
@@ -4462,60 +4807,30 @@ function createHourlyEnergyChart(dateFilter = 'all', startDate = null, endDate =
                     scales: {
                         y: {
                             beginAtZero: true,
-                            max: yMax,
-                            title: {
-                                display: true,
-                                text: 'Énergie (Wh)',
-                                font: { size: 12, weight: 'bold' },
-                                color: '#475569'
-                            },
-                            ticks: {
-                                font: { size: 11 },
-                                color: '#64748b',
-                                callback: value => value.toFixed(0) + ' Wh'
-                            },
-                            grid: {
-                                color: 'rgba(245, 158, 11, 0.1)',
-                                lineWidth: 1
-                            }
+                            title: { display: true, text: 'Consommation (Wh)' },
+                            ticks: { callback: v => v.toFixed(0) + ' Wh' }
                         },
                         x: {
-                            title: {
-                                display: true,
-                                text: 'Date et Heure',
-                                font: { size: 12, weight: 'bold' },
-                                color: '#475569',
-                                padding: { top: 10 }
-                            },
-                            ticks: {
-                                font: { size: 9 },
-                                color: '#64748b',
-                                maxRotation: 45,
-                                minRotation: 30,
+                            title: { display: true, text: 'Jour et Intervalle horaire (0h-1h, 1h-2h, ...)' },
+                            ticks: { 
+                                maxRotation: 45, 
+                                minRotation: 30, 
                                 maxTicksLimit: 30,
-                                callback: function(val, index) {
-                                    // Afficher 1 label sur 6 pour éviter la surcharge
-                                    if (index % 6 === 0 || index === 0 || index === labels.length - 1) {
-                                        return this.getLabelForValue(val);
+                                callback: (val, idx) => {
+                                    if (idx % 6 === 0 || idx === 0 || idx === consumptionLabels.length - 1) {
+                                        return consumptionLabels[idx];
                                     }
                                     return '';
                                 }
-                            },
-                            grid: {
-                                display: false
                             }
                         }
                     }
                 }
             });
             
-            console.log(`✅ Graphique énergie horaire (barres épaisses) créé avec ${allDates.length} jours et ${allDataPoints.length} points`);
-            
-            // Ajouter le résumé statistique
-            addHourlyEnergySummary(chartContainer, allDataPoints, maxValue, isDateRange ? selectedDateFormatted : null);
-            
+            console.log(`✅ Graphiques énergie horaire créés avec ${allDates.length} jours`);
         } catch (error) {
-            console.error('❌ Erreur création graphique énergie horaire:', error);
+            console.error('❌ Erreur création graphiques:', error);
         }
     }, 100);
 }
@@ -7683,9 +7998,7 @@ function displayClientCommercialAnalysis(container, clientNumber) {
         <div style="flex: 1;">
             <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
                 <h2 style="margin: 0; font-size: 24px; font-weight: 700;">Client ${clientNumber}</h2>
-                <span style="background: ${isActive ? '#22c55e' : '#94a3b8'}; padding: 4px 15px; border-radius: 30px; font-size: 14px; font-weight: 600;">
-                    ${isActive ? 'Actif' : 'Inactif'}
-                </span>
+                
                 <span style="background: rgba(255,255,255,0.2); padding: 4px 15px; border-radius: 30px; font-size: 14px;">
                     ${currentForfait} · ${forfaitMax}Wh
                 </span>
@@ -8438,7 +8751,7 @@ function createClientEventsTable(clientNumber) {
         <div style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); border-radius: 10px; padding: 12px; color: white;">
             <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
                 <span style="font-size: 20px;">📈</span>
-                <span style="font-size: 12px; font-weight: 600; opacity: 0.9;">PUISSANCE</span>
+                <span style="font-size: 12px; font-weight: 600; opacity: 0.9;">PUISSANCE DÉPASSÉE</span>
             </div>
             <div style="font-size: 28px; font-weight: 800; margin-bottom: 4px;">${daysWithSuspendP.size}</div>
             <div style="font-size: 11px; opacity: 0.9;">jour(s) concerné(s)</div>
@@ -8452,7 +8765,7 @@ function createClientEventsTable(clientNumber) {
         <div style="background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%); border-radius: 10px; padding: 12px; color: white;">
             <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
                 <span style="font-size: 20px;">🔋</span>
-                <span style="font-size: 12px; font-weight: 600; opacity: 0.9;">ÉNERGIE</span>
+                <span style="font-size: 12px; font-weight: 600; opacity: 0.9;">ÉNERGIE ÉPUISÉE</span>
             </div>
             <div style="font-size: 28px; font-weight: 800; margin-bottom: 4px;">${daysWithSuspendE.size}</div>
             <div style="font-size: 11px; opacity: 0.9;">jour(s) concerné(s)</div>
@@ -9907,87 +10220,6 @@ function createClientCreditAnalysis(clientNumber) {
             });
             
             habitSection.innerHTML = `
-                <!-- Habitude de recharge (détail) -->
-                <div style="margin-bottom: 15px;">
-                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
-                        <div style="display: flex; align-items: center; gap: 5px;">
-                            <span style="font-size: 16px;">📊</span>
-                            <span style="font-weight: 600; font-size: 13px;">Habitudes de recharge</span>
-                        </div>
-                        <span style="background: #e2e8f0; padding: 2px 10px; border-radius: 12px; font-size: 10px; font-weight: 600;">
-                            ${totalPurchases} recharges
-                        </span>
-                    </div>
-                    
-                    <!-- Barre de progression avec tooltips -->
-                    <div style="height: 36px; background: #f1f5f9; border-radius: 18px; overflow: hidden; display: flex; margin-bottom: 10px; box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);">
-                        ${sortedDays.map(([days, count]) => {
-                            const percentage = (count / totalPurchases * 100).toFixed(1);
-                            const isMain = days === mainHabit.days;
-                            
-                            let bgColor = '';
-                            if (days >= 30) bgColor = '#22c55e';
-                            else if (days >= 20) bgColor = '#84cc16';
-                            else if (days >= 15) bgColor = '#eab308';
-                            else if (days >= 10) bgColor = '#f97316';
-                            else if (days >= 7) bgColor = '#ef4444';
-                            else if (days >= 5) bgColor = '#ec4899';
-                            else if (days >= 3) bgColor = '#8b5cf6';
-                            else bgColor = '#94a3b8';
-                            
-                            // Ajouter un effet de bordure pour l'habitude principale
-                            const borderStyle = isMain ? 'border: 2px solid #00000040; box-sizing: border-box;' : '';
-                            
-                            return `
-                                <div style="width: ${percentage}%; height: 100%; background: ${bgColor}; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: white; ${borderStyle} transition: all 0.2s;" 
-                                    title="${days} jours : ${count} recharge(s) (${percentage}%)"
-                                    onmouseover="this.style.opacity='0.9'"
-                                    onmouseout="this.style.opacity='1'">
-                                    ${percentage > 8 ? percentage + '%' : ''}
-                                </div>
-                            `;
-                        }).join('')}
-                    </div>
-                    
-                    <!-- Légende améliorée avec indicateur principal -->
-                    <div style="display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 5px; padding: 5px; background: #f8fafc; border-radius: 6px;">
-                        ${sortedDays.map(([days, count]) => {
-                            const percentage = (count / totalPurchases * 100).toFixed(1);
-                            const isMain = days === mainHabit.days;
-                            
-                            let bgColor = '';
-                            if (days >= 30) bgColor = '#22c55e';
-                            else if (days >= 20) bgColor = '#84cc16';
-                            else if (days >= 15) bgColor = '#eab308';
-                            else if (days >= 10) bgColor = '#f97316';
-                            else if (days >= 7) bgColor = '#ef4444';
-                            else if (days >= 5) bgColor = '#ec4899';
-                            else if (days >= 3) bgColor = '#8b5cf6';
-                            else bgColor = '#94a3b8';
-                            
-                            return `
-                                <div style="display: flex; align-items: center; gap: 5px; ${isMain ? 'background: #f1f5f9; padding: 2px 8px; border-radius: 16px; border: 1px solid #cbd5e1;' : ''}">
-                                    <div style="width: 12px; height: 12px; background: ${bgColor}; border-radius: 3px; ${isMain ? 'box-shadow: 0 0 0 2px white, 0 0 0 3px ' + bgColor + ';' : ''}"></div>
-                                    <span style="font-size: 11px; color: #334155;">
-                                        <strong>${days}j</strong>
-                                        <span style="color: #64748b;"> ${count}x</span>
-                                        <span style="color: #475569; font-weight: 600;"> ${percentage}%</span>
-                                        ${isMain ? '<span style="margin-left: 4px; font-size: 12px;">👑</span>' : ''}
-                                    </span>
-                                </div>
-                            `;
-                        }).join('')}
-                    </div>
-                    
-                    <!-- Indication visuelle de l'habitude principale -->
-                    <div style="background: #f1f5f9; padding: 6px 10px; border-radius: 6px; font-size: 11px; color: #334155; display: flex; align-items: center; gap: 8px; border-left: 3px solid #9f7aea;">
-                        <span style="font-size: 14px;">👉</span>
-                        <span><strong>Habitude principale :</strong> <span style="background: #9f7aea20; color: #7e22ce; padding: 2px 10px; border-radius: 20px; font-weight: 700;">${mainHabit.days} jours</span> (${mainHabit.percentage}% des recharges)</span>
-                    </div>
-                </div>
-                
-                <!-- Séparateur -->
-                <div style="height: 1px; background: #e2e8f0; margin: 10px 0;"></div>
                 
                 <!-- Répartition par intervalles -->
                 <div style="margin-top: 10px;">
@@ -10504,14 +10736,12 @@ function createVoltageThresholdTable() {
     
     card.appendChild(legend);
     
-    // ===== DASHBOARD DES ATTEINTES (EN HAUT) =====
-    // Calculer les statistiques par catégorie
+    // Dashboard des atteintes
     const excellent = analysis.days.filter(d => d.count >= 4).length;
     const tresBien = analysis.days.filter(d => d.count === 3).length;
     const correct = analysis.days.filter(d => d.count === 2).length;
     const faible = analysis.days.filter(d => d.count === 1).length;
     const nulle = analysis.days.filter(d => d.count === 0).length;
-
     const totalJours = analysis.days.length;
 
     const dashboard = document.createElement('div');
@@ -10572,7 +10802,7 @@ function createVoltageThresholdTable() {
         <div style="background: white; border-radius: 8px; padding: 12px; border-left: 4px solid #ef4444; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
             <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
                 <span style="font-size: 18px;">🔴</span>
-                <span style="font-size: 12px; font-weight: 600; color: #991b1b;">NULLE</span>
+                <span style="font-size: 12px; font-weight: 600; color: #991b1b;">TROP FAIBLE</span>
             </div>
             <div style="font-size: 24px; font-weight: 800; color: #ef4444; margin-bottom: 5px;">${nulle}</div>
             <div style="font-size: 11px; color: #64748b;">${totalJours > 0 ? ((nulle/totalJours*100).toFixed(1)) : 0}% des jours</div>
@@ -10584,7 +10814,7 @@ function createVoltageThresholdTable() {
 
     card.appendChild(dashboard);
 
-    // ===== TABLEAU DÉTAILLÉ (CACHÉ PAR DÉFAUT) =====
+    // En-tête du tableau détaillé
     const detailsHeader = document.createElement('div');
     detailsHeader.style.cssText = `
         padding: 10px 20px;
@@ -10649,7 +10879,7 @@ function createVoltageThresholdTable() {
         min-width: 700px;
     `;
     
-    // En-tête du tableau (fixe)
+    // En-tête du tableau
     const thead = document.createElement('thead');
     thead.style.cssText = `
         position: sticky;
@@ -10721,20 +10951,20 @@ function createVoltageThresholdTable() {
         };
         
         // Déterminer la couleur de fond selon le nombre d'atteintes
-        let bgColor = '#fee2e2'; // Rouge
+        let bgColor = '#fee2e2';
         let textColor = '#991b1b';
         
         if (dayData.count >= 4) {
-            bgColor = '#dcfce7'; // Vert
+            bgColor = '#dcfce7';
             textColor = '#166534';
         } else if (dayData.count === 3) {
-            bgColor = '#fef9c3'; // Jaune
+            bgColor = '#fef9c3';
             textColor = '#854d0e';
         } else if (dayData.count === 2) {
-            bgColor = '#ffedd5'; // Orange
+            bgColor = '#ffedd5';
             textColor = '#9a3412';
         } else if (dayData.count === 1) {
-            bgColor = '#fef3c7'; // Jaune clair
+            bgColor = '#fef3c7';
             textColor = '#92400e';
         }
         
@@ -10819,14 +11049,14 @@ function createVoltageThresholdTable() {
     detailsContainer.appendChild(tableWrapper);
     card.appendChild(detailsContainer);
     
-    // ✅ AJOUT DU GRAPHIQUE EN COURBE
+    // Graphique en courbe
     const chartContainer = document.createElement('div');
     chartContainer.id = 'voltage-threshold-chart';
     chartContainer.style.cssText = `
         padding: 20px 25px;
         background: white;
         border-top: 1px solid #e2e8f0;
-        height: 480px; /* Hauteur ajustée pour l'info supplémentaire */
+        height: 480px;
         position: relative;
         display: flex;
         flex-direction: column;
@@ -10872,10 +11102,9 @@ function createVoltageThresholdTable() {
     `;
     chartContainer.appendChild(chartTitle);
     
-    // Conteneur du canvas - prend la majorité de l'espace
     const canvasContainer = document.createElement('div');
     canvasContainer.style.cssText = `
-        height: 320px; /* Hauteur du graphique */
+        height: 320px;
         position: relative;
         margin-bottom: 10px;
         flex-shrink: 0;
@@ -10891,10 +11120,9 @@ function createVoltageThresholdTable() {
     
     canvasContainer.appendChild(canvas);
     chartContainer.appendChild(canvasContainer);
-    
     card.appendChild(chartContainer);
     
-    // Toggle (après insertion des éléments)
+    // Toggle
     detailsToggleBtn.onclick = () => {
         voltageThresholdDetailsTableVisible = !voltageThresholdDetailsTableVisible;
         const dc = document.getElementById('voltage-threshold-details-container');
@@ -10907,10 +11135,9 @@ function createVoltageThresholdTable() {
         }
     };
     
-    // Ajouter la carte au container
     container.appendChild(card);
     
-    // Créer le graphique avec un délai pour que le canvas soit prêt
+    // Créer le graphique
     setTimeout(() => {
         createVoltageThresholdChart(
             analysis.days.map(d => d.formattedDate).reverse(), 
@@ -11208,10 +11435,9 @@ function createCombinedTables() {
     if (techniqueContent) {
         techniqueContent.innerHTML = '';
         const techniqueGrid = document.createElement('div');
-        // Réduire les espacements pour gagner en hauteur (onglet Technique)
         techniqueGrid.style.cssText = `display: flex; flex-direction: column; gap: 16px; padding: 12px;`;
         
-        // CARD 1 : FILTRES
+        // ========== CARD 1 : FILTRES (toujours en premier) ==========
         const cardFilters = document.createElement('div');
         cardFilters.id = 'card-filters';
         cardFilters.className = 'dashboard-card';
@@ -11222,7 +11448,7 @@ function createCombinedTables() {
         cardFilters.appendChild(cardFiltersContent);
         techniqueGrid.appendChild(cardFilters);
         
-        // CARD 2 : DONNÉES TECHNIQUES
+        // ========== CARD 2 : DONNÉES TECHNIQUES ==========
         const cardTechData = document.createElement('div');
         cardTechData.id = 'card-technical-data';
         cardTechData.className = 'dashboard-card';
@@ -11233,7 +11459,7 @@ function createCombinedTables() {
         cardTechData.appendChild(cardTechDataContent);
         techniqueGrid.appendChild(cardTechData);
         
-        // CARD 3 : ANALYSE TOTALE TENSION
+        // ========== CARD 3 : ANALYSE TOTALE TENSION ==========
         const cardTensionAnalysis = document.createElement('div');
         cardTensionAnalysis.id = 'card-tension-analysis';
         cardTensionAnalysis.className = 'dashboard-card';
@@ -11243,8 +11469,25 @@ function createCombinedTables() {
         cardTensionAnalysisContent.style.cssText = `padding: 14px; display: flex; flex-direction: column; gap: 16px;`;
         cardTensionAnalysis.appendChild(cardTensionAnalysisContent);
         techniqueGrid.appendChild(cardTensionAnalysis);
-
-        // ✅ NOUVELLE CARD : TABLEAU DES DÉPASSEMENTS DE TENSION À 14.0V/28V
+        
+        // ========== CARD 4 : ÉVÉNEMENTS DE DÉLESTAGES (NOUVEL EMPLACEMENT) ==========
+        const cardDelestage = document.createElement('div');
+        cardDelestage.id = 'card-delestage';
+        cardDelestage.className = 'dashboard-card';
+        cardDelestage.style.cssText = `
+            background: white; 
+            border-radius: 16px; 
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08); 
+            overflow: hidden; 
+            border: 1px solid #e2e8f0;
+        `;
+        const cardDelestageContent = document.createElement('div');
+        cardDelestageContent.id = 'card-delestage-content';
+        cardDelestageContent.style.cssText = `padding: 0;`;
+        cardDelestage.appendChild(cardDelestageContent);
+        techniqueGrid.appendChild(cardDelestage);
+        
+        // ========== CARD 5 : TABLEAU DES DÉPASSEMENTS DE TENSION (≥14V/28V) ==========
         const cardVoltageThreshold = document.createElement('div');
         cardVoltageThreshold.id = 'card-voltage-threshold';
         cardVoltageThreshold.className = 'dashboard-card';
@@ -11253,9 +11496,8 @@ function createCombinedTables() {
             border-radius: 16px; 
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08); 
             overflow: hidden; 
-            border: 1px solid #e2e8f0; 
-            margin-top: 10px;
-            min-height: 650px; /* 👈 AJOUTEZ CETTE LIGNE */
+            border: 1px solid #e2e8f0;
+            min-height: 650px;
         `;
         const cardVoltageThresholdContent = document.createElement('div');
         cardVoltageThresholdContent.id = 'voltage-threshold-table-container';
@@ -11263,7 +11505,7 @@ function createCombinedTables() {
         cardVoltageThreshold.appendChild(cardVoltageThresholdContent);
         techniqueGrid.appendChild(cardVoltageThreshold);
         
-        // CARD 4 : ANALYSE TOTALE ÉNERGIE
+        // ========== CARD 6 : ANALYSE TOTALE ÉNERGIE ==========
         const cardEnergyAnalysis = document.createElement('div');
         cardEnergyAnalysis.id = 'card-energy-analysis';
         cardEnergyAnalysis.className = 'dashboard-card';
@@ -11274,7 +11516,7 @@ function createCombinedTables() {
         cardEnergyAnalysis.appendChild(cardEnergyAnalysisContent);
         techniqueGrid.appendChild(cardEnergyAnalysis);
         
-        // CARD 5 : TABLEAU ENERGIE
+        // ========== CARD 7 : TABLEAU ENERGIE ==========
         const cardEnergyTable = document.createElement('div');
         cardEnergyTable.id = 'combined-energy-container';
         cardEnergyTable.className = 'combined-table-container dashboard-card';
@@ -11285,7 +11527,7 @@ function createCombinedTables() {
         cardEnergyTable.appendChild(cardEnergyTableContent);
         techniqueGrid.appendChild(cardEnergyTable);
         
-        // CARD 6 : TABLEAU TENSION
+        // ========== CARD 8 : TABLEAU TENSION ==========
         const cardTensionTable = document.createElement('div');
         cardTensionTable.id = 'combined-tension-container';
         cardTensionTable.className = 'combined-table-container dashboard-card';
@@ -11299,7 +11541,7 @@ function createCombinedTables() {
         techniqueContent.appendChild(techniqueGrid);
     }
     
-    // Onglet COMMERCIALE
+    // ========== ONGLET COMMERCIALE (inchangé) ==========
     const commercialeContent = document.getElementById('main-tab-content-commerciale');
     if (commercialeContent) {
         commercialeContent.innerHTML = '';
@@ -11338,7 +11580,7 @@ function createCombinedTables() {
         commercialeContent.appendChild(commercialeGrid);
     }
     
-    // Onglet ÉVÉNEMENTS
+    // ========== ONGLET ÉVÉNEMENTS (inchangé) ==========
     const evenementContent = document.getElementById('main-tab-content-evenement');
     if (evenementContent) {
         evenementContent.innerHTML = '';
@@ -11362,20 +11604,15 @@ function createCombinedTables() {
         evenementContent.appendChild(evenementGrid);
     }
 
-    //✅ ONGLETS FRAUDE
+    // ========== ONGLET FRAUDE (inchangé) ==========
     const fraudeContent = document.getElementById('main-tab-content-fraude');
     if (fraudeContent) {
         fraudeContent.innerHTML = '';
         const fraudeGrid = document.createElement('div');
         fraudeGrid.style.cssText = `display: flex; flex-direction: column; gap: 30px; padding: 20px;`;
-        
-        // Le contenu sera généré dynamiquement par displayFraudeAnalysis()
-        
         fraudeContent.appendChild(fraudeGrid);
     }
 }
-
-
 // ==================== ANALYSE DES CHUTES DE TENSION (24h/24) ====================
 function analyzeTensionDrops() {
     const results = {
