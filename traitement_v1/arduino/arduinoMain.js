@@ -20,7 +20,9 @@ let currentFilter = {
     month: null,
     year: null
 };
-
+export function getCurrentFilter() {
+    return { ...currentFilter };
+}
 // ============================================
 // DÉTECTION PLATEFORME
 // ============================================
@@ -236,27 +238,33 @@ console.log("✅ ArduinoMain initialisé - Prêt pour l'import");
 // ===========================================
 // FONCTION DE FILTRAGE
 // ===========================================
+
 export function applyFilter(newFilter) {
-    // ===== 1. CRÉER UNE COPIE DU FILTRE =====
-    let filterToApply = { ...newFilter };
+    // ===== 1. GARDER LA PÉRIODE ORIGINALE POUR L'AFFICHAGE =====
+    const originalPeriod = newFilter.period;
     
-    // ===== 2. RÉCUPÉRER LES DATES DISPONIBLES =====
+    // ===== 2. CRÉER UNE COPIE POUR LE FILTRAGE =====
+    let filterForData = { ...newFilter };
+    
+    // ===== 3. RÉCUPÉRER LA DERNIÈRE DATE DISPONIBLE =====
     let lastAvailableDate = new Date();
     
     if (database.technicalData?.dailyStats) {
         const availableDates = Object.keys(database.technicalData.dailyStats).sort();
         if (availableDates.length > 0) {
             lastAvailableDate = new Date(availableDates[availableDates.length - 1]);
-            console.log(`📅 Dernière date disponible: ${lastAvailableDate.toLocaleDateString()}`);
         }
     }
     
-    // ===== 3. TRADUIRE LA PÉRIODE EN DATES (basées sur la dernière date dispo) =====
-    if (filterToApply.period && filterToApply.period !== 'all') {
-        const endDate = new Date(lastAvailableDate); // Fin = dernière date dispo
-        const startDate = new Date(lastAvailableDate);
+    // ===== 4. CONVERTIR LA PÉRIODE EN DATES (POUR LE FILTRAGE) =====
+    let startDate = null;
+    let endDate = null;
+    
+    if (newFilter.period && newFilter.period !== 'all') {
+        endDate = new Date(lastAvailableDate);
+        startDate = new Date(lastAvailableDate);
         
-        switch(filterToApply.period) {
+        switch(newFilter.period) {
             case '7days':
                 startDate.setDate(lastAvailableDate.getDate() - 7);
                 break;
@@ -280,20 +288,34 @@ export function applyFilter(newFilter) {
                 break;
         }
         
-        // Remplacer period par de vraies dates
-        filterToApply = {
+        // Pour le filtrage, on utilise les dates
+        filterForData = {
             period: null,
             startDate: startDate,
             endDate: endDate,
             month: null,
             year: null
         };
-        
-        console.log(`📅 Période "${newFilter.period}" traduite en dates:`, 
-                    startDate.toLocaleDateString(), '→', endDate.toLocaleDateString());
     }
     
-    // ===== 4. APPLIQUER LE FILTRE =====
+    // ===== 5. STOCKER LE FILTRE AVEC LES DEUX INFOS =====
+    currentFilter = {
+        // Pour l'affichage (boutons actifs)
+        period: originalPeriod,  // ← on garde "30days", "7days", etc.
+        // Pour le résumé et le filtrage
+        startDate: filterForData.startDate || newFilter.startDate,
+        endDate: filterForData.endDate || newFilter.endDate,
+        month: newFilter.month,
+        year: newFilter.year
+    };
+    
+    console.log('✅ Filtre stocké:', {
+        period: currentFilter.period,
+        startDate: currentFilter.startDate?.toLocaleDateString(),
+        endDate: currentFilter.endDate?.toLocaleDateString()
+    });
+    
+    // ===== 6. APPLIQUER LE FILTRAGE =====
     if (!database.rawTables || database.rawTables.length === 0) {
         console.warn("Pas de données brutes disponibles");
         return;
@@ -301,27 +323,33 @@ export function applyFilter(newFilter) {
     
     showLoader();
     
+    // arduinoMain.js - Dans applyFilter(), modifier la fin
+
     setTimeout(() => {
         // Filtrer les tables brutes
-        const filteredTables = filterTablesByDate(database.rawTables, filterToApply);
-        
-        // Reconstruire la database avec les tables filtrées
+        const filteredTables = filterTablesByDate(database.rawTables, filterForData);
         buildDatabase(filteredTables);
         
-        // Relancer les analyses
         buildEventMap();
         analyzeTechnicalData();
         analyzeEnergyData();
         analyzeCommercialData();
         linkEnergyToCommercial();
         
-        // Re-rendre
+        // ✅ D'abord re-rendre
         renderByTab();
+        
+        // ✅ Ensuite, attendre que le DOM soit prêt pour mettre à jour l'UI
+        setTimeout(() => {
+            if (window.refreshFilterUI) {
+                window.refreshFilterUI();
+            }
+        }, 50); // Petit délai pour que le DOM soit bien créé
         
         hideLoader();
     }, 50);
-}
 
+}
 // ===========================================
 // FONCTION DE FILTRAGE PAR DATE 
 // ===========================================

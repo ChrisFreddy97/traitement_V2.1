@@ -305,70 +305,6 @@ input[type="file"] {
     to { transform: rotate(360deg); }
 }
 
-/* ============================================
-   STYLES POUR CELLULES CLIQUABLES (optimisés)
-   ============================================ */
-
-.event-cell {
-    position: relative;
-    cursor: pointer;
-    transition: background-color 0.2s ease;
-    background: #f8f9fa;
-    border-radius: var(--radius-sm);
-}
-
-.event-cell:hover {
-    background: #f0f4ff;
-}
-
-.cell-value {
-    display: inline-block;
-    padding: 0.4rem 0.8rem;
-    border-radius: var(--radius-md);
-    font-weight: 500;
-    transition: border-color 0.2s ease;
-    border: 1px solid transparent;
-}
-
-.cell-mode-value {
-    background: var(--white);
-    color: var(--dark);
-    border: 1px solid var(--gray-200);
-}
-
-.cell-mode-value:hover {
-    border-color: var(--primary);
-}
-
-.cell-mode-event {
-    background: var(--primary); /* Remplacé gradient */
-    color: var(--white);
-    font-weight: 600;
-    padding: 0.4rem 1rem;
-}
-
-.event-SuspendE { background: #f72585; }
-.event-SuspendP { background: #f8961e; }
-.event-Surcharge { background: #f94144; }
-
-.cell-mode-nbdep {
-    background: #4cc9f0; /* Remplacé gradient */
-    color: var(--white);
-    font-weight: 600;
-    border-radius: 20px;
-    padding: 0.3rem 1rem;
-}
-
-.event-indicator {
-    position: absolute;
-    top: 2px;
-    right: 2px;
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    display: inline-block;
-}
-
 /* ----- SECTION DÉROULANTE (optimisée) ----- */
 .table-section-header {
     display: flex;
@@ -727,23 +663,26 @@ html {
     border-color: var(--primary-light);
 }
 
-/* Styles spécifiques pour les cartes de qualité */
+/* High voltage */
 .stats-grid-4 .stat-card.excellent {
     border-top: 4px solid #4CAF50;
+    background: rgba(76, 175, 80, 0.1);  /* Vert doux */
 }
 
 .stats-grid-4 .stat-card.bon {
     border-top: 4px solid #FFD700;
+    background: rgba(255, 215, 0, 0.1);  /* Jaune doré doux */
 }
 
 .stats-grid-4 .stat-card.mauvais {
     border-top: 4px solid #FF9800;
+    background: rgba(255, 152, 0, 0.1);  /* Orange doux */
 }
 
 .stats-grid-4 .stat-card.critique {
     border-top: 4px solid #F44336;
+    background: rgba(244, 67, 54, 0.1);  /* Rouge doux */
 }
-
 /* Pour les très petits écrans, on repasse en colonne */
 @media (max-width: 768px) {
     .stats-grid-4 {
@@ -984,6 +923,27 @@ html {
     border-top-width: 3px;
 }
 
+/* Styles pour les différentes périodes avec fonds doux */
+.period-item.excellent {
+    border-top-color: #4CAF50;
+    background: rgba(76, 175, 80, 0.08);
+}
+
+.period-item.bon {
+    border-top-color: #FFD700;
+    background: rgba(255, 215, 0, 0.08);
+}
+
+.period-item.mauvais {
+    border-top-color: #FF9800;
+    background: rgba(255, 152, 0, 0.08);
+}
+
+.period-item.critique {
+    border-top-color: #F44336;
+    background: rgba(244, 67, 54, 0.08);
+}
+
 .period-icon {
     font-size: 1.2rem;
     display: block;
@@ -1043,17 +1003,204 @@ html {
     margin-right: 4px;
 }
 
+/* ============================================
+   PANEL DE FILTRES - DATES PERSONNALISÉES
+   ============================================ */
+
+.filter-panel {
+    background: white;
+    border-radius: var(--radius-lg);
+    margin-bottom: 1.5rem;
+    border: 1px solid var(--gray-200);
+    overflow: hidden;
+}
+
+.filter-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1rem 1.25rem;
+    background: var(--gray-50);
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+
+.filter-header:hover {
+    background: var(--gray-100);
+}
+
+.filter-icon {
+    font-size: 1.1rem;
+}
+
+.filter-title {
+    font-weight: 600;
+    color: var(--gray-700);
+}
+
+.filter-badge {
+    background: var(--primary);
+    color: white;
+    font-size: 0.7rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: 12px;
+    font-weight: 500;
+}
+
+.filter-toggle {
+    margin-left: auto;
+    font-size: 0.8rem;
+    color: var(--gray-500);
+    transition: transform 0.2s ease;
+}
+
+.filter-content {
+    padding: 1.25rem;
+    border-top: 1px solid var(--gray-200);
+}
+
+.filter-row {
+    margin-bottom: 1.5rem;
+}
+
+.filter-row:last-child {
+    margin-bottom: 0;
+}
+
+.filter-label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--gray-700);
+    margin-bottom: 0.75rem;
+}
+
+.filter-options {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.filter-btn {
+    padding: 0.5rem 1rem;
+    border: 1px solid var(--gray-300);
+    background: white;
+    border-radius: var(--radius-md);
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    color: var(--gray-700);
+}
+
+.filter-btn:hover {
+    background: var(--gray-50);
+    border-color: var(--gray-400);
+}
+
+.filter-btn.active {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: white;
+}
+
+.filter-btn-primary {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: white;
+}
+
+.filter-btn-primary:hover {
+    background: var(--primary-dark);
+    border-color: var(--primary-dark);
+}
+
+.filter-select {
+    padding: 0.5rem 1rem;
+    border: 1px solid var(--gray-300);
+    border-radius: var(--radius-md);
+    font-size: 0.85rem;
+    background: white;
+    cursor: pointer;
+    min-width: 120px;
+}
+
+.filter-date-group {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: var(--gray-50);
+    padding: 0.25rem 0.75rem;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--gray-200);
+}
+
+.filter-date-group span {
+    font-size: 0.8rem;
+    color: var(--gray-600);
+}
+
+.filter-date-select {
+    padding: 0.4rem 0.5rem;
+    border: none;
+    background: transparent;
+    font-size: 0.85rem;
+    cursor: pointer;
+    outline: none;
+}
+
+.filter-date-select:focus {
+    outline: none;
+}
+
+.filter-summary {
+    margin-top: 1rem;
+    padding: 0.75rem;
+    background: var(--gray-50);
+    border-radius: var(--radius-md);
+    font-size: 0.8rem;
+    color: var(--gray-600);
+    border-left: 3px solid var(--primary);
+}
+
+/* Responsive pour le panel de filtres */
 @media (max-width: 768px) {
-    .period-stats {
-        flex-direction: column;
+    .filter-content {
+        padding: 1rem;
     }
     
-    .cycle-highlights {
+    .filter-options {
         flex-direction: column;
-        align-items: flex-start;
+        align-items: stretch;
     }
     
-    .chart-legend {
+    .filter-date-group {
+        justify-content: space-between;
+    }
+    
+    .filter-date-select {
+        flex: 1;
+    }
+    
+    .filter-btn {
+        text-align: center;
+    }
+    
+    .filter-select {
+        width: 100%;
+    }
+}
+
+@media (max-width: 480px) {
+    .filter-header {
+        padding: 0.75rem 1rem;
+    }
+    
+    .filter-date-group {
         flex-wrap: wrap;
+        gap: 0.25rem;
+    }
+    
+    .filter-date-group span {
+        width: 100%;
     }
 }

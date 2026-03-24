@@ -21,8 +21,6 @@ export function renderCommercialDashboard() {
     
     // Structure avec onglet client en haut
     const html = `
-        ${renderFilterPanel()}
-
         <!-- Onglet client global en haut -->
         <div class="global-client-tabs-container">
             <h3>👥 Sélection client</h3>
