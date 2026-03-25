@@ -2,6 +2,7 @@
 import { database } from '../../arduinoCore.js';
 import { FORFAIT_LIMITS } from '../../arduinoConstants.js';
 import { FORFAIT_NAMES } from '../../arduinoConstants.js';
+import {renderFilterPanel}from '../technical/TechnicalDashboard.js';
 
 // Variable globale pour suivre le client actif
 let activeClientId = null;

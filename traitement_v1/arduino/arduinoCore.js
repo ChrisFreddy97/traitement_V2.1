@@ -8,7 +8,8 @@ export const database = {
     eventMap: new Map(),
     cellStateMap: new Map(),
     clientCreditData: new Map(),
-    energyPerClient: {}  // ← NOUVEAU
+    energyPerClient: {},
+    rawTables: []  
 };
 
 // ------------------- Gestion du loader -------------------
