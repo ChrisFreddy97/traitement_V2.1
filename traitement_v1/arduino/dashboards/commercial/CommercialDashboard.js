@@ -1163,58 +1163,23 @@ function createRechargeHabitsHTML(rechargeData) {
     }).join('');
     
     return `
-        <div style="background: #f8fafc; border-radius: 8px; padding: 12px; margin-top: 12px; border: 1px solid #e2e8f0;">
-            <!-- Habitude de recharge -->
-            <div style="margin-bottom: 15px;">
-                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
-                    <div style="display: flex; align-items: center; gap: 5px;">
-                        <span style="font-size: 16px;">📊</span>
-                        <span style="font-weight: 600; font-size: 13px;">Habitudes de recharge</span>
-                    </div>
-                    <span style="background: #e2e8f0; padding: 2px 10px; border-radius: 12px; font-size: 10px; font-weight: 600;">
-                        ${totalPurchases} recharges
-                    </span>
-                </div>
-                
-                <!-- Barre de progression -->
-                <div style="height: 36px; background: #f1f5f9; border-radius: 18px; overflow: hidden; display: flex; margin-bottom: 10px; box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);">
-                    ${habitBarHTML}
-                </div>
-                
-                <!-- Légende -->
-                <div style="display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 5px; padding: 5px; background: #f8fafc; border-radius: 6px;">
-                    ${habitLegendHTML}
-                </div>
-                
-                <!-- Indication habitude principale -->
-                <div style="background: #f1f5f9; padding: 6px 10px; border-radius: 6px; font-size: 11px; color: #334155; display: flex; align-items: center; gap: 8px; border-left: 3px solid #9f7aea;">
-                    <span style="font-size: 14px;">👉</span>
-                    <span><strong>Habitude principale :</strong> <span style="background: #9f7aea20; color: #7e22ce; padding: 2px 10px; border-radius: 20px; font-weight: 700;">${mainHabit.days} jours</span> (${mainHabit.percentage}% des recharges)</span>
-                </div>
+        <div style="margin-top: 10px;">
+            <div style="display: flex; align-items: center; gap: 5px; margin-bottom: 8px;">
+                <span style="font-size: 14px;">📈</span>
+                <span style="font-weight: 600; font-size: 12px;">Habitude de recharge</span>
             </div>
             
-            <!-- Séparateur -->
-            <div style="height: 1px; background: #e2e8f0; margin: 10px 0;"></div>
+            <div style="height: 36px; background: #f1f5f9; border-radius: 18px; overflow: hidden; display: flex; margin-bottom: 10px; box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);">
+                ${intervalBarHTML}
+            </div>
             
-            <!-- Répartition par intervalles -->
-            <div style="margin-top: 10px;">
-                <div style="display: flex; align-items: center; gap: 5px; margin-bottom: 8px;">
-                    <span style="font-size: 14px;">📈</span>
-                    <span style="font-weight: 600; font-size: 12px;">Répartition par intervalle</span>
-                </div>
-                
-                <div style="height: 36px; background: #f1f5f9; border-radius: 18px; overflow: hidden; display: flex; margin-bottom: 10px; box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);">
-                    ${intervalBarHTML}
-                </div>
-                
-                <div style="display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-around; margin-bottom: 8px;">
-                    ${intervalLegendHTML}
-                </div>
-                
-                <div style="background: #f1f5f9; padding: 6px 10px; border-radius: 6px; font-size: 11px; display: flex; align-items: center; gap: 8px;">
-                    <span style="font-size: 14px;">🏆</span>
-                    <span><strong>Intervalle principal :</strong> <span style="background: ${mainInterval.color}20; color: ${mainInterval.color}; padding: 2px 12px; border-radius: 20px; font-weight: 700;">${mainInterval.name}</span> (${mainInterval.percent}%, ${mainInterval.range})</span>
-                </div>
+            <div style="display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-around; margin-bottom: 8px;">
+                ${intervalLegendHTML}
+            </div>
+            
+            <div style="background: #f1f5f9; padding: 6px 10px; border-radius: 6px; font-size: 11px; display: flex; align-items: center; gap: 8px;">
+                <span style="font-size: 14px;">🏆</span>
+                <span><strong>Intervalle principal :</strong> <span style="background: ${mainInterval.color}20; color: ${mainInterval.color}; padding: 2px 12px; border-radius: 20px; font-weight: 700;">${mainInterval.name}</span> (${mainInterval.percent}%, ${mainInterval.range})</span>
             </div>
         </div>
     `;

@@ -205,7 +205,41 @@ uploadSection.addEventListener('drop', (e) => {
 });
 
 // ===========================================
-// GESTION DES ONGLETS
+// FONCTION POUR RÉINITIALISER LE FILTRE
+// ===========================================
+
+function resetFilterToAll() {
+    // Réinitialiser le filtre courant
+    currentFilter = {
+        period: 'all',
+        startDate: null,
+        endDate: null,
+        month: null,
+        year: null
+    };
+    
+    // Mettre à jour l'interface des filtres si elle existe
+    if (window.updateFilterUI) {
+        window.updateFilterUI('all');
+    }
+    
+    // Réappliquer le filtre sur les données
+    if (database.rawTables && database.rawTables.length > 0) {
+        const tablesToUse = filterTablesByDate(database.rawTables, currentFilter);
+        buildDatabase(tablesToUse);
+        
+        buildEventMap();
+        analyzeTechnicalData();
+        analyzeEnergyData();
+        analyzeCommercialData();
+        linkEnergyToCommercial();
+        
+        console.log("✅ Filtre réinitialisé à 'all'");
+    }
+}
+
+// ===========================================
+// GESTION DES ONGLETS AVEC RÉINITIALISATION
 // ===========================================
 
 document.querySelectorAll('.tab').forEach(tab => {
@@ -213,6 +247,9 @@ document.querySelectorAll('.tab').forEach(tab => {
         // Mise à jour des onglets actifs
         document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
         tab.classList.add('active');
+        
+        // Réinitialiser le filtre à "all"
+        resetFilterToAll();
         
         // Rendu selon l'onglet sélectionné
         renderByTab();
@@ -323,8 +360,6 @@ export function applyFilter(newFilter) {
     
     showLoader();
     
-    // arduinoMain.js - Dans applyFilter(), modifier la fin
-
     setTimeout(() => {
         // Filtrer les tables brutes
         const filteredTables = filterTablesByDate(database.rawTables, filterForData);
@@ -365,7 +400,7 @@ function filterTablesByDate(tables, filter) {
     // Filtrer chaque table
     filteredTables.forEach(table => {
         // Filtrer les tables qui ont des dates (T, I, E)
-        if (table.type === 'T' || table.type === 'I' || table.type === 'E' || table.type === 'S' || table.type === 'R') {
+        if (table.type === 'T' || table.type === 'I' || table.type === 'E') {
             const originalCount = table.data.length;
             
             table.data = table.data.filter(row => {

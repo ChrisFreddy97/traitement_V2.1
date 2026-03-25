@@ -999,14 +999,14 @@ function renderHourlyChart(selectedDate = null) {
             chartEndIndex = idx; 
         }
     } else if (chartEndIndex === 0) { 
-        chartEndIndex = allDates.length - 1; 
-        chartStartIndex = Math.max(0, chartEndIndex - 6); 
+        // Par défaut : 7 derniers jours
+        chartEndIndex = allDates.length - 1;
+        chartStartIndex = Math.max(0, chartEndIndex - 6);
     }
     
     const norms = VOLTAGE_NORMS[database.technicalData?.normSystem || '12V'];
     const daysCount = chartEndIndex - chartStartIndex + 1;
     
-    // Construction du HTML avec le même style que energy cycle
     container.innerHTML = `
         <div class="hourly-card" style="background:white; border-radius:24px; overflow:hidden; box-shadow:0 4px 12px rgba(0,0,0,0.05);">
             <div class="hourly-header" style="padding:20px 24px; border-bottom:1px solid #e9ecef;">
@@ -1052,11 +1052,259 @@ function renderHourlyChart(selectedDate = null) {
         </div>
     `;
     
-    // Attacher les événements
     attachDateSelectors();
-    
-    // Afficher le graphique
     updateHourlyChartData();
+}
+
+function updateHourlyChartData() {
+    const labels = [];
+    const tensions = [];
+    const dayInfo = [];
+    const dayStartPositions = [];
+    
+    // ✅ ÉTAPE 1 : Déterminer tous les jours de la plage
+    const selectedDays = [];
+    for (let i = chartStartIndex; i <= chartEndIndex; i++) {
+        selectedDays.push({
+            date: allDates[i],
+            data: allTensionData[i]
+        });
+    }
+    
+    // ✅ ÉTAPE 2 : Pour chaque jour, créer 24 points (0h à 23h)
+    selectedDays.forEach((day, dayIdx) => {
+        // Créer un Map des heures disponibles
+        const hourMap = new Map();
+        day.data.forEach(point => {
+            hourMap.set(point.hour, point.tension);
+        });
+        
+        // Parcourir les 24 heures
+        for (let h = 0; h < 24; h++) {
+            const hourStr = `${h.toString().padStart(2, '0')}:00`;
+            const tension = hourMap.get(hourStr);
+            
+            labels.push(hourStr);
+            tensions.push(tension !== undefined ? tension : null); // null si donnée manquante
+            dayInfo.push({ 
+                date: day.date, 
+                hour: hourStr, 
+                dayIndex: chartStartIndex + dayIdx,
+                hasData: tension !== undefined
+            });
+            
+            // Enregistrer la position du premier point de chaque jour
+            if (h === 0) {
+                dayStartPositions.push({
+                    date: day.date,
+                    position: labels.length - 1
+                });
+            }
+        }
+    });
+    
+    const norms = VOLTAGE_NORMS[database.technicalData?.normSystem || '12V'];
+    
+    // ✅ ÉTAPE 3 : Calculer la marge sur les valeurs existantes (ignorer null)
+    const validTensions = tensions.filter(t => t !== null);
+    const minTension = Math.min(...validTensions);
+    const maxTension = Math.max(...validTensions);
+    const padding = (maxTension - minTension) * 0.1;
+    
+    // Plugin pour colorer le fond des jours et ajouter les labels de dates
+    const dayBackgroundPlugin = {
+        id: 'dayBackground',
+        beforeDatasetsDraw(chart) {
+            const { ctx, chartArea, scales, data } = chart;
+            if (!scales.x || !data.labels.length) return;
+            
+            const labels = data.labels;
+            let currentDay = '';
+            let dayStartIndex = 0;
+            const daySegments = [];
+            
+            // Détecter les changements de jour (tous les 24 points)
+            for (let i = 0; i < labels.length; i += 24) {
+                const dayIdx = Math.floor(i / 24);
+                if (dayIdx < selectedDays.length) {
+                    const dayKey = selectedDays[dayIdx].date;
+                    const startX = scales.x.getPixelForValue(i);
+                    const endX = (i + 24 < labels.length) 
+                        ? scales.x.getPixelForValue(i + 23.5)
+                        : chartArea.right;
+                    
+                    if (startX && endX) {
+                        daySegments.push({ day: dayKey, startX, endX, index: dayIdx });
+                    }
+                }
+            }
+            
+            // Dessiner les fonds colorés
+            ctx.save();
+            daySegments.forEach((segment, i) => {
+                const dayNum = parseInt(segment.day.split('-')[2]) || i;
+                const isEven = dayNum % 2 === 0;
+                ctx.fillStyle = isEven ? '#fef7e0' : '#ffffff';
+                ctx.fillRect(
+                    Math.max(chartArea.left, segment.startX),
+                    chartArea.top,
+                    Math.min(segment.endX, chartArea.right) - Math.max(chartArea.left, segment.startX),
+                    chartArea.bottom - chartArea.top
+                );
+            });
+            
+            // Lignes de séparation verticales
+            ctx.beginPath();
+            ctx.strokeStyle = '#cbd5e1';
+            ctx.lineWidth = 1.5;
+            ctx.setLineDash([6, 6]);
+            daySegments.forEach((segment, i) => {
+                if (i > 0 && segment.startX > chartArea.left && segment.startX < chartArea.right) {
+                    ctx.beginPath();
+                    ctx.moveTo(segment.startX, chartArea.top);
+                    ctx.lineTo(segment.startX, chartArea.bottom);
+                    ctx.stroke();
+                }
+            });
+            ctx.restore();
+        },
+        afterDatasetsDraw(chart) {
+            // Ajouter les labels de dates en bas du graphique
+            const { ctx, chartArea, scales } = chart;
+            if (!scales.x) return;
+            
+            ctx.save();
+            ctx.font = '10px Inter, system-ui, sans-serif';
+            ctx.fillStyle = '#495057';
+            ctx.textAlign = 'center';
+            
+            dayStartPositions.forEach(pos => {
+                const x = scales.x.getPixelForValue(pos.position);
+                if (x >= chartArea.left && x <= chartArea.right) {
+                    const [year, month, day] = pos.date.split('-');
+                    const dateLabel = `${day}/${month}`;
+                    ctx.fillText(dateLabel, x, chartArea.bottom + 18);
+                }
+            });
+            ctx.restore();
+        }
+    };
+    
+    const config = {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: 'Tension',
+                    data: tensions,
+                    borderColor: '#3b82f6',
+                    borderWidth: 2.5,
+                    pointRadius: 2,
+                    pointHoverRadius: 6,
+                    pointBackgroundColor: '#3b82f6',
+                    tension: 0.2,
+                    fill: false,
+                    spanGaps: true  // ✅ Permet de connecter les points même avec des null
+                },
+                {
+                    label: 'Seuil minimal',
+                    data: Array(labels.length).fill(norms.min),
+                    borderColor: '#94a3b8',
+                    borderWidth: 1.5,
+                    borderDash: [6, 6],
+                    pointRadius: 0,
+                    fill: false
+                },
+                {
+                    label: 'Seuil maximal',
+                    data: Array(labels.length).fill(norms.max),
+                    borderColor: '#94a3b8',
+                    borderWidth: 1.5,
+                    borderDash: [6, 6],
+                    pointRadius: 0,
+                    fill: false
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        title: (items) => {
+                            const idx = items[0].dataIndex;
+                            if (dayInfo[idx]) {
+                                const hasData = dayInfo[idx].hasData;
+                                const dataStatus = hasData ? '' : ' (donnée manquante)';
+                                return `${dayInfo[idx].date} ${dayInfo[idx].hour}${dataStatus}`;
+                            }
+                            return labels[idx];
+                        },
+                        label: (ctx) => {
+                            if (ctx.raw === null) return 'Donnée non disponible';
+                            return `${ctx.raw.toFixed(1)} V`;
+                        }
+                    }
+                },
+                legend: {
+                    display: false
+                }
+            },
+            layout: {
+                padding: {
+                    bottom: 25
+                }
+            },
+            scales: {
+                y: {
+                    suggestedMin: minTension - padding,
+                    suggestedMax: maxTension + padding,
+                    grid: { color: '#e9ecef' },
+                    title: { 
+                        display: true, 
+                        text: 'Tension (V)', 
+                        font: { size: 10, weight: 'normal' },
+                        color: '#6c757d'
+                    }
+                },
+                x: {
+                    grid: { display: false },
+                    ticks: {
+                        callback: (val, idx) => {
+                            const hour = labels[idx];
+                            // Afficher toutes les 6 heures (0h, 6h, 12h, 18h)
+                            if (hour && (hour === '00:00' || hour === '06:00' || hour === '12:00' || hour === '18:00')) {
+                                return hour;
+                            }
+                            return '';
+                        },
+                        autoSkip: true,
+                        maxTicksLimit: 8,
+                        font: { size: 9 },
+                        color: '#6c757d'
+                    }
+                }
+            }
+        },
+        plugins: [dayBackgroundPlugin]
+    };
+    
+    // Nettoyer l'instance existante avant d'en créer une nouvelle
+    if (chartManager.instances['hourlyTensionChart']) {
+        chartManager.destroy('hourlyTensionChart');
+    }
+    
+    requestAnimationFrame(() => {
+        const canvas = document.getElementById('hourlyTensionChart');
+        if (canvas) {
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+                chartManager.create('hourlyTensionChart', config);
+            }
+        }
+    });
 }
 
 function attachDateSelectors() {
@@ -1099,7 +1347,6 @@ function attachDateSelectors() {
             chartStartIndex = newStart;
             chartEndIndex = newEnd;
             
-            // Mettre à jour l'en-tête
             const daysCount = chartEndIndex - chartStartIndex + 1;
             const header = document.querySelector('#hourlyChartCard .hourly-header');
             if (header) {
@@ -1114,186 +1361,6 @@ function attachDateSelectors() {
     });
 }
 
-function updateHourlyChartData() {
-    const labels = [];
-    const tensions = [];
-    const dayInfo = [];
-    
-    // Construire les données pour la plage sélectionnée
-    for (let i = chartStartIndex; i <= chartEndIndex; i++) {
-        const dayPoints = allTensionData[i];
-        dayPoints.forEach(point => {
-            labels.push(`${allDates[i]} ${point.hour}`);
-            tensions.push(point.tension);
-            dayInfo.push({ date: allDates[i], hour: point.hour, dayIndex: i });
-        });
-    }
-    
-    const norms = VOLTAGE_NORMS[database.technicalData?.normSystem || '12V'];
-    
-    // Plugin pour colorer le fond des jours
-    const dayBackgroundPlugin = {
-        id: 'dayBackground',
-        beforeDatasetsDraw(chart) {
-            const { ctx, chartArea, scales, data } = chart;
-            if (!scales.x || !data.labels.length) return;
-            
-            const labels = data.labels;
-            let currentDay = '';
-            let dayStartIndex = 0;
-            const daySegments = [];
-            
-            // Détecter les changements de jour
-            labels.forEach((label, idx) => {
-                const dayKey = label.split(' ')[0];
-                if (currentDay === '') {
-                    currentDay = dayKey;
-                    dayStartIndex = idx;
-                } else if (dayKey !== currentDay) {
-                    const startX = scales.x.getPixelForValue(dayStartIndex);
-                    const endX = scales.x.getPixelForValue(idx - 0.5);
-                    daySegments.push({ day: currentDay, startX, endX });
-                    currentDay = dayKey;
-                    dayStartIndex = idx;
-                }
-            });
-            
-            // Dernier jour
-            if (currentDay) {
-                const startX = scales.x.getPixelForValue(dayStartIndex);
-                const endX = chartArea.right;
-                daySegments.push({ day: currentDay, startX, endX });
-            }
-            
-            // Dessiner les fonds colorés
-            ctx.save();
-            daySegments.forEach((segment, i) => {
-                const dayNum = parseInt(segment.day.split('-')[2]) || i;
-                const isEven = dayNum % 2 === 0;
-                ctx.fillStyle = isEven ? '#fef7e0' : '#ffffff';
-                ctx.fillRect(
-                    Math.max(chartArea.left, segment.startX),
-                    chartArea.top,
-                    Math.min(segment.endX, chartArea.right) - Math.max(chartArea.left, segment.startX),
-                    chartArea.bottom - chartArea.top
-                );
-            });
-            
-            // Lignes de séparation verticales
-            ctx.beginPath();
-            ctx.strokeStyle = '#cbd5e1';
-            ctx.lineWidth = 1.5;
-            ctx.setLineDash([6, 6]);
-            daySegments.forEach((segment, i) => {
-                if (i > 0 && segment.startX > chartArea.left && segment.startX < chartArea.right) {
-                    ctx.beginPath();
-                    ctx.moveTo(segment.startX, chartArea.top);
-                    ctx.lineTo(segment.startX, chartArea.bottom);
-                    ctx.stroke();
-                }
-            });
-            ctx.restore();
-        }
-    };
-    
-    // Calculer la marge automatique
-    const minTension = Math.min(...tensions);
-    const maxTension = Math.max(...tensions);
-    const padding = (maxTension - minTension) * 0.1; // 10% de marge
-    
-    const config = {
-        type: 'line',
-        data: {
-            labels: labels,
-            datasets: [
-                {
-                    label: 'Tension',
-                    data: tensions,
-                    borderColor: '#3b82f6',
-                    borderWidth: 2.5,
-                    pointRadius: 2,
-                    pointHoverRadius: 6,
-                    pointBackgroundColor: '#3b82f6',
-                    tension: 0.2,
-                    fill: false
-                },
-                {
-                    label: 'Seuil minimal',
-                    data: Array(labels.length).fill(norms.min),
-                    borderColor: '#94a3b8',
-                    borderWidth: 1.5,
-                    borderDash: [6, 6],
-                    pointRadius: 0,
-                    fill: false
-                },
-                {
-                    label: 'Seuil maximal',
-                    data: Array(labels.length).fill(norms.max),
-                    borderColor: '#94a3b8',
-                    borderWidth: 1.5,
-                    borderDash: [6, 6],
-                    pointRadius: 0,
-                    fill: false
-                }
-            ]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                tooltip: {
-                    callbacks: {
-                        title: (items) => {
-                            const idx = items[0].dataIndex;
-                            if (dayInfo[idx]) {
-                                return `${dayInfo[idx].date} ${dayInfo[idx].hour}`;
-                            }
-                            return labels[idx];
-                        }
-                    }
-                },
-                legend: {
-                    display: false  // Supprimer la légende pour plus d'espace
-                }
-            },
-            scales: {
-                y: {
-                    // ✅ Supprimer min/max fixes, laisser Chart.js calculer automatiquement
-                    // Optionnel : ajouter une petite marge pour mieux voir
-                    suggestedMin: minTension - padding,
-                    suggestedMax: maxTension + padding,
-                    grid: { color: '#e9ecef' },
-                    title: { display: true, text: 'Tension (V)', font: { size: 10 } }
-                },
-                x: {
-                    grid: { display: false },
-                    ticks: {
-                        maxRotation: 45,
-                        autoSkip: true,
-                        maxTicksLimit: 12,
-                        callback: (val, idx) => {
-                            const label = labels[idx];
-                            if (label && label.includes(' ')) {
-                                const [, hour] = label.split(' ');
-                                if (idx % 3 === 0) return hour;
-                            }
-                            return '';
-                        }
-                    }
-                }
-            }
-        },
-        plugins: [dayBackgroundPlugin]
-    };
-    
-    chartManager.destroy('hourlyTensionChart');
-    requestAnimationFrame(() => {
-        const ctx = document.getElementById('hourlyTensionChart')?.getContext('2d');
-        if (ctx) {
-            chartManager.create('hourlyTensionChart', config);
-        }
-    });
-}
 // ===========================================
 // III) ÉNERGIE - CLIENT ANALYTICS
 // ===========================================
@@ -1815,18 +1882,17 @@ class EnergyCycleManager {
     }
     
     getHourlyAverages() {
-        const { labels, cumulValues } = this.getChartData();
+        const { labels, hourlyValues } = this.getChartData();
         const averages = [];
         const avgLabels = [];
         const avgDayInfo = [];
         
-        for (let i = 1; i < cumulValues.length; i++) {
-            const avg = (cumulValues[i] + cumulValues[i-1]) / 2;
-            averages.push(avg);
+        for (let i = 0; i < hourlyValues.length; i++) {
+            averages.push(hourlyValues[i]);
             avgLabels.push(labels[i]);
             
             const [date, hour] = labels[i].split(' ');
-            avgDayInfo.push({ date, hour, average: avg });
+            avgDayInfo.push({ date, hour, average: hourlyValues[i] });
         }
         
         return { averages, labels: avgLabels, dayInfo: avgDayInfo };
@@ -1878,8 +1944,8 @@ class EnergyCycleManager {
         const total = dayTotal + nightTotal;
         const count = this.endIndex - this.startIndex + 1;
         return { 
-            day: { avg: dayTotal / count, percent: total ? (dayTotal / total) * 100 : 0 }, 
-            night: { avg: nightTotal / count, percent: total ? (nightTotal / total) * 100 : 0 } 
+            day: { avg: dayTotal / count, percent: total ? (dayTotal / (total*12)) * 100 : 0 }, 
+            night: { avg: nightTotal / count, percent: total ? (nightTotal / (total*12)) * 100 : 0 } 
         };
     }
 }
@@ -2030,7 +2096,6 @@ const dayBackgroundBarPlugin = {
         ctx.restore();
     }
 };
-
 // ===========================================
 // RENDER PRINCIPAL
 // ===========================================
@@ -2120,11 +2185,11 @@ function renderCycleUI(container) {
                 <div style="display:grid; grid-template-columns:repeat(2,1fr); gap:16px;">
                     <div style="text-align:center;">
                         <div style="font-size:0.7rem; color:#6c757d;">MOYENNE HORAIRE</div>
-                        <div style="font-size:1.4rem; font-weight:700; color:#3b82f6;">${averageStats.avg.toFixed(1)} <span style="font-size:0.8rem;">Wh</span></div>
+                        <div style="font-size:1.4rem; font-weight:700; color:#3b82f6;">${averageStats.avg.toFixed(1)} <span style="font-size:0.8rem;">Wh/h</span></div>
                     </div>
                     <div style="text-align:center;">
                         <div style="font-size:0.7rem; color:#6c757d;">MAX HORAIRE</div>
-                        <div style="font-size:1.4rem; font-weight:700; color:#f59e0b;">${averageStats.max.toFixed(1)} <span style="font-size:0.8rem;">Wh</span></div>
+                        <div style="font-size:1.4rem; font-weight:700; color:#f59e0b;">${averageStats.max.toFixed(1)} <span style="font-size:0.8rem;">Wh/h</span></div>
                     </div>
                 </div>
             </div>
@@ -2137,7 +2202,7 @@ function renderCycleUI(container) {
                             <span style="font-size:2rem;">☀️</span>
                             <div>
                                 <div style="font-size:0.7rem; color:#f59e0b; font-weight:600;">JOUR (6h-17h)</div>
-                                <div style="font-size:1.4rem; font-weight:700; color:#f59e0b;">${dayNightAverages.day.toFixed(1)} <span style="font-size:0.8rem;">Wh</span></div>
+                                <div style="font-size:1.4rem; font-weight:700; color:#f59e0b;">${dayNightAverages.day.toFixed(1)} <span style="font-size:0.8rem;">Wh/h</span></div>
                                 <div style="font-size:0.7rem; color:#6c757d;">moyenne horaire</div>
                             </div>
                         </div>
@@ -2147,7 +2212,7 @@ function renderCycleUI(container) {
                             <span style="font-size:2rem;">🌙</span>
                             <div>
                                 <div style="font-size:0.7rem; color:#3b82f6; font-weight:600;">NUIT (18h-5h)</div>
-                                <div style="font-size:1.4rem; font-weight:700; color:#3b82f6;">${dayNightAverages.night.toFixed(1)} <span style="font-size:0.8rem;">Wh</span></div>
+                                <div style="font-size:1.4rem; font-weight:700; color:#3b82f6;">${dayNightAverages.night.toFixed(1)} <span style="font-size:0.8rem;">Wh/h</span></div>
                                 <div style="font-size:0.7rem; color:#6c757d;">moyenne horaire</div>
                             </div>
                         </div>
@@ -2158,6 +2223,7 @@ function renderCycleUI(container) {
     `;
 }
 
+
 function updateCycleChart() {
     if (!currentManager) return;
     const data = currentManager.getChartData();
@@ -2165,10 +2231,45 @@ function updateCycleChart() {
     if (!ctx) return;
     
     const dayInfo = [];
+    const dayStartPositions = [];
+    
+    // Enrichir dayInfo avec les positions des débuts de jour
     data.labels.forEach((label, idx) => {
         const [date, hour] = label.split(' ');
         dayInfo.push({ date, hour, index: idx });
+        
+        // Détecter le début de chaque jour (00:00)
+        if (hour === '00:00') {
+            dayStartPositions.push({
+                date: date,
+                position: idx
+            });
+        }
     });
+    
+    // Plugin pour afficher les dates en bas
+    const dateLabelPlugin = {
+        id: 'dateLabels',
+        afterDatasetsDraw(chart) {
+            const { ctx, chartArea, scales } = chart;
+            if (!scales.x) return;
+            
+            ctx.save();
+            ctx.font = '10px Inter, system-ui, sans-serif';
+            ctx.fillStyle = '#495057';
+            ctx.textAlign = 'center';
+            
+            dayStartPositions.forEach(pos => {
+                const x = scales.x.getPixelForValue(pos.position);
+                if (x >= chartArea.left && x <= chartArea.right) {
+                    const [year, month, day] = pos.date.split('-');
+                    const dateLabel = `${day}/${month}`;
+                    ctx.fillText(dateLabel, x, chartArea.bottom + 20);
+                }
+            });
+            ctx.restore();
+        }
+    };
     
     const config = {
         type: 'line',
@@ -2189,8 +2290,12 @@ function updateCycleChart() {
         options: { 
             responsive: true, 
             maintainAspectRatio: false, 
+            layout: {
+                padding: {
+                    bottom: 30
+                }
+            },
             plugins: {
-                // ✅ Désactiver complètement la légende
                 legend: {
                     display: false
                 },
@@ -2216,23 +2321,27 @@ function updateCycleChart() {
                 x: {
                     grid: { display: false },
                     ticks: { 
-                        maxRotation: 45, 
-                        minRotation: 45,
+                        maxRotation: 0,
                         autoSkip: true,
                         maxTicksLimit: 12,
                         callback: (val, idx) => {
                             const label = data.labels[idx];
                             if (label && label.includes(' ')) {
                                 const [, hour] = label.split(' ');
-                                if (idx % 3 === 0) return hour;
+                                // Afficher les heures toutes les 6h
+                                if (hour === '00:00' || hour === '06:00' || hour === '12:00' || hour === '18:00') {
+                                    return hour;
+                                }
                             }
                             return '';
-                        }
+                        },
+                        font: { size: 9 },
+                        color: '#6c757d'
                     }
                 }
             } 
         },
-        plugins: [dayBackgroundPlugin]
+        plugins: [dayBackgroundPlugin, dateLabelPlugin]
     };
     
     chartManager.destroy('dailyEnergyCycleChart');
@@ -2240,11 +2349,51 @@ function updateCycleChart() {
         chartManager.create('dailyEnergyCycleChart', config);
     });
 }
+
 function updateAverageChart() {
     if (!currentManager) return;
     const { averages, labels, dayInfo } = currentManager.getHourlyAverages();
     const ctx = document.getElementById('hourlyAverageChart')?.getContext('2d');
     if (!ctx) return;
+    
+    const dayStartPositions = [];
+    
+    // Détecter les débuts de jour (premier point de chaque jour)
+    let currentDate = '';
+    labels.forEach((label, idx) => {
+        const [date, hour] = label.split(' ');
+        if (date !== currentDate) {
+            currentDate = date;
+            dayStartPositions.push({
+                date: date,
+                position: idx
+            });
+        }
+    });
+    
+    // Plugin pour afficher les dates en bas
+    const dateLabelPlugin = {
+        id: 'dateLabels',
+        afterDatasetsDraw(chart) {
+            const { ctx, chartArea, scales } = chart;
+            if (!scales.x) return;
+            
+            ctx.save();
+            ctx.font = '10px Inter, system-ui, sans-serif';
+            ctx.fillStyle = '#495057';
+            ctx.textAlign = 'center';
+            
+            dayStartPositions.forEach(pos => {
+                const x = scales.x.getPixelForValue(pos.position);
+                if (x >= chartArea.left && x <= chartArea.right) {
+                    const [year, month, day] = pos.date.split('-');
+                    const dateLabel = `${day}/${month}`;
+                    ctx.fillText(dateLabel, x, chartArea.bottom + 20);
+                }
+            });
+            ctx.restore();
+        }
+    };
     
     chartManager.destroy('hourlyAverageChart');
     requestAnimationFrame(() => {
@@ -2256,7 +2405,7 @@ function updateAverageChart() {
                     return hour;
                 }),
                 datasets: [{
-                    label: 'Moyenne horaire (Wh)',
+                    label: 'Moyenne horaire (Wh/h)',
                     data: averages,
                     backgroundColor: UNIFIED_STYLE.colors.success,
                     borderColor: 'white',
@@ -2267,6 +2416,11 @@ function updateAverageChart() {
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
+                layout: {
+                    padding: {
+                        bottom: 30
+                    }
+                },
                 plugins: {
                     tooltip: {
                         callbacks: {
@@ -2279,7 +2433,7 @@ function updateAverageChart() {
                             },
                             label: (ctx) => {
                                 const value = ctx.raw;
-                                return `${value.toFixed(1)} Wh (moyenne)`;
+                                return `${value.toFixed(1)} Wh/h`;
                             }
                         }
                     },
@@ -2288,24 +2442,34 @@ function updateAverageChart() {
                 scales: {
                     y: { 
                         beginAtZero: true,
-                        title: { display: true, text: 'Moyenne (Wh)', font: { size: 10 } },
+                        title: { display: true, text: 'Moyenne (Wh/h)', font: { size: 10 } },
                         grid: { color: UNIFIED_STYLE.colors.grid }
                     },
                     x: {
                         title: { display: true, text: 'Heure', font: { size: 10 } },
                         ticks: { 
-                            maxRotation: 45, 
-                            minRotation: 45, 
+                            maxRotation: 0,
                             autoSkip: true, 
-                            maxTicksLimit: 12
+                            maxTicksLimit: 12,
+                            callback: (val, idx) => {
+                                const hour = labels[idx]?.split(' ')[1];
+                                // Afficher toutes les 3 heures pour mieux se repérer
+                                if (hour === '00:00' || hour === '03:00' || hour === '06:00' || hour === '09:00' || 
+                                    hour === '12:00' || hour === '15:00' || hour === '18:00' || hour === '21:00') {
+                                    return hour;
+                                }
+                                return '';
+                            },
+                            font: { size: 9 }
                         }
                     }
                 }
             },
-            plugins: [dayBackgroundBarPlugin]
+            plugins: [dayBackgroundBarPlugin, dateLabelPlugin]
         });
     });
 }
+
 
 function attachCycleEvents() {
     const startSelect = document.getElementById('cycleStartSelect');
@@ -2360,11 +2524,11 @@ function attachCycleEvents() {
                     <div style="display:grid; grid-template-columns:repeat(2,1fr); gap:16px;">
                         <div style="text-align:center;">
                             <div style="font-size:0.7rem; color:#6c757d;">MOYENNE HORAIRE</div>
-                            <div style="font-size:1.4rem; font-weight:700; color:#3b82f6;">${averageStats.avg.toFixed(1)} <span style="font-size:0.8rem;">Wh</span></div>
+                            <div style="font-size:1.4rem; font-weight:700; color:#3b82f6;">${averageStats.avg.toFixed(1)} <span style="font-size:0.8rem;">Wh/h</span></div>
                         </div>
                         <div style="text-align:center;">
                             <div style="font-size:0.7rem; color:#6c757d;">MAX HORAIRE</div>
-                            <div style="font-size:1.4rem; font-weight:700; color:#f59e0b;">${averageStats.max.toFixed(1)} <span style="font-size:0.8rem;">Wh</span></div>
+                            <div style="font-size:1.4rem; font-weight:700; color:#f59e0b;">${averageStats.max.toFixed(1)} <span style="font-size:0.8rem;">Wh/h</span></div>
                         </div>
                     </div>
                 `;
@@ -2380,7 +2544,7 @@ function attachCycleEvents() {
                                 <span style="font-size:2rem;">☀️</span>
                                 <div>
                                     <div style="font-size:0.7rem; color:#f59e0b; font-weight:600;">JOUR (6h-17h)</div>
-                                    <div style="font-size:1.4rem; font-weight:700; color:#f59e0b;">${dayNightAverages.day.toFixed(1)} <span style="font-size:0.8rem;">Wh</span></div>
+                                    <div style="font-size:1.4rem; font-weight:700; color:#f59e0b;">${dayNightAverages.day.toFixed(1)} <span style="font-size:0.8rem;">Wh/h</span></div>
                                     <div style="font-size:0.7rem; color:#6c757d;">moyenne horaire</div>
                                 </div>
                             </div>
@@ -2390,7 +2554,7 @@ function attachCycleEvents() {
                                 <span style="font-size:2rem;">🌙</span>
                                 <div>
                                     <div style="font-size:0.7rem; color:#3b82f6; font-weight:600;">NUIT (18h-5h)</div>
-                                    <div style="font-size:1.4rem; font-weight:700; color:#3b82f6;">${dayNightAverages.night.toFixed(1)} <span style="font-size:0.8rem;">Wh</span></div>
+                                    <div style="font-size:1.4rem; font-weight:700; color:#3b82f6;">${dayNightAverages.night.toFixed(1)} <span style="font-size:0.8rem;">Wh/h</span></div>
                                     <div style="font-size:0.7rem; color:#6c757d;">moyenne horaire</div>
                                 </div>
                             </div>
