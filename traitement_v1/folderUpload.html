@@ -78,6 +78,28 @@
                 <span class="close">&times;</span>
             </div>
             <div class="modal-body">
+                <!-- ALERTE IMPORTANTE - RENOMMER LE DOSSIER -->
+                <div class="folder-rename-alert" style="background: linear-gradient(135deg, #fff4e5 0%, #ffe6cc 100%); border-left: 5px solid #ff9800; padding: 15px; margin-bottom: 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
+                    <div style="display: flex; align-items: flex-start; gap: 12px;">
+                        <div style="font-size: 28px;">⚠️</div>
+                        <div style="flex: 1;">
+                            <h3 style="color: #e67e22; margin: 0 0 8px 0; font-size: 16px; font-weight: bold;">IMPORTANT : Renommage obligatoire du dossier</h3>
+                            <p style="color: #a05a15; margin: 0 0 8px 0; font-size: 14px; line-height: 1.4;">
+                                Avant d'importer votre dossier, vous <strong>DEVEZ impérativement le renommer</strong> selon le format suivant :
+                            </p>
+                            <p style="color: #e67e22; margin: 0; font-size: 18px; font-weight: bold; font-family: monospace;">
+                                📁 <strong style="background: #fff0d0; padding: 3px 8px; border-radius: 5px;">NR + numéro du NR</strong>
+                            </p>
+                            <p style="color: #a05a15; margin: 8px 0 0 0; font-size: 13px;">
+                                <strong>Exemple :</strong> <code style="background: #fff0d0; padding: 2px 6px; border-radius: 4px; font-weight: bold;">NR755</code>, <code style="background: #fff0d0; padding: 2px 6px; border-radius: 4px;">NR3125</code>, <code style="background: #fff0d0; padding: 2px 6px; border-radius: 4px;">NR1024</code>
+                            </p>
+                            <div style="background: #ffebcc; margin-top: 10px; padding: 8px 12px; border-radius: 6px; font-size: 12px; color: #b85c00;">
+                                💡 <strong>Pourquoi ?</strong> Le numéro NR sera automatiquement extrait du nom du dossier pour faciliter la gestion de vos relevés.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Section Sélection de dossier -->
                 <div class="upload-section">
                     <div class="upload-card">
@@ -89,12 +111,10 @@
                 </div>
 
                 <!-- Section Analyse du dossier -->
-                <div id="folder-analysis-section" class="analysis-section hidden">
-                    <h3>Aperçu du dossier</h3>
-                    
+                <div id="folder-analysis-section" class="analysis-section hidden">                    
                     <div style="background: #e8f4f8; border-left: 4px solid #3498db; padding: 12px; margin-bottom: 15px; border-radius: 4px;">
                         <p style="color: #2c3e50; font-size: 13px; margin: 0;">
-                            <strong>ℹ️ Info :</strong> Le dossier principal doit être nommé "NR" suivi du numéro (ex: NR3125). Le N°NR sera extrait automatiquement.
+                            <strong>ℹ️ Aperçu du dossier</strong>
                         </p>
                     </div>
                     

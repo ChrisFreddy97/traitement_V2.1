@@ -43,6 +43,9 @@ let filterYear = null;
 let energyChartStartDate = null;
 let energyChartEndDate = null;
 
+// Déclarer updateDateBadge comme fonction globale ou dans un scope accessible
+let updateDateBadgeFunction = null;
+
 // ==================== DICTIONNAIRE DES FORFAITS ====================
 const FORFAIT_NAMES = {
     1: "ECO",
@@ -244,7 +247,10 @@ function calculateTechnicalData() {
         avgTension: { value: 0 },
         minTension: { value: 100, date: '' },
         maxTension: { value: 0, date: '' },
-        tensionSystem: 'Système 12V'
+        tensionSystem: 'Système 12V',
+        // ✅ AJOUT DES NOUVELLES MÉTRIQUES
+        avgMinTension: { value: 0 },  // Moyenne des tensions minimales journalières
+        avgMaxTension: { value: 0 }   // Moyenne des tensions maximales journalières
     };
     
     // Calcul des jours uniques
@@ -268,7 +274,7 @@ function calculateTechnicalData() {
         data.period = uniqueDays.size > 0 ? `${uniqueDays.size} jour${uniqueDays.size !== 1 ? 's' : ''}` : 'Données en cours...';
     }
     
-    // Calcul du nombre de clients
+    // Calcul du nombre de clients (inchangé)
     if (energyDataToUse.length > 0) {
         let clientCount = 0;
         for (let i = 1; i <= 6; i++) {
@@ -288,7 +294,7 @@ function calculateTechnicalData() {
         data.clientCount = clientCount > 0 ? clientCount : '0';
     }
     
-    // Calcul de l'énergie
+    // Calcul de l'énergie (inchangé)
     if (energyDataToUse.length > 0) {
         let maxEnergyValue = 0;
         let maxEnergyDate = '';
@@ -325,7 +331,7 @@ function calculateTechnicalData() {
         }
     }
     
-    // Calcul de la tension
+    // ✅ NOUVEAU CALCUL DES MOYENNES JOURNALIÈRES DE TENSION
     if (tensionDataToUse.length > 0) {
         let tensionSum = 0;
         let tensionCount = 0;
@@ -334,33 +340,71 @@ function calculateTechnicalData() {
         let minTensionDate = '';
         let maxTensionDate = '';
         
+        // ✅ Pour les moyennes journalières
+        const dailyMinValues = [];
+        const dailyMaxValues = [];
+        
+        // Grouper par jour pour calculer les min et max journaliers
+        const dailyData = {};
+        
         tensionDataToUse.forEach(row => {
-            const tMoyStr = row['T_moy'];
-            if (tMoyStr && tMoyStr.toString().trim() !== '' && tMoyStr.toString().trim() !== '-') {
-                const tMoy = parseFloat(tMoyStr.toString().replace(',', '.'));
-                if (!isNaN(tMoy) && tMoy > 0) {
-                    tensionSum += tMoy;
-                    tensionCount++;
-                }
+            if (!row['Date et Heure']) return;
+            const date = row['Date et Heure'].split(' ')[0];
+            const tMin = parseFloat(row['T_min']) || 0;
+            const tMax = parseFloat(row['T_max']) || 0;
+            const tMoy = parseFloat(row['T_moy']) || 0;
+            
+            if (!dailyData[date]) {
+                dailyData[date] = {
+                    minValues: [],
+                    maxValues: [],
+                    avgValues: []
+                };
             }
-            const tMinStr = row['T_min'];
-            if (tMinStr && tMinStr.toString().trim() !== '' && tMinStr.toString().trim() !== '-') {
-                const tMin = parseFloat(tMinStr.toString().replace(',', '.'));
-                if (!isNaN(tMin) && tMin > 0 && tMin < minTensionValue) {
-                    minTensionValue = tMin;
-                    minTensionDate = row['Date et Heure'];
-                }
+            
+            if (tMin > 0) dailyData[date].minValues.push(tMin);
+            if (tMax > 0) dailyData[date].maxValues.push(tMax);
+            if (tMoy > 0) dailyData[date].avgValues.push(tMoy);
+            
+            // Statistiques globales (inchangées)
+            if (tMoy > 0) {
+                tensionSum += tMoy;
+                tensionCount++;
             }
-            const tMaxStr = row['T_max'];
-            if (tMaxStr && tMaxStr.toString().trim() !== '' && tMaxStr.toString().trim() !== '-') {
-                const tMax = parseFloat(tMaxStr.toString().replace(',', '.'));
-                if (!isNaN(tMax) && tMax > maxTensionValue) {
-                    maxTensionValue = tMax;
-                    maxTensionDate = row['Date et Heure'];
-                }
+            if (tMin > 0 && tMin < minTensionValue) {
+                minTensionValue = tMin;
+                minTensionDate = row['Date et Heure'];
+            }
+            if (tMax > 0 && tMax > maxTensionValue) {
+                maxTensionValue = tMax;
+                maxTensionDate = row['Date et Heure'];
             }
         });
         
+        // ✅ Calculer les moyennes des min et max journaliers
+        let totalDailyMin = 0;
+        let totalDailyMax = 0;
+        let daysWithData = 0;
+        
+        Object.values(dailyData).forEach(day => {
+            if (day.minValues.length > 0 && day.maxValues.length > 0) {
+                // Prendre la valeur la plus basse du jour pour le min journalier
+                const dayMin = Math.min(...day.minValues);
+                // Prendre la valeur la plus haute du jour pour le max journalier
+                const dayMax = Math.max(...day.maxValues);
+                
+                totalDailyMin += dayMin;
+                totalDailyMax += dayMax;
+                daysWithData++;
+            }
+        });
+        
+        if (daysWithData > 0) {
+            data.avgMinTension.value = (totalDailyMin / daysWithData).toFixed(2) + ' V';
+            data.avgMaxTension.value = (totalDailyMax / daysWithData).toFixed(2) + ' V';
+        }
+        
+        // Statistiques globales (inchangées)
         if (tensionCount > 0) {
             const avgTension = tensionSum / tensionCount;
             data.avgTension.value = avgTension.toFixed(2) + ' V';
@@ -375,19 +419,25 @@ function calculateTechnicalData() {
             data.maxTension.date = maxTensionDate ? maxTensionDate.split(' ')[0].split('-').reverse().join('/') : 'Non disponible';
         }
     }
+    
     return data;
 }
 
 // ==================== ANALYSE STABILITÉ TENSION ====================
-
 function analyzeTensionStability(tensionResults) {
     if (!tensionResults || !tensionResults.length) {
         return {
-            stable: 0, unstable: 0, outOfLimits: 0,
-            stabilityPercentage: 0, averageVariation: 0,
-            days: 0, systemType: '12V', limits: getSystemLimits('12V')
+            stable: 0,           // Jours conformes (tension dans seuils ET variation ≤ max)
+            outOfLimits: 0,      // Jours non conformes (tension hors seuils)
+            highVariation: 0,    // Jours avec variation excessive (tension dans seuils MAIS variation > max)
+            stabilityPercentage: 0,
+            averageVariation: 0,
+            days: 0,
+            systemType: '12V',
+            limits: getSystemLimits('12V')
         };
     }
+    
     const dailyData = {};
     tensionResults.forEach(item => {
         const date = item['Date et Heure'] ? item['Date et Heure'].split(' ')[0] : null;
@@ -404,15 +454,31 @@ function analyzeTensionStability(tensionResults) {
         if (tMin > 0 && tMin < dailyData[date].min) dailyData[date].min = tMin;
         if (tMax > 0 && tMax > dailyData[date].max) dailyData[date].max = tMax;
     });
+    
     const systemType = detectSystemType(tensionResults);
     const limits = getSystemLimits(systemType);
-    let stableDays = 0, unstableDays = 0, outOfLimitsDays = 0;
+    
+    // ✅ NOUVELLE CLASSIFICATION AVEC 3 CATÉGORIES
+    let stableDays = 0;           // Jours conformes
+    let outOfLimitsDays = 0;      // Jours non conformes (hors seuils min/max)
+    let highVariationDays = 0;    // Jours avec variation excessive (mais seuils respectés)
     
     Object.values(dailyData).forEach(day => {
         const variation = day.max - day.min;
-        if (day.min < limits.min || day.max > limits.max) outOfLimitsDays++;
-        else if (variation > limits.maxVariation) unstableDays++;
-        else stableDays++;
+        const isWithinMinMax = (day.min >= limits.min && day.max <= limits.max);
+        
+        // ✅ PRIORITÉ 1 : Vérifier si tension hors seuils
+        if (!isWithinMinMax) {
+            outOfLimitsDays++;  // Jour non conforme (tension trop basse ou trop haute)
+        }
+        // ✅ PRIORITÉ 2 : Vérifier si variation excessive (mais seuils respectés)
+        else if (variation > limits.maxVariation) {
+            highVariationDays++;  // Jour avec variation élevée
+        }
+        // ✅ PRIORITÉ 3 : Jour parfaitement conforme
+        else {
+            stableDays++;
+        }
     });
     
     const variations = [];
@@ -425,11 +491,17 @@ function analyzeTensionStability(tensionResults) {
     const totalDays = Object.keys(dailyData).length;
     const stabilityPercentage = totalDays > 0 ? Math.round((stableDays / totalDays) * 100) : 0;
     
-    return { stable: stableDays, unstable: unstableDays, outOfLimits: outOfLimitsDays,
-        stabilityPercentage, averageVariation: parseFloat(averageVariation),
-        days: totalDays, systemType, limits };
+    return { 
+        stable: stableDays,           // Jours conformes
+        outOfLimits: outOfLimitsDays, // Jours non conformes (hors seuils)
+        highVariation: highVariationDays, // Jours avec variation excessive
+        stabilityPercentage, 
+        averageVariation: parseFloat(averageVariation),
+        days: totalDays, 
+        systemType, 
+        limits 
+    };
 }
-
 function analyzeThresholdExceedances(tensionResults) {
     if (!tensionResults || !tensionResults.length) {
         return {
@@ -1297,7 +1369,7 @@ function showWarningMessage(message) {
 function resetFilters() {
     filterStartDate = null;
     filterEndDate = null;
-    filterPeriod = 'all';
+    filterPeriod = 'all';  // ✅ Conserver "all" comme filtre par défaut
     filterMonth = null;
     filterYear = null;
     
@@ -1316,10 +1388,10 @@ function resetFilters() {
     if (yearFilterSelect) yearFilterSelect.value = '';
     if (monthFilterSelect) monthFilterSelect.value = '';
     
-    // Réinitialiser les boutons de période
+    // ✅ Mettre à jour l'état visuel des boutons de période
     document.querySelectorAll('.period-btn').forEach(b => {
         b.classList.remove('active');
-        b.style.cssText = `padding: 10px; border: 1px solid #dee2e6; border-radius: 4px; background: white; color: #495057; cursor: pointer; font-size: 12px;`;
+        b.style.cssText = `padding: 10px; border: 1px solid #dee2e6; border-radius: 4px; background: white; color: #495057; cursor: pointer; font-size: 12px; transition: all 0.3s;`;
     });
     
     const allBtn = document.querySelector('.period-btn[data-period="all"]');
@@ -1335,6 +1407,13 @@ function resetFilters() {
     createTechnicalDataCard();
     
     showFilterMessage('Filtres réinitialisés');
+    
+    // ✅ Mettre à jour le badge pour afficher la période par défaut
+    setTimeout(() => {
+        if (typeof updateDateBadge === 'function') {
+            updateDateBadge();
+        }
+    }, 100);
 }
 
 function showFilterMessage(message = 'Filtres appliqués') {
@@ -1354,7 +1433,6 @@ function showFilterMessage(message = 'Filtres appliqués') {
 }
 
 // ==================== CRÉATION DES FILTRES (CARD 1) ====================
-
 function createFilterControls() {
     const filtersContainerParent = document.getElementById('card-filters-content');
     if (!filtersContainerParent) return;
@@ -1376,6 +1454,46 @@ function createFilterControls() {
         </div>
     `;
     filtersContainer.appendChild(filtersHeader);
+    
+    // ✅ AJOUT DU BADGE D'AFFICHAGE DES DATES (initialement vide)
+    const dateBadgeContainer = document.createElement('div');
+    dateBadgeContainer.id = 'filter-date-badge';
+    dateBadgeContainer.style.cssText = `
+        margin-bottom: 20px;
+        padding: 12px 16px;
+        background: linear-gradient(135deg, #3498db 0%, #2c3e50 100%);
+        border-radius: 12px;
+        color: white;
+        font-size: 14px;
+        display: none;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 10px;
+        box-shadow: 0 2px 8px rgba(52, 152, 219, 0.3);
+    `;
+
+    const dateBadgeLeft = document.createElement('div');
+    dateBadgeLeft.style.cssText = `display: flex; align-items: center; gap: 10px;`;
+    dateBadgeLeft.innerHTML = `
+        <span style="font-size: 20px;">📅</span>
+        <span style="font-weight: 600;">Période sélectionnée :</span>
+        <span id="filter-date-range" style="font-weight: 700; letter-spacing: 0.5px;"></span>
+    `;
+
+    const dateBadgeRight = document.createElement('div');
+    dateBadgeRight.style.cssText = `display: flex; align-items: center; gap: 8px;`;
+    dateBadgeRight.innerHTML = `
+        <span id="filter-records-count" style="background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 30px; font-size: 12px;"></span>
+        <button id="clear-badge-btn" style="background: rgba(255,255,255,0.25); border: none; color: white; cursor: pointer; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; transition: all 0.2s;" 
+                onmouseover="this.style.background='rgba(255,255,255,0.4)'" onmouseout="this.style.background='rgba(255,255,255,0.25)'">
+            ✕
+        </button>
+    `;
+
+    dateBadgeContainer.appendChild(dateBadgeLeft);
+    dateBadgeContainer.appendChild(dateBadgeRight);
+    filtersContainer.appendChild(dateBadgeContainer);
     
     const filtersGrid = document.createElement('div');
     filtersGrid.style.cssText = `display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;`;
@@ -1424,10 +1542,6 @@ function createFilterControls() {
             <div><label style="display: block; margin-bottom: 5px; font-size: 13px; color: #495057; font-weight: 500;">Date de fin</label>
                 <input type="date" id="end-date-input" style="width: 100%; padding: 8px 12px; border: 1px solid #ced4da; border-radius: 4px; font-size: 13px;" min="${minDate}" max="${maxDate}" value="${endDateValue}"></div>
         </div>
-        <div style="margin-top: 12px; font-size: 11px; color: #6c757d; display: flex; justify-content: space-between;">
-            <span>📅 Du ${minDate || '...'} au ${maxDate || '...'}</span>
-            <span>${allDates.length} enregistrements</span>
-        </div>
     `;
     filtersGrid.appendChild(dateRangeFilterDiv);
     
@@ -1452,17 +1566,152 @@ function createFilterControls() {
             <div><label style="display: block; margin-bottom: 5px; font-size: 13px; color: #495057; font-weight: 500;">Mois</label>
                 <select id="month-filter-select" style="width: 100%; padding: 8px 12px; border: 1px solid #ced4da; border-radius: 4px; font-size: 13px;">${monthOptions}</select></div>
         </div>
-        <div style="margin-top: 15px; font-size: 11px; color: #6c757d; background: #e9ecef; padding: 8px 12px; border-radius: 4px;">
-            <div style="display: flex; justify-content: space-between;"><span>⚡ Énergie: ${combinedEnergyData.length} lignes</span><span>📊 Tension: ${combinedTensionData.length} lignes</span></div>
-        </div>
     `;
     filtersGrid.appendChild(monthYearFilterDiv);
     filtersContainer.appendChild(filtersGrid);
     filtersContainerParent.appendChild(filtersContainer);
-    setupFilterEvents();
+    setupFilterEvents(dateBadgeContainer);
 }
 
-function setupFilterEvents() {
+function setupFilterEvents(dateBadgeContainer) {
+    // Fonction pour mettre à jour le badge avec les dates exactes
+    function updateDateBadge() {
+        const badgeElement = document.getElementById('filter-date-badge');
+        const dateRangeSpan = document.getElementById('filter-date-range');
+        const recordsCountSpan = document.getElementById('filter-records-count');
+        
+        if (!badgeElement || !dateRangeSpan) return;
+        
+        let startDateFormatted = '';
+        let endDateFormatted = '';
+        
+        // Calculer les dates réelles en fonction du filtre
+        if (filterPeriod && filterPeriod !== 'all') {
+            // Trouver la dernière date dans les données
+            let lastDate = null;
+            const allDates = [];
+            
+            if (combinedEnergyData.length > 0) {
+                combinedEnergyData.forEach(row => {
+                    if (row['Date et Heure']) {
+                        const date = new Date(row['Date et Heure'].split(' ')[0]);
+                        if (!isNaN(date.getTime())) allDates.push(date);
+                    }
+                });
+            }
+            if (combinedTensionData.length > 0) {
+                combinedTensionData.forEach(row => {
+                    if (row['Date et Heure']) {
+                        const date = new Date(row['Date et Heure'].split(' ')[0]);
+                        if (!isNaN(date.getTime())) allDates.push(date);
+                    }
+                });
+            }
+            
+            if (allDates.length > 0) {
+                lastDate = new Date(Math.max(...allDates));
+                
+                // Calculer la date de début selon la période
+                let startDate = new Date(lastDate);
+                switch (filterPeriod) {
+                    case '5days':
+                        startDate.setDate(lastDate.getDate() - 5);
+                        break;
+                    case '7days':
+                        startDate.setDate(lastDate.getDate() - 7);
+                        break;
+                    case '15days':
+                        startDate.setDate(lastDate.getDate() - 15);
+                        break;
+                    case '30days':
+                        startDate.setDate(lastDate.getDate() - 30);
+                        break;
+                    case '2months':
+                        startDate.setMonth(lastDate.getMonth() - 2);
+                        break;
+                    case '3months':
+                        startDate.setMonth(lastDate.getMonth() - 3);
+                        break;
+                    case '6months':
+                        startDate.setMonth(lastDate.getMonth() - 6);
+                        break;
+                    case '1year':
+                        startDate.setFullYear(lastDate.getFullYear() - 1);
+                        break;
+                }
+                
+                startDateFormatted = startDate.toLocaleDateString('fr-FR');
+                endDateFormatted = lastDate.toLocaleDateString('fr-FR');
+            }
+        } 
+        else if (filterStartDate || filterEndDate) {
+            startDateFormatted = filterStartDate ? filterStartDate.toLocaleDateString('fr-FR') : 'début';
+            endDateFormatted = filterEndDate ? filterEndDate.toLocaleDateString('fr-FR') : 'fin';
+        }
+        else if (filterMonth && filterYear) {
+            // Pour un mois, on calcule le premier et dernier jour du mois
+            const firstDay = new Date(filterYear, filterMonth - 1, 1);
+            const lastDay = new Date(filterYear, filterMonth, 0);
+            startDateFormatted = firstDay.toLocaleDateString('fr-FR');
+            endDateFormatted = lastDay.toLocaleDateString('fr-FR');
+        }
+        else if (filterYear && !filterMonth) {
+            // Pour une année, on calcule le premier et dernier jour de l'année
+            const firstDay = new Date(filterYear, 0, 1);
+            const lastDay = new Date(filterYear, 11, 31);
+            startDateFormatted = firstDay.toLocaleDateString('fr-FR');
+            endDateFormatted = lastDay.toLocaleDateString('fr-FR');
+        }
+        else {
+            // ✅ CAS PAR DÉFAUT "Tous" : afficher la première et la dernière date disponible
+            let firstDate = null;
+            let lastDate = null;
+            const allDates = [];
+            
+            if (combinedEnergyData.length > 0) {
+                combinedEnergyData.forEach(row => {
+                    if (row['Date et Heure']) {
+                        const date = new Date(row['Date et Heure'].split(' ')[0]);
+                        if (!isNaN(date.getTime())) allDates.push(date);
+                    }
+                });
+            }
+            if (combinedTensionData.length > 0) {
+                combinedTensionData.forEach(row => {
+                    if (row['Date et Heure']) {
+                        const date = new Date(row['Date et Heure'].split(' ')[0]);
+                        if (!isNaN(date.getTime())) allDates.push(date);
+                    }
+                });
+            }
+            
+            if (allDates.length > 0) {
+                firstDate = new Date(Math.min(...allDates));
+                lastDate = new Date(Math.max(...allDates));
+                startDateFormatted = firstDate.toLocaleDateString('fr-FR');
+                endDateFormatted = lastDate.toLocaleDateString('fr-FR');
+            } else {
+                startDateFormatted = 'Non disponible';
+                endDateFormatted = 'Non disponible';
+            }
+        }
+        
+        // ✅ Toujours afficher le badge (même pour "Tous")
+        badgeElement.style.display = 'flex';
+        dateRangeSpan.innerHTML = `<strong>${startDateFormatted}</strong> → <strong>${endDateFormatted}</strong>`;
+    }
+    
+    // ✅ Stocker la fonction globalement pour qu'elle soit accessible depuis resetFilters
+    window.updateDateBadge = updateDateBadge;
+    
+    // Bouton pour effacer le badge (réinitialiser les filtres)
+    const clearBadgeBtn = document.getElementById('clear-badge-btn');
+    if (clearBadgeBtn) {
+        clearBadgeBtn.addEventListener('click', () => {
+            resetFilters();
+        });
+    }
+    
     document.querySelectorAll('.period-btn').forEach(btn => {
         btn.addEventListener('click', function() {
             document.querySelectorAll('.period-btn').forEach(b => {
@@ -1479,6 +1728,8 @@ function setupFilterEvents() {
                 document.getElementById('month-filter-select').value = '';
                 filterStartDate = null; filterEndDate = null; filterMonth = null; filterYear = null;
             }
+            // Mettre à jour le badge immédiatement
+            setTimeout(() => updateDateBadge(), 50);
         });
     });
     
@@ -1516,21 +1767,29 @@ function setupFilterEvents() {
             document.querySelector('.period-btn[data-period="all"]').classList.add('active');
             document.querySelector('.period-btn[data-period="all"]').style.cssText = `padding: 10px; border: 2px solid #3498db; border-radius: 4px; background: #3498db; color: white; cursor: pointer; font-size: 12px; font-weight: bold;`;
         }
+        
         applyDateFilters();
         showFilterMessage('Filtres appliqués');
+        
+        // Mettre à jour le badge après application des filtres
+        setTimeout(() => updateDateBadge(), 100);
     });
     
-    document.getElementById('reset-filters-btn').addEventListener('click', resetFilters);
+    document.getElementById('reset-filters-btn').addEventListener('click', () => {
+        resetFilters();
+    });
     
     document.querySelectorAll('.period-btn').forEach(btn => {
         if (btn.classList.contains('active')) {
             btn.style.cssText = `padding: 10px; border: 2px solid #3498db; border-radius: 4px; background: #3498db; color: white; cursor: pointer; font-size: 12px; font-weight: bold;`;
         }
     });
+    
+    // ✅ Initialiser le badge au chargement (affichera la plage complète des données)
+    setTimeout(() => updateDateBadge(), 500);
 }
 
 // ==================== CARD 2 : DONNÉES TECHNIQUES ====================
-
 function createTechnicalDataCard() {
     const cardContent = document.getElementById('card-technical-data-content');
     if (!cardContent) return;
@@ -1592,12 +1851,15 @@ function createTechnicalDataCard() {
     const isMaxOutOfLimit = parseFloat(techData.maxTension.value) > limits.max;
     const isVariationOutOfLimit = parseFloat(maxDailyVariation.value) > limits.maxVariation;
     
+    // ✅ AJOUT DES NOUVELLES LIGNES DANS LE TABLEAU
     let tbodyHTML = `
         <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.1);"><td style="padding: 12px 0; width: 40%;"><div style="display: flex; align-items: center; gap: 12px;"><span style="font-size: 18px;">⚡</span><span style="font-weight: 600;">Énergie Maximale</span></div></td><td style="padding: 12px 0; width: 30%; font-weight: 700; color: white;">${techData.maxEnergy.value}</td><td style="padding: 12px 0; width: 30%; text-align: right; color: rgba(255,255,255,0.8);">${techData.maxEnergy.date}</td></tr>
         <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.1);"><td style="padding: 12px 0;"><div style="display: flex; align-items: center; gap: 12px;"><span style="font-size: 18px;">📊</span><span style="font-weight: 600;">Énergie Moyenne</span></div></td><td style="padding: 12px 0; font-weight: 700;">${techData.avgEnergy.value || '0 Wh'}</td><td style="padding: 12px 0; text-align: right; color: rgba(255,255,255,0.8);">sur ${daysToUse} jour${daysToUse !== 1 ? 's' : ''}</td></tr>
         <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.1);"><td style="padding: 12px 0;"><div style="display: flex; align-items: center; gap: 12px;"><span style="font-size: 18px;">📊</span><span style="font-weight: 600;">Tension Moyenne</span></div></td><td style="padding: 12px 0; font-weight: 700;">${techData.avgTension.value}</td><td style="padding: 12px 0; text-align: right;"><span style="background: rgba(255,255,255,0.15); padding: 4px 12px; border-radius: 20px; font-size: 13px;">${techData.tensionSystem}</span></td></tr>
         <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.1);"><td style="padding: 12px 0;"><div style="display: flex; align-items: center; gap: 12px;"><span style="font-size: 18px;">⬇️</span><span style="font-weight: 600;">Tension Minimale</span></div></td><td style="padding: 12px 0; font-weight: 700; color: ${isMinOutOfLimit ? '#ffb3b3' : 'white'};">${techData.minTension.value} ${isMinOutOfLimit ? '⚠️' : ''}</td><td style="padding: 12px 0; text-align: right; color: rgba(255,255,255,0.8);">${techData.minTension.date}</td></tr>
         <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.1);"><td style="padding: 12px 0;"><div style="display: flex; align-items: center; gap: 12px;"><span style="font-size: 18px;">⬆️</span><span style="font-weight: 600;">Tension Maximale</span></div></td><td style="padding: 12px 0; font-weight: 700; color: ${isMaxOutOfLimit ? '#ffb3b3' : 'white'};">${techData.maxTension.value} ${isMaxOutOfLimit ? '⚠️' : ''}</td><td style="padding: 12px 0; text-align: right; color: rgba(255,255,255,0.8);">${techData.maxTension.date}</td></tr>
+        <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.1); background: rgba(255,255,255,0.05);"><td style="padding: 12px 0;"><div style="display: flex; align-items: center; gap: 12px;"><span style="font-size: 18px;">📉</span><span style="font-weight: 600;">Moyenne des Min Journaliers</span></div></td><td style="padding: 12px 0; font-weight: 700; color: #a5f3c3;">${techData.avgMinTension.value || '0 V'}</td><td style="padding: 12px 0; text-align: right; color: rgba(255,255,255,0.7); font-size: 12px;">moyenne sur ${daysToUse} jour(s)</td></tr>
+        <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.1); background: rgba(255,255,255,0.05);"><td style="padding: 12px 0;"><div style="display: flex; align-items: center; gap: 12px;"><span style="font-size: 18px;">📈</span><span style="font-weight: 600;">Moyenne des Max Journaliers</span></div></td><td style="padding: 12px 0; font-weight: 700; color: #fbc4ab;">${techData.avgMaxTension.value || '0 V'}</td><td style="padding: 12px 0; text-align: right; color: rgba(255,255,255,0.7); font-size: 12px;">moyenne sur ${daysToUse} jour(s)</td></tr>
         <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.1);"><td style="padding: 12px 0;"><div style="display: flex; align-items: center; gap: 12px;"><span style="font-size: 18px;">📏</span><span style="font-weight: 600;">Variation Max/Jour</span></div></td><td style="padding: 12px 0; font-weight: 700; color: ${isVariationOutOfLimit ? '#ffb3b3' : 'white'};">${maxDailyVariation.value} V ${isVariationOutOfLimit ? '⚠️' : ''}</td><td style="padding: 12px 0; text-align: right;"><span style="background: rgba(255,255,255,0.15); padding: 4px 12px; border-radius: 20px; font-size: 13px;">Seuil: ${limits.maxVariation} V/h</span></td></tr>
     `;
     table.innerHTML = `<tbody>${tbodyHTML}</tbody>`;
@@ -1617,34 +1879,131 @@ function createTensionAnalysisContent() {
     const analysisDiv = document.createElement('div');
     analysisDiv.style.cssText = `display: flex; flex-direction: column; gap: 20px;`;
     
-    // Statistiques 4 cartes (inchangé)
+    // ========== SECTION NORMES SYSTÈME (avec titre visible et contenu caché par défaut) ==========
+    const normsSection = document.createElement('div');
+    normsSection.style.cssText = `background: #f8fafc; border-radius: 10px; border: 1px solid #e2e8f0; overflow: hidden;`;
+    
+    // En-tête cliquable avec titre
+    const normsHeader = document.createElement('div');
+    normsHeader.style.cssText = `
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 14px 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    `;
+    normsHeader.innerHTML = `
+        <div style="display: flex; align-items: center; gap: 12px;">
+            <span style="font-size: 20px;">⚡</span>
+            <span style="font-weight: 700; color: white; font-size: 16px;">Normes Système ${stabilityData.systemType} - Seuils d'alerte</span>
+        </div>
+        <span id="norms-toggle-icon" style="font-size: 20px; color: white;">🔽</span>
+    `;
+    
+    // Contenu de la section Normes (caché par défaut)
+    const normsContent = document.createElement('div');
+    normsContent.id = 'norms-content';
+    normsContent.style.cssText = `
+        padding: 16px;
+        display: none;
+        background: #f8fafc;
+    `;
+    normsContent.innerHTML = `
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 16px;">
+            <div style="background: white; padding: 12px; border-radius: 8px; border-left: 3px solid #e53e3e;">
+                <div style="font-size: 11px; color: #718096; margin-bottom: 4px;">Tension Min (alerte)</div>
+                <div style="font-size: 18px; font-weight: 700; color: #e53e3e;">${stabilityData.limits.min}V</div>
+            </div>
+            <div style="background: white; padding: 12px; border-radius: 8px; border-left: 3px solid #f59e0b;">
+                <div style="font-size: 11px; color: #718096; margin-bottom: 4px;">Plage Idéale</div>
+                <div style="font-size: 18px; font-weight: 700; color: #f59e0b;">${stabilityData.limits.ideal.min}V - ${stabilityData.limits.ideal.max}V</div>
+            </div>
+            <div style="background: white; padding: 12px; border-radius: 8px; border-left: 3px solid #22c55e;">
+                <div style="font-size: 11px; color: #718096; margin-bottom: 4px;">Tension Max (alerte)</div>
+                <div style="font-size: 18px; font-weight: 700; color: #22c55e;">${stabilityData.limits.max}V</div>
+            </div>
+            <div style="background: white; padding: 12px; border-radius: 8px; border-left: 3px solid #3b82f6;">
+                <div style="font-size: 11px; color: #718096; margin-bottom: 4px;">Variation max</div>
+                <div style="font-size: 18px; font-weight: 700; color: #3b82f6;">${stabilityData.limits.maxVariation}V</div>
+            </div>
+        </div>
+        
+        <!-- Classification des jours -->
+        <div style="margin-top: 12px; padding: 12px; background: white; border-radius: 8px; border: 1px solid #e2e8f0;">
+            <div style="font-weight: 700; color: #1e293b; margin-bottom: 10px; font-size: 12px; display: flex; align-items: center; gap: 8px;">
+                <span>📋</span> Classification des jours
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
+                <div style="background: #f0fdf4; border-radius: 6px; padding: 8px; border-left: 3px solid #22c55e;">
+                    <div style="display: flex; align-items: center; gap: 4px; margin-bottom: 4px;">
+                        <span style="font-size: 14px;">✅</span>
+                        <span style="font-weight: 700; color: #166534; font-size: 11px;">Jours conformes</span>
+                    </div>
+                    <div style="font-size: 9px; color: #15803d;">${stabilityData.limits.min}V-${stabilityData.limits.max}V · Var ≤ ${stabilityData.limits.maxVariation}V</div>
+                    <div style="font-size: 8px; color: #64748b; margin-top: 2px;">Tension stable et dans les normes</div>
+                </div>
+                <div style="background: #fef2f2; border-radius: 6px; padding: 8px; border-left: 3px solid #ef4444;">
+                    <div style="display: flex; align-items: center; gap: 4px; margin-bottom: 4px;">
+                        <span style="font-size: 14px;">🔴</span>
+                        <span style="font-weight: 700; color: #991b1b; font-size: 11px;">Jours non conformes</span>
+                    </div>
+                    <div style="font-size: 9px; color: #b91c1c;">Tension &lt; ${stabilityData.limits.min}V ou &gt; ${stabilityData.limits.max}V</div>
+                    <div style="font-size: 8px; color: #64748b; margin-top: 2px;">Tension hors seuils critiques</div>
+                </div>
+                <div style="background: #fef3c7; border-radius: 6px; padding: 8px; border-left: 3px solid #f59e0b;">
+                    <div style="display: flex; align-items: center; gap: 4px; margin-bottom: 4px;">
+                        <span style="font-size: 14px;">⚠️</span>
+                        <span style="font-weight: 700; color: #92400e; font-size: 11px;">Variation haute</span>
+                    </div>
+                    <div style="font-size: 9px; color: #b45309;">Tension dans seuils · Var > ${stabilityData.limits.maxVariation}V</div>
+                    <div style="font-size: 8px; color: #64748b; margin-top: 2px;">Tension dans seuils mais instable</div>
+                </div>
+            </div>
+        </div>
+        
+        <div style="margin-top: 12px; padding: 8px 12px; background: #fef2f2; border-radius: 6px; font-size: 11px; color: #991b1b; display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 12px;">🚨</span>
+            <span><strong>Dépassement de seuil détecté</strong> lorsque Tension &lt; ${stabilityData.limits.min}V ou Tension &gt; ${stabilityData.limits.max}V</span>
+        </div>
+    `;
+    
+    normsSection.appendChild(normsHeader);
+    normsSection.appendChild(normsContent);
+    analysisDiv.appendChild(normsSection);
+    
+    // ========== STATISTIQUES 4 CARTES (toujours visibles) ==========
     const statsRow = document.createElement('div');
     statsRow.style.cssText = `display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px;`;
     statsRow.innerHTML = `
         <div style="background: linear-gradient(135deg, #f0fff4 0%, #ffffff 100%); padding: 16px; border-radius: 10px; border-left: 5px solid #22c55e; box-shadow: 0 2px 8px rgba(0,0,0,0.06); text-align: center;">
-            <div style="font-size: 11px; color: #718096; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px;">📊 Conformité</div>
+            <div style="font-size: 11px; color: #718096; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px;">📊 CONFORMITÉ</div>
             <div style="font-size: 32px; font-weight: 800; color: #22c55e; margin-bottom: 8px;">${stabilityData.stabilityPercentage}%</div>
             <div style="font-size: 12px; color: #64748b;">${stabilityData.days} jour${stabilityData.days !== 1 ? 's' : ''} analysés</div>
         </div>
-        <div style="background: linear-gradient(135deg, #f0fff4 0%, #ffffff 100%); padding: 16px; border-radius: 10px; border-left: 5px solid #22c55e; box-shadow: 0 2px 8px rgba(0,0,0,0.06); text-align: center;">
-            <div style="font-size: 11px; color: #718096; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px;">✅ Jours Conforme</div>
-            <div style="font-size: 28px; font-weight: 800; color: #22c55e; margin-bottom: 8px;">${stabilityData.stable}</div>
-            <div style="text-align: center; padding: 6px 12px; background: rgba(34, 197, 94, 0.1); border-radius: 6px; font-size: 12px; color: #15803d; font-weight: 600;">${stabilityData.days > 0 ? Math.round((stabilityData.stable / stabilityData.days) * 100) : 0}% des jours</div>
-        </div>
-        <div style="background: linear-gradient(135deg, #fef3c7 0%, #ffffff 100%); padding: 16px; border-radius: 10px; border-left: 5px solid #f59e0b; box-shadow: 0 2px 8px rgba(0,0,0,0.06); text-align: center;">
-            <div style="font-size: 11px; color: #718096; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px;">⚠️ Jours Non Conforme</div>
-            <div style="font-size: 28px; font-weight: 800; color: #f59e0b; margin-bottom: 8px;">${stabilityData.unstable}</div>
-            <div style="text-align: center; padding: 6px 12px; background: rgba(245, 158, 11, 0.1); border-radius: 6px; font-size: 12px; color: #92400e; font-weight: 600;">${stabilityData.days > 0 ? Math.round((stabilityData.unstable / stabilityData.days) * 100) : 0}% des jours</div>
+        <div style="background: linear-gradient(135deg, #e8f0fe 0%, #ffffff 100%); padding: 16px; border-radius: 10px; border-left: 5px solid #3b82f6; box-shadow: 0 2px 8px rgba(0,0,0,0.06); text-align: center;">
+            <div style="font-size: 11px; color: #718096; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px;">✅ JOURS CONFORMES</div>
+            <div style="font-size: 28px; font-weight: 800; color: #3b82f6; margin-bottom: 8px;">${stabilityData.stable}</div>
+            <div style="font-size: 12px; color: #64748b;">Tension dans les seuils</div>
+            <div style="font-size: 11px; color: #475569; margin-top: 5px;">${stabilityData.limits.min}V - ${stabilityData.limits.max}V</div>
         </div>
         <div style="background: linear-gradient(135deg, #fee2e2 0%, #ffffff 100%); padding: 16px; border-radius: 10px; border-left: 5px solid #ef4444; box-shadow: 0 2px 8px rgba(0,0,0,0.06); text-align: center;">
-            <div style="font-size: 11px; color: #718096; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px;">🚨 JOURS D'ALERTE</div>
-            <div style="font-size: 32px; font-weight: 800; color: #ef4444; margin-bottom: 8px;">${exceedanceData.daysWithExceedance} / ${stabilityData.days}</div>
-            <div style="margin-top: 8px; font-size: 11px; color: #991b1b; background: rgba(239, 68, 68, 0.1); padding: 4px 8px; border-radius: 4px;">Seuil ${exceedanceData.systemType}: ${exceedanceData.limits.min}V - ${exceedanceData.limits.max}V</div>
+            <div style="font-size: 11px; color: #718096; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px;">🔴 JOURS NON CONFORMES</div>
+            <div style="font-size: 28px; font-weight: 800; color: #ef4444; margin-bottom: 8px;">${stabilityData.outOfLimits}</div>
+            <div style="font-size: 12px; color: #64748b;">Hors seuils (min/max)</div>
+            <div style="font-size: 11px; color: #991b1b; margin-top: 5px;">&lt; ${stabilityData.limits.min}V ou &gt; ${stabilityData.limits.max}V</div>
+        </div>
+        <div style="background: linear-gradient(135deg, #fef3c7 0%, #ffffff 100%); padding: 16px; border-radius: 10px; border-left: 5px solid #f59e0b; box-shadow: 0 2px 8px rgba(0,0,0,0.06); text-align: center;">
+            <div style="font-size: 11px; color: #718096; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px;">⚠️ VARIATION HAUTE</div>
+            <div style="font-size: 28px; font-weight: 800; color: #f59e0b; margin-bottom: 8px;">${stabilityData.highVariation}</div>
+            <div style="font-size: 12px; color: #64748b;">Variation > ${stabilityData.limits.maxVariation}V</div>
+            <div style="font-size: 11px; color: #92400e; margin-top: 5px;">Instabilité détectée</div>
         </div>
     `;
     analysisDiv.appendChild(statsRow);
     
-    // ========== SECTION TABLEAU DES DÉPASSEMENTS AVEC BOUTON ==========
+    // ========== SECTION TABLEAU DES DÉPASSEMENTS AVEC BOUTON (toujours visible) ==========
     const exceedanceSection = document.createElement('div');
     exceedanceSection.style.cssText = `border: 1px solid #fee2e2; border-radius: 10px; overflow: hidden;`;
     
@@ -1652,7 +2011,6 @@ function createTensionAnalysisContent() {
     const exceedanceHeader = document.createElement('div');
     exceedanceHeader.style.cssText = `background: #fef2f2; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #fee2e2; cursor: pointer; transition: all 0.2s ease;`;
     
-    // Partie gauche du header (titre et statistiques)
     const headerLeft = document.createElement('div');
     headerLeft.style.cssText = `display: flex; align-items: center; gap: 10px;`;
     headerLeft.innerHTML = `
@@ -1661,9 +2019,8 @@ function createTensionAnalysisContent() {
         <span style="font-size: 12px; color: #64748b; margin-left: 10px;">Total: ${exceedanceData.totalExceedances} dépassement${exceedanceData.totalExceedances !== 1 ? 's' : ''}</span>
     `;
     
-    // Bouton toggle
-    const toggleBtn = document.createElement('button');
-    toggleBtn.style.cssText = `
+    const exceedanceToggleBtn = document.createElement('button');
+    exceedanceToggleBtn.style.cssText = `
         background: rgba(239, 68, 68, 0.15);
         border: 1px solid #ef4444;
         color: #991b1b;
@@ -1677,21 +2034,14 @@ function createTensionAnalysisContent() {
         gap: 6px;
         transition: all 0.2s ease;
     `;
-    toggleBtn.innerHTML = `
+    exceedanceToggleBtn.innerHTML = `
         <span style="font-size: 12px;">🔽</span>
         <span>Afficher le tableau</span>
     `;
-    toggleBtn.onmouseover = () => {
-        toggleBtn.style.background = 'rgba(239, 68, 68, 0.25)';
-    };
-    toggleBtn.onmouseout = () => {
-        toggleBtn.style.background = 'rgba(239, 68, 68, 0.15)';
-    };
     
     exceedanceHeader.appendChild(headerLeft);
-    exceedanceHeader.appendChild(toggleBtn);
+    exceedanceHeader.appendChild(exceedanceToggleBtn);
     
-    // Conteneur du tableau (caché par défaut)
     const tableWrapper = document.createElement('div');
     tableWrapper.style.cssText = `
         overflow-x: auto;
@@ -1700,7 +2050,7 @@ function createTensionAnalysisContent() {
         padding: 16px;
         background: white;
         overscroll-behavior: contain;
-        display: none; /* ✅ CACHÉ PAR DÉFAUT */
+        display: none;
     `;
     
     // Générer le contenu du tableau
@@ -1723,62 +2073,59 @@ function createTensionAnalysisContent() {
             if (day.maxOutOfLimit !== '-') exceedanceValues.push(`Max: ${day.maxOutOfLimit}V`);
             const exceedanceText = exceedanceValues.length > 0 ? exceedanceValues.join(' • ') : '-';
             
-            tableHTML += `<tr style="border-bottom: 1px solid #e2e8f0; background: ${rowBgColor};"><td style="padding: 10px 8px; text-align: left; color: #1e293b; font-weight: 500;"><div style="display: flex; flex-direction: column;"><span>${day.formattedDate}</span><span style="font-size: 10px; color: #64748b;">${day.date}</span></div>`;
-            tableHTML += `<td style="padding: 10px 8px; text-align: center; color: ${day.dailyVariation > exceedanceData.limits.maxVariation ? '#f59e0b' : '#1e293b'}; font-weight: ${day.dailyVariation > exceedanceData.limits.maxVariation ? '700' : '400'};">${day.dailyVariation}V`;
-            tableHTML += `<td style="padding: 10px 8px; text-align: center;"><span style="background: ${day.hoursOutOfLimits > 0 ? 'rgba(239, 68, 68, 0.1)' : 'transparent'}; color: ${day.hoursOutOfLimits > 0 ? '#ef4444' : '#64748b'}; padding: 4px 8px; border-radius: 4px; font-weight: ${day.hoursOutOfLimits > 0 ? '600' : '400'};">${day.hoursOutOfLimits}h</span>`;
-            tableHTML += `<td style="padding: 10px 8px; text-align: center; color: #1e293b;">${minMaxDisplay}`;
+            tableHTML += `<tr style="border-bottom: 1px solid #e2e8f0; background: ${rowBgColor};"><td style="padding: 10px 8px; text-align: left; color: #1e293b; font-weight: 500;"><div style="display: flex; flex-direction: column;"><span>${day.formattedDate}</span><span style="font-size: 10px; color: #64748b;">${day.date}</span></div></td>`;
+            tableHTML += `<td style="padding: 10px 8px; text-align: center; color: ${day.dailyVariation > exceedanceData.limits.maxVariation ? '#f59e0b' : '#1e293b'}; font-weight: ${day.dailyVariation > exceedanceData.limits.maxVariation ? '700' : '400'};">${day.dailyVariation}V</td>`;
+            tableHTML += `<td style="padding: 10px 8px; text-align: center;"><span style="background: ${day.hoursOutOfLimits > 0 ? 'rgba(239, 68, 68, 0.1)' : 'transparent'}; color: ${day.hoursOutOfLimits > 0 ? '#ef4444' : '#64748b'}; padding: 4px 8px; border-radius: 4px; font-weight: ${day.hoursOutOfLimits > 0 ? '600' : '400'};">${day.hoursOutOfLimits}h</span></td>`;
+            tableHTML += `<td style="padding: 10px 8px; text-align: center; color: #1e293b;">${minMaxDisplay}</td>`;
             tableHTML += `<td style="padding: 10px 8px; text-align: center;"><span style="background: rgba(239, 68, 68, 0.1); color: #ef4444; padding: 4px 8px; border-radius: 4px; font-weight: 600;">${exceedanceText}</span></td></tr>`;
         });
     }
-    tableHTML += `</tbody>`;
-    tableHTML += `</table>`;
+    tableHTML += `</tbody></table>`;
     tableWrapper.innerHTML = tableHTML;
     
     exceedanceSection.appendChild(exceedanceHeader);
     exceedanceSection.appendChild(tableWrapper);
     analysisDiv.appendChild(exceedanceSection);
     
-    // ========== ÉVÉNEMENT DU BOUTON ==========
-    let isTableVisible = false;
-    toggleBtn.onclick = (e) => {
+    // ========== ÉVÉNEMENTS ==========
+    // Événement pour la section Normes (toggle du contenu)
+    let isNormsVisible = false;
+    normsHeader.onclick = () => {
+        isNormsVisible = !isNormsVisible;
+        const toggleIcon = document.getElementById('norms-toggle-icon');
+        if (isNormsVisible) {
+            normsContent.style.display = 'block';
+            toggleIcon.innerHTML = '🔼';
+        } else {
+            normsContent.style.display = 'none';
+            toggleIcon.innerHTML = '🔽';
+        }
+    };
+    
+    // Événement pour le tableau des dépassements
+    let isExceedanceTableVisible = false;
+    exceedanceToggleBtn.onclick = (e) => {
         e.stopPropagation();
-        isTableVisible = !isTableVisible;
-        if (isTableVisible) {
+        isExceedanceTableVisible = !isExceedanceTableVisible;
+        if (isExceedanceTableVisible) {
             tableWrapper.style.display = 'block';
-            toggleBtn.innerHTML = `
+            exceedanceToggleBtn.innerHTML = `
                 <span style="font-size: 12px;">🔼</span>
                 <span>Masquer le tableau</span>
             `;
         } else {
             tableWrapper.style.display = 'none';
-            toggleBtn.innerHTML = `
+            exceedanceToggleBtn.innerHTML = `
                 <span style="font-size: 12px;">🔽</span>
                 <span>Afficher le tableau</span>
             `;
         }
     };
     
-    // Optionnel: cliquer sur l'en-tête fait aussi toggle
     exceedanceHeader.onclick = (e) => {
-        // Éviter de déclencher si on a cliqué sur le bouton
-        if (e.target === toggleBtn || toggleBtn.contains(e.target)) return;
-        toggleBtn.click();
+        if (e.target === exceedanceToggleBtn || exceedanceToggleBtn.contains(e.target)) return;
+        exceedanceToggleBtn.click();
     };
-    
-    // Normes système (inchangé)
-    const normsDiv = document.createElement('div');
-    normsDiv.style.cssText = `background: #f8fafc; border-radius: 10px; padding: 16px; border: 1px solid #e2e8f0;`;
-    normsDiv.innerHTML = `
-        <div style="font-weight: 600; color: #2d3748; margin-bottom: 12px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 8px;"><span>⚡</span> Normes Système ${stabilityData.systemType} - Seuils d'alerte</div>
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px;">
-            <div style="background: white; padding: 12px; border-radius: 8px; border-left: 3px solid #e53e3e;"><div style="font-size: 11px; color: #718096; margin-bottom: 4px;">Tension Min (alerte)</div><div style="font-size: 18px; font-weight: 700; color: #e53e3e;">${stabilityData.limits.min}V</div></div>
-            <div style="background: white; padding: 12px; border-radius: 8px; border-left: 3px solid #f59e0b;"><div style="font-size: 11px; color: #718096; margin-bottom: 4px;">Plage Idéale</div><div style="font-size: 18px; font-weight: 700; color: #f59e0b;">${stabilityData.limits.ideal.min}V - ${stabilityData.limits.ideal.max}V</div></div>
-            <div style="background: white; padding: 12px; border-radius: 8px; border-left: 3px solid #22c55e;"><div style="font-size: 11px; color: #718096; margin-bottom: 4px;">Tension Max (alerte)</div><div style="font-size: 18px; font-weight: 700; color: #22c55e;">${stabilityData.limits.max}V</div></div>
-            <div style="background: white; padding: 12px; border-radius: 8px; border-left: 3px solid #3b82f6;"><div style="font-size: 11px; color: #718096; margin-bottom: 4px;">Variation max</div><div style="font-size: 18px; font-weight: 700; color: #3b82f6;">${stabilityData.limits.maxVariation}V</div></div>
-        </div>
-        <div style="margin-top: 12px; padding: 10px; background: #fef2f2; border-radius: 6px; font-size: 11px; color: #991b1b; display: flex; align-items: center; gap: 8px;"><span style="font-size: 14px;">🚨</span><span><strong>Dépassement de seuil détecté</strong> lorsque Tension < ${stabilityData.limits.min}V ou Tension > ${stabilityData.limits.max}V</span></div>
-    `;
-    analysisDiv.appendChild(normsDiv);
     
     return analysisDiv;
 }
@@ -2566,14 +2913,21 @@ function createTensionChart() {
     });
     
     const dates = Object.keys(dailyData).sort();
+    
+    // ✅ FORMATER LES DATES EN JJ/MM/AAAA
+    const formattedDates = dates.map(date => {
+        const [year, month, day] = date.split('-');
+        return `${day}/${month}/${year}`;
+    });
+    
     const minValues = dates.map(date => dailyData[date].min);
     const maxValues = dates.map(date => dailyData[date].max);
     const avgValues = dates.map(date => dailyData[date].sumMoy / dailyData[date].countMoy);
     
     // Couleurs selon la demande : orange pour max, vert pour moyenne, bleu pour min
-    const pointBackgroundColorsMin = minValues.map(v => v > 0 && (v < limits.min || v > limits.max) ? '#ef4444' : '#3b82f6'); // Bleu
-    const pointBackgroundColorsMax = maxValues.map(v => v > 0 && (v > limits.max || v < limits.min) ? '#ef4444' : '#f97316'); // Orange
-    const pointBackgroundColorsAvg = avgValues.map(v => v > 0 && (v < limits.min || v > limits.max) ? '#ef4444' : '#22c55e'); // Vert
+    const pointBackgroundColorsMin = minValues.map(v => v > 0 && (v < limits.min || v > limits.max) ? '#ef4444' : '#3b82f6');
+    const pointBackgroundColorsMax = maxValues.map(v => v > 0 && (v > limits.max || v < limits.min) ? '#ef4444' : '#f97316');
+    const pointBackgroundColorsAvg = avgValues.map(v => v > 0 && (v < limits.min || v > limits.max) ? '#ef4444' : '#22c55e');
     
     const exceedanceCount = { total: pointsExceedingLimits.min.length + pointsExceedingLimits.max.length + pointsExceedingLimits.avg.length };
     
@@ -2614,20 +2968,20 @@ function createTensionChart() {
             if (existingChart) existingChart.destroy();
             
             const thresholdDatasets = [
-                { label: '', data: dates.map(() => limits.min), borderColor: '#ef4444', borderWidth: 2, borderDash: [8, 6], pointRadius: 0, pointHoverRadius: 0, fill: false, tension: 0, order: 4 },
-                { label: '', data: dates.map(() => limits.max), borderColor: '#ef4444', borderWidth: 2, borderDash: [8, 6], pointRadius: 0, pointHoverRadius: 0, fill: false, tension: 0, order: 4 }
+                { label: '', data: formattedDates.map(() => limits.min), borderColor: '#ef4444', borderWidth: 2, borderDash: [8, 6], pointRadius: 0, pointHoverRadius: 0, fill: false, tension: 0, order: 4 },
+                { label: '', data: formattedDates.map(() => limits.max), borderColor: '#ef4444', borderWidth: 2, borderDash: [8, 6], pointRadius: 0, pointHoverRadius: 0, fill: false, tension: 0, order: 4 }
             ];
             
             new Chart(ctx, {
                 type: 'line',
                 data: {
-                    labels: dates,
+                    labels: formattedDates, // ✅ UTILISER LES DATES FORMATÉES
                     datasets: [
                         ...thresholdDatasets,
                         { 
                             label: 'Tension Maximale', 
                             data: maxValues, 
-                            borderColor: '#f97316', // Orange pour max
+                            borderColor: '#f97316',
                             backgroundColor: 'rgba(249, 115, 22, 0.05)', 
                             borderWidth: 2.5, 
                             pointRadius: 3, 
@@ -2643,7 +2997,7 @@ function createTensionChart() {
                         { 
                             label: 'Tension Moyenne', 
                             data: avgValues, 
-                            borderColor: '#22c55e', // Vert pour moyenne
+                            borderColor: '#22c55e',
                             backgroundColor: 'rgba(34, 197, 94, 0.05)', 
                             borderWidth: 3, 
                             pointRadius: 4, 
@@ -2659,7 +3013,7 @@ function createTensionChart() {
                         { 
                             label: 'Tension Minimale', 
                             data: minValues, 
-                            borderColor: '#3b82f6', // Bleu pour min
+                            borderColor: '#3b82f6',
                             backgroundColor: 'rgba(59, 130, 246, 0.05)', 
                             borderWidth: 2.5, 
                             pointRadius: 3, 
@@ -2678,9 +3032,22 @@ function createTensionChart() {
                     responsive: true, maintainAspectRatio: false,
                     interaction: { mode: 'index', intersect: false },
                     plugins: {
-                        legend: { position: 'top', labels: { font: { size: 12, weight: 'bold' }, usePointStyle: true, pointStyle: 'circle', padding: 20, filter: item => item.text !== '' } },
+                        legend: { 
+                            position: 'top', 
+                            labels: { 
+                                font: { size: 12, weight: 'bold' }, 
+                                usePointStyle: true, 
+                                pointStyle: 'circle', 
+                                padding: 20, 
+                                filter: item => item.text !== '' 
+                            } 
+                        },
                         tooltip: {
-                            backgroundColor: 'rgba(15, 23, 42, 0.95)', titleFont: { size: 13, weight: 'bold' }, bodyFont: { size: 12 }, padding: 12, cornerRadius: 8,
+                            backgroundColor: 'rgba(15, 23, 42, 0.95)', 
+                            titleFont: { size: 13, weight: 'bold' }, 
+                            bodyFont: { size: 12 }, 
+                            padding: 12, 
+                            cornerRadius: 8,
                             callbacks: {
                                 label: function(context) {
                                     let label = context.dataset.label || '';
@@ -2698,7 +3065,21 @@ function createTensionChart() {
                         }
                     },
                     scales: {
-                        x: { title: { display: true, text: 'Date', font: { size: 13, weight: 'bold' } }, ticks: { maxRotation: 45, font: { size: 11 } }, grid: { color: 'rgba(0, 0, 0, 0.05)' } },
+                        x: { 
+                            title: { display: true, text: 'Date', font: { size: 13, weight: 'bold' } }, 
+                            ticks: { 
+                                maxRotation: 45, 
+                                font: { size: 11 },
+                                callback: function(val, index) {
+                                    // Pour éviter d'afficher trop de dates, on peut espacer
+                                    if (formattedDates.length > 30) {
+                                        return index % Math.ceil(formattedDates.length / 20) === 0 ? this.getLabelForValue(val) : '';
+                                    }
+                                    return this.getLabelForValue(val);
+                                }
+                            }, 
+                            grid: { color: 'rgba(0, 0, 0, 0.05)' } 
+                        },
                         y: {
                             title: { display: true, text: 'Tension (Volts)', font: { size: 13, weight: 'bold' } },
                             ticks: { font: { size: 11, weight: '500' }, stepSize: systemType === '12V' ? 1 : 2, callback: function(value) { return value + 'V'; } },
@@ -2722,7 +3103,6 @@ function createTensionChart() {
 }
 
 // ==================== GRAPHIQUE TENSION HORAIRE CONTINU (UNE COULEUR PAR JOUR - SANS LÉGENDE) ====================
-// ==================== GRAPHIQUE TENSION HORAIRE CONTINU (SEUILS DYNAMIQUES) ====================
 function createHourlyTensionChart(selectedDate = 'all', startDate = null, endDate = null) {
 
     const container = document.getElementById('hourly-tension-chart-placeholder');
@@ -2810,38 +3190,28 @@ function createHourlyTensionChart(selectedDate = 'all', startDate = null, endDat
     const dataMax = maxValue + 1;
     
     // ===== DÉCISION D'AFFICHER OU NON LES LIGNES DE SEUIL =====
-    const margin = 1.5; // Marge en volts pour décider d'afficher les seuils
-    
-    // On affiche le seuil min si des données sont dans la zone (moins de 2V au-dessus du seuil)
+    const margin = 1.5;
     const showMinThreshold = minValue < (limits.min + margin);
-    
-    // On affiche le seuil max si des données sont dans la zone (moins de 2V en dessous du seuil)
     const showMaxThreshold = maxValue > (limits.max - margin);
     
     // Calculer l'échelle Y dynamique
     let yMin, yMax;
     
     if (systemType === '12V') {
-        // Pour 12V, on ajuste l'échelle en fonction des données
         if (showMinThreshold && showMaxThreshold) {
-            // Les deux seuils sont pertinents - garder l'échelle complète
             yMin = Math.min(10, dataMin);
             yMax = Math.max(16, dataMax);
         } else if (showMinThreshold) {
-            // Seulement le seuil min est pertinent
             yMin = Math.min(10, dataMin);
-            yMax = Math.max(14, dataMax); // Pas besoin d'aller jusqu'à 16
+            yMax = Math.max(14, dataMax);
         } else if (showMaxThreshold) {
-            // Seulement le seuil max est pertinent
-            yMin = Math.min(11, dataMin); // Minimum à 11V au lieu de 10
+            yMin = Math.min(11, dataMin);
             yMax = Math.max(16, dataMax);
         } else {
-            // Aucun seuil n'est pertinent - zoomer sur les données
             yMin = dataMin;
             yMax = dataMax;
         }
     } else {
-        // Pour 24V, même logique
         if (showMinThreshold && showMaxThreshold) {
             yMin = Math.min(20, dataMin);
             yMax = Math.max(30, dataMax);
@@ -2857,12 +3227,10 @@ function createHourlyTensionChart(selectedDate = 'all', startDate = null, endDat
         }
     }
     
-    // Arrondir pour avoir des valeurs propres
     yMin = Math.floor(yMin * 2) / 2;
     yMax = Math.ceil(yMax * 2) / 2;
     
     // ===== ORGANISER LES DONNÉES PAR JOUR =====
-    // Grouper les données par date
     const dataByDate = {};
     const allDates = [];
     
@@ -2909,10 +3277,8 @@ function createHourlyTensionChart(selectedDate = 'all', startDate = null, endDat
         }
     });
     
-    // Trier les dates par ordre chronologique
     allDates.sort((a, b) => new Date(a) - new Date(b));
     
-    // Trier les points de chaque jour par heure
     allDates.forEach(date => {
         dataByDate[date].points.sort((a, b) => a.timestamp - b.timestamp);
         dataByDate[date].timestamps.sort((a, b) => a - b);
@@ -2925,18 +3291,28 @@ function createHourlyTensionChart(selectedDate = 'all', startDate = null, endDat
         '#a855f7', '#22c55e', '#eab308', '#0ea5e9', '#d946ef'
     ];
     
-    // Créer les datasets - un dataset par jour
+    // Créer les datasets - un dataset par jour (uniquement tension moyenne)
     const datasets = [];
     const allLabels = [];
     const allTimestamps = [];
+    
+    // Stocker les couleurs par date pour la légende
+    const dateColors = [];
     
     allDates.forEach((date, dateIndex) => {
         const dayData = dataByDate[date];
         const color = colorPalette[dateIndex % colorPalette.length];
         
-        // Pour ce jour, on crée un tableau de données avec des nulls partout sauf pour ses points
+        // Stocker la couleur pour cette date
+        dateColors.push({
+            date: date,
+            formattedDate: new Date(date).toLocaleDateString('fr-FR', {
+                day: '2-digit', month: '2-digit', year: 'numeric'
+            }),
+            color: color
+        });
+        
         const dayPoints = [];
-        const dayLabels = [];
         
         dayData.points.forEach(point => {
             dayPoints.push({
@@ -2947,10 +3323,8 @@ function createHourlyTensionChart(selectedDate = 'all', startDate = null, endDat
             });
         });
         
-        // Trier par timestamp
         dayPoints.sort((a, b) => a.timestamp - b.timestamp);
         
-        // Ajouter les labels pour les tooltips
         dayPoints.forEach(point => {
             if (!allLabels.includes(point.label)) {
                 allLabels.push(point.label);
@@ -2958,7 +3332,7 @@ function createHourlyTensionChart(selectedDate = 'all', startDate = null, endDat
             }
         });
         
-        // Créer un dataset pour ce jour
+        // Dataset pour la tension moyenne (ligne continue)
         datasets.push({
             label: `${date}`,
             data: dayPoints.map(p => p.value),
@@ -3007,19 +3381,17 @@ function createHourlyTensionChart(selectedDate = 'all', startDate = null, endDat
         dataset.data = reorderedData;
         dataset._points = reorderedPoints;
         
-        // Recréer les couleurs des points
         dataset.pointBackgroundColor = reorderedData.map((value, index) => {
             if (value === null) return 'transparent';
             return (value < limits.min || value > limits.max) ? '#ef4444' : dataset.borderColor;
         });
     });
     
-    // ===== CRÉER LES DATASETS DE SEUILS DYNAMIQUEMENT =====
+    // ===== CRÉER LES DATASETS DE SEUILS =====
     const thresholdDatasets = [];
     
     if (showMinThreshold) {
         thresholdDatasets.push({
-            label: `Seuil Min ${systemType}`,
             data: finalLabels.map(() => limits.min),
             borderColor: '#ef4444',
             borderWidth: 2,
@@ -3035,7 +3407,6 @@ function createHourlyTensionChart(selectedDate = 'all', startDate = null, endDat
     
     if (showMaxThreshold) {
         thresholdDatasets.push({
-            label: `Seuil Max ${systemType}`,
             data: finalLabels.map(() => limits.max),
             borderColor: '#ef4444',
             borderWidth: 2,
@@ -3126,48 +3497,92 @@ function createHourlyTensionChart(selectedDate = 'all', startDate = null, endDat
     
     periodBadge.appendChild(globalFiltersBadge);
     
-    // En-tête principal
+    // ========== EN-TÊTE PRINCIPAL AVEC LÉGENDE INTÉGRÉE ==========
     const header = document.createElement('div');
     header.style.cssText = `
         background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
         color: white;
         padding: 15px 25px;
-        font-size: 16px;
-        font-weight: 700;
+    `;
+    
+    const thresholdBadges = [];
+    if (showMinThreshold) thresholdBadges.push(`⬇️ Min ${limits.min}V`);
+    if (showMaxThreshold) thresholdBadges.push(`⬆️ Max ${limits.max}V`);
+    
+    // Titre
+    const titleRow = document.createElement('div');
+    titleRow.style.cssText = `
         display: flex;
         align-items: center;
         justify-content: space-between;
         flex-wrap: wrap;
         gap: 10px;
+        margin-bottom: 12px;
     `;
-    
-    // Ajouter des badges pour indiquer quels seuils sont actifs
-    const thresholdBadges = [];
-    if (showMinThreshold) thresholdBadges.push(`⬇️ Min ${limits.min}V`);
-    if (showMaxThreshold) thresholdBadges.push(`⬆️ Max ${limits.max}V`);
-    
-    header.innerHTML = `
+    titleRow.innerHTML = `
         <div style="display: flex; align-items: center; gap: 12px;">
             <span style="font-size: 20px;">📊</span>
-            <span>ÉVOLUTION HORAIRE DE LA TENSION MOYENNE</span>
+            <span style="font-weight: 700; font-size: 16px;">ÉVOLUTION HORAIRE DE LA TENSION INSTANTANÉE</span>
             ${thresholdBadges.length > 0 ? `
                 <span style="font-size: 11px; background: rgba(239, 68, 68, 0.2); color: #fee2e2; padding: 4px 12px; border-radius: 20px;">
                     Seuils: ${thresholdBadges.join(' · ')}
                 </span>
             ` : ''}
         </div>
-        <div style="display: flex; align-items: center; gap: 15px;">
-            <span style="font-size: 12px; background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 20px;">
-                ${finalLabels.length} points
-            </span>
-            <span style="font-size: 12px; background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 20px;">
-                Système ${systemType}
-            </span>
-            <span style="font-size: 12px; background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 20px;">
-                Échelle: ${yMin.toFixed(1)}V - ${yMax.toFixed(1)}V
-            </span>
-        </div>
     `;
+    header.appendChild(titleRow);
+    
+    // ========== LÉGENDE INTÉGRÉE SOUS LE TITRE ==========
+    const legendRow = document.createElement('div');
+    legendRow.style.cssText = `
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 12px;
+        padding-top: 10px;
+        border-top: 1px solid rgba(255,255,255,0.2);
+    `;
+    
+    const legendTitle = document.createElement('span');
+    legendTitle.style.cssText = `
+        font-size: 11px;
+        font-weight: 600;
+        color: rgba(255,255,255,0.8);
+        margin-right: 4px;
+    `;
+    legendTitle.innerHTML = `📅 Légende par date :`;
+    legendRow.appendChild(legendTitle);
+    
+    // Ajouter chaque date avec sa couleur
+    dateColors.forEach((item) => {
+        const colorBadge = document.createElement('div');
+        colorBadge.style.cssText = `
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(255,255,255,0.15);
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 11px;
+            transition: transform 0.2s ease;
+            cursor: pointer;
+        `;
+        colorBadge.onmouseover = () => {
+            colorBadge.style.transform = 'scale(1.05)';
+            colorBadge.style.background = 'rgba(255,255,255,0.25)';
+        };
+        colorBadge.onmouseout = () => {
+            colorBadge.style.transform = 'scale(1)';
+            colorBadge.style.background = 'rgba(255,255,255,0.15)';
+        };
+        colorBadge.innerHTML = `
+            <span style="display: inline-block; width: 12px; height: 12px; background: ${item.color}; border-radius: 3px;"></span>
+            <span style="font-weight: 500;">${item.formattedDate}</span>
+        `;
+        legendRow.appendChild(colorBadge);
+    });
+    
+    header.appendChild(legendRow);
     
     const chartWrapper = document.createElement('div');
     chartWrapper.style.cssText = `padding: 20px; height: 450px; position: relative;`;
@@ -3214,15 +3629,7 @@ function createHourlyTensionChart(selectedDate = 'all', startDate = null, endDat
                     interaction: { mode: 'index', intersect: false },
                     plugins: {
                         legend: {
-                            display: true,
-                            position: 'top',
-                            labels: {
-                                font: { size: 11, weight: 'bold' },
-                                color: '#1e293b',
-                                usePointStyle: true,
-                                padding: 15,
-                                filter: item => !item.text.includes('Seuil')
-                            }
+                            display: false // ✅ Désactiver la légende par défaut car on a notre propre légende
                         },
                         tooltip: {
                             backgroundColor: 'rgba(15, 23, 42, 0.95)',
@@ -3261,7 +3668,6 @@ function createHourlyTensionChart(selectedDate = 'all', startDate = null, endDat
                             grid: {
                                 color: function(context) {
                                     const value = context.tick.value;
-                                    // Mettre en évidence les seuils s'ils sont dans l'échelle
                                     if (showMinThreshold && Math.abs(value - limits.min) < 0.1) {
                                         return 'rgba(239, 68, 68, 0.5)';
                                     }
@@ -3299,27 +3705,29 @@ function createHourlyTensionChart(selectedDate = 'all', startDate = null, endDat
                                 color: '#64748b',
                                 maxRotation: 45,
                                 minRotation: 30,
-                                maxTicksLimit: 20,
                                 callback: function(val, index) {
-                                    if (index % Math.floor(finalLabels.length / 15) === 0) {
+                                    // Calculate step size based on total points
+                                    const totalPoints = finalLabels.length;
+                                    const daysDiff = Math.ceil((new Date(endDate) - new Date(startDate)) / (1000 * 60 * 60 * 24));
+                                    
+                                    // Show more labels for shorter periods, fewer for longer periods
+                                    let stepSize = 1;
+                                    if (totalPoints > 200) stepSize = 12;      // Show every 12th label for large datasets
+                                    else if (totalPoints > 100) stepSize = 6;  // Show every 6th label for medium datasets
+                                    else if (totalPoints > 48) stepSize = 4;   // Show every 4th label
+                                    else if (totalPoints > 24) stepSize = 3;   // Show every 3rd label
+                                    else stepSize = 2;                         // Show every 2nd label
+                                    
+                                    if (index % stepSize === 0) {
                                         return this.getLabelForValue(val);
                                     }
                                     return '';
                                 }
-                            },
-                            title: {
-                                display: true,
-                                text: 'Date et Heure',
-                                font: { size: 12, weight: 'bold' },
-                                color: '#475569',
-                                padding: { top: 10 }
                             }
                         }
                     }
                 }
             });
-            
-            console.log(`✅ Graphique tension créé - Seuils affichés: Min=${showMinThreshold}, Max=${showMaxThreshold}, Échelle=${yMin}V-${yMax}V`);
             
         } catch (error) {
             console.error('❌ Erreur création graphique tension:', error);
@@ -3898,7 +4306,6 @@ function showFilterWarning(message) {
 }
 
 // ==================== GRAPHIQUES ÉNERGIE ====================
-
 function createTotalEnergyChart() {
     const dataToUse = filteredEnergyData.length > 0 ? filteredEnergyData : combinedEnergyData;
     if (dataToUse.length === 0) return;
@@ -3939,8 +4346,45 @@ function createTotalEnergyChart() {
     
     const daysWithConsumption = totalEnergyData.filter(v => v && v > 0);
     const totalDays = daysWithConsumption.length;
-    const distribution = { 'Kit 0': 0, 'Kit 1': 0, 'Kit 2': 0, 'Kit 3': 0, 'Kit 4': 0, 'Kit 4+': 0 };
-    const percentages = {};
+    
+    // Calculer le kit maximum réellement atteint par les données
+    let maxKitReachedIndex = -1;
+    daysWithConsumption.forEach(energy => {
+        let kitIndex = 0;
+        for (let i = 0; i < kitThresholds.length; i++) {
+            if (energy <= kitThresholds[i].value) {
+                kitIndex = i;
+                break;
+            }
+        }
+        if (kitIndex > maxKitReachedIndex) maxKitReachedIndex = kitIndex;
+    });
+    
+    // Si des points dépassent Kit 4, ajouter Kit 4+ dans l'affichage
+    const hasKit4Plus = daysWithConsumption.some(energy => energy > kitThresholds[kitThresholds.length - 1].value);
+    if (hasKit4Plus) maxKitReachedIndex = kitThresholds.length; // Indice pour Kit 4+
+    
+    // Définir les kits à afficher (seulement jusqu'au maximum atteint)
+    let kitsToDisplay = [];
+    if (maxKitReachedIndex >= 0) {
+        // Ajouter les kits standards jusqu'au max atteint
+        for (let i = 0; i <= maxKitReachedIndex && i < kitThresholds.length; i++) {
+            kitsToDisplay.push(kitThresholds[i]);
+        }
+        // Si Kit 4+ est atteint, l'ajouter
+        if (hasKit4Plus) {
+            kitsToDisplay.push({ label: 'Kit 4+', value: Infinity, color: '#dc2626' });
+        }
+    } else {
+        // Par défaut, afficher au moins Kit 0
+        kitsToDisplay = [kitThresholds[0]];
+    }
+    
+    const distribution = {};
+    kitsToDisplay.forEach(kit => {
+        distribution[kit.label] = 0;
+    });
+    
     let totalEnergySum = 0, maxEnergy = 0, maxKitReached = null;
     
     daysWithConsumption.forEach(energy => {
@@ -3948,17 +4392,37 @@ function createTotalEnergyChart() {
         if (energy > maxEnergy) maxEnergy = energy;
         let kitForDay = null;
         for (let i = 0; i < kitThresholds.length; i++) {
-            if (energy <= kitThresholds[i].value) { kitForDay = kitThresholds[i].label; break; }
+            if (energy <= kitThresholds[i].value) { 
+                kitForDay = kitThresholds[i].label; 
+                break; 
+            }
         }
         if (!kitForDay) kitForDay = 'Kit 4+';
-        distribution[kitForDay] = (distribution[kitForDay] || 0) + 1;
+        
+        // Ne compter que si le kit est dans notre liste d'affichage
+        if (distribution[kitForDay] !== undefined) {
+            distribution[kitForDay] = (distribution[kitForDay] || 0) + 1;
+        }
+        
         if (energy === maxEnergy) maxKitReached = kitForDay;
     });
     
-    Object.keys(distribution).forEach(kit => percentages[kit] = totalDays > 0 ? Math.round((distribution[kit] / totalDays) * 100) : 0);
+    const percentages = {};
+    Object.keys(distribution).forEach(kit => {
+        percentages[kit] = totalDays > 0 ? Math.round((distribution[kit] / totalDays) * 100) : 0;
+    });
     
-    // (Recommandation supprimée : l'utilisateur déduit lui-même le kit)
-    // Couleur dominante basée sur le kit max atteint (pure info visuelle, sans recommandation)
+    // Calcul des valeurs cumulées pour l'affichage (seulement sur les kits affichés)
+    const kitDisplayOrder = kitsToDisplay.map(kit => kit.label);
+    let cumulativeCount = 0;
+    const cumulativeDistribution = {};
+    
+    kitDisplayOrder.forEach(kitLabel => {
+        const count = distribution[kitLabel] || 0;
+        cumulativeCount += count;
+        cumulativeDistribution[kitLabel] = cumulativeCount;
+    });
+    
     const dominantKitInfo = maxKitReached === 'Kit 4+'
         ? { color: '#dc2626' }
         : kitThresholds.find(k => k.label === maxKitReached);
@@ -3990,10 +4454,6 @@ function createTotalEnergyChart() {
         const matchingKit = visibleKitThresholds.find(kit => value <= kit.value);
         return matchingKit ? matchingKit.color : '#1f2933';
     });
-    
-    // ... (le reste du code pour créer le graphique reste inchangé)
-    
-    // ... (le reste du code pour créer le graphique reste inchangé)
     
     const chartContainer = document.createElement('div');
     chartContainer.id = 'total-energy-chart-container';
@@ -4027,7 +4487,7 @@ function createTotalEnergyChart() {
         <div style="width: 56px; height: 56px; background: ${dominantColor}; border-radius: 16px; display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 16px ${dominantColor}60;"><span style="font-size: 28px; color: white;">📊</span></div>
         <div style="flex: 1;">
             <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 8px; flex-wrap: wrap;">
-                <span style="font-size: 14px; color: #475569; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase;">Répartition par kit</span>
+                <span style="font-size: 14px; color: #475569; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase;">Répartition cumulée par kit</span>
             </div>
             <div style="display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap;">
                 <span style="font-size: 14px; color: #475569; background: white; padding: 6px 14px; border-radius: 40px; border: 1px solid ${dominantColor}20; font-weight: 600;">
@@ -4042,44 +4502,59 @@ function createTotalEnergyChart() {
     
     const progressBarsContainer = document.createElement('div');
     progressBarsContainer.style.cssText = `padding: 24px;`;
-    const repartitionTitle = document.createElement('div');
-    repartitionTitle.style.cssText = `display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;`;
-    repartitionTitle.innerHTML = `<h5 style="margin: 0; font-size: 16px; color: #0f172a; display: flex; align-items: center; gap: 8px;"><span style="font-size: 20px;">📊</span><span style="font-weight: 700;">Répartition détaillée par kit</span></h5><span style="font-size: 12px; color: #475569; background: #f8fafc; padding: 6px 16px; border-radius: 40px; border: 1px solid #e2e8f0;">📋 ${totalDays} jours de consommation</span>`;
-    progressBarsContainer.appendChild(repartitionTitle);
     
-    const kitOrder = ['Kit 0', 'Kit 1', 'Kit 2', 'Kit 3', 'Kit 4', 'Kit 4+'];
-    let cumulativePercentage = 0;
-    kitOrder.forEach(kitLabel => {
+    const maxKitLabel = kitsToDisplay[kitsToDisplay.length - 1].label;
+    
+    // Affichage avec valeurs cumulées (seulement pour les kits atteints)
+    let previousCumulative = 0;
+    kitDisplayOrder.forEach((kitLabel, index) => {
         const percentage = percentages[kitLabel] || 0;
         const count = distribution[kitLabel] || 0;
-        if (percentage === 0 && count === 0) return;
-        const kitInfo = kitLabel === 'Kit 4+' ? { color: '#dc2626', label: 'Kit 4+' } : kitThresholds.find(k => k.label === kitLabel);
-        const prevCum = cumulativePercentage;
-        cumulativePercentage = Math.min(100, Math.round((cumulativePercentage + percentage) * 10) / 10);
+        const cumulativeCount = cumulativeDistribution[kitLabel] || 0;
+        
+        if (count === 0 && cumulativeCount === 0) return;
+        
+        const kitInfo = kitLabel === 'Kit 4+' 
+            ? { color: '#dc2626', label: 'Kit 4+', value: Infinity } 
+            : kitThresholds.find(k => k.label === kitLabel);
+        
         const progressBar = document.createElement('div');
-        progressBar.style.cssText = `margin-bottom: 20px;`;
+        progressBar.style.cssText = `margin-bottom: 24px;`;
+        
+        // Déterminer si c'est le dernier kit affiché
+        const isLastKit = index === kitDisplayOrder.length - 1;
+        
         progressBar.innerHTML = `
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                 <div style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap;">
-                    <div style="display: flex; align-items: center; gap: 10px;"><span style="width: 16px; height: 16px; background: ${kitInfo.color}; border-radius: 4px; box-shadow: 0 2px 6px ${kitInfo.color}80;"></span><span style="font-weight: 600; font-size: 15px; color: #1e293b;">${kitLabel}</span></div>
-                    <span style="font-size: 13px; color: #475569; background: #f1f5f9; padding: 4px 14px; border-radius: 30px;">📅 ${count} jour${count !== 1 ? 's' : ''}</span>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <span style="width: 16px; height: 16px; background: ${kitInfo.color}; border-radius: 4px; box-shadow: 0 2px 6px ${kitInfo.color}80;"></span>
+                        <span style="font-weight: 700; font-size: 16px; color: #1e293b;">${kitLabel}</span>
+                        ${kitInfo.value !== Infinity ? `<span style="font-size: 11px; color: #64748b; background: #f1f5f9; padding: 2px 8px; border-radius: 20px;">≤ ${kitInfo.value} Wh</span>` : `<span style="font-size: 11px; color: #dc2626; background: #fee2e2; padding: 2px 8px; border-radius: 20px;">> ${kitThresholds[kitThresholds.length-1].value} Wh</span>`}
+                    </div>
                 </div>
-                <div style="display: flex; align-items: baseline; gap: 8px;">
-                    <span style="font-weight: 900; font-size: 22px; color: ${kitInfo.color};">${cumulativePercentage}%</span>
-                    <span style="font-size: 12px; color: #64748b;">cumulé</span>
+                <div style="display: flex; align-items: baseline; gap: 12px;">
+                    <span style="font-weight: 800; font-size: 24px; color: ${kitInfo.color};">${cumulativeCount}</span>
+                    <span style="font-size: 14px; color: #64748b;">/ ${totalDays} jours</span>
+                    <span style="font-size: 13px; color: #94a3b8; background: #f8fafc; padding: 4px 12px; border-radius: 30px;">
+                        ${Math.round((cumulativeCount / totalDays) * 100)}%
+                    </span>
                 </div>
             </div>
-            <div style="position: relative; width: 100%; height: 12px; background: #edf2f7; border-radius: 8px; overflow: hidden; margin-top: 6px; box-shadow: inset 0 1px 4px rgba(0,0,0,0.05);">
-                <div style="width: ${cumulativePercentage}%; height: 100%; background: ${kitInfo.color}; border-radius: 8px; transition: width 0.6s cubic-bezier(0.34, 1.56, 0.64, 1); box-shadow: 0 0 12px ${kitInfo.color}80;"></div>
-            </div>
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px;">
-                <span style="font-size: 12px; color: #475569;">
-                    <span style="font-weight: 600;">${kitLabel}</span>
-                </span>
-                <span style="font-size: 12px; color: #64748b;">${count}/${totalDays} jours</span>
+            <div style="position: relative; width: 100%; height: 14px; background: #edf2f7; border-radius: 12px; overflow: hidden; margin-top: 6px; box-shadow: inset 0 1px 4px rgba(0,0,0,0.05);">
+                <div style="width: ${(cumulativeCount / totalDays) * 100}%; height: 100%; background: ${kitInfo.color}; border-radius: 12px; transition: width 0.8s cubic-bezier(0.34, 1.56, 0.64, 1); box-shadow: 0 0 12px ${kitInfo.color}80;"></div>
             </div>
         `;
         progressBarsContainer.appendChild(progressBar);
+        
+        // Ajouter un espacement entre les kits (sauf après le dernier)
+        if (index < kitDisplayOrder.length - 1) {
+            const spacer = document.createElement('div');
+            spacer.style.cssText = `margin: 8px 0; border-top: 1px dashed #e2e8f0; opacity: 0.5;`;
+            progressBarsContainer.appendChild(spacer);
+        }
+        
+        previousCumulative = cumulativeCount;
     });
     
     dimensioningSection.appendChild(dimHeader);
@@ -4531,7 +5006,7 @@ function createHourlyEnergyChart(dateFilter = 'all', startDate = null, endDate =
     });
     const avgDailyMax = dailyMaxCount > 0 ? sumDailyMax / dailyMaxCount : 0;
     
-    // ===== CRÉER LA CARD UNIQUE =====
+    // ===== CRÉER LA CARD PRINCIPALE =====
     const chartContainer = document.createElement('div');
     chartContainer.id = 'hourly-energy-chart-container';
     chartContainer.style.cssText = `
@@ -4644,37 +5119,9 @@ function createHourlyEnergyChart(dateFilter = 'all', startDate = null, endDate =
     `;
     chartContainer.appendChild(statsGrid);
     
-    // ===== GRAPHIQUE 1 : CUMULÉ (BARRES AVEC CONTOUR SEULEMENT) =====
-    const header1 = document.createElement('div');
-    header1.style.cssText = `
-        background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
-        color: white;
-        padding: 12px 25px;
-        font-size: 14px;
-        font-weight: 700;
-        display: flex;
-        align-items: center;
-        gap: 10px;
-    `;
-    header1.innerHTML = `<span style="font-size: 18px;">📊</span> ÉNERGIE TOTALE PAR HEURE - Évolution temporelle (cumul par date)`;
-    chartContainer.appendChild(header1);
-    
-    const chartWrapper1 = document.createElement('div');
-    chartWrapper1.style.cssText = `padding: 20px; height: 450px; position: relative;`;
-    const canvasContainer1 = document.createElement('div');
-    canvasContainer1.style.cssText = `height: 400px; position: relative;`;
-    chartWrapper1.appendChild(canvasContainer1);
-    chartContainer.appendChild(chartWrapper1);
-    
-    const ctx1 = document.createElement('canvas');
-    ctx1.id = 'hourly-energy-chart-canvas-cumul';
-    ctx1.style.width = '100%';
-    ctx1.style.height = '100%';
-    canvasContainer1.appendChild(ctx1);
-    
-    // ===== GRAPHIQUE 2 : CONSOMMATION HORAIRE PAR INTERVALLE (BARRES AVEC CONTOUR SEULEMENT) =====
-    const header2 = document.createElement('div');
-    header2.style.cssText = `
+    // ===== GRAPHIQUE 1 : CONSOMMATION HORAIRE PAR INTERVALLE - EN HAUT ET VISIBLE PAR DÉFAUT =====
+    const headerConsumption = document.createElement('div');
+    headerConsumption.style.cssText = `
         background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
         color: white;
         padding: 12px 25px;
@@ -4683,23 +5130,81 @@ function createHourlyEnergyChart(dateFilter = 'all', startDate = null, endDate =
         display: flex;
         align-items: center;
         gap: 10px;
+    `;
+    headerConsumption.innerHTML = `<span style="font-size: 18px;">📈</span> CONSOMMATION HORAIRE PAR INTERVALLE (Wh) - Différence entre heures consécutives`;
+    chartContainer.appendChild(headerConsumption);
+    
+    const chartWrapperConsumption = document.createElement('div');
+    chartWrapperConsumption.style.cssText = `padding: 20px; height: 450px; position: relative;`;
+    const canvasContainerConsumption = document.createElement('div');
+    canvasContainerConsumption.style.cssText = `height: 400px; position: relative;`;
+    chartWrapperConsumption.appendChild(canvasContainerConsumption);
+    chartContainer.appendChild(chartWrapperConsumption);
+    
+    const ctxConsumption = document.createElement('canvas');
+    ctxConsumption.id = 'hourly-energy-chart-canvas-horaire';
+    ctxConsumption.style.width = '100%';
+    ctxConsumption.style.height = '100%';
+    canvasContainerConsumption.appendChild(ctxConsumption);
+    
+    // ===== GRAPHIQUE 2 : ÉNERGIE TOTALE PAR HEURE - EN BAS ET CACHÉ PAR DÉFAUT =====
+    const graphCumulWrapper = document.createElement('div');
+    
+    const headerCumul = document.createElement('div');
+    headerCumul.style.cssText = `
+        background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+        color: white;
+        padding: 12px 25px;
+        font-size: 14px;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        cursor: pointer;
+        transition: all 0.3s ease;
         margin-top: 10px;
     `;
-    header2.innerHTML = `<span style="font-size: 18px;">📈</span> CONSOMMATION HORAIRE PAR INTERVALLE (Wh) - Différence entre heures consécutives`;
-    chartContainer.appendChild(header2);
+    headerCumul.onmouseover = () => {
+        headerCumul.style.background = 'linear-gradient(135deg, #d97706 0%, #f59e0b 100%)';
+    };
+    headerCumul.onmouseout = () => {
+        headerCumul.style.background = 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)';
+    };
     
-    const chartWrapper2 = document.createElement('div');
-    chartWrapper2.style.cssText = `padding: 20px; height: 450px; position: relative;`;
-    const canvasContainer2 = document.createElement('div');
-    canvasContainer2.style.cssText = `height: 400px; position: relative;`;
-    chartWrapper2.appendChild(canvasContainer2);
-    chartContainer.appendChild(chartWrapper2);
+    const headerCumulLeft = document.createElement('div');
+    headerCumulLeft.style.cssText = `display: flex; align-items: center; gap: 10px;`;
+    headerCumulLeft.innerHTML = `<span style="font-size: 18px;">📊</span> ÉNERGIE TOTALE PAR HEURE - Évolution temporelle (cumul par date)`;
     
-    const ctx2 = document.createElement('canvas');
-    ctx2.id = 'hourly-energy-chart-canvas-horaire';
-    ctx2.style.width = '100%';
-    ctx2.style.height = '100%';
-    canvasContainer2.appendChild(ctx2);
+    const toggleIconCumul = document.createElement('span');
+    toggleIconCumul.style.cssText = `
+        font-size: 18px;
+        transition: transform 0.3s ease;
+        display: inline-block;
+    `;
+    toggleIconCumul.innerHTML = '▼';
+    
+    headerCumul.appendChild(headerCumulLeft);
+    headerCumul.appendChild(toggleIconCumul);
+    
+    const cumulContent = document.createElement('div');
+    cumulContent.style.cssText = `display: none; transition: all 0.3s ease;`;
+    
+    const chartWrapperCumul = document.createElement('div');
+    chartWrapperCumul.style.cssText = `padding: 20px; height: 450px; position: relative;`;
+    const canvasContainerCumul = document.createElement('div');
+    canvasContainerCumul.style.cssText = `height: 400px; position: relative;`;
+    chartWrapperCumul.appendChild(canvasContainerCumul);
+    cumulContent.appendChild(chartWrapperCumul);
+    
+    const ctxCumul = document.createElement('canvas');
+    ctxCumul.id = 'hourly-energy-chart-canvas-cumul';
+    ctxCumul.style.width = '100%';
+    ctxCumul.style.height = '100%';
+    canvasContainerCumul.appendChild(ctxCumul);
+    
+    graphCumulWrapper.appendChild(headerCumul);
+    graphCumulWrapper.appendChild(cumulContent);
+    chartContainer.appendChild(graphCumulWrapper);
     
     // Légende finale
     const legendFooter = document.createElement('div');
@@ -4716,12 +5221,12 @@ function createHourlyEnergyChart(dateFilter = 'all', startDate = null, endDate =
     `;
     legendFooter.innerHTML = `
         <div style="display: flex; align-items: center; gap: 8px;">
-            <div style="width: 16px; height: 16px; border: 2px solid #f59e0b; border-radius: 4px; background: transparent;"></div>
-            <span>Graphique 1: Énergie cumulée par heure (contour seulement)</span>
+            <div style="width: 16px; height: 16px; border: 2px solid #22c55e; border-radius: 4px; background: transparent;"></div>
+            <span>Graphique 1: Consommation horaire = différence entre heure n et heure n+1 (contour seulement)</span>
         </div>
         <div style="display: flex; align-items: center; gap: 8px;">
-            <div style="width: 16px; height: 16px; border: 2px solid #22c55e; border-radius: 4px; background: transparent;"></div>
-            <span>Graphique 2: Consommation horaire = différence entre heure n et heure n+1 (contour seulement)</span>
+            <div style="width: 16px; height: 16px; border: 2px solid #f59e0b; border-radius: 4px; background: transparent;"></div>
+            <span>Graphique 2: Énergie cumulée par heure (contour seulement) - Cliquez pour afficher</span>
         </div>
         <div style="display: flex; align-items: center; gap: 8px;">
             <span style="font-size: 14px;">📊</span>
@@ -4732,54 +5237,16 @@ function createHourlyEnergyChart(dateFilter = 'all', startDate = null, endDate =
     
     container.appendChild(chartContainer);
     
-    // ===== CRÉER LES GRAPHIQUES =====
+    // ===== CRÉER LE GRAPHIQUE DE CONSOMMATION HORAIRE IMMÉDIATEMENT (EN HAUT, VISIBLE) =====
     setTimeout(() => {
         if (typeof Chart === 'undefined') return;
         
         try {
-            // Graphique 1: Barres cumulées par date (contour seulement)
-            const existingChart1 = Chart.getChart(ctx1);
-            if (existingChart1) existingChart1.destroy();
+            // Graphique consommation horaire
+            const existingChartConsumption = Chart.getChart(ctxConsumption);
+            if (existingChartConsumption) existingChartConsumption.destroy();
             
-            new Chart(ctx1, {
-                type: 'bar',
-                data: { labels: labels, datasets: datasetsCumul },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { display: true, position: 'top', labels: { font: { size: 10, weight: 'bold' }, usePointStyle: true, boxWidth: 8 } },
-                        tooltip: {
-                            callbacks: {
-                                title: (context) => context[0].label,
-                                label: (context) => `⚡ ${context.parsed.y?.toFixed(2) || 0} Wh`,
-                                afterBody: (context) => {
-                                    const point = allDataPoints[context[0].dataIndex];
-                                    if (!point) return [];
-                                    const details = detailsByDate[point.date];
-                                    if (!details?.perClientByHour?.[point.label]) return [];
-                                    const lines = ['📊 Détail par client:'];
-                                    for (let i = 1; i <= 6; i++) {
-                                        const v = details.perClientByHour[point.label][`client_${i}`];
-                                        if (v) lines.push(`   Client ${i}: ${v.toFixed(2)} Wh`);
-                                    }
-                                    return lines;
-                                }
-                            }
-                        }
-                    },
-                    scales: {
-                        y: { beginAtZero: true, max: yMax, title: { display: true, text: 'Énergie (Wh)' }, ticks: { callback: v => v.toFixed(0) + ' Wh' } },
-                        x: { ticks: { maxRotation: 45, minRotation: 30, maxTicksLimit: 30, callback: (val, idx) => idx % 6 === 0 ? labels[idx] : '' }, title: { display: true, text: 'Date et Heure' } }
-                    }
-                }
-            });
-            
-            // Graphique 2: Barres de consommation horaire (contour seulement)
-            const existingChart2 = Chart.getChart(ctx2);
-            if (existingChart2) existingChart2.destroy();
-            
-            new Chart(ctx2, {
+            new Chart(ctxConsumption, {
                 type: 'bar',
                 data: {
                     labels: consumptionLabels,
@@ -4828,11 +5295,79 @@ function createHourlyEnergyChart(dateFilter = 'all', startDate = null, endDate =
                 }
             });
             
-            console.log(`✅ Graphiques énergie horaire créés avec ${allDates.length} jours`);
+            console.log(`✅ Graphique consommation horaire créé avec ${allDates.length} jours (visible en haut)`);
         } catch (error) {
-            console.error('❌ Erreur création graphiques:', error);
+            console.error('❌ Erreur création graphique consommation horaire:', error);
         }
     }, 100);
+    
+    // ===== GESTION DU TOGGLE POUR LE GRAPHIQUE D'ÉNERGIE TOTALE (EN BAS, CACHÉ PAR DÉFAUT) =====
+    let cumulVisible = false;
+    let cumulCreated = false;
+    
+    headerCumul.onclick = () => {
+        cumulVisible = !cumulVisible;
+        if (cumulVisible) {
+            cumulContent.style.display = 'block';
+            toggleIconCumul.innerHTML = '▲';
+            
+            // Créer le graphique cumulé uniquement lors du premier affichage
+            if (!cumulCreated) {
+                setTimeout(() => {
+                    if (typeof Chart === 'undefined') return;
+                    
+                    try {
+                        const existingChartCumul = Chart.getChart(ctxCumul);
+                        if (existingChartCumul) existingChartCumul.destroy();
+                        
+                        new Chart(ctxCumul, {
+                            type: 'bar',
+                            data: { labels: labels, datasets: datasetsCumul },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                plugins: {
+                                    legend: { display: true, position: 'top', labels: { font: { size: 10, weight: 'bold' }, usePointStyle: true, boxWidth: 8 } },
+                                    tooltip: {
+                                        callbacks: {
+                                            title: (context) => context[0].label,
+                                            label: (context) => `⚡ ${context.parsed.y?.toFixed(2) || 0} Wh`,
+                                            afterBody: (context) => {
+                                                const point = allDataPoints[context[0].dataIndex];
+                                                if (!point) return [];
+                                                const details = detailsByDate[point.date];
+                                                if (!details?.perClientByHour?.[point.label]) return [];
+                                                const lines = ['📊 Détail par client:'];
+                                                for (let i = 1; i <= 6; i++) {
+                                                    const v = details.perClientByHour[point.label][`client_${i}`];
+                                                    if (v) lines.push(`   Client ${i}: ${v.toFixed(2)} Wh`);
+                                                }
+                                                return lines;
+                                            }
+                                        }
+                                    }
+                                },
+                                scales: {
+                                    y: { beginAtZero: true, max: yMax, title: { display: true, text: 'Énergie (Wh)' }, ticks: { callback: v => v.toFixed(0) + ' Wh' } },
+                                    x: { ticks: { maxRotation: 45, minRotation: 30, maxTicksLimit: 30, callback: (val, idx) => idx % 6 === 0 ? labels[idx] : '' }, title: { display: true, text: 'Date et Heure' } }
+                                }
+                            }
+                        });
+                        
+                        cumulCreated = true;
+                        console.log(`✅ Graphique énergie totale horaire créé avec ${allDates.length} jours (caché par défaut en bas)`);
+                    } catch (error) {
+                        console.error('❌ Erreur création graphique énergie totale:', error);
+                    }
+                }, 100);
+            }
+        } else {
+            cumulContent.style.display = 'none';
+            toggleIconCumul.innerHTML = '▼';
+        }
+    };
+    
+    console.log(`✅ Carte énergie horaire créée - ${allDates.length} jours - Graphique consommation visible en haut, graphique cumul caché en bas`);
 }
 
 // Fonction utilitaire pour générer une palette de couleurs
