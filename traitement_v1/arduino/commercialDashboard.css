@@ -629,3 +629,451 @@
         border-radius: var(--radius-md);
     }
 }
+
+/* ============================================
+   ADAPTATEUR D'AFFICHAGE UNIVERSEL
+   Support: Web, Electron, Mobile, Tablette
+   ============================================ */
+
+/* ----- DÉTECTION AUTOMATIQUE VIA JS (à implémenter) ----- */
+/* 
+   Les classes suivantes seront ajoutées dynamiquement par JavaScript :
+   - .platform-web : Navigation standard
+   - .platform-electron : Application desktop Electron
+   - .platform-mobile : Smartphone
+   - .platform-tablet : Tablette
+   - .orientation-portrait : Mode portrait
+   - .orientation-landscape : Mode paysage
+*/
+
+/* ===== 1. BASE ADAPTATIVE (viewport + typographie fluide) ===== */
+html {
+    /* Base typographique fluide */
+    font-size: 16px;
+    
+    /* Smooth scrolling */
+    scroll-behavior: smooth;
+    
+    /* Amélioration du rendu */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    
+    /* Gestion du safe area (notch, etc.) */
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
+/* Viewport meta à ajouter dans HTML */
+/* <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"> */
+
+/* ===== 2. VARIABLES RESPONSIVES (ajustables par plateforme) ===== */
+:root {
+    /* Tailles de base */
+    --base-font-size-web: 16px;
+    --base-font-size-electron: 15px;
+    --base-font-size-tablet: 14px;
+    --base-font-size-mobile: 13px;
+    
+    /* Espacements */
+    --spacing-base-web: 2rem;
+    --spacing-base-electron: 1.75rem;
+    --spacing-base-tablet: 1.25rem;
+    --spacing-base-mobile: 1rem;
+    
+    /* Padding container */
+    --container-padding-web: 2rem;
+    --container-padding-electron: 1.75rem;
+    --container-padding-tablet: 1.25rem;
+    --container-padding-mobile: 0.75rem;
+    
+    /* Rayons de bordure (plus petits sur mobile) */
+    --radius-base-web: 1rem;
+    --radius-base-electron: 0.875rem;
+    --radius-base-tablet: 0.75rem;
+    --radius-base-mobile: 0.5rem;
+    
+    /* Ombres (plus subtiles sur mobile) */
+    --shadow-intensity-web: 0.1;
+    --shadow-intensity-electron: 0.08;
+    --shadow-intensity-tablet: 0.06;
+    --shadow-intensity-mobile: 0.04;
+}
+
+/* ===== 3. PLATEFORME - WEB (desktop classique) ===== */
+.platform-web {
+    font-size: var(--base-font-size-web);
+}
+
+.platform-web .container {
+    max-width: 1600px;
+    margin: 0 auto;
+    padding: var(--container-padding-web);
+}
+
+.platform-web .card,
+.platform-web .client-card {
+    border-radius: var(--radius-base-web);
+    padding: 1.75rem;
+}
+
+/* ===== 4. PLATEFORME - ELECTRON (application desktop) ===== */
+.platform-electron {
+    font-size: var(--base-font-size-electron);
+}
+
+.platform-electron .container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: var(--container-padding-electron);
+}
+
+.platform-electron .card,
+.platform-electron .client-card {
+    border-radius: var(--radius-base-electron);
+    padding: 1.5rem;
+}
+
+/* Style spécifique Electron (fenêtre native) */
+.platform-electron {
+    /* Réduction des espacements pour maximiser l'espace utile */
+    --spacing-section: 1.25rem;
+    
+    /* Optimisation pour les fenêtres redimensionnables */
+    transition: all 0.2s ease;
+}
+
+.platform-electron .header {
+    padding: 1.25rem 1.5rem;
+}
+
+.platform-electron .header h1 {
+    font-size: 1.75rem;
+}
+
+/* ===== 5. PLATEFORME - TABLETTE (iPad, Android Tablette) ===== */
+.platform-tablet {
+    font-size: var(--base-font-size-tablet);
+}
+
+.platform-tablet .container {
+    max-width: 1024px;
+    margin: 0 auto;
+    padding: var(--container-padding-tablet);
+}
+
+.platform-tablet .card,
+.platform-tablet .client-card {
+    border-radius: var(--radius-base-tablet);
+    padding: 1.25rem;
+    margin-bottom: 1.25rem;
+}
+
+/* Optimisation tablette - grilles adaptées */
+.platform-tablet .grid-4 {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+}
+
+.platform-tablet .stats-grid-3,
+.platform-tablet .stats-grid-4 {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+}
+
+.platform-tablet .client-tabs {
+    gap: 0.5rem;
+}
+
+.platform-tablet .client-tab {
+    padding: 0.5rem 1rem;
+    font-size: 0.85rem;
+}
+
+/* Mode paysage tablette */
+.platform-tablet.orientation-landscape .grid-4 {
+    grid-template-columns: repeat(3, 1fr);
+}
+
+.platform-tablet.orientation-landscape .stats-grid-3 {
+    grid-template-columns: repeat(3, 1fr);
+}
+
+/* ===== 6. PLATEFORME - MOBILE (smartphone) ===== */
+.platform-mobile {
+    font-size: var(--base-font-size-mobile);
+}
+
+.platform-mobile .container {
+    width: 100%;
+    padding: var(--container-padding-mobile);
+    border-radius: 0; /* Pas de coins arrondis sur mobile pour maximiser l'espace */
+    box-shadow: none;
+}
+
+.platform-mobile body {
+    padding: 0;
+    background: var(--gray-100);
+}
+
+/* Header mobile */
+.platform-mobile .header {
+    padding: 1rem;
+    text-align: center;
+}
+
+.platform-mobile .header h1 {
+    font-size: 1.25rem;
+    margin-bottom: 0.25rem;
+}
+
+.platform-mobile .header p {
+    font-size: 0.85rem;
+    display: none; /* Cache sous-titre sur mobile */
+}
+
+/* Cards mobiles */
+.platform-mobile .card,
+.platform-mobile .client-card {
+    border-radius: var(--radius-base-mobile);
+    padding: 1rem;
+    margin-bottom: 1rem;
+    box-shadow: var(--shadow-sm);
+}
+
+.platform-mobile .card-title {
+    font-size: 1rem;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+}
+
+/* Grilles mobiles - toujours en colonne */
+.platform-mobile .grid-2,
+.platform-mobile .grid-3,
+.platform-mobile .grid-4,
+.platform-mobile .stats-grid-3,
+.platform-mobile .stats-grid-4 {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+}
+
+/* Stats items mobiles */
+.platform-mobile .stat-item,
+.platform-mobile .stat-card {
+    padding: 0.75rem;
+}
+
+.platform-mobile .stat-value {
+    font-size: 1.25rem;
+}
+
+.platform-mobile .stat-label {
+    font-size: 0.7rem;
+}
+
+.platform-mobile .stat-detail {
+    display: none; /* Cache détails sur mobile */
+}
+
+/* Navigation tabs mobile */
+.platform-mobile .client-tabs-header {
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.platform-mobile .client-tab-nav {
+    width: 100%;
+    border-radius: var(--radius-md);
+}
+
+.platform-mobile .client-tabs {
+    width: 100%;
+    overflow-x: auto;
+    padding-bottom: 0.5rem;
+}
+
+.platform-mobile .client-tab {
+    padding: 0.5rem 1rem;
+    font-size: 0.8rem;
+    white-space: nowrap;
+}
+
+/* Tableaux mobiles */
+.platform-mobile .table-wrapper {
+    max-height: 300px;
+}
+
+.platform-mobile .table-wrapper th,
+.platform-mobile .table-wrapper td {
+    padding: 0.5rem;
+    font-size: 0.75rem;
+}
+
+.platform-mobile .table-wrapper table {
+    min-width: 500px; /* Permet scroll horizontal */
+}
+
+/* Filtres mobiles */
+.platform-mobile .filter-row {
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.platform-mobile .filter-label {
+    width: 100%;
+}
+
+.platform-mobile .filter-options {
+    width: 100%;
+    flex-wrap: wrap;
+}
+
+.platform-mobile .filter-btn {
+    flex: 1;
+    text-align: center;
+    padding: 0.5rem;
+}
+
+/* Messages mobiles */
+.platform-mobile .client-message {
+    font-size: 0.85rem;
+    padding: 0.5rem 0.75rem;
+}
+
+/* Timeline mobile */
+.platform-mobile .change-item {
+    flex-direction: column;
+    text-align: center;
+    gap: 0.5rem;
+}
+
+.platform-mobile .change-date {
+    font-size: 0.7rem;
+}
+
+/* Barres de progression mobiles */
+.platform-mobile .unified-progress-bar {
+    height: 32px;
+    border-radius: 16px;
+}
+
+.platform-mobile .progress-legend {
+    gap: 12px;
+    font-size: 10px;
+}
+
+/* ===== 7. MODE PORTRAIT vs PAYSAGE (mobile/tablette) ===== */
+
+/* Portrait */
+.orientation-portrait .stats-grid-3,
+.orientation-portrait .stats-grid-4 {
+    grid-template-columns: 1fr;
+}
+
+/* Paysage (mobile seulement) */
+.platform-mobile.orientation-landscape .stats-grid-3,
+.platform-mobile.orientation-landscape .stats-grid-4 {
+    grid-template-columns: repeat(2, 1fr);
+}
+
+.platform-mobile.orientation-landscape .grid-2,
+.platform-mobile.orientation-landscape .grid-3,
+.platform-mobile.orientation-landscape .grid-4 {
+    grid-template-columns: repeat(2, 1fr);
+}
+
+.platform-mobile.orientation-landscape .header h1 {
+    font-size: 1.1rem;
+}
+
+/* ===== 8. TOUCH OPTIMISATIONS (mobile/tablette) ===== */
+.platform-mobile .client-tab,
+.platform-mobile .filter-btn,
+.platform-mobile .pagination-button,
+.platform-mobile .back-button,
+.platform-mobile .toggle-tables-btn,
+.platform-mobile .detail-btn {
+    min-height: 44px; /* Taille minimum recommandée pour le touch */
+    touch-action: manipulation;
+}
+
+.platform-mobile button,
+.platform-mobile .client-tab,
+.platform-mobile .filter-btn {
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.platform-mobile button:active,
+.platform-mobile .client-tab:active,
+.platform-mobile .filter-btn:active {
+    transform: scale(0.98);
+    transition: transform 0.05s ease;
+}
+
+/* ===== 9. GESTION DES SAFE AREAS (notch, Dynamic Island) ===== */
+@supports (padding: max(0px)) {
+    .platform-mobile .header {
+        padding-top: max(1rem, env(safe-area-inset-top));
+        padding-left: max(1rem, env(safe-area-inset-left));
+        padding-right: max(1rem, env(safe-area-inset-right));
+    }
+    
+    .platform-mobile .container {
+        padding-left: max(var(--container-padding-mobile), env(safe-area-inset-left));
+        padding-right: max(var(--container-padding-mobile), env(safe-area-inset-right));
+    }
+    
+    /* Boutons flottants si utilisés */
+    .platform-mobile .fab-button {
+        bottom: max(1rem, env(safe-area-inset-bottom));
+        right: max(1rem, env(safe-area-inset-right));
+    }
+}
+
+/* ===== 10. PERFORMANCE GPU (accélération matérielle) ===== */
+.platform-electron .card,
+.platform-mobile .card,
+.platform-tablet .card {
+    transform: translateZ(0);
+    will-change: transform;
+    backface-visibility: hidden;
+}
+
+/* ===== 11. DARK MODE SUPPORT (optionnel) ===== */
+@media (prefers-color-scheme: dark) {
+    .platform-web.dark-mode,
+    .platform-electron.dark-mode {
+        --dark: #e2e8f0;
+        --gray-100: #1a202c;
+        --gray-200: #2d3748;
+        --gray-400: #718096;
+        --gray-600: #a0aec0;
+        --white: #1a202c;
+    }
+    
+    .platform-web.dark-mode .card,
+    .platform-electron.dark-mode .card {
+        background: #2d3748;
+        border-color: #4a5568;
+    }
+}
+
+/* ===== 12. RÉGLAGES FINALS POUR PETITS ÉCRANS ===== */
+@media (max-width: 480px) {
+    /* Fallback si les classes plateforme ne sont pas présentes */
+    body {
+        font-size: 13px;
+    }
+    
+    .header h1 {
+        font-size: 1.25rem;
+    }
+    
+    .card {
+        padding: 1rem;
+    }
+    
+    .grid-2, .grid-3, .grid-4,
+    .stats-grid-3, .stats-grid-4 {
+        grid-template-columns: 1fr;
+    }
+}
