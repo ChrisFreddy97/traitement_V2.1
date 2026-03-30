@@ -182,6 +182,16 @@ function getAvailableDates() {
     return Array.from(dates).sort();
 }
 
+function getFirstAvailableDate() {
+    const dates = getAvailableDates();
+    return dates.length > 0 ? dates[0] : null;
+}
+
+function getLastAvailableDate() {
+    const dates = getAvailableDates();
+    return dates.length > 0 ? dates[dates.length - 1] : null;
+}
+
 function getAvailableYears() {
     const years = new Set();
     getAvailableDates().forEach(date => {
@@ -191,27 +201,74 @@ function getAvailableYears() {
 }
 
 function hasActiveFilter(filter) {
-    return filter.period !== 'all' || 
+    return (filter.period && filter.period !== 'all') || 
            filter.startDate || 
            filter.endDate || 
            filter.month || 
            filter.year;
 }
 
+function formatDisplayDate(dateStr) {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    return d.toLocaleDateString('fr-FR');
+}
+
 function getFilterSummaryText(filter) {
+    // Dates personnalisées
     if (filter.startDate && filter.endDate) {
-        const start = new Date(filter.startDate).toLocaleDateString('fr-FR');
-        const end = new Date(filter.endDate).toLocaleDateString('fr-FR');
+        const start = formatDisplayDate(filter.startDate);
+        const end = formatDisplayDate(filter.endDate);
+        
         return `📅 Du ${start} au ${end}`;
     }
+    
+    // Mois/année spécifique
     if (filter.month && filter.year) {
         const monthName = new Date(2000, filter.month - 1, 1).toLocaleDateString('fr-FR', { month: 'long' });
         return `📅 ${monthName} ${filter.year}`;
     }
+    
+    // Année seule
     if (filter.year) {
         return `📅 Année ${filter.year}`;
     }
+    
+    // Période prédéfinie
     if (filter.period && filter.period !== 'all') {
+        const lastDate = getLastAvailableDate();
+        if (lastDate) {
+            const endDate = new Date(lastDate);
+            const startDate = new Date(lastDate);
+            
+            switch(filter.period) {
+                case '7days':
+                    startDate.setDate(endDate.getDate() - 7);
+                    break;
+                case '15days':
+                    startDate.setDate(endDate.getDate() - 15);
+                    break;
+                case '30days':
+                    startDate.setDate(endDate.getDate() - 30);
+                    break;
+                case '2months':
+                    startDate.setMonth(endDate.getMonth() - 2);
+                    break;
+                case '3months':
+                    startDate.setMonth(endDate.getMonth() - 3);
+                    break;
+                case '6months':
+                    startDate.setMonth(endDate.getMonth() - 6);
+                    break;
+                case '1year':
+                    startDate.setFullYear(endDate.getFullYear() - 1);
+                    break;
+            }
+            
+            return `📅 Du ${formatDisplayDate(startDate)} au ${formatDisplayDate(endDate)}`;
+        }
+        
+        // Fallback si pas de dates
         const periodMap = {
             '7days': '7 derniers jours',
             '15days': '15 derniers jours',
@@ -223,7 +280,15 @@ function getFilterSummaryText(filter) {
         };
         return `📅 ${periodMap[filter.period] || filter.period}`;
     }
-    return '📊 Toutes les données';
+    
+    const firstDate = getFirstAvailableDate();
+    const lastDate = getLastAvailableDate();
+    
+    if (firstDate && lastDate) {
+        return `📅 Du ${formatDisplayDate(firstDate)} au ${formatDisplayDate(lastDate)}`;
+    }
+    
+    return `📅 Aucune donnée disponible`;
 }
 
 function formatDateForInput(date) {
@@ -232,11 +297,6 @@ function formatDateForInput(date) {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-function getLastDateFromData() {
-    const dates = getAvailableDates();
-    if (dates.length === 0) return new Date();
-    return new Date(dates[dates.length - 1]);
-}
 
 export function renderFilterPanel() {
     const currentFilter = getCurrentFilter();
@@ -249,32 +309,49 @@ export function renderFilterPanel() {
     return `
         <div class="filter-panel">
             <div class="filter-header" onclick="window.toggleFilterPanel()">
-                <span class="filter-icon">🔍</span>
-                <span class="filter-title">Filtres</span>
-                <span class="filter-badge" id="filterActiveBadge" style="display: ${hasActiveFilter(currentFilter) ? 'inline-block' : 'none'};">Actif</span>
-                <span class="filter-toggle">▼</span>
+                <div class="filter-header-left">
+                    <span class="filter-icon">🎯</span>
+                    <span class="filter-title">Filtrer les données</span>
+                </div>
+                <div class="filter-header-right">
+                    <span class="filter-badge" id="filterActiveBadge" style="display: ${hasActiveFilter(currentFilter) ? 'inline-flex' : 'none'};">Filtre actif</span>
+                    <span class="filter-toggle">▼</span>
+                </div>
             </div>
             
             <div class="filter-content" id="filterContent">
-                <div class="filter-row">
-                    <div class="filter-label">Période rapide</div>
-                    <div class="filter-options">
-                        <button class="filter-btn ${currentFilter.period === '7days' ? 'active' : ''}" data-period="7days" onclick="window.applyFilterPeriod('7days')">7 jours</button>
-                        <button class="filter-btn ${currentFilter.period === '15days' ? 'active' : ''}" data-period="15days" onclick="window.applyFilterPeriod('15days')">15 jours</button>
-                        <button class="filter-btn ${currentFilter.period === '30days' ? 'active' : ''}" data-period="30days" onclick="window.applyFilterPeriod('30days')">30 jours</button>
-                        <button class="filter-btn ${currentFilter.period === '2months' ? 'active' : ''}" data-period="2months" onclick="window.applyFilterPeriod('2months')">2 mois</button>
-                        <button class="filter-btn ${currentFilter.period === '3months' ? 'active' : ''}" data-period="3months" onclick="window.applyFilterPeriod('3months')">3 mois</button>
-                        <button class="filter-btn ${currentFilter.period === '6months' ? 'active' : ''}" data-period="6months" onclick="window.applyFilterPeriod('6months')">6 mois</button>
-                        <button class="filter-btn ${currentFilter.period === '1year' ? 'active' : ''}" data-period="1year" onclick="window.applyFilterPeriod('1year')">1 an</button>
-                        <button class="filter-btn ${currentFilter.period === 'all' ? 'active' : ''}" data-period="all" onclick="window.applyFilterPeriod('all')">Tout</button>
+                <!-- Résumé du filtre actif -->
+                <div class="filter-summary" id="filterSummary">
+                    ${getFilterSummaryText(currentFilter)}
+                </div>
+
+                <!-- Section Période rapide -->
+                <div class="filter-section">
+                    <div class="filter-section-header">
+                        <span class="filter-section-icon">⚡</span>
+                        <span class="filter-section-title">Période rapide</span>
+                    </div>
+                    <div class="filter-options-grid">
+                        <button class="filter-chip ${currentFilter.period === '7days' ? 'active' : ''}" data-period="7days" onclick="window.applyFilterPeriod('7days')">7 jours</button>
+                        <button class="filter-chip ${currentFilter.period === '15days' ? 'active' : ''}" data-period="15days" onclick="window.applyFilterPeriod('15days')">15 jours</button>
+                        <button class="filter-chip ${currentFilter.period === '30days' ? 'active' : ''}" data-period="30days" onclick="window.applyFilterPeriod('30days')">30 jours</button>
+                        <button class="filter-chip ${currentFilter.period === '2months' ? 'active' : ''}" data-period="2months" onclick="window.applyFilterPeriod('2months')">2 mois</button>
+                        <button class="filter-chip ${currentFilter.period === '3months' ? 'active' : ''}" data-period="3months" onclick="window.applyFilterPeriod('3months')">3 mois</button>
+                        <button class="filter-chip ${currentFilter.period === '6months' ? 'active' : ''}" data-period="6months" onclick="window.applyFilterPeriod('6months')">6 mois</button>
+                        <button class="filter-chip ${currentFilter.period === '1year' ? 'active' : ''}" data-period="1year" onclick="window.applyFilterPeriod('1year')">1 an</button>
+                        <button class="filter-chip ${currentFilter.period === 'all' ? 'active' : ''}" data-period="all" onclick="window.applyFilterPeriod('all')">Toutes</button>
                     </div>
                 </div>
                 
-                <div class="filter-row">
-                    <div class="filter-label">Mois spécifique</div>
-                    <div class="filter-options">
+                <!-- Section Mois spécifique -->
+                <div class="filter-section">
+                    <div class="filter-section-header">
+                        <span class="filter-section-icon">📅</span>
+                        <span class="filter-section-title">Mois spécifique</span>
+                    </div>
+                    <div class="filter-controls-group">
                         <select class="filter-select" id="filterMonthSelect">
-                            <option value="">-- Mois --</option>
+                            <option value="">Sélectionner un mois</option>
                             ${Array.from({length: 12}, (_, i) => {
                                 const monthNum = i + 1;
                                 const monthName = new Date(2000, i, 1).toLocaleDateString('fr-FR', { month: 'long' });
@@ -282,43 +359,54 @@ export function renderFilterPanel() {
                             }).join('')}
                         </select>
                         <select class="filter-select" id="filterYearSelect">
-                            <option value="">-- Année --</option>
+                            <option value="">Sélectionner une année</option>
                             ${getAvailableYears().map(year => `<option value="${year}" ${currentFilter.year === year ? 'selected' : ''}>${year}</option>`).join('')}
                         </select>
-                        <button class="filter-btn filter-btn-primary" onclick="window.applyFilterMonthYear()">Appliquer</button>
+                        <button class="filter-btn-primary" onclick="window.applyFilterMonthYear()">
+                            <span>▶</span> Appliquer
+                        </button>
                     </div>
                 </div>
                 
-                <div class="filter-row">
-                    <div class="filter-label">Dates personnalisées</div>
-                    <div class="filter-options">
-                        <div class="filter-date-group">
-                            <span>Du</span>
-                            <select class="filter-date-select" id="filterStartDateSelect">
-                                <option value="">-- Sélectionner --</option>
-                                ${dateOptions}
-                            </select>
+                <!-- Section Dates personnalisées -->
+                <div class="filter-section">
+                    <div class="filter-section-header">
+                        <span class="filter-section-icon">📆</span>
+                        <span class="filter-section-title">Dates personnalisées</span>
+                    </div>
+                    <div class="filter-controls-group">
+                        <div class="filter-date-range">
+                            <div class="filter-date-box">
+                                <span class="date-label">Du</span>
+                                <select class="filter-date-select" id="filterStartDateSelect">
+                                    <option value="">Choisir une date</option>
+                                    ${dateOptions}
+                                </select>
+                            </div>
+                            <span class="date-separator">→</span>
+                            <div class="filter-date-box">
+                                <span class="date-label">Au</span>
+                                <select class="filter-date-select" id="filterEndDateSelect">
+                                    <option value="">Choisir une date</option>
+                                    ${dateOptions}
+                                </select>
+                            </div>
                         </div>
-                        <div class="filter-date-group">
-                            <span>Au</span>
-                            <select class="filter-date-select" id="filterEndDateSelect">
-                                <option value="">-- Sélectionner --</option>
-                                ${dateOptions}
-                            </select>
+                        <div class="filter-actions">
+                            <button class="filter-btn-primary" onclick="window.applyFilterCustomDates()">
+                                <span>✓</span> Appliquer
+                            </button>
+                            <button class="filter-btn-secondary" onclick="window.clearFilter()">
+                                <span>⟳</span> Réinitialiser
+                            </button>
                         </div>
-                        <button class="filter-btn filter-btn-primary" onclick="window.applyFilterCustomDates()">Appliquer</button>
-                        <button class="filter-btn" onclick="window.clearFilter()">Réinitialiser</button>
                     </div>
                 </div>
                 
-                <div class="filter-summary" id="filterSummary">
-                    ${getFilterSummaryText(currentFilter)}
-                </div>
             </div>
         </div>
     `;
 }
-
 // ===========================================
 // FONCTIONS GLOBALES DU FILTRE
 // ===========================================
@@ -1362,7 +1450,7 @@ function attachDateSelectors() {
 }
 
 // ===========================================
-// III) ÉNERGIE - CLIENT ANALYTICS
+// III) ÉNERGIE - CLIENT ANALYTICS (UI/UX CORRIGÉE)
 // ===========================================
 
 class ClientEnergyAnalytics {
@@ -1374,7 +1462,6 @@ class ClientEnergyAnalytics {
         this.siteDaily = {};
         this.clientStatistics = {};
         this.siteStatistics = {};
-        this.allPoints = []; // ✅ NOUVEAU : stocker tous les points de consommation
         this.processData();
     }
     
@@ -1382,20 +1469,9 @@ class ClientEnergyAnalytics {
         if (!this.rawData?.data) return;
         const dailyMap = new Map(), siteMap = new Map(), clientSet = new Set();
         
-        // ✅ NOUVEAU : collecter tous les points pour la distribution cumulative
-        this.allPoints = [];
-        
         this.rawData.data.forEach(point => {
             if (!point.timestamp || !point.energie || !point.clientId) return;
             const date = point.date, clientId = point.clientId, energie = point.energie;
-            
-            // ✅ Ajouter chaque point à la collection
-            this.allPoints.push({
-                date: date,
-                clientId: clientId,
-                energie: energie,
-                timestamp: point.timestamp
-            });
             
             clientSet.add(clientId);
             if (!dailyMap.has(date)) dailyMap.set(date, new Map());
@@ -1418,107 +1494,10 @@ class ClientEnergyAnalytics {
         this.calculateSiteStats();
     }
     
-    // ✅ NOUVELLE MÉTHODE : distribution cumulative des points
-    getKitDistributionCumulative() {
-        if (!this.allPoints.length) return [];
-        
-        const seuils = [
-            { id: 0, label: 'Kit 0', max: 250, color: '#22c55e' },
-            { id: 1, label: 'Kit 1', max: 360, color: '#eab308' },
-            { id: 2, label: 'Kit 2', max: 540, color: '#f97316' },
-            { id: 3, label: 'Kit 3', max: 720, color: '#ef4444' },
-            { id: 4, label: 'Kit 4', max: 1080, color: '#8b5cf6' }
-        ];
-        
-        const totalPoints = this.allPoints.length;
-        const result = [];
-        
-        for (const seuil of seuils) {
-            const count = this.allPoints.filter(p => p.energie <= seuil.max).length;
-            result.push({
-                id: seuil.id,
-                label: seuil.label,
-                max: seuil.max,
-                color: seuil.color,
-                count: count,
-                percentage: (count / totalPoints) * 100
-            });
-        }
-        
-        return result;
-    }
-    
-    // ✅ NOUVELLE MÉTHODE : version non cumulative (pour l'affichage des barres)
-    getKitDistributionSimple() {
-        if (!this.allPoints.length) return [];
-        
-        const seuils = [
-            { id: 0, label: 'Kit 0', min: 0, max: 250 },
-            { id: 1, label: 'Kit 1', min: 251, max: 360 },
-            { id: 2, label: 'Kit 2', min: 361, max: 540 },
-            { id: 3, label: 'Kit 3', min: 541, max: 720 },
-            { id: 4, label: 'Kit 4', min: 721, max: 1080 }
-        ];
-        
-        const totalPoints = this.allPoints.length;
-        const distribution = [];
-        
-        for (const seuil of seuils) {
-            const count = this.allPoints.filter(p => p.energie >= seuil.min && p.energie <= seuil.max).length;
-            distribution.push({
-                id: seuil.id,
-                label: seuil.label,
-                min: seuil.min,
-                max: seuil.max,
-                count: count,
-                percentage: (count / totalPoints) * 100
-            });
-        }
-        
-        // Points > Kit 4
-        const overCount = this.allPoints.filter(p => p.energie > 1080).length;
-        distribution.push({
-            id: 5,
-            label: '> Kit 4',
-            min: 1081,
-            max: Infinity,
-            count: overCount,
-            percentage: (overCount / totalPoints) * 100
-        });
-        
-        return distribution;
-    }
-    
     calculatePercentile(values, p) {
         if (!values.length) return 0;
         const sorted = [...values].sort((a,b) => a-b);
         return sorted[Math.min(Math.ceil(p/100 * sorted.length) - 1, sorted.length - 1)];
-    }
-    
-    recommendKit(values) {
-        const valid = values.filter(v => v > 0);
-        if (!valid.length) return { id: 0, label: 'Kit 0', capacity: 250, confidence: 0 };
-        const total = valid.length;
-        const dep = { s250: valid.filter(v=>v>250).length, s360: valid.filter(v=>v>360).length, s540: valid.filter(v=>v>540).length, s720: valid.filter(v=>v>720).length, s1080: valid.filter(v=>v>1080).length };
-        let tech = 0;
-        if (dep.s1080/total > 0.2) return { id: null, label: 'Aucun kit adapté', capacity: null, message: 'Contacter le commercial' };
-        if (dep.s720/total > 0.2) tech = 4;
-        else if (dep.s540/total > 0.2) tech = 3;
-        else if (dep.s360/total > 0.2) tech = 2;
-        else if (dep.s250/total > 0.2) tech = 1;
-        const caps = [250,360,540,720,1080], costs = [100,200,300,500,800];
-        let best = 0, bestCost = Infinity;
-        for (let i=0; i<=4; i++) {
-            const cap = caps[i];
-            const overCost = valid.filter(v=>v>cap).length * 30;
-            let waste = 0;
-            valid.forEach(v => { if (v < cap * 0.7) waste += (cap - v) * 0.05; });
-            const totalCost = costs[i] + overCost + waste;
-            if (totalCost < bestCost) { bestCost = totalCost; best = i; }
-        }
-        const final = Math.max(best, tech);
-        const p95 = this.calculatePercentile(valid, 95);
-        return { id: final, label: `Kit ${final}`, capacity: caps[final], required: Math.ceil(Math.max(p95, Math.max(...valid)*0.9) * 1.1), confidence: 95 };
     }
     
     calculateSiteStats() {
@@ -1528,7 +1507,6 @@ class ClientEnergyAnalytics {
             maximum: Math.max(...this.processedDates.map(d=>this.siteDaily[d]||0), 0),
             percentile95: this.calculatePercentile(values, 95),
             activeDays: values.length,
-            recommendation: this.recommendKit(values),
             totalEnergy: values.reduce((a,b)=>a+b,0)
         };
     }
@@ -1570,11 +1548,10 @@ function renderClientBoardUI(container) {
     const range = clientAnalyticsInstance.getDateRange();
     const stats = profile.stats;
     
-    // Récupérer les valeurs de consommation de chaque point du graphique
     const dailyValues = profile.history.map(d => d.consumption);
     const totalJours = dailyValues.length;
     
-    const seuils = [
+    const tousLesSeuils = [
         { id: 0, label: 'Kit 0', max: 250, color: '#94a3b8' },
         { id: 1, label: 'Kit 1', max: 360, color: '#22c55e' },
         { id: 2, label: 'Kit 2', max: 540, color: '#eab308' },
@@ -1582,29 +1559,43 @@ function renderClientBoardUI(container) {
         { id: 4, label: 'Kit 4', max: 1080, color: '#ef4444' }
     ];
     
-    // Calculer le nombre de jours ≤ chaque seuil
+    // Calculer les pourcentages cumulés et trouver le premier kit qui atteint 100%
     const cumulative = [];
-    for (const seuil of seuils) {
+    let stopIndex = tousLesSeuils.length;
+    
+    for (let i = 0; i < tousLesSeuils.length; i++) {
+        const seuil = tousLesSeuils[i];
         const joursCouverts = dailyValues.filter(v => v <= seuil.max).length;
         const pourcentage = (joursCouverts / totalJours) * 100;
+        
         cumulative.push({
             ...seuil,
             jours: joursCouverts,
             percentage: pourcentage
         });
+        
+        if (pourcentage >= 99.9 && stopIndex === tousLesSeuils.length) {
+            stopIndex = i + 1;
+        }
     }
     
-    // Générer les barres avec pourcentage DANS la barre
+    // ✅ Les kits visibles = jusqu'à celui qui atteint 100%
+    const visibleSeuils = cumulative.slice(0, stopIndex);
+    const lastKit = visibleSeuils[visibleSeuils.length - 1];
+    const isComplete = lastKit && lastKit.percentage >= 99.9;
+    
     const renderBars = () => {
-        return cumulative.map(kit => {
+        return visibleSeuils.map(kit => {
             const percent = kit.percentage;
-            const showLabel = percent > 12; // Afficher le texte seulement si la barre est assez large
+            const isLast = kit.id === visibleSeuils[visibleSeuils.length - 1].id;
+            const showLabel = percent > 12;
             
             return `
                 <div style="margin-bottom: 20px;">
                     <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
                         <span style="display: inline-block; width: 12px; height: 12px; background: ${kit.color}; border-radius: 2px;"></span>
                         <span style="font-weight: 500;">${kit.label} (≤${kit.max}Wh)</span>
+                        <span style="margin-left: auto; font-size: 0.75rem; font-weight: 600; color: ${kit.color};">${percent.toFixed(1)}%</span>
                     </div>
                     <div style="background: #e9ecef; border-radius: 8px; height: 36px; overflow: hidden; position: relative;">
                         <div style="width: ${percent}%; height: 100%; background: ${kit.color}; border-radius: 8px; display: flex; align-items: center; justify-content: flex-end; padding-right: ${showLabel ? '10px' : '0'};">
@@ -1615,6 +1606,11 @@ function renderClientBoardUI(container) {
                     <div style="font-size: 0.7rem; color: #6c757d; margin-top: 4px;">
                         ${kit.jours} jours sur ${totalJours}
                     </div>
+                    ${isLast && !isComplete ? `
+                        <div style="margin-top: 8px; padding: 6px 10px; background: #fef3c7; border-radius: 8px; font-size: 0.7rem; color: #92400e;">
+                            ⚠️ ${(100 - percent).toFixed(1)}% des jours dépassent ce kit
+                        </div>
+                    ` : ''}
                 </div>
             `;
         }).join('');
@@ -1623,44 +1619,34 @@ function renderClientBoardUI(container) {
     container.innerHTML = `
         <div class="card" style="padding:0;">
             <div style="padding:20px 24px; border-bottom:1px solid #e9ecef;">
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <h3 style="margin:0; display: flex; align-items: center; gap: 8px;">
-                        <span>🏭</span>
-                        CONSOMMATION TOTALE DU SITE
-                    </h3>
-                    <span style="background:#e9ecef; padding:4px 12px; border-radius:100px; font-size:0.75rem;">
-                        ${range.total} JOURS • ${clients.length} CLIENTS
-                    </span>
+                <h3 style="margin:0; display: flex; align-items: center; gap: 8px;">
+                    <span>🏭</span>
+                    CONSOMMATION TOTALE
+                </h3>
+            </div>
+            
+            <div style="padding:24px;">
+                <div style="height:320px;">
+                    <canvas id="clientTrendChart"></canvas>
                 </div>
             </div>
             
-            <!-- Légende des couleurs des kits -->
-            <div style="padding:12px 24px; background:#f8f9fa; border-bottom:1px solid #e9ecef; display: flex; gap: 20px; flex-wrap: wrap;">
-                ${seuils.map(kit => `
+            <div style="padding:12px 24px; background:#f8f9fa; border-bottom:1px solid #e9ecef; display: flex; gap: 20px; flex-wrap: wrap; justify-content: center;">
+                ${visibleSeuils.map(kit => `
                     <div style="display: flex; align-items: center; gap: 6px;">
                         <span style="width: 12px; height: 12px; background: ${kit.color}; border-radius: 2px;"></span>
                         <span style="font-size: 0.7rem;">${kit.label}</span>
                     </div>
                 `).join('')}
+                ${stopIndex < tousLesSeuils.length ? `
+                    <div style="display: flex; align-items: center; gap: 6px; opacity: 0.5;">
+                        <span style="width: 12px; height: 12px; background: #cbd5e1; border-radius: 2px;"></span>
+                        <span style="font-size: 0.7rem;">Kit ${stopIndex}+ (100% atteint)</span>
+                    </div>
+                ` : ''}
             </div>
-            
-            <div style="padding:24px;">
-                <div style="height:300px;">
-                    <canvas id="clientTrendChart"></canvas>
-                </div>
-            </div>
-            
-            <div style="padding:20px 24px; background:#f8f9fa; border-top:1px solid #e9ecef;">
-                <h4 style="margin:0 0 16px 0; font-size:0.9rem; font-weight:600;">
-                    📊 DISTRIBUTION CUMULATIVE DES CONSOMMATIONS
-                </h4>
-                <div style="font-size:0.7rem; color:#6c757d; margin-bottom: 16px;">
-                    Pourcentage de jours couverts par chaque kit (cumulé)
-                </div>
-                ${renderBars()}
-            </div>
-            
-            ${createDetailButton('clientDetailTable', '📋 AFFICHER LE DÉTAIL CLIENT')}
+                       
+            ${createDetailButton('clientDetailTable', '📋 Voir le détail par client')}
             
             <div id="clientDetailTable" style="display:none; padding:0 24px 24px 24px;">
                 <div style="max-height:400px; overflow-y:auto; border:1px solid #e9ecef; border-radius:12px;">
@@ -1673,10 +1659,11 @@ function renderClientBoardUI(container) {
                             </tr>
                         </thead>
                         <tbody>
-                            ${clientAnalyticsInstance.processedDates.map(date => {
+                            ${clientAnalyticsInstance.processedDates.map((date, idx) => {
                                 let rowTotal = 0;
+                                const isEven = idx % 2 === 0;
                                 return `
-                                    <tr>
+                                    <tr style="background: ${isEven ? '#ffffff' : '#f8f9fa'};">
                                         <td style="padding:8px 12px; font-weight:500;">${date}</td>
                                         ${clientAnalyticsInstance.processedClients.map(id => {
                                             const val = clientAnalyticsInstance.clientDaily[date][id] || 0;
@@ -1701,27 +1688,37 @@ function createClientTrendChart() {
     
     const profile = clientAnalyticsInstance.getSiteProfile();
     const dates = clientAnalyticsInstance.processedDates;
-    const maxConsumption = Math.max(...profile.history.map(d => d.consumption), 0);
+    const dailyValues = profile.history.map(d => d.consumption);
+    const totalJours = dailyValues.length;
     
-    // ✅ Définir les seuils des kits
-    const kitThresholds = [
-        { label: 'Kit 0 (250Wh)', value: 250, color: '#22c55e' },
-        { label: 'Kit 1 (360Wh)', value: 360, color: '#eab308' },
-        { label: 'Kit 2 (540Wh)', value: 540, color: '#f97316' },
-        { label: 'Kit 3 (720Wh)', value: 720, color: '#ef4444' },
-        { label: 'Kit 4 (1080Wh)', value: 1080, color: '#8b5cf6' }
+    const tousLesKits = [
+        { label: 'Kit 0 (250Wh)', value: 250, color: '#94a3b8' },
+        { label: 'Kit 1 (360Wh)', value: 360, color: '#22c55e' },
+        { label: 'Kit 2 (540Wh)', value: 540, color: '#eab308' },
+        { label: 'Kit 3 (720Wh)', value: 720, color: '#f97316' },
+        { label: 'Kit 4 (1080Wh)', value: 1080, color: '#ef4444' }
     ];
     
-    // ✅ Filtrer les seuils : ne garder que ceux qui sont dans la plage des données
-    const visibleThresholds = kitThresholds.filter(threshold => threshold.value <= maxConsumption * 1.2);
+    // ✅ Trouver le premier kit qui atteint 100% (même logique que la barre)
+    let stopIndex = tousLesKits.length;
+    for (let i = 0; i < tousLesKits.length; i++) {
+        const kit = tousLesKits[i];
+        const joursCouverts = dailyValues.filter(v => v <= kit.value).length;
+        const pourcentage = (joursCouverts / totalJours) * 100;
+        if (pourcentage >= 99.9 && stopIndex === tousLesKits.length) {
+            stopIndex = i + 1;
+        }
+    }
     
-    // ✅ Créer les datasets des lignes de seuils (seulement les visibles)
-    const thresholdDatasets = visibleThresholds.map(threshold => ({
-        label: threshold.label,
-        data: Array(dates.length).fill(threshold.value),
-        borderColor: threshold.color,
+    // ✅ N'afficher que les kits jusqu'à celui qui atteint 100%
+    const visibleKits = tousLesKits.slice(0, stopIndex);
+    
+    const kitDatasets = visibleKits.map(kit => ({
+        label: kit.label,
+        data: Array(dates.length).fill(kit.value),
+        borderColor: kit.color,
         borderWidth: 1.5,
-        borderDash: [6, 6],
+        borderDash: [5, 5],
         pointRadius: 0,
         fill: false,
         order: 2
@@ -1735,42 +1732,59 @@ function createClientTrendChart() {
             data: {
                 labels: dates.map(d => d.slice(5)),
                 datasets: [
-                    // Courbe de consommation (au premier plan)
                     {
-                        label: 'Consommation totale',
+                        label: 'Consommation',
                         data: profile.history.map(d => d.consumption),
                         borderColor: '#1e293b',
                         backgroundColor: 'rgba(59, 130, 246, 0.05)',
-                        borderWidth: 3,
+                        borderWidth: 2.5,
                         tension: 0.2,
                         pointRadius: 3,
                         pointHoverRadius: 6,
-                        pointBackgroundColor: '#3b82f6',
-                        pointBorderColor: 'white',
-                        pointBorderWidth: 2,
+                        pointBackgroundColor: (ctx) => {
+                            const value = ctx.raw;
+                            if (value <= 250) return '#94a3b8';
+                            if (value <= 360) return '#22c55e';
+                            if (value <= 540) return '#eab308';
+                            if (value <= 720) return '#f97316';
+                            if (value <= 1080) return '#ef4444';
+                            return '#dc2626';
+                        },
+                        pointBorderColor: '#fff',
+                        pointBorderWidth: 1.5,
                         fill: false,
                         order: 1
                     },
-                    // Lignes des kits (en arrière-plan)
-                    ...thresholdDatasets
+                    ...kitDatasets
                 ]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
                 plugins: {
-                    legend: { 
+                    legend: {
                         position: 'top',
-                        labels: { 
-                            font: { size: 10 }, 
+                        labels: {
+                            font: { size: 10 },
                             usePointStyle: true,
-                            filter: (item) => item.text !== 'Consommation totale' // Optionnel
+                            filter: (item) => item.text !== 'Consommation'
                         }
                     },
                     tooltip: {
+                        backgroundColor: '#1e293b',
+                        titleColor: '#f8fafc',
+                        bodyColor: '#cbd5e1',
+                        borderColor: '#334155',
+                        borderWidth: 1,
+                        padding: 10,
+                        cornerRadius: 8,
                         callbacks: {
+                            title: (items) => {
+                                const date = dates[items[0].dataIndex];
+                                return new Date(date).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
+                            },
                             label: (context) => {
-                                if (context.dataset.label === 'Consommation totale') {
+                                if (context.dataset.label === 'Consommation') {
                                     const value = context.raw;
                                     let kit = '';
                                     if (value <= 250) kit = 'Kit 0';
@@ -1779,9 +1793,9 @@ function createClientTrendChart() {
                                     else if (value <= 720) kit = 'Kit 3';
                                     else if (value <= 1080) kit = 'Kit 4';
                                     else kit = '> Kit 4';
-                                    return [`Consommation: ${value.toFixed(0)} Wh`, `Seuil: ${kit}`];
+                                    return [`${value.toFixed(0)} Wh`, `↳ ${kit}`];
                                 }
-                                return `${context.dataset.label}: ${context.raw} Wh`;
+                                return null;
                             }
                         }
                     }
@@ -1790,7 +1804,7 @@ function createClientTrendChart() {
                     y: {
                         beginAtZero: true,
                         grid: { color: '#e9ecef' },
-                        title: { display: true, text: 'Consommation (Wh)', font: { size: 10 } }
+                        title: { display: true, text: 'Wh', font: { size: 10 } }
                     },
                     x: {
                         grid: { display: false },
@@ -1802,8 +1816,10 @@ function createClientTrendChart() {
     });
 }
 
-export function destroyClientBoard() { chartManager.destroy('clientTrendChart'); clientAnalyticsInstance = null; }
-
+export function destroyClientBoard() { 
+    chartManager.destroy('clientTrendChart'); 
+    clientAnalyticsInstance = null; 
+}
 
 // ===========================================
 // ENERGY CYCLE MANAGER
@@ -2188,7 +2204,7 @@ function renderCycleUI(container) {
                         <div style="font-size:1.4rem; font-weight:700; color:#3b82f6;">${averageStats.avg.toFixed(1)} <span style="font-size:0.8rem;">Wh/h</span></div>
                     </div>
                     <div style="text-align:center;">
-                        <div style="font-size:0.7rem; color:#6c757d;">MAX HORAIRE</div>
+                        <div style="font-size:0.7rem; color:#6c757d;">MAXIMUM HORAIRE</div>
                         <div style="font-size:1.4rem; font-weight:700; color:#f59e0b;">${averageStats.max.toFixed(1)} <span style="font-size:0.8rem;">Wh/h</span></div>
                     </div>
                 </div>
@@ -2201,7 +2217,7 @@ function renderCycleUI(container) {
                         <div style="display:flex; align-items:center; gap:12px;">
                             <span style="font-size:2rem;">☀️</span>
                             <div>
-                                <div style="font-size:0.7rem; color:#f59e0b; font-weight:600;">JOUR (6h-17h)</div>
+                                <div style="font-size:0.7rem; color:#f59e0b; font-weight:600;">JOUR (6h-18h)</div>
                                 <div style="font-size:1.4rem; font-weight:700; color:#f59e0b;">${dayNightAverages.day.toFixed(1)} <span style="font-size:0.8rem;">Wh/h</span></div>
                                 <div style="font-size:0.7rem; color:#6c757d;">moyenne horaire</div>
                             </div>
@@ -2211,7 +2227,7 @@ function renderCycleUI(container) {
                         <div style="display:flex; align-items:center; gap:12px;">
                             <span style="font-size:2rem;">🌙</span>
                             <div>
-                                <div style="font-size:0.7rem; color:#3b82f6; font-weight:600;">NUIT (18h-5h)</div>
+                                <div style="font-size:0.7rem; color:#3b82f6; font-weight:600;">NUIT (18h-6h)</div>
                                 <div style="font-size:1.4rem; font-weight:700; color:#3b82f6;">${dayNightAverages.night.toFixed(1)} <span style="font-size:0.8rem;">Wh/h</span></div>
                                 <div style="font-size:0.7rem; color:#6c757d;">moyenne horaire</div>
                             </div>

@@ -303,25 +303,29 @@ export function applyFilter(newFilter) {
         
         switch(newFilter.period) {
             case '7days':
-                startDate.setDate(lastAvailableDate.getDate() - 7);
+                startDate.setDate(lastAvailableDate.getDate() - 7 + 1); // +1 = 7 jours inclus
                 break;
             case '15days':
-                startDate.setDate(lastAvailableDate.getDate() - 15);
+                startDate.setDate(lastAvailableDate.getDate() - 15 + 1);
                 break;
             case '30days':
-                startDate.setDate(lastAvailableDate.getDate() - 30);
+                startDate.setDate(lastAvailableDate.getDate() - 30 + 1);
                 break;
             case '2months':
                 startDate.setMonth(lastAvailableDate.getMonth() - 2);
+                startDate.setDate(startDate.getDate() + 1);
                 break;
             case '3months':
                 startDate.setMonth(lastAvailableDate.getMonth() - 3);
+                startDate.setDate(startDate.getDate() + 1);
                 break;
             case '6months':
                 startDate.setMonth(lastAvailableDate.getMonth() - 6);
+                startDate.setDate(startDate.getDate() + 1);
                 break;
             case '1year':
                 startDate.setFullYear(lastAvailableDate.getFullYear() - 1);
+                startDate.setDate(startDate.getDate() + 1);
                 break;
         }
         
@@ -337,9 +341,7 @@ export function applyFilter(newFilter) {
     
     // ===== 5. STOCKER LE FILTRE AVEC LES DEUX INFOS =====
     currentFilter = {
-        // Pour l'affichage (boutons actifs)
-        period: originalPeriod,  // ← on garde "30days", "7days", etc.
-        // Pour le résumé et le filtrage
+        period: originalPeriod,
         startDate: filterForData.startDate || newFilter.startDate,
         endDate: filterForData.endDate || newFilter.endDate,
         month: newFilter.month,
@@ -361,7 +363,6 @@ export function applyFilter(newFilter) {
     showLoader();
     
     setTimeout(() => {
-        // Filtrer les tables brutes
         const filteredTables = filterTablesByDate(database.rawTables, filterForData);
         buildDatabase(filteredTables);
         
@@ -371,19 +372,16 @@ export function applyFilter(newFilter) {
         analyzeCommercialData();
         linkEnergyToCommercial();
         
-        // ✅ D'abord re-rendre
         renderByTab();
         
-        // ✅ Ensuite, attendre que le DOM soit prêt pour mettre à jour l'UI
         setTimeout(() => {
             if (window.refreshFilterUI) {
                 window.refreshFilterUI();
             }
-        }, 50); // Petit délai pour que le DOM soit bien créé
+        }, 50);
         
         hideLoader();
     }, 50);
-
 }
 // ===========================================
 // FONCTION DE FILTRAGE PAR DATE 

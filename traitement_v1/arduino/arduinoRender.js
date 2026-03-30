@@ -8,37 +8,10 @@ import { renderCommercialDashboard } from './dashboards/commercial/CommercialDas
 import { renderEventDashboard } from './dashboards/eventDashboard.js';
 import { FORFAIT_NAMES } from './arduinoConstants.js';
 
-// Variable pour suivre l'état d'affichage des tableaux
-let tablesVisible = false;
-
-// Fonction pour afficher/masquer les tableaux
-window.toggleTablesContainer = function() {
-    const container = document.getElementById('tablesContainer');
-    const buttons = document.querySelectorAll('.toggle-tables-btn');
-    
-    if (!tablesVisible) {
-        container.style.display = 'block';
-        buttons.forEach(btn => {
-            btn.innerHTML = '📋 Masquer les tableaux détaillés';
-        });
-        tablesVisible = true;
-    } else {
-        container.style.display = 'none';
-        buttons.forEach(btn => {
-            btn.innerHTML = '📋 Afficher les tableaux détaillés';
-        });
-        tablesVisible = false;
-    }
-};
-
-// Au chargement initial, cacher les tableaux
-document.addEventListener('DOMContentLoaded', () => {
-    document.getElementById('tablesContainer').style.display = 'none';
-});
-
-// Variable pour suivre l'état d'affichage des tableaux
+// Variable globale pour suivre l'état d'affichage
 window.tablesVisible = false;
 
+// Fonction pour afficher/masquer les tableaux
 window.toggleTablesContainer = function() {
     const container = document.getElementById('tablesContainer');
     const buttons = document.querySelectorAll('.toggle-tables-btn');
@@ -59,58 +32,80 @@ window.toggleTablesContainer = function() {
 };
 
 export function renderByTab() {
+    console.log("🟢 renderByTab() appelée");
+    
     const currentTab = document.querySelector('.tab.active')?.dataset.tab || 'Technique';
+    console.log("📌 Onglet actif:", currentTab);
+    
     const visibleTableIndices = [];
+    
+    console.log("📊 database.tables:", database.tables?.length || 0, "tables trouvées");
+    
     database.tables.forEach((table, idx) => {
+        const tableTab = TABLE_TYPES[table.type]?.tab;
+        console.log(`   Table ${idx}: type=${table.type}, tab=${tableTab}, correspond à ${currentTab}?`, tableTab === currentTab);
+        
         if (TABLE_TYPES[table.type] && TABLE_TYPES[table.type].tab === currentTab) {
             visibleTableIndices.push(idx);
+            console.log(`   ✅ Ajoutée à visibleTableIndices`);
         }
     });
-
-    // 🔴 1. D'ABORD sauvegarder la position de scroll
-    const scrollPos = window.scrollY;
     
-    // 🔴 2. ENSUITE vider les dashboards
+    console.log("📋 visibleTableIndices final:", visibleTableIndices);
+
+    // Vider les dashboards
+    console.log("🧹 Vidage des dashboards...");
     document.getElementById('technicalDashboard').innerHTML = '';
     document.getElementById('commercialDashboard').innerHTML = '';
     const eventDashboard = document.getElementById('eventDashboard');
     if (eventDashboard) eventDashboard.innerHTML = '';
 
-    // 🔴 3. Rendre le dashboard approprié
+    // Rendre les dashboards
+    console.log("🎨 Rendu du dashboard pour:", currentTab);
     if (currentTab === 'Technique') {
+        console.log("   → Appel de renderTechnicalDashboard()");
         renderTechnicalDashboard();
     } else if (currentTab === 'Commercial') {
+        console.log("   → Appel de renderCommercialDashboard()");
         renderCommercialDashboard();
-    }
-    // 🔴 4. Rendre les tableaux
-    displayTables(visibleTableIndices);
-    
-    // 🔴 5. MASQUER LES TABLEAUX PAR DÉFAUT À CHAQUE CHANGEMENT D'ONGLET
-    const tablesContainer = document.getElementById('tablesContainer');
-    if (tablesContainer) {
-        tablesContainer.style.display = 'none';
+    } else if (currentTab === 'Evenement') {
+        console.log("   → Appel de renderEventDashboard()");
+        renderEventDashboard();
     }
     
-    // Réinitialiser l'état du bouton
-    window.tablesVisible = false;
-    const buttons = document.querySelectorAll('.toggle-tables-btn');
-    buttons.forEach(btn => {
-        btn.innerHTML = '📋 Afficher les tableaux détaillés';
-    });
-    
-    // 🔴 6. RESTAURER la position de scroll
+    // Afficher les tableaux avec délai
+    console.log("⏳ Attente 100ms avant displayTables...");
     setTimeout(() => {
-        window.scrollTo({
-            top: scrollPos,
-            behavior: 'auto'
+        console.log("🔄 Appel de displayTables avec:", visibleTableIndices);
+        displayTables(visibleTableIndices);
+        
+        // Initialiser l'état des boutons
+        const container = document.getElementById('tablesContainer');
+        const buttons = document.querySelectorAll('.toggle-tables-btn');
+        
+        if (container) {
+            // Par défaut, les tableaux sont masqués
+            container.style.display = 'none';
+            window.tablesVisible = false;
+        }
+        
+        // Mettre à jour le texte des boutons s'ils existent
+        buttons.forEach(btn => {
+            btn.innerHTML = '📋 Afficher les tableaux détaillés';
         });
-    }, 10);
+        
+        console.log("✅ renderByTab() terminé");
+    }, 100);
 }
 
-// Le reste de votre code displayTables reste IDENTIQUE
 export function displayTables(visibleTableIndices) {
+    console.log("🔍 displayTables() appelée avec indices:", visibleTableIndices);
+    console.log("   database.pages:", database.pages?.length || 0);
+    
     const container = document.getElementById('tablesContainer');
+    console.log("   container trouvé?", !!container);
     if (!container) return;
+    
     let html = '';
 
     visibleTableIndices.forEach(tableIdx => {
@@ -133,15 +128,15 @@ export function displayTables(visibleTableIndices) {
         // Identifier la colonne Forfait pour la table R
         const forfaitColumnIndex = headers.findIndex(h => h.toLowerCase().includes('forfait'));
 
-        const headerHTML = '<tr>' + headers.map(h => `<th>${h.trim()}</th>`).join('') + '</tr>';
-        let bodyHTML = '';
+        const headerHTML = '<table>\n<thead>\n<tr>\n' + headers.map(h => `<th>${h.trim()}</th>`).join('\n') + '\n</tr>\n</thead>\n';
+        let bodyHTML = '<tbody>\n';
 
         page.rows.forEach(row => {
             const timestamp = row.cells[1];
             const date = timestamp.split(' ')[0];
             const cellsWithoutFirst = row.cells.slice(1);
 
-            bodyHTML += '<tr>';
+            bodyHTML += '<tr>\n';
             cellsWithoutFirst.forEach((cell, cellIndex) => {
                 const originalValue = cell.trim();
                 const clientColumn = clientColumns.find(c => c.index === cellIndex);
@@ -150,7 +145,7 @@ export function displayTables(visibleTableIndices) {
                 if (table.type === 'R' && cellIndex === forfaitColumnIndex) {
                     const forfaitId = parseInt(originalValue);
                     const forfaitName = FORFAIT_NAMES[forfaitId] || `Forfait ${forfaitId}`;
-                    bodyHTML += `<td><span class="forfait-badge">${forfaitName}</span></td>`;
+                    bodyHTML += `<td><span class="forfait-badge">${forfaitName}</span></td>\n`;
                 }
                 // Cas tables I et S avec événements
                 else if (clientColumn && (table.type === 'I' || table.type === 'S')) {
@@ -171,16 +166,18 @@ export function displayTables(visibleTableIndices) {
                             <span onclick="window.handleCellClick('${table.id}', '${clientColumn.clientId}', '${timestamp}', this, '${originalValue}')" 
                                   class="${className}">${displayText}</span>
                             <span class="event-indicator" style="background:${getEventColor(event.type)};"></span>
-                        </td>`;
+                         </td>\n`;
                     } else {
-                        bodyHTML += `<td>${originalValue}</td>`;
+                        bodyHTML += `<td>${originalValue}</td>\n`;
                     }
                 } else {
-                    bodyHTML += `<td>${originalValue}</td>`;
+                    bodyHTML += `<td>${originalValue}</td>\n`;
                 }
             });
-            bodyHTML += '</tr>';
+            bodyHTML += '</tr>\n';
         });
+        
+        bodyHTML += '</tbody>\n</table>';
 
         const paginationHTML = generatePagination(tableIdx, page);
         html += `
@@ -191,7 +188,10 @@ export function displayTables(visibleTableIndices) {
                         ${page.totalRows} enregistrement(s) - Page ${currentPageNum}/${page.totalPages} - Lignes ${page.startRow} à ${page.endRow}
                     </div>
                 </div>
-                <div class="table-wrapper"><table><thead>${headerHTML}</thead><tbody>${bodyHTML}</tbody></table></div>
+                <div class="table-wrapper">
+                    ${headerHTML}
+                    ${bodyHTML}
+                </div>
                 ${paginationHTML}
             </div>`;
     });
@@ -199,4 +199,5 @@ export function displayTables(visibleTableIndices) {
     container.innerHTML = html;
     container.classList.add('show');
     attachPaginationEvents(renderByTab);
+    console.log("✅ displayTables() terminé");
 }
