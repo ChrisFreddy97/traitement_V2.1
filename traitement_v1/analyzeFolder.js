@@ -1015,34 +1015,46 @@ function applyDateFilters() {
         year: filterYear
     });
     
-    // Trouver la date la plus récente dans les données
+    // Trouver la date la plus récente dans les données (optimisé avec échantillonnage)
     let lastDate = null;
     const allDates = [];
+    const maxSamples = 1000; // Limiter le nombre d'échantillons pour éviter surcharge
+    let sampleCount = 0;
     
-    // Collecter toutes les dates des données d'énergie
+    // Collecter les dates des données d'énergie (échantillonnage)
     if (combinedEnergyData.length > 0) {
-        combinedEnergyData.forEach(row => {
+        const step = Math.max(1, Math.floor(combinedEnergyData.length / (maxSamples / 2)));
+        for (let i = 0; i < combinedEnergyData.length && sampleCount < maxSamples / 2; i += step) {
+            const row = combinedEnergyData[i];
             if (row['Date et Heure']) {
                 const date = new Date(row['Date et Heure'].split(' ')[0]);
-                if (!isNaN(date.getTime())) allDates.push(date);
+                if (!isNaN(date.getTime())) {
+                    allDates.push(date);
+                    sampleCount++;
+                }
             }
-        });
+        }
     }
     
-    // Collecter toutes les dates des données de tension
+    // Collecter les dates des données de tension (échantillonnage)
     if (combinedTensionData.length > 0) {
-        combinedTensionData.forEach(row => {
+        const step = Math.max(1, Math.floor(combinedTensionData.length / (maxSamples / 2)));
+        for (let i = 0; i < combinedTensionData.length && sampleCount < maxSamples; i += step) {
+            const row = combinedTensionData[i];
             if (row['Date et Heure']) {
                 const date = new Date(row['Date et Heure'].split(' ')[0]);
-                if (!isNaN(date.getTime())) allDates.push(date);
+                if (!isNaN(date.getTime())) {
+                    allDates.push(date);
+                    sampleCount++;
+                }
             }
-        });
+        }
     }
     
     // Trouver la date la plus récente
     if (allDates.length > 0) {
         lastDate = new Date(Math.max(...allDates));
-        console.log('📅 Date la plus récente dans les données:', lastDate.toLocaleDateString('fr-FR'));
+        console.log('📅 Date la plus récente dans les données (échantillonnage):', lastDate.toLocaleDateString('fr-FR'));
     }
     
     // 1. Appliquer les filtres aux données d'énergie
@@ -1524,9 +1536,43 @@ function createFilterControls() {
     // Filtre sélection manuelle
     const dateRangeFilterDiv = document.createElement('div');
     dateRangeFilterDiv.style.cssText = `background: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px solid #e9ecef;`;
-    let minDate = '', maxDate = ''; const allDates = [];
-    if (combinedEnergyData?.length > 0) combinedEnergyData.forEach(row => { if (row['Date et Heure']) { const d = new Date(row['Date et Heure']); if (!isNaN(d.getTime())) allDates.push(d); } });
-    if (combinedTensionData?.length > 0) combinedTensionData.forEach(row => { if (row['Date et Heure']) { const d = new Date(row['Date et Heure']); if (!isNaN(d.getTime())) allDates.push(d); } });
+    let minDate = '', maxDate = '';
+    
+    // Optimisation : limiter le nombre d'objets Date créés (max 1000 pour éviter surcharge)
+    const allDates = [];
+    const maxSamples = 1000;
+    let sampleCount = 0;
+    
+    // Échantillonnage des données d'énergie (pas plus de maxSamples dates)
+    if (combinedEnergyData?.length > 0) {
+        const step = Math.max(1, Math.floor(combinedEnergyData.length / (maxSamples / 2)));
+        for (let i = 0; i < combinedEnergyData.length && sampleCount < maxSamples / 2; i += step) {
+            const row = combinedEnergyData[i];
+            if (row['Date et Heure']) {
+                const d = new Date(row['Date et Heure']);
+                if (!isNaN(d.getTime())) {
+                    allDates.push(d);
+                    sampleCount++;
+                }
+            }
+        }
+    }
+    
+    // Échantillonnage des données de tension (pas plus de maxSamples dates)
+    if (combinedTensionData?.length > 0) {
+        const step = Math.max(1, Math.floor(combinedTensionData.length / (maxSamples / 2)));
+        for (let i = 0; i < combinedTensionData.length && sampleCount < maxSamples; i += step) {
+            const row = combinedTensionData[i];
+            if (row['Date et Heure']) {
+                const d = new Date(row['Date et Heure']);
+                if (!isNaN(d.getTime())) {
+                    allDates.push(d);
+                    sampleCount++;
+                }
+            }
+        }
+    }
+    
     if (allDates.length > 0) {
         minDate = new Date(Math.min(...allDates)).toISOString().split('T')[0];
         maxDate = new Date(Math.max(...allDates)).toISOString().split('T')[0];
@@ -1549,8 +1595,41 @@ function createFilterControls() {
     const monthYearFilterDiv = document.createElement('div');
     monthYearFilterDiv.style.cssText = `background: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px solid #e9ecef;`;
     const years = new Set();
-    if (combinedEnergyData?.length > 0) combinedEnergyData.forEach(row => { if (row['Date et Heure']) { const d = new Date(row['Date et Heure']); if (!isNaN(d.getTime())) years.add(d.getFullYear()); } });
-    if (combinedTensionData?.length > 0) combinedTensionData.forEach(row => { if (row['Date et Heure']) { const d = new Date(row['Date et Heure']); if (!isNaN(d.getTime())) years.add(d.getFullYear()); } });
+    
+    // Optimisation : échantillonnage pour éviter surcharge avec beaucoup de fichiers
+    const maxYearSamples = 500;
+    let yearSampleCount = 0;
+    
+    // Échantillonnage des données d'énergie pour les années
+    if (combinedEnergyData?.length > 0) {
+        const step = Math.max(1, Math.floor(combinedEnergyData.length / (maxYearSamples / 2)));
+        for (let i = 0; i < combinedEnergyData.length && yearSampleCount < maxYearSamples / 2; i += step) {
+            const row = combinedEnergyData[i];
+            if (row['Date et Heure']) {
+                const d = new Date(row['Date et Heure']);
+                if (!isNaN(d.getTime())) {
+                    years.add(d.getFullYear());
+                    yearSampleCount++;
+                }
+            }
+        }
+    }
+    
+    // Échantillonnage des données de tension pour les années
+    if (combinedTensionData?.length > 0) {
+        const step = Math.max(1, Math.floor(combinedTensionData.length / (maxYearSamples / 2)));
+        for (let i = 0; i < combinedTensionData.length && yearSampleCount < maxYearSamples; i += step) {
+            const row = combinedTensionData[i];
+            if (row['Date et Heure']) {
+                const d = new Date(row['Date et Heure']);
+                if (!isNaN(d.getTime())) {
+                    years.add(d.getFullYear());
+                    yearSampleCount++;
+                }
+            }
+        }
+    }
+    
     const yearsArray = Array.from(years).sort((a, b) => b - a);
     const monthNames = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
     let yearOptions = '<option value="">Toutes les années</option>';
@@ -1587,25 +1666,33 @@ function setupFilterEvents(dateBadgeContainer) {
         
         // Calculer les dates réelles en fonction du filtre
         if (filterPeriod && filterPeriod !== 'all') {
-            // Trouver la dernière date dans les données
+            // Trouver la dernière date dans les données avec échantillonnage
             let lastDate = null;
             const allDates = [];
+            const maxSamples = 1000;
             
+            // Échantillonnage des données d'énergie
             if (combinedEnergyData.length > 0) {
-                combinedEnergyData.forEach(row => {
+                const step = Math.max(1, Math.floor(combinedEnergyData.length / maxSamples));
+                for (let i = 0; i < combinedEnergyData.length; i += step) {
+                    const row = combinedEnergyData[i];
                     if (row['Date et Heure']) {
                         const date = new Date(row['Date et Heure'].split(' ')[0]);
                         if (!isNaN(date.getTime())) allDates.push(date);
                     }
-                });
+                }
             }
+            
+            // Échantillonnage des données de tension
             if (combinedTensionData.length > 0) {
-                combinedTensionData.forEach(row => {
+                const step = Math.max(1, Math.floor(combinedTensionData.length / maxSamples));
+                for (let i = 0; i < combinedTensionData.length; i += step) {
+                    const row = combinedTensionData[i];
                     if (row['Date et Heure']) {
                         const date = new Date(row['Date et Heure'].split(' ')[0]);
                         if (!isNaN(date.getTime())) allDates.push(date);
                     }
-                });
+                }
             }
             
             if (allDates.length > 0) {
@@ -1667,22 +1754,30 @@ function setupFilterEvents(dateBadgeContainer) {
             let firstDate = null;
             let lastDate = null;
             const allDates = [];
+            const maxSamples = 1000;
             
+            // Échantillonnage des données d'énergie
             if (combinedEnergyData.length > 0) {
-                combinedEnergyData.forEach(row => {
+                const step = Math.max(1, Math.floor(combinedEnergyData.length / maxSamples));
+                for (let i = 0; i < combinedEnergyData.length; i += step) {
+                    const row = combinedEnergyData[i];
                     if (row['Date et Heure']) {
                         const date = new Date(row['Date et Heure'].split(' ')[0]);
                         if (!isNaN(date.getTime())) allDates.push(date);
                     }
-                });
+                }
             }
+            
+            // Échantillonnage des données de tension
             if (combinedTensionData.length > 0) {
-                combinedTensionData.forEach(row => {
+                const step = Math.max(1, Math.floor(combinedTensionData.length / maxSamples));
+                for (let i = 0; i < combinedTensionData.length; i += step) {
+                    const row = combinedTensionData[i];
                     if (row['Date et Heure']) {
                         const date = new Date(row['Date et Heure'].split(' ')[0]);
                         if (!isNaN(date.getTime())) allDates.push(date);
                     }
-                });
+                }
             }
             
             if (allDates.length > 0) {
@@ -1986,7 +2081,7 @@ function createTensionAnalysisContent() {
             <div style="font-size: 11px; color: #718096; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px;">✅ JOURS CONFORMES</div>
             <div style="font-size: 28px; font-weight: 800; color: #3b82f6; margin-bottom: 8px;">${stabilityData.stable}</div>
             <div style="font-size: 12px; color: #64748b;">Tension dans les seuils</div>
-            <div style="font-size: 11px; color: #475569; margin-top: 5px;">${stabilityData.limits.min}V - ${stabilityData.limits.max}V</div>
+            <div style="font-size: 11px; color: #475569; margin-top: 5px;">${stabilityData.limits.min}V - ${stabilityData.limits.max}V et Variation < ${stabilityData.limits.maxVariation}V</div>
         </div>
         <div style="background: linear-gradient(135deg, #fee2e2 0%, #ffffff 100%); padding: 16px; border-radius: 10px; border-left: 5px solid #ef4444; box-shadow: 0 2px 8px rgba(0,0,0,0.06); text-align: center;">
             <div style="font-size: 11px; color: #718096; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px;">🔴 JOURS NON CONFORMES</div>
@@ -2191,40 +2286,145 @@ function displayTensionStabilityAnalysis() {
 }
 function analyzeDelestageEvents() {
     if (combinedEventData.length === 0) {
-        return { 
-            allEvents: [], 
-            eventsByDay: [], 
-            totalEvents: 0, 
-            totalPartiel: 0, 
+        return {
+            allEvents: [],
+            eventsByDay: [],
+            totalEvents: 0,
+            totalPartiel: 0,
             totalTotal: 0,
             totalDuration: '0h',
             totalDiagnosticDays: 0
         };
     }
+
+    // Appliquer les filtres de dates aux données d'événements
+    let filteredEventData = [...combinedEventData];
     
+    if (filterStartDate || filterEndDate) {
+        filteredEventData = filteredEventData.filter(row => {
+            if (!row['Date et Heure']) return false;
+            const rowDate = new Date(row['Date et Heure']);
+            if (isNaN(rowDate.getTime())) return false;
+            
+            let pass = true;
+            if (filterStartDate) pass = pass && (rowDate >= filterStartDate);
+            if (filterEndDate) pass = pass && (rowDate <= filterEndDate);
+            return pass;
+        });
+    }
+    // Gérer les périodes prédéfinies
+    else if (filterPeriod && filterPeriod !== 'all') {
+        // Trouver la date la plus récente dans les données d'événements
+        let lastDate = null;
+        combinedEventData.forEach(row => {
+            if (row['Date et Heure']) {
+                const date = new Date(row['Date et Heure']);
+                if (!isNaN(date.getTime()) && (!lastDate || date > lastDate)) {
+                    lastDate = date;
+                }
+            }
+        });
+        
+        if (lastDate) {
+            let startDate = new Date(lastDate);
+            
+            // Soustraire la période appropriée
+            switch (filterPeriod) {
+                case '5days':
+                    startDate.setDate(lastDate.getDate() - 5);
+                    break;
+                case '7days':
+                    startDate.setDate(lastDate.getDate() - 7);
+                    break;
+                case '15days':
+                    startDate.setDate(lastDate.getDate() - 15);
+                    break;
+                case '30days':
+                    startDate.setDate(lastDate.getDate() - 30);
+                    break;
+                case '2months':
+                    startDate.setMonth(lastDate.getMonth() - 2);
+                    break;
+                case '3months':
+                    startDate.setMonth(lastDate.getMonth() - 3);
+                    break;
+                case '6months':
+                    startDate.setMonth(lastDate.getMonth() - 6);
+                    break;
+                case '1year':
+                    startDate.setFullYear(lastDate.getFullYear() - 1);
+                    break;
+            }
+            
+            // Ajouter 1 jour à la date de fin pour inclure le dernier jour complet
+            const endDate = new Date(lastDate);
+            endDate.setHours(23, 59, 59, 999);
+            
+            filteredEventData = filteredEventData.filter(row => {
+                if (!row['Date et Heure']) return false;
+                const rowDate = new Date(row['Date et Heure']);
+                return !isNaN(rowDate.getTime()) && rowDate >= startDate && rowDate <= endDate;
+            });
+        }
+    }
+    // Gérer les filtres par mois et année
+    else if (filterMonth && filterYear) {
+        filteredEventData = filteredEventData.filter(row => {
+            if (!row['Date et Heure']) return false;
+            const rowDate = new Date(row['Date et Heure']);
+            return !isNaN(rowDate.getTime()) && 
+                   rowDate.getFullYear() === filterYear && 
+                   (rowDate.getMonth() + 1) === filterMonth;
+        });
+    }
+    else if (filterYear && !filterMonth) {
+        filteredEventData = filteredEventData.filter(row => {
+            if (!row['Date et Heure']) return false;
+            const rowDate = new Date(row['Date et Heure']);
+            return !isNaN(rowDate.getTime()) && rowDate.getFullYear() === filterYear;
+        });
+    }
+    else if (filterMonth && !filterYear) {
+        const currentYear = new Date().getFullYear();
+        filteredEventData = filteredEventData.filter(row => {
+            if (!row['Date et Heure']) return false;
+            const rowDate = new Date(row['Date et Heure']);
+            return !isNaN(rowDate.getTime()) && 
+                   rowDate.getFullYear() === currentYear && 
+                   (rowDate.getMonth() + 1) === filterMonth;
+        });
+    }
+
     const eventsByDayMap = new Map();
-    let totalDurationMinutes = 0;
-    
-    combinedEventData.forEach(row => {
+
+    filteredEventData.forEach(row => {
         if (!row['Date et Heure'] || !row['Évènements']) return;
-        
+
         const event = row['Évènements'].trim();
-        
+
         // Vérifier si c'est un événement de délestage
         if (event.includes('DelestagePartiel') || event.includes('DelestageTotal')) {
             const dateTime = new Date(row['Date et Heure']);
             if (isNaN(dateTime.getTime())) return;
-            
+
             const dateStr = dateTime.toLocaleDateString('fr-FR', {
                 day: '2-digit', month: '2-digit', year: 'numeric'
             });
-            const dateKey = dateTime.toISOString().split('T')[0];
+            
+            // Ignorer les dates fausses (horloge déréglée)
+            if (dateStr === '01/01/2010') return;
+            
+            // Utiliser la date locale pour éviter les décalages de fuseau horaire
+            const dateKey = dateTime.getFullYear() + '-' + 
+                           String(dateTime.getMonth() + 1).padStart(2, '0') + '-' + 
+                           String(dateTime.getDate()).padStart(2, '0');
             const time = dateTime.toLocaleTimeString('fr-FR', {
                 hour: '2-digit', minute: '2-digit'
             });
-            
-            const eventType = event.includes('DelestagePartiel') ? 'Délestage Partiel' : 'Délestage Total';
-            
+
+            const eventType = event.includes('DelestagePartiel') ? 'partiel' : 'total';
+            const value = row['Code 2'] ? parseFloat(row['Code 2']).toFixed(2) : '0.00';
+
             // Initialiser le jour si nécessaire
             if (!eventsByDayMap.has(dateKey)) {
                 eventsByDayMap.set(dateKey, {
@@ -2232,151 +2432,43 @@ function analyzeDelestageEvents() {
                     dateObj: dateKey,
                     partiel: [],
                     total: [],
-                    hasBoth: false,
-                    events: []
+                    hasBoth: false
                 });
             }
-            
+
             const dayData = eventsByDayMap.get(dateKey);
-            
-            // Chercher s'il y a déjà un événement du même type pour calculer début/fin
-            const existingEvents = dayData.events.filter(e => e.type === eventType);
-            
-            if (existingEvents.length === 0) {
-                // Premier événement de ce type pour cette journée
-                dayData.events.push({
-                    type: eventType,
-                    start: time,
-                    end: time,
-                    count: 1,
-                    times: [time]
-                });
-            } else {
-                // Mettre à jour l'événement existant
-                const lastEvent = existingEvents[existingEvents.length - 1];
-                lastEvent.end = time;
-                lastEvent.count++;
-                lastEvent.times.push(time);
-                
-                // Calculer la durée entre le premier et le dernier
-                const startTime = lastEvent.times[0];
-                const endTime = lastEvent.times[lastEvent.times.length - 1];
-                
-                const start = new Date(`2000-01-01T${startTime}`);
-                const end = new Date(`2000-01-01T${endTime}`);
-                if (end < start) end.setDate(end.getDate() + 1);
-                
-                const diffMs = end - start;
-                const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-                const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-                
-                lastEvent.duration = diffHours > 0 ? 
-                    `${diffHours}h${diffMinutes.toString().padStart(2, '0')}` : 
-                    `${diffMinutes}min`;
-                
-                totalDurationMinutes += diffMs / (1000 * 60);
-            }
-            
-            // Ajouter aux listes spécifiques
-            if (eventType === 'Délestage Partiel') {
-                // Mettre à jour la liste partiel
-                const existingPartiel = dayData.partiel.find(p => p.start === time);
-                if (!existingPartiel) {
-                    dayData.partiel.push({
-                        start: time,
-                        end: time,
-                        duration: '-',
-                        count: 1
-                    });
-                }
-            } else {
-                const existingTotal = dayData.total.find(t => t.start === time);
-                if (!existingTotal) {
-                    dayData.total.push({
-                        start: time,
-                        end: time,
-                        duration: '-',
-                        count: 1
-                    });
-                }
-            }
+
+            // Ajouter l'événement individuel
+            dayData[eventType].push({
+                time: time,
+                value: value
+            });
         }
     });
-    
-    // Traiter chaque jour pour calculer les durées finales
+
+    // Traiter chaque jour
     const eventsByDay = [];
     let totalPartiel = 0;
     let totalTotal = 0;
-    
+
     eventsByDayMap.forEach((day, dateKey) => {
-        // Traiter les événements partiels
-        if (day.partiel.length > 0) {
-            day.partiel.sort((a, b) => a.start.localeCompare(b.start));
-            // Si plusieurs événements, prendre le premier début et dernière fin
-            if (day.partiel.length > 1) {
-                const first = day.partiel[0];
-                const last = day.partiel[day.partiel.length - 1];
-                
-                const start = new Date(`2000-01-01T${first.start}`);
-                const end = new Date(`2000-01-01T${last.end}`);
-                if (end < start) end.setDate(end.getDate() + 1);
-                
-                const diffMs = end - start;
-                const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-                const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-                
-                day.partiel = [{
-                    start: first.start,
-                    end: last.end,
-                    duration: diffHours > 0 ? `${diffHours}h${diffMinutes.toString().padStart(2, '0')}` : `${diffMinutes}min`,
-                    count: day.partiel.length
-                }];
-            }
-            totalPartiel += day.partiel.reduce((sum, p) => sum + (p.count || 1), 0);
-        }
-        
-        // Traiter les événements totaux
-        if (day.total.length > 0) {
-            day.total.sort((a, b) => a.start.localeCompare(b.start));
-            if (day.total.length > 1) {
-                const first = day.total[0];
-                const last = day.total[day.total.length - 1];
-                
-                const start = new Date(`2000-01-01T${first.start}`);
-                const end = new Date(`2000-01-01T${last.end}`);
-                if (end < start) end.setDate(end.getDate() + 1);
-                
-                const diffMs = end - start;
-                const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-                const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-                
-                day.total = [{
-                    start: first.start,
-                    end: last.end,
-                    duration: diffHours > 0 ? `${diffHours}h${diffMinutes.toString().padStart(2, '0')}` : `${diffMinutes}min`,
-                    count: day.total.length
-                }];
-            }
-            totalTotal += day.total.reduce((sum, t) => sum + (t.count || 1), 0);
-        }
-        
+        // Trier les événements par heure
+        day.partiel.sort((a, b) => a.time.localeCompare(b.time));
+        day.total.sort((a, b) => a.time.localeCompare(b.time));
+
+        totalPartiel += day.partiel.length;
+        totalTotal += day.total.length;
+
         day.hasBoth = day.partiel.length > 0 && day.total.length > 0;
         eventsByDay.push(day);
     });
-    
+
     // Trier par date décroissante
     eventsByDay.sort((a, b) => new Date(b.dateObj) - new Date(a.dateObj));
-    
-    // Formater la durée totale
-    const totalHours = Math.floor(totalDurationMinutes / 60);
-    const totalMins = Math.floor(totalDurationMinutes % 60);
-    const totalDuration = totalHours > 0 ? 
-        `${totalHours}h${totalMins > 0 ? totalMins + 'min' : ''}` : 
-        `${totalMins}min`;
-    
+
     // ✅ CALCULER LE NOMBRE TOTAL DE JOURS DE DIAGNOSTIC
     const totalDiagnosticDays = new Set();
-    
+
     if (combinedEnergyData.length > 0) {
         combinedEnergyData.forEach(row => {
             if (row['Date et Heure']) {
@@ -2385,7 +2477,7 @@ function analyzeDelestageEvents() {
             }
         });
     }
-    
+
     if (combinedTensionData.length > 0) {
         combinedTensionData.forEach(row => {
             if (row['Date et Heure']) {
@@ -2394,13 +2486,13 @@ function analyzeDelestageEvents() {
             }
         });
     }
-    
+
     return {
         eventsByDay: eventsByDay,
         totalEvents: totalPartiel + totalTotal,
         totalPartiel: totalPartiel,
         totalTotal: totalTotal,
-        totalDuration: totalDuration || '0h',
+        totalDuration: 'N/A', // Plus pertinent maintenant
         totalDiagnosticDays: totalDiagnosticDays.size
     };
 }
@@ -2443,10 +2535,36 @@ function createDelestageEventsTable() {
     const daysWithTotal = delestageData.eventsByDay.filter(day => day.total.length > 0).length;
     const daysWithBoth = delestageData.eventsByDay.filter(day => day.partiel.length > 0 && day.total.length > 0).length;
     
-    // ✅ POURCENTAGES PAR RAPPORT AU NOMBRE TOTAL DE JOURS DE DIAGNOSTIC
-    const percentPartiel = totalDays > 0 ? ((daysWithPartiel / totalDays) * 100).toFixed(1) : 0;
-    const percentTotal = totalDays > 0 ? ((daysWithTotal / totalDays) * 100).toFixed(1) : 0;
-    const percentBoth = totalDays > 0 ? ((daysWithBoth / totalDays) * 100).toFixed(1) : 0;
+    // ✅ CALCULER LE NOMBRE DE JOURS DANS LA PÉRIODE FILTRÉE
+    let filteredDaysCount = totalDays; // Par défaut, utiliser le total
+    
+    if (filteredEnergyData.length > 0 || filteredTensionData.length > 0) {
+        // Utiliser les données déjà filtrées pour compter les jours uniques
+        const filteredDates = new Set();
+        
+        // Collecter les dates des données d'énergie filtrées
+        filteredEnergyData.forEach(row => {
+            if (row['Date et Heure']) {
+                const dateStr = row['Date et Heure'].split(' ')[0];
+                filteredDates.add(dateStr);
+            }
+        });
+        
+        // Collecter les dates des données de tension filtrées
+        filteredTensionData.forEach(row => {
+            if (row['Date et Heure']) {
+                const dateStr = row['Date et Heure'].split(' ')[0];
+                filteredDates.add(dateStr);
+            }
+        });
+        
+        filteredDaysCount = filteredDates.size;
+    }
+    
+    // ✅ POURCENTAGES PAR RAPPORT AU NOMBRE DE JOURS FILTRÉS
+    const percentPartiel = filteredDaysCount > 0 ? ((daysWithPartiel / filteredDaysCount) * 100).toFixed(1) : 0;
+    const percentTotal = filteredDaysCount > 0 ? ((daysWithTotal / filteredDaysCount) * 100).toFixed(1) : 0;
+    const percentBoth = filteredDaysCount > 0 ? ((daysWithBoth / filteredDaysCount) * 100).toFixed(1) : 0;
     
     // ========== EN-TÊTE AVEC BOUTON ==========
     const header = document.createElement('div');
@@ -2625,7 +2743,7 @@ function createDelestageEventsTable() {
             <span style="color: #7f1d1d; font-weight: 600;">🔋 Délestage Total</span>
         </div>
         <div style="margin-left: auto; background: white; padding: 4px 12px; border-radius: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-            <span style="color: #475569;">⏱️ Durée = heure de fin - heure de début</span>
+            <span style="color: #475569;">⏱️ Valeurs individuelles par événement</span>
         </div>
     `;
     
@@ -2645,21 +2763,12 @@ function createDelestageEventsTable() {
     `;
     
     let tableHTML = `
-        <table style="width: 100%; border-collapse: collapse; font-size: 12px; min-width: 1000px;">
+        <table style="width: 100%; border-collapse: collapse; font-size: 12px; min-width: 600px;">
             <thead style="position: sticky; top: 0; z-index: 20; background: white;">
                 <tr style="background: #334155; color: white;">
                     <th style="padding: 14px 10px; text-align: left; border-bottom: 3px solid #1e293b; position: sticky; left: 0; background: #334155; color: white; font-weight: 700;">📅 DATE</th>
-                    <th style="padding: 14px 10px; text-align: center; border-bottom: 3px solid #1e293b; background: #334155; color: white; font-weight: 700;" colspan="3">🔌 DÉLESTAGE PARTIEL</th>
-                    <th style="padding: 14px 10px; text-align: center; border-bottom: 3px solid #1e293b; background: #334155; color: white; font-weight: 700;" colspan="3">🔋 DÉLESTAGE TOTAL</th>
-                  </tr>
-                <tr style="background: #f1f5f9;">
-                    <th style="padding: 12px 10px; text-align: left; border-bottom: 2px solid #cbd5e1; position: sticky; left: 0; background: #f1f5f9;"></th>
-                    <th style="padding: 12px 10px; text-align: center; border-bottom: 2px solid #cbd5e1; background: #f1f5f9;">Début</th>
-                    <th style="padding: 12px 10px; text-align: center; border-bottom: 2px solid #cbd5e1; background: #f1f5f9;">Fin</th>
-                    <th style="padding: 12px 10px; text-align: center; border-bottom: 2px solid #cbd5e1; background: #f1f5f9;">Durée</th>
-                    <th style="padding: 12px 10px; text-align: center; border-bottom: 2px solid #cbd5e1; background: #f1f5f9;">Début</th>
-                    <th style="padding: 12px 10px; text-align: center; border-bottom: 2px solid #cbd5e1; background: #f1f5f9;">Fin</th>
-                    <th style="padding: 12px 10px; text-align: center; border-bottom: 2px solid #cbd5e1; background: #f1f5f9;">Durée</th>
+                    <th style="padding: 14px 10px; text-align: center; border-bottom: 3px solid #1e293b; background: #334155; color: white; font-weight: 700;">🔌 DÉLESTAGE PARTIEL</th>
+                    <th style="padding: 14px 10px; text-align: center; border-bottom: 3px solid #1e293b; background: #334155; color: white; font-weight: 700;">🔋 DÉLESTAGE TOTAL</th>
                 </tr>
             </thead>
             <tbody>
@@ -2668,106 +2777,55 @@ function createDelestageEventsTable() {
     // Grouper les événements par jour
     delestageData.eventsByDay.forEach((day, index) => {
         const bgColor = index % 2 === 0 ? '#ffffff' : '#fafbfc';
-        const rowSpan = Math.max(1, day.partiel.length, day.total.length);
         
-        // Première ligne pour ce jour
+        // Collecter les heures pour partiel et total
+        const partielTimes = day.partiel.map(p => p.time).join(', ');
+        const totalTimes = day.total.map(t => t.time).join(', ');
+        
         tableHTML += `<tr style="border-bottom: 1px solid #e2e8f0; background: ${bgColor};">`;
         
-        // Date (avec rowSpan)
+        // Date
         tableHTML += `
-            <td style="padding: 12px 10px; position: sticky; left: 0; background: ${bgColor}; font-weight: 700; border-right: 1px solid #e2e8f0;" rowspan="${rowSpan}">
-                <div style="display: flex; flex-direction: column;">
-                    <span style="font-size: 13px;">${day.date}</span>
-                    <span style="font-size: 9px; color: #64748b; margin-top: 2px;">${day.dateObj}</span>
-                </div>
-             </td>
+            <td style="padding: 12px 10px; position: sticky; left: 0; background: ${bgColor}; font-weight: 700; border-right: 1px solid #e2e8f0;">
+                <span style="font-size: 13px;">${day.date}</span>
+            </td>
         `;
         
-        // Délestage Partiel - première occurrence
-        if (day.partiel.length > 0) {
-            const p = day.partiel[0];
+        // Délestage Partiel
+        if (partielTimes) {
             tableHTML += `
-                <td style="padding: 12px 10px; text-align: center; background: #ea580c10; color: #9a3412; font-weight: 600; font-family: monospace;">${p.start}</td>
-                <td style="padding: 12px 10px; text-align: center; background: #ea580c10; color: #9a3412; font-weight: 600; font-family: monospace;">${p.end}</td>
-                <td style="padding: 12px 10px; text-align: center; background: #ea580c20; color: #ea580c; font-weight: 700; font-family: monospace;">${p.duration} ${p.count > 1 ? `<span style="background: white; padding: 2px 6px; border-radius: 12px; font-size: 9px; margin-left: 4px;">${p.count}x</span>` : ''}</td>
+                <td style="padding: 12px 10px; text-align: center; background: #ea580c10; color: #9a3412; font-weight: 600; font-family: monospace;">${partielTimes}</td>
             `;
         } else {
             tableHTML += `
-                <td style="padding: 12px 10px; text-align: center; color: #cbd5e1; font-style: italic;">-</td>
-                <td style="padding: 12px 10px; text-align: center; color: #cbd5e1; font-style: italic;">-</td>
                 <td style="padding: 12px 10px; text-align: center; color: #cbd5e1; font-style: italic;">-</td>
             `;
         }
         
-        // Délestage Total - première occurrence
-        if (day.total.length > 0) {
-            const t = day.total[0];
+        // Délestage Total
+        if (totalTimes) {
             tableHTML += `
-                <td style="padding: 12px 10px; text-align: center; background: #991b1b10; color: #7f1d1d; font-weight: 600; font-family: monospace;">${t.start}</td>
-                <td style="padding: 12px 10px; text-align: center; background: #991b1b10; color: #7f1d1d; font-weight: 600; font-family: monospace;">${t.end}</td>
-                <td style="padding: 12px 10px; text-align: center; background: #991b1b20; color: #991b1b; font-weight: 700; font-family: monospace;">${t.duration} ${t.count > 1 ? `<span style="background: white; padding: 2px 6px; border-radius: 12px; font-size: 9px; margin-left: 4px;">${t.count}x</span>` : ''}</td>
+                <td style="padding: 12px 10px; text-align: center; background: #991b1b10; color: #7f1d1d; font-weight: 600; font-family: monospace;">${totalTimes}</td>
             `;
         } else {
             tableHTML += `
-                <td style="padding: 12px 10px; text-align: center; color: #cbd5e1; font-style: italic;">-</td>
-                <td style="padding: 12px 10px; text-align: center; color: #cbd5e1; font-style: italic;">-</td>
                 <td style="padding: 12px 10px; text-align: center; color: #cbd5e1; font-style: italic;">-</td>
             `;
         }
         
         tableHTML += `</tr>`;
-        
-        // Lignes supplémentaires pour les événements multiples dans la même journée
-        const maxEvents = Math.max(day.partiel.length, day.total.length);
-        for (let i = 1; i < maxEvents; i++) {
-            tableHTML += `<tr style="border-bottom: 1px solid #e2e8f0; background: ${bgColor};">`;
-            
-            // Partiel (si existe)
-            if (i < day.partiel.length) {
-                const p = day.partiel[i];
-                tableHTML += `
-                    <td style="padding: 12px 10px; text-align: center; background: #ea580c10; color: #9a3412; font-weight: 600; font-family: monospace;">${p.start}</td>
-                    <td style="padding: 12px 10px; text-align: center; background: #ea580c10; color: #9a3412; font-weight: 600; font-family: monospace;">${p.end}</td>
-                    <td style="padding: 12px 10px; text-align: center; background: #ea580c20; color: #ea580c; font-weight: 700; font-family: monospace;">${p.duration} ${p.count > 1 ? `<span style="background: white; padding: 2px 6px; border-radius: 12px; font-size: 9px; margin-left: 4px;">${p.count}x</span>` : ''}</td>
-                `;
-            } else {
-                tableHTML += `
-                    <td style="padding: 12px 10px; text-align: center; color: #cbd5e1; font-style: italic;">-</td>
-                    <td style="padding: 12px 10px; text-align: center; color: #cbd5e1; font-style: italic;">-</td>
-                    <td style="padding: 12px 10px; text-align: center; color: #cbd5e1; font-style: italic;">-</td>
-                `;
-            }
-            
-            // Total (si existe)
-            if (i < day.total.length) {
-                const t = day.total[i];
-                tableHTML += `
-                    <td style="padding: 12px 10px; text-align: center; background: #991b1b10; color: #7f1d1d; font-weight: 600; font-family: monospace;">${t.start}</td>
-                    <td style="padding: 12px 10px; text-align: center; background: #991b1b10; color: #7f1d1d; font-weight: 600; font-family: monospace;">${t.end}</td>
-                    <td style="padding: 12px 10px; text-align: center; background: #991b1b20; color: #991b1b; font-weight: 700; font-family: monospace;">${t.duration} ${t.count > 1 ? `<span style="background: white; padding: 2px 6px; border-radius: 12px; font-size: 9px; margin-left: 4px;">${t.count}x</span>` : ''}</td>
-                `;
-            } else {
-                tableHTML += `
-                    <td style="padding: 12px 10px; text-align: center; color: #cbd5e1; font-style: italic;">-</td>
-                    <td style="padding: 12px 10px; text-align: center; color: #cbd5e1; font-style: italic;">-</td>
-                    <td style="padding: 12px 10px; text-align: center; color: #cbd5e1; font-style: italic;">-</td>
-                `;
-            }
-            
-            tableHTML += `</tr>`;
-        }
     });
     
     // Ligne de total
     tableHTML += `
         <tr style="background: #1e293b; color: white; font-weight: 700; position: sticky; bottom: 0; z-index: 15;">
             <td style="padding: 14px 10px; text-align: left; background: #1e293b; position: sticky; left: 0;">TOTAL GÉNÉRAL</td>
-            <td style="padding: 14px 10px; text-align: center; background: #1e293b;" colspan="3">
+            <td style="padding: 14px 10px; text-align: center; background: #1e293b;">
                 <span style="background: #ea580c; padding: 6px 16px; border-radius: 30px; font-size: 12px;">
                     ${delestageData.totalPartiel} événement(s)
                 </span>
             </td>
-            <td style="padding: 14px 10px; text-align: center; background: #1e293b;" colspan="3">
+            <td style="padding: 14px 10px; text-align: center; background: #1e293b;">
                 <span style="background: #991b1b; padding: 6px 16px; border-radius: 30px; font-size: 12px;">
                     ${delestageData.totalTotal} événement(s)
                 </span>
@@ -2799,11 +2857,8 @@ function createDelestageEventsTable() {
     footer.innerHTML = `
         <div style="display: flex; align-items: center; gap: 20px;">
             <span>📊 <strong>${delestageData.eventsByDay.length}</strong> jour(s) avec délestages</span>
-            <span>⏱️ Durée totale: <strong>${delestageData.totalDuration}</strong></span>
-        </div>
-        <div style="display: flex; align-items: center; gap: 20px;">
-            <span>🔌 Partiel: <strong style="color: #ea580c;">${delestageData.totalPartiel}</strong> fois</span>
-            <span>🔋 Total: <strong style="color: #991b1b;">${delestageData.totalTotal}</strong> fois</span>
+            <span>🔌 Partiel: <strong style="color: #ea580c;">${delestageData.totalPartiel}</strong> événements</span>
+            <span>🔋 Total: <strong style="color: #991b1b;">${delestageData.totalTotal}</strong> événements</span>
         </div>
     `;
     
@@ -3891,6 +3946,58 @@ function createHourlyTensionPeriodFilter() {
     });
     
     if (sortedDates.length === 0) return;
+    
+    // ==================== SIGNIFICATION DES COURBES DE TENSION ====================
+    const explanationCard = document.createElement('div');
+    explanationCard.style.cssText = `
+        background: white;
+        border-radius: 16px;
+        padding: 18px 22px;
+        margin-bottom: 20px;
+        border: 1px solid #e2e8f0;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+        transition: all 0.3s ease;
+    `;
+    
+    explanationCard.innerHTML = `
+        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 15px;">
+            <div style="width: 40px; height: 40px; background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); 
+                      border-radius: 10px; display: flex; align-items: center; justify-content: center;">
+                <span style="font-size: 20px; color: white;">📊</span>
+            </div>
+            <div>
+                <h4 style="margin: 0; font-size: 16px; font-weight: 700; color: #1e293b;">
+                    Signification des courbes de tension
+                </h4>
+                <p style="margin: 2px 0 0 0; font-size: 11px; color: #64748b;">
+                    Comprendre les trois courbes du graphique journalier
+                </p>
+            </div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 12px;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <div style="width: 16px; height: 16px; background: #ef4444; border-radius: 3px;"></div>
+                <span style="font-size: 13px; color: #374151; font-weight: 500;">
+                    <strong>Tension maximale</strong> : La tension la plus élevée observée dans la journée
+                </span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <div style="width: 16px; height: 16px; background: #3b82f6; border-radius: 3px;"></div>
+                <span style="font-size: 13px; color: #374151; font-weight: 500;">
+                    <strong>Tension moyenne</strong> : La moyenne des tensions instantanées mesurées tout au long de la journée
+                </span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <div style="width: 16px; height: 16px; background: #10b981; border-radius: 3px;"></div>
+                <span style="font-size: 13px; color: #374151; font-weight: 500;">
+                    <strong>Tension minimale</strong> : La tension la plus basse observée dans la journée
+                </span>
+            </div>
+        </div>
+    `;
+    
+    // Ajouter la card d'explication au conteneur principal
+    container.appendChild(explanationCard);
     
     // Créer le conteneur du filtre
     const filterContainer = document.createElement('div');
@@ -8700,17 +8807,17 @@ function displayClientCommercialAnalysis(container, clientNumber) {
         
         const daysWithConsumptionOnly = daysInPeriod.filter(day => day.total > 0);
         
-        // Jours hors tolérance = jours avec SuspendE dans cette période
+        // Jours hors tolérance = jours >115% ou jours avec SuspendE (priorité, même sans >115%)
         const daysAbove115 = daysWithConsumptionOnly.filter(day => 
-            suspendEDates.has(day.date)
+            suspendEDates.has(day.date) || day.total > maxWithTolerance
         ).length;
         
         const daysBelow85 = daysWithConsumptionOnly.filter(day => 
-            day.total <= seuil85 && !suspendEDates.has(day.date)
+            !suspendEDates.has(day.date) && day.total <= seuil85
         ).length;
         
         const daysInTolerance = daysWithConsumptionOnly.filter(day => 
-            day.total > seuil85 && day.total <= maxWithTolerance && !suspendEDates.has(day.date)
+            !suspendEDates.has(day.date) && day.total > seuil85 && day.total <= maxWithTolerance
         ).length;
         
         const percentBelow85 = daysWithConsumptionOnly.length > 0 ? 
@@ -8913,7 +9020,7 @@ function displayClientCommercialAnalysis(container, clientNumber) {
                     </div>
                     <div style="display: flex; align-items: center; gap: 8px;">
                         <div style="width: 16px; height: 16px; background: #ef4444; border-radius: 4px;"></div>
-                        <span><strong>Hors tolérance</strong> (>115% du forfait) = SuspendE</span>
+                        <span><strong>Hors tolérance</strong> (>115% du forfait ou événement SuspendE)</span>
                     </div>
                 </div>
             </div>
@@ -9333,6 +9440,35 @@ function createClientEventsTable(clientNumber) {
     `;
     content.appendChild(periodInfo);
     
+    // ✅ FILTRE PAR ÉVÉNEMENT
+    const filterContainer = document.createElement('div');
+    filterContainer.style.cssText = `
+        background: #f8fafc;
+        border-radius: 8px;
+        padding: 15px;
+        margin-bottom: 15px;
+        border: 1px solid #e2e8f0;
+    `;
+    
+    filterContainer.innerHTML = `
+        <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
+            <div style="font-size: 14px; font-weight: 600; color: #1e293b;">🔍 Filtrer par événement :</div>
+            <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                <input type="checkbox" id="filter-suspendp-${clientNumber}" checked style="width: 16px; height: 16px;">
+                <span style="font-size: 12px; color: #3b82f6; font-weight: 600;">📈 Puissance dépassée</span>
+            </label>
+            <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                <input type="checkbox" id="filter-creditnul-${clientNumber}" checked style="width: 16px; height: 16px;">
+                <span style="font-size: 12px; color: #f59e0b; font-weight: 600;">💰 Crédit nul</span>
+            </label>
+            <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                <input type="checkbox" id="filter-suspende-${clientNumber}" checked style="width: 16px; height: 16px;">
+                <span style="font-size: 12px; color: #0ea5e9; font-weight: 600;">🔋 Énergie épuisée</span>
+            </label>
+        </div>
+    `;
+    content.appendChild(filterContainer);
+    
     // ✅ Bouton Plus de détails
     const toggleBtn = document.createElement('button');
     toggleBtn.id = `toggle-events-${clientNumber}`;
@@ -9379,20 +9515,16 @@ function createClientEventsTable(clientNumber) {
             <thead style="position: sticky; top: 0; z-index: 10;">
                 <tr>
                     <th rowspan="2" style="padding: 15px 10px; text-align: left; border-right: 2px solid #cbd5e1; background: #f1f5f9; font-size: 14px; position: sticky; left: 0; z-index: 11;">📅 DATE</th>
-                    <th colspan="3" style="padding: 12px 10px; text-align: center; background: #3b82f6; color: white; border-right: 2px solid #2563eb;">📈 PUISSANCE DÉPASSÉE</th>
-                    <th colspan="1" style="padding: 12px 10px; text-align: center; background: #f59e0b; color: white; border-right: 2px solid #d97706;">💰 CRÉDIT NUL</th>
-                    <th colspan="3" style="padding: 12px 10px; text-align: center; background: #0ea5e9; color: white;">🔋 ÉNERGIE ÉPUISÉE</th>
+                    <th style="padding: 12px 10px; text-align: center; background: #3b82f6; color: white; border-right: 2px solid #2563eb;">📈 PUISSANCE DÉPASSÉE</th>
+                    <th style="padding: 12px 10px; text-align: center; background: #f59e0b; color: white; border-right: 2px solid #d97706;">💰 CRÉDIT NUL</th>
+                    <th style="padding: 12px 10px; text-align: center; background: #0ea5e9; color: white;">🔋 ÉNERGIE ÉPUISÉE</th>
                 </tr>
                 <tr style="background: #f1f5f9;">
-                    <th style="padding: 10px 8px; text-align: center; border-bottom: 1px solid #cbd5e1;">Début</th>
-                    <th style="padding: 10px 8px; text-align: center; border-bottom: 1px solid #cbd5e1;">Fin</th>
-                    <th style="padding: 10px 8px; text-align: center; border-bottom: 1px solid #cbd5e1; border-right: 2px solid #cbd5e1;">Durée</th>
+                    <th style="padding: 10px 8px; text-align: center; border-bottom: 1px solid #cbd5e1; border-right: 2px solid #cbd5e1;">Heure</th>
                     
                     <th style="padding: 10px 8px; text-align: center; border-bottom: 1px solid #cbd5e1; border-right: 2px solid #cbd5e1;">Signalement</th>
                     
-                    <th style="padding: 10px 8px; text-align: center; border-bottom: 1px solid #cbd5e1;">Début</th>
-                    <th style="padding: 10px 8px; text-align: center; border-bottom: 1px solid #cbd5e1;">Fin</th>
-                    <th style="padding: 10px 8px; text-align: center; border-bottom: 1px solid #cbd5e1;">Durée</th>
+                    <th style="padding: 10px 8px; text-align: center; border-bottom: 1px solid #cbd5e1;">Heure</th>
                 </tr>
             </thead>
             <tbody>
@@ -9403,8 +9535,18 @@ function createClientEventsTable(clientNumber) {
     eventsByDay.forEach((day, index) => {
         const bgColor = index % 2 === 0 ? '#ffffff' : '#fafbfc';
         
+        // Déterminer les classes pour le filtrage
+        const hasSuspendP = day.SuspendP > 0;
+        const hasCreditNul = day.CreditNul > 0;
+        const hasSuspendE = day.SuspendE > 0;
+        const rowClasses = [
+            hasSuspendP ? 'event-suspendp' : '',
+            hasCreditNul ? 'event-creditnul' : '',
+            hasSuspendE ? 'event-suspende' : ''
+        ].filter(cls => cls).join(' ');
+        
         tableHTML += `
-            <tr style="border-bottom: 1px solid #e2e8f0; background: ${bgColor};">
+            <tr class="${rowClasses}" style="border-bottom: 1px solid #e2e8f0; background: ${bgColor};">
                 <td style="padding: 12px 10px; font-weight: 600; border-right: 2px solid #e2e8f0; position: sticky; left: 0; background: ${bgColor};">
                     ${new Date(day.date).toLocaleDateString('fr-FR', {
                         day: '2-digit', month: '2-digit', year: 'numeric'
@@ -9412,14 +9554,8 @@ function createClientEventsTable(clientNumber) {
                 </td>
                 
                 <!-- SuspendP -->
-                <td style="padding: 10px 8px; text-align: center; ${day.SuspendP > 0 ? 'background: #3b82f610; font-weight: 600; color: #2563eb;' : 'color: #94a3b8;'}">
-                    ${day.SuspendP_start || '-'}
-                </td>
-                <td style="padding: 10px 8px; text-align: center; ${day.SuspendP > 0 ? 'background: #3b82f610; font-weight: 600; color: #2563eb;' : 'color: #94a3b8;'}">
-                    ${day.SuspendP_end || '-'}
-                </td>
                 <td style="padding: 10px 8px; text-align: center; border-right: 2px solid #e2e8f0; ${day.SuspendP > 0 ? 'background: #3b82f620; font-weight: 700; color: #2563eb;' : 'color: #94a3b8;'}">
-                    ${day.SuspendP_duration || '-'}
+                    ${day.SuspendP_start || '-'}
                 </td>
                 
                 <!-- Crédit Nul -->
@@ -9428,14 +9564,8 @@ function createClientEventsTable(clientNumber) {
                 </td>
                 
                 <!-- SuspendE -->
-                <td style="padding: 10px 8px; text-align: center; ${day.SuspendE > 0 ? 'background: #0ea5e910; font-weight: 600; color: #0284c7;' : 'color: #94a3b8;'}">
-                    ${day.SuspendE_start || '-'}
-                </td>
-                <td style="padding: 10px 8px; text-align: center; ${day.SuspendE > 0 ? 'background: #0ea5e910; font-weight: 600; color: #0284c7;' : 'color: #94a3b8;'}">
-                    ${day.SuspendE_end || '-'}
-                </td>
                 <td style="padding: 10px 8px; text-align: center; ${day.SuspendE > 0 ? 'background: #0ea5e920; font-weight: 700; color: #0284c7;' : 'color: #94a3b8;'}">
-                    ${day.SuspendE_duration || '-'}
+                    ${day.SuspendE_start || '-'}
                 </td>
             </tr>
         `;
@@ -9484,6 +9614,42 @@ function createClientEventsTable(clientNumber) {
                 }
             });
         }
+        
+        // ✅ LOGIQUE DE FILTRAGE DES ÉVÉNEMENTS
+        const filterSuspendP = document.getElementById(`filter-suspendp-${clientNumber}`);
+        const filterCreditNul = document.getElementById(`filter-creditnul-${clientNumber}`);
+        const filterSuspendE = document.getElementById(`filter-suspende-${clientNumber}`);
+        
+        function applyEventFilter() {
+            if (!table) return;
+            
+            const showSuspendP = filterSuspendP.checked;
+            const showCreditNul = filterCreditNul.checked;
+            const showSuspendE = filterSuspendE.checked;
+            
+            const rows = table.querySelectorAll('tbody tr');
+            rows.forEach(row => {
+                const hasSuspendP = row.classList.contains('event-suspendp');
+                const hasCreditNul = row.classList.contains('event-creditnul');
+                const hasSuspendE = row.classList.contains('event-suspende');
+                
+                // Montrer la ligne si elle a au moins un événement coché
+                const shouldShow = 
+                    (hasSuspendP && showSuspendP) ||
+                    (hasCreditNul && showCreditNul) ||
+                    (hasSuspendE && showSuspendE);
+                
+                row.style.display = shouldShow ? '' : 'none';
+            });
+        }
+        
+        // Attacher les événements aux checkboxes
+        if (filterSuspendP) filterSuspendP.addEventListener('change', applyEventFilter);
+        if (filterCreditNul) filterCreditNul.addEventListener('change', applyEventFilter);
+        if (filterSuspendE) filterSuspendE.addEventListener('change', applyEventFilter);
+        
+        // Appliquer le filtre initial
+        applyEventFilter();
     }, 100);
     
     return container;
@@ -10249,30 +10415,45 @@ function createClientEnergyAnalysis(clientNumber) {
         // ===== ANALYSE PAR SEUILS =====
         const daysWithConsumptionOnly = daysInPeriod.filter(day => day.consumption > 0);
 
-        // Les jours hors tolérance sont exactement les jours avec SuspendE
-        const daysAbove115 = daysWithSuspendE;
+        // Les jours hors tolérance (>=115%) doivent être basés sur la consommation, pas uniquement sur l'événement SuspendE
+        const daysAbove115 = daysWithConsumptionOnly.filter(day => day.consumption > maxWithTolerance).length;
 
         // Les autres jours sont répartis entre ≤85% et 85-115%
         const daysBelow85 = daysWithConsumptionOnly.filter(day => 
-            day.consumption <= seuil85 && !suspendEDates.has(day.date)
+            day.consumption <= seuil85
         ).length;
 
         const daysInTolerance = daysWithConsumptionOnly.filter(day => 
-            day.consumption > seuil85 && day.consumption <= maxWithTolerance && !suspendEDates.has(day.date)
+            day.consumption > seuil85 && day.consumption <= maxWithTolerance
         ).length;
 
         // Calcul des pourcentages
-        const percentBelow85 = daysWithConsumptionOnly.length > 0 ? 
+        let percentBelow85 = daysWithConsumptionOnly.length > 0 ? 
             ((daysBelow85 / daysWithConsumptionOnly.length) * 100).toFixed(1) : 0;
 
-        const percentInTolerance = daysWithConsumptionOnly.length > 0 ? 
+        let percentInTolerance = daysWithConsumptionOnly.length > 0 ? 
             ((daysInTolerance / daysWithConsumptionOnly.length) * 100).toFixed(1) : 0;
 
-        const percentAbove115 = daysWithConsumptionOnly.length > 0 ? 
+        let percentAbove115 = daysWithConsumptionOnly.length > 0 ? 
             ((daysAbove115 / daysWithConsumptionOnly.length) * 100).toFixed(1) : 0;
 
         const percentSuspendE = daysWithConsumptionOnly.length > 0 ? 
             ((daysWithSuspendE / daysWithConsumptionOnly.length) * 100).toFixed(1) : 0;
+
+        // Ajustement mineur d'arrondi pour que la barre fasse 100%
+        let percentSum = Number(percentBelow85) + Number(percentInTolerance) + Number(percentAbove115);
+        if (daysWithConsumptionOnly.length > 0 && Math.abs(percentSum - 100) >= 0.1) {
+            const diff = 100 - percentSum;
+            // on ajoute la différence à la catégorie la plus grande
+            if (percentAbove115 >= percentInTolerance && percentAbove115 >= percentBelow85) {
+                percentAbove115 = (Number(percentAbove115) + diff).toFixed(1);
+            } else if (percentInTolerance >= percentBelow85) {
+                percentInTolerance = (Number(percentInTolerance) + diff).toFixed(1);
+            } else {
+                percentBelow85 = (Number(percentBelow85) + diff).toFixed(1);
+            }
+            percentSum = 100;
+        }
 
         // Vérification
         const totalCheck = daysBelow85 + daysInTolerance + daysAbove115;
@@ -10816,6 +10997,131 @@ function createClientCreditAnalysis(clientNumber) {
             
             content.appendChild(habitSection);
             
+            // === GRAPHIQUE ÉVOLUTION DU CRÉDIT ===
+            if (creditData.length > 0) {
+                // Extraire les années disponibles
+                const availableYears = [...new Set(creditData.map(d => new Date(d.date).getFullYear()))].sort((a, b) => b - a);
+                
+                const chartSection = document.createElement('div');
+                chartSection.style.cssText = `
+                    background: #f8fafc;
+                    border-radius: 8px;
+                    padding: 15px;
+                    margin-bottom: 12px;
+                    border: 1px solid #e2e8f0;
+                `;
+                
+                chartSection.innerHTML = `
+                    <div style="display: flex; align-items: center; gap: 5px; margin-bottom: 15px;">
+                        <span style="font-size: 16px;">📊</span>
+                        <span style="font-weight: 600; font-size: 13px;">Évolution du crédit</span>
+                        <span style="margin-left: auto; background: #e2e8f0; padding: 2px 8px; border-radius: 12px; font-size: 10px;" class="releve-count">
+                            ${creditData.length} relevé(s)
+                        </span>
+                    </div>
+                    
+                    <!-- Filtre par année -->
+                    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 15px; padding: 10px; background: #f1f5f9; border-radius: 6px; border: 1px solid #e2e8f0;">
+                        <span style="font-size: 14px;">🔍</span>
+                        <label for="year-filter-${clientNumber}" style="font-weight: 600; font-size: 12px;">Filtrer par année :</label>
+                        <select id="year-filter-${clientNumber}" style="padding: 5px 10px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 12px; background: white;">
+                            ${availableYears.map((year, index) => `<option value="${year}" ${index === 0 ? 'selected' : ''}>${year}</option>`).join('')}
+                        </select>
+                        <button id="apply-year-filter-${clientNumber}" style="padding: 5px 15px; background: #3b82f6; color: white; border: none; border-radius: 4px; font-size: 12px; font-weight: 600; cursor: pointer; transition: background 0.2s;">
+                            Appliquer
+                        </button>
+                    </div>
+                    
+                    <div style="height: 500px; position: relative;">
+                        <canvas id="credit-chart-${clientNumber}" style="width: 100%; height: 100%;"></canvas>
+                    </div>
+                    
+                    <div style="margin-top: 10px; display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: #64748b;">
+                        <div style="font-size: 10px; color: #94a3b8;">
+                            Dernière mise à jour: ${creditData.length > 0 ? new Date(creditData[creditData.length - 1].date).toLocaleDateString('fr-FR') : 'N/A'}
+                        </div>
+                    </div>
+                `;
+                
+                content.appendChild(chartSection);
+                
+                // Fonction de filtrage par année
+                function filterCreditDataByYear(selectedYear) {
+                    if (!selectedYear || selectedYear === 'all') {
+                        return creditData;
+                    }
+                    return creditData.filter(d => new Date(d.date).getFullYear() === parseInt(selectedYear));
+                }
+                
+                // Gestionnaire d'événement pour le bouton Appliquer
+                setTimeout(() => {
+                    const applyButton = document.getElementById(`apply-year-filter-${clientNumber}`);
+                    console.log('Bouton trouvé:', applyButton, `apply-year-filter-${clientNumber}`);
+                    if (applyButton) {
+                        applyButton.addEventListener('click', function() {
+                            console.log('Bouton cliqué!');
+                            const yearFilter = document.getElementById(`year-filter-${clientNumber}`);
+                            const selectedYear = yearFilter.value;
+                            console.log('Année sélectionnée:', selectedYear);
+                            const filteredData = filterCreditDataByYear(selectedYear);
+                            console.log('Données filtrées:', filteredData.length, 'éléments');
+                            
+                            // Créer consumptionByDay à partir des données filtrées
+                            const consumptionByDay = {};
+                            filteredData.forEach(item => {
+                                const dateKey = item.date.split(' ')[0];
+                                consumptionByDay[dateKey] = { hasConsumption: false };
+                            });
+                            
+                            // Détruire le graphique existant s'il existe
+                            const existingChart = Chart.getChart(`credit-chart-${clientNumber}`);
+                            if (existingChart) {
+                                existingChart.destroy();
+                            }
+                            
+                            // Recréer le graphique avec les données filtrées
+                            createCreditEvolutionChart(clientNumber, filteredData, consumptionByDay);
+                            
+                            // Mettre à jour le compteur de relevés
+                            const countElement = chartSection.querySelector('.releve-count');
+                            if (countElement) {
+                                countElement.textContent = `${filteredData.length} relevé(s)`;
+                            }
+                            
+                            // Feedback visuel
+                            this.style.background = '#1d4ed8';
+                            setTimeout(() => {
+                                this.style.background = '#3b82f6';
+                            }, 200);
+                        });
+                    } else {
+                        console.error('Bouton non trouvé:', `apply-year-filter-${clientNumber}`);
+                    }
+                }, 500);
+                
+                // Créer le graphique initial avec l'année la plus récente
+                setTimeout(() => {
+                    const initialYearFilter = document.getElementById(`year-filter-${clientNumber}`);
+                    const initialSelectedYear = initialYearFilter ? initialYearFilter.value : availableYears[0];
+                    const initialFilteredData = filterCreditDataByYear(initialSelectedYear);
+                    
+                    // Créer consumptionByDay à partir des données de crédit (par défaut, pas de consommation)
+                    const consumptionByDay = {};
+                    initialFilteredData.forEach(item => {
+                        const dateKey = item.date.split(' ')[0];
+                        consumptionByDay[dateKey] = { hasConsumption: false };
+                    });
+                    
+                    createCreditEvolutionChart(clientNumber, initialFilteredData, consumptionByDay);
+                    
+                    // Mettre à jour le compteur de relevés initial
+                    const countElement = chartSection.querySelector('.releve-count');
+                    if (countElement) {
+                        countElement.textContent = `${initialFilteredData.length} relevé(s)`;
+                    }
+                }, 100);
+            }
+            
             // === TABLEAUX DÉTAILS (cachés) - VERSION ORIGINALE RESTAURÉE ===
             const detailsContainer = document.createElement('div');
             detailsContainer.id = `credit-details-${clientNumber}`;
@@ -11047,7 +11353,14 @@ function createDaysWithoutCreditCard(clientNumber) {
     const content = document.createElement('div');
     content.style.cssText = `padding: 12px;`;
     
-    const significantStreaks = analysis.consecutiveDays.filter(group => group.length > 1);
+    let significantStreaks = analysis.consecutiveDays.filter(group => group.length > 1);
+    // Trier par nombre de jours décroissant (plus grande série en haut)
+    significantStreaks = significantStreaks.sort((a, b) => {
+        const diff = b.length - a.length;
+        if (diff !== 0) return diff;
+        // Si égalité sur la longueur, trier par date de début la plus récente d'abord
+        return new Date(b[0].date) - new Date(a[0].date);
+    });
     
     if (significantStreaks.length > 0) {
         const streaksSection = document.createElement('div');
@@ -11062,10 +11375,10 @@ function createDaysWithoutCreditCard(clientNumber) {
             <div style="display: flex; flex-wrap: wrap; gap: 8px;">
                 ${significantStreaks.map((group, idx) => {
                     const start = new Date(group[0].date).toLocaleDateString('fr-FR', {
-                        day: '2-digit', month: '2-digit'
+                        day: '2-digit', month: '2-digit', year: 'numeric'
                     });
                     const end = new Date(group[group.length - 1].date).toLocaleDateString('fr-FR', {
-                        day: '2-digit', month: '2-digit'
+                        day: '2-digit', month: '2-digit', year: 'numeric'
                     });
                     const isLongest = group.length === analysis.longestStreak;
                     
@@ -11272,7 +11585,8 @@ function createVoltageThresholdTable() {
     card.appendChild(legend);
     
     // Dashboard des atteintes
-    const excellent = analysis.days.filter(d => d.count >= 4).length;
+    const excellent = analysis.days.filter(d => d.count >= 4 && d.count <= 8).length;
+    const exces = analysis.days.filter(d => d.count > 8).length;
     const tresBien = analysis.days.filter(d => d.count === 3).length;
     const correct = analysis.days.filter(d => d.count === 2).length;
     const faible = analysis.days.filter(d => d.count === 1).length;
@@ -11285,7 +11599,7 @@ function createVoltageThresholdTable() {
         background: #f8fafc;
         border-top: 1px solid #e2e8f0;
         display: grid;
-        grid-template-columns: repeat(5, 1fr);
+        grid-template-columns: repeat(6, 1fr);
         gap: 12px;
     `;
 
@@ -11299,6 +11613,17 @@ function createVoltageThresholdTable() {
             <div style="font-size: 11px; color: #64748b;">${totalJours > 0 ? ((excellent/totalJours*100).toFixed(1)) : 0}% des jours</div>
             <div style="margin-top: 8px; width: 100%; height: 4px; background: #e2e8f0; border-radius: 2px; overflow: hidden;">
                 <div style="width: ${totalJours > 0 ? (excellent/totalJours*100) : 0}%; height: 100%; background: #22c55e;"></div>
+            </div>
+        </div>
+        <div style="background: white; border-radius: 8px; padding: 12px; border-left: 4px solid #8b5cf6; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                <span style="font-size: 18px;">🔴</span>
+                <span style="font-size: 12px; font-weight: 600; color: #6d28d9;">EXCÈS</span>
+            </div>
+            <div style="font-size: 24px; font-weight: 800; color: #8b5cf6; margin-bottom: 5px;">${exces}</div>
+            <div style="font-size: 11px; color: #64748b;">${totalJours > 0 ? ((exces/totalJours*100).toFixed(1)) : 0}% des jours</div>
+            <div style="margin-top: 8px; width: 100%; height: 4px; background: #e2e8f0; border-radius: 2px; overflow: hidden;">
+                <div style="width: ${totalJours > 0 ? (exces/totalJours*100) : 0}%; height: 100%; background: #8b5cf6;"></div>
             </div>
         </div>
         <div style="background: white; border-radius: 8px; padding: 12px; border-left: 4px solid #eab308; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
@@ -11348,6 +11673,15 @@ function createVoltageThresholdTable() {
     `;
 
     card.appendChild(dashboard);
+
+    // ✅ LÉGENDE DES CATÉGORIES D'ATTEINTES
+    const thresholdLegend = document.createElement('div');
+    thresholdLegend.style.cssText = `
+        padding: 15px 20px;
+        background: white;
+        border-top: 1px solid #e2e8f0;
+        margin-top: 10px;
+    `;
 
     // En-tête du tableau détaillé
     const detailsHeader = document.createElement('div');
@@ -11489,7 +11823,10 @@ function createVoltageThresholdTable() {
         let bgColor = '#fee2e2';
         let textColor = '#991b1b';
         
-        if (dayData.count >= 4) {
+        if (dayData.count > 8) {
+            bgColor = '#ede9fe'; // Violet clair pour excès de charge
+            textColor = '#581c87';
+        } else if (dayData.count >= 4) {
             bgColor = '#dcfce7';
             textColor = '#166534';
         } else if (dayData.count === 3) {
@@ -11535,7 +11872,8 @@ function createVoltageThresholdTable() {
         `;
         
         let statusIcon = '';
-        if (dayData.count >= 4) statusIcon = '⭐ Excellente';
+        if (dayData.count > 8) statusIcon = '🔴 Excès';
+        else if (dayData.count >= 4) statusIcon = '⭐ Excellente';
         else if (dayData.count === 3) statusIcon = '👍 Très bien';
         else if (dayData.count === 2) statusIcon = '🟡 Correct';
         else if (dayData.count === 1) statusIcon = '⚠️ Faible';
@@ -11633,6 +11971,10 @@ function createVoltageThresholdTable() {
                 <div style="width: 14px; height: 14px; background: #ef4444; border-radius: 3px;"></div>
                 <span style="font-size: 11px; color: #991b1b; font-weight: 500;">0 (Critique)</span>
             </div>
+            <div style="display: flex; align-items: center; gap: 6px;">
+                <div style="width: 14px; height: 14px; background: #7c3aed; border-radius: 3px;"></div>
+                <span style="font-size: 11px; color: #581c87; font-weight: 500;">>8 (Excès)</span>
+            </div>
         </div>
     `;
     chartContainer.appendChild(chartTitle);
@@ -11678,6 +12020,7 @@ function createVoltageThresholdTable() {
             analysis.days.map(d => d.formattedDate).reverse(), 
             analysis.days.map(d => d.count).reverse(), 
             analysis.days.map(d => {
+                if (d.count > 8) return '#7c3aed'; // Violet pour excès de charge
                 if (d.count >= 4) return '#22c55e';
                 if (d.count === 3) return '#eab308';
                 if (d.count === 2) return '#f97316';
@@ -11791,7 +12134,9 @@ function createVoltageThresholdChart(dates, counts, colors, threshold) {
                             
                             let status = '';
                             
-                            if (value >= 4) {
+                            if (value > 8) {
+                                status = '🔴 EXCÈS DE CHARGE';
+                            } else if (value >= 4) {
                                 status = '✅ CONFORME';
                             } else if (value >= 2) {
                                 status = '⚠️ MOYEN';
@@ -11810,7 +12155,13 @@ function createVoltageThresholdChart(dates, counts, colors, threshold) {
                             if (!context.dataset.label.includes('Seuil')) {
                                 const value = context.parsed.y;
                                 const date = context.label;
-                                if (value < 4) {
+                                if (value > 8) {
+                                    const excess = value - 8;
+                                    return [
+                                        `⚠️ ${excess} atteinte${excess !== 1 ? 's' : ''} au-dessus de 8`,
+                                        `📅 ${date}`
+                                    ];
+                                } else if (value < 4) {
                                     const diff = 4 - value;
                                     return [
                                         `⬇️ ${diff} atteinte${diff !== 1 ? 's' : ''} sous le seuil`,
@@ -12650,6 +13001,881 @@ filterAnimationStyles.textContent = `
 document.head.appendChild(filterAnimationStyles);
 // Appeler au chargement
 document.addEventListener('DOMContentLoaded', addCommercialStyles);
+
+// ==================== GRAPHIQUE ÉVOLUTION DU CRÉDIT (SANS LÉGENDE) ====================
+function createCreditEvolutionChart(clientNumber, creditData, consumptionByDay = {}) {
+    const canvas = document.getElementById(`credit-chart-${clientNumber}`);
+    if (!canvas) {
+        console.error(`Canvas credit-chart-${clientNumber} non trouvé`);
+        return;
+    }
+    
+    if (!creditData || creditData.length === 0) {
+        console.log(`Aucune donnée de crédit pour le client ${clientNumber}`);
+        return;
+    }
+    
+    // Trier les données par date
+    const sortedData = [...creditData].sort((a, b) => new Date(a.date) - new Date(b.date));
+    
+    // Préparer les données pour le graphique
+    const labels = sortedData.map(d => {
+        const date = new Date(d.date);
+        return date.toLocaleDateString('fr-FR', { 
+            day: '2-digit', 
+            month: '2-digit',
+            year: '2-digit'
+        });
+    });
+    
+    const values = sortedData.map(d => d.value);
+    
+    // Palette de couleurs par mois
+    const monthColors = {
+        0: '#22c55e', 1: '#eab308', 2: '#a855f7', 3: '#f97316',
+        4: '#06b6d4', 5: '#ec4899', 6: '#84cc16', 7: '#f59e0b',
+        8: '#8b5cf6', 9: '#ef4444', 10: '#10b981', 11: '#6366f1'
+    };
+    
+    // Couleurs pour chaque barre (foncée si crédit nul)
+    const colors = values.map((value, index) => {
+        const date = new Date(sortedData[index].date);
+        const month = date.getMonth();
+        const baseColor = monthColors[month] || monthColors[0];
+        
+        if (value === 0) {
+            return darkenColor(baseColor, 40); // Version foncée = jour sans crédit
+        }
+        return baseColor;
+    });
+    
+    // Détruire l'ancien graphique
+    const existingChart = Chart.getChart(canvas);
+    if (existingChart) existingChart.destroy();
+    
+    // Largeur des barres
+    const barThickness = Math.max(6, Math.min(20, 600 / labels.length));
+    
+    // Créer le graphique
+    new Chart(canvas, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Crédit (jours)',
+                data: values,
+                backgroundColor: colors,
+                borderColor: colors.map(c => darkenColor(c, 10)),
+                borderWidth: 1,
+                borderRadius: 4,
+                barPercentage: 0.8,
+                categoryPercentage: 0.9,
+                barThickness: barThickness,
+                maxBarThickness: 25
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: { duration: 800 },
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: 'rgba(0, 0, 0, 0.85)',
+                    callbacks: {
+                        title: function(context) {
+                            const date = new Date(sortedData[context[0].dataIndex].date);
+                            return date.toLocaleDateString('fr-FR', {
+                                weekday: 'long',
+                                day: '2-digit',
+                                month: 'long',
+                                year: 'numeric'
+                            });
+                        },
+                        label: function(context) {
+                            const value = context.parsed.y;
+                            const status = value > 0 ? '✅ Crédit disponible' : '🔴 Sans crédit';
+                            return `${value} jour(s) - ${status}`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    title: { display: true, text: 'Date', font: { size: 11 } },
+                    ticks: { maxRotation: 45, minRotation: 45, autoSkip: true, maxTicksLimit: 15 },
+                    grid: { display: false }
+                },
+                y: {
+                    title: { display: true, text: 'Crédit (jours)', font: { size: 11 } },
+                    beginAtZero: true,
+                    ticks: { stepSize: 1, callback: value => value + ' j' },
+                    grid: { color: '#f1f5f9' }
+                }
+            }
+        }
+    });
+    
+    // Ajouter les statistiques mensuelles
+    const parentContainer = canvas.closest('#client-sub-tabs-content') || 
+                            canvas.closest('.client-sub-tabs-content') ||
+                            canvas.parentNode;
+    
+    if (parentContainer) {
+        addCreditMonthlyStatsToSection(sortedData, clientNumber, parentContainer, consumptionByDay);
+    }
+}
+
+// ==================== FONCTION POUR ASSOMBRIR UNE COULEUR ====================
+function darkenColor(color, percent) {
+    if (!color || !color.startsWith('#')) return color;
+    
+    let r, g, b;
+    if (color.length === 4) {
+        r = parseInt(color[1] + color[1], 16);
+        g = parseInt(color[2] + color[2], 16);
+        b = parseInt(color[3] + color[3], 16);
+    } else {
+        r = parseInt(color.slice(1, 3), 16);
+        g = parseInt(color.slice(3, 5), 16);
+        b = parseInt(color.slice(5, 7), 16);
+    }
+    
+    r = Math.max(0, Math.floor(r * (1 - percent / 100)));
+    g = Math.max(0, Math.floor(g * (1 - percent / 100)));
+    b = Math.max(0, Math.floor(b * (1 - percent / 100)));
+    
+    return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+}
+
+// ==================== LÉGENDE DES COULEURS PAR MOIS ====================
+function addCreditMonthLegendToSection(clientNumber, monthColors, parentContainer) {
+    // Supprimer l'ancienne légende si elle existe
+    const oldLegend = document.getElementById(`credit-month-legend-${clientNumber}`);
+    if (oldLegend) oldLegend.remove();
+    
+    const monthNames = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 
+                        'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
+    
+    const legendContainer = document.createElement('div');
+    legendContainer.id = `credit-month-legend-${clientNumber}`;
+    legendContainer.style.cssText = `
+        margin-top: 20px;
+        padding: 15px;
+        background: #f8fafc;
+        border-radius: 12px;
+        border: 1px solid #e2e8f0;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    `;
+    
+    legendContainer.innerHTML = `
+        <div style="font-weight: 700; color: #1e293b; margin-bottom: 12px; font-size: 13px; display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 16px;">🎨</span>
+            <span>Légende des couleurs par mois</span>
+            <span style="margin-left: auto; font-size: 11px; font-weight: normal; color: #64748b;">
+                🔴 Couleurs foncées = jours sans crédit
+            </span>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 10px;">
+            ${Object.entries(monthColors).map(([month, color]) => `
+                <div style="display: flex; align-items: center; gap: 8px; padding: 6px 10px; background: white; border-radius: 8px; border: 1px solid #e2e8f0;">
+                    <div style="display: flex; gap: 4px;">
+                        <div style="width: 20px; height: 20px; background: ${color}; border-radius: 4px; border: 1px solid #cbd5e1;"></div>
+                        <div style="width: 20px; height: 20px; background: ${darkenColor(color, 40)}; border-radius: 4px; border: 1px solid #94a3b8;"></div>
+                    </div>
+                    <span style="font-size: 12px; font-weight: 500; color: #334155;">${monthNames[parseInt(month)]}</span>
+                    <span style="font-size: 9px; color: #94a3b8; margin-left: auto;">↘️ sans crédit</span>
+                </div>
+            `).join('')}
+        </div>
+        <div style="margin-top: 12px; padding: 8px 12px; background: #fef3c7; border-radius: 8px; font-size: 11px; color: #92400e; display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 14px;">ℹ️</span>
+            <span>Les barres en couleur foncée indiquent les jours où le crédit était à zéro.</span>
+        </div>
+    `;
+    
+    parentContainer.appendChild(legendContainer);
+}
+
+// ==================== STATISTIQUES MENSUELLES CRÉDIT UNIQUEMENT ====================
+function addCreditMonthlyStatsToSection(data, clientNumber, parentContainer) {
+    if (!data || data.length === 0) return;
+    
+    // Supprimer les anciennes stats
+    const oldStats = document.getElementById(`credit-monthly-stats-${clientNumber}`);
+    if (oldStats) oldStats.remove();
+    
+    const year = new Date(data[0].date).getFullYear();
+    const monthNames = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 
+                        'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
+    
+    const monthColors = {
+        0: '#22c55e', 1: '#eab308', 2: '#a855f7', 3: '#f97316',
+        4: '#06b6d4', 5: '#ec4899', 6: '#84cc16', 7: '#f59e0b',
+        8: '#8b5cf6', 9: '#ef4444', 10: '#10b981', 11: '#6366f1'
+    };
+    
+    // Analyser les données de crédit par mois
+    const monthlyStats = {};
+    for (let i = 0; i < 12; i++) {
+        monthlyStats[i] = {
+            totalDays: 0,
+            zeroCreditDays: 0,
+            positiveCreditDays: 0,
+            maxCredit: 0,
+            totalCredit: 0,
+            credits: []
+        };
+    }
+    
+    // Remplir les statistiques
+    data.forEach(item => {
+        const date = new Date(item.date);
+        const month = date.getMonth();
+        const creditValue = item.value;
+        
+        monthlyStats[month].totalDays++;
+        monthlyStats[month].credits.push(creditValue);
+        monthlyStats[month].totalCredit += creditValue;
+        
+        if (creditValue === 0) {
+            monthlyStats[month].zeroCreditDays++;
+        } else {
+            monthlyStats[month].positiveCreditDays++;
+        }
+        
+        if (creditValue > monthlyStats[month].maxCredit) {
+            monthlyStats[month].maxCredit = creditValue;
+        }
+    });
+    
+    // Filtrer les mois avec données
+    const monthsWithData = Object.entries(monthlyStats).filter(([_, stats]) => stats.totalDays > 0);
+    
+    if (monthsWithData.length === 0) return;
+    
+    // Créer le tableau
+    const statsContainer = document.createElement('div');
+    statsContainer.id = `credit-monthly-stats-${clientNumber}`;
+    statsContainer.style.cssText = `
+        margin-top: 20px;
+        padding: 20px;
+        background: linear-gradient(135deg, #f0f9ff 0%, #e6f7ff 100%);
+        border-radius: 12px;
+        border: 1px solid #bae6fd;
+        overflow-x: auto;
+    `;
+    
+    statsContainer.innerHTML = `
+        <div style="font-weight: 700; margin-bottom: 20px; font-size: 18px; color: #0c4a6e;">
+            📊 Analyse mensuelle du crédit - Client ${clientNumber} - ${year}
+        </div>
+        <div style="margin-bottom: 15px; padding: 10px; background: #f8fafc; border-radius: 8px; font-size: 12px; color: #475569;">
+            📌 Source: Données SOLDE du client ${clientNumber}
+        </div>
+    `;
+    
+    // TABLEAU
+    const table = document.createElement('table');
+    table.style.cssText = `
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+        background: white;
+        border-radius: 8px;
+        overflow: hidden;
+    `;
+    
+    // EN-TÊTE
+    const thead = document.createElement('thead');
+    thead.innerHTML = `
+        <tr style="background: #334155; color: white;">
+            <th style="padding: 12px 10px; text-align: left;">Mois</th>
+            <th style="padding: 12px 10px; text-align: center;">Jours analysés</th>
+            <th style="padding: 12px 10px; text-align: center;">Jours sans crédit</th>
+            <th style="padding: 12px 10px; text-align: center;">Taux de disponibilité</th>
+            <th style="padding: 12px 10px; text-align: center;">Crédit maximum</th>
+            <th style="padding: 12px 10px; text-align: center;">Crédit moyen</th>
+         </tr>
+    `;
+    table.appendChild(thead);
+    
+    // CORPS DU TABLEAU
+    const tbody = document.createElement('tbody');
+    
+    monthsWithData.forEach(([month, stats], index) => {
+        const bgColor = index % 2 === 0 ? '#ffffff' : '#fafcff';
+        const totalDays = stats.totalDays;
+        const creditRate = totalDays > 0 ? ((stats.positiveCreditDays / totalDays) * 100).toFixed(1) : 0;
+        const avgCredit = stats.credits.length > 0 ? (stats.totalCredit / stats.credits.length).toFixed(1) : 0;
+        
+        let creditColor = '#16a34a';
+        if (creditRate < 70) creditColor = '#dc2626';
+        else if (creditRate < 90) creditColor = '#f59e0b';
+        
+        const row = document.createElement('tr');
+        row.style.cssText = `border-bottom: 1px solid #e2e8f0; background: ${bgColor};`;
+        
+        row.innerHTML = `
+            <td style="padding: 12px 10px; position: sticky; left: 0; background: ${bgColor};">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <div style="width: 12px; height: 12px; background: ${monthColors[parseInt(month)]}; border-radius: 2px;"></div>
+                    <span style="font-weight: 600;">${monthNames[parseInt(month)]}</span>
+                </div>
+             </td>
+            <td style="padding: 12px 8px; text-align: center;"><strong>${totalDays}</strong></td>
+            <td style="padding: 12px 8px; text-align: center;">
+                <span style="color: ${stats.zeroCreditDays > 0 ? '#dc2626' : '#16a34a'}; font-weight: 700;">${stats.zeroCreditDays}</span>
+                <div style="font-size: 10px; color: #64748b;">(${((stats.zeroCreditDays / totalDays) * 100).toFixed(1)}%)</div>
+             </td>
+            <td style="padding: 12px 8px; text-align: center;">
+                <span style="color: ${creditColor}; font-weight: 600;">${creditRate}%</span>
+                <div style="margin-top: 3px; width: 60px; height: 4px; background: #e2e8f0; border-radius: 2px; overflow: hidden; margin: 3px auto 0;">
+                    <div style="width: ${creditRate}%; height: 100%; background: ${creditColor};"></div>
+                </div>
+             </td>
+            <td style="padding: 12px 8px; text-align: center; color: #16a34a; font-weight: 600;">${stats.maxCredit} j</td>
+            <td style="padding: 12px 8px; text-align: center; font-weight: 500;">${avgCredit} j</td>
+        `;
+        
+        tbody.appendChild(row);
+    });
+    
+    table.appendChild(tbody);
+    statsContainer.appendChild(table);
+    
+    // RÉSUMÉ ANNUEL
+    let totalDays = 0;
+    let totalZeroCredit = 0;
+    monthsWithData.forEach(([_, stats]) => {
+        totalDays += stats.totalDays;
+        totalZeroCredit += stats.zeroCreditDays;
+    });
+    
+    const overallCreditRate = totalDays > 0 ? ((totalDays - totalZeroCredit) / totalDays * 100).toFixed(1) : 0;
+    
+    const summaryDiv = document.createElement('div');
+    summaryDiv.style.cssText = `
+        margin-top: 20px;
+        padding: 15px 20px;
+        background: white;
+        border-radius: 10px;
+        border: 1px solid #e2e8f0;
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 15px;
+        text-align: center;
+    `;
+    
+    summaryDiv.innerHTML = `
+        <div>
+            <div style="font-size: 12px; color: #64748b;">📅 Période</div>
+            <div style="font-size: 20px; font-weight: 700; color: #0c4a6e;">${monthsWithData.length} mois</div>
+            <div style="font-size: 11px; color: #94a3b8;">${totalDays} jours analysés</div>
+        </div>
+        <div>
+            <div style="font-size: 12px; color: #64748b;">💰 Disponibilité crédit</div>
+            <div style="font-size: 20px; font-weight: 700; color: ${overallCreditRate >= 80 ? '#16a34a' : '#f59e0b'};">${overallCreditRate}%</div>
+            <div style="font-size: 11px; color: #94a3b8;">${totalDays - totalZeroCredit} jours avec crédit</div>
+        </div>
+        <div>
+            <div style="font-size: 12px; color: #64748b;">⚠️ Jours sans crédit</div>
+            <div style="font-size: 20px; font-weight: 700; color: ${totalZeroCredit > 0 ? '#dc2626' : '#16a34a'};">${totalZeroCredit}</div>
+            <div style="font-size: 11px; color: #94a3b8;">${((totalZeroCredit / totalDays) * 100).toFixed(1)}% du temps</div>
+        </div>
+    `;
+    
+    statsContainer.appendChild(summaryDiv);
+    parentContainer.appendChild(statsContainer);
+}
+
+// ==================== FONCTIONS UTILITAIRES POUR LES STATISTIQUES MENSUELLES ====================
+// Récupérer les données d'énergie pour un client
+function getClientEnergyData(clientNumber) {
+    const energyKey = `Energie${clientNumber}`;
+    const energyData = [];
+    
+    if (window.combinedEnergyData && window.combinedEnergyData.length > 0) {
+        window.combinedEnergyData.forEach(row => {
+            if (!row['Date et Heure']) return;
+            
+            const value = row[energyKey];
+            if (value && value.toString().trim() !== '' && value.toString().trim() !== '-') {
+                const consumption = parseFloat(value.toString().replace(',', '.'));
+                if (!isNaN(consumption)) {
+                    energyData.push({
+                        date: row['Date et Heure'],
+                        value: consumption
+                    });
+                }
+            }
+        });
+    }
+    
+    return energyData;
+}
+
+// Récupérer l'historique des forfaits pour un client
+function getClientForfaitHistory(clientNumber) {
+    const forfaitHistory = [];
+    
+    if (window.combinedRechargeData && window.combinedRechargeData.length > 0) {
+        const clientRecharges = window.combinedRechargeData
+            .filter(row => row['Code 1']?.toString().trim() === clientNumber.toString())
+            .sort((a, b) => new Date(a['Date et Heure']) - new Date(b['Date et Heure']));
+        
+        clientRecharges.forEach((recharge, index) => {
+            const date = new Date(recharge['Date et Heure']);
+            const code4 = parseInt(recharge['Code 4']);
+            const forfaitName = getForfaitName(code4);
+            const limits = getForfaitLimits(forfaitName);
+            
+            if (index === 0) {
+                forfaitHistory.push({
+                    forfait: forfaitName,
+                    max: limits.max,
+                    startDate: date,
+                    endDate: null
+                });
+            } else if (code4 !== parseInt(clientRecharges[index-1]['Code 4'])) {
+                forfaitHistory[forfaitHistory.length - 1].endDate = date;
+                forfaitHistory.push({
+                    forfait: forfaitName,
+                    max: limits.max,
+                    startDate: date,
+                    endDate: null
+                });
+            }
+        });
+    }
+    
+    if (forfaitHistory.length === 0) {
+        forfaitHistory.push({
+            forfait: 'ECO',
+            max: 50,
+            startDate: new Date(2000, 0, 1),
+            endDate: null
+        });
+    }
+    
+    return forfaitHistory;
+}
+
+// Déterminer le forfait pour un mois donné
+function getForfaitForMonth(forfaitHistory, month, year) {
+    const monthStart = new Date(year, month, 1);
+    const monthEnd = new Date(year, month + 1, 0);
+    
+    for (const forfait of forfaitHistory) {
+        const forfaitStart = new Date(forfait.startDate);
+        const forfaitEnd = forfait.endDate ? new Date(forfait.endDate) : new Date();
+        
+        if (monthStart <= forfaitEnd && monthEnd >= forfaitStart) {
+            return forfait.max;
+        }
+    }
+    
+    return 50;
+}
+// ==================== LÉGENDE DES COULEURS PAR MOIS ====================
+function addCreditMonthLegend(clientNumber, monthColors) {
+    const canvas = document.getElementById(`credit-chart-${clientNumber}`);
+    if (!canvas) return;
+    
+    const chartContainer = canvas.closest('.client-credit-analysis');
+    if (!chartContainer) return;
+    
+    // Supprimer l'ancienne légende si elle existe
+    const oldLegend = document.getElementById(`credit-month-legend-${clientNumber}`);
+    if (oldLegend) oldLegend.remove();
+    
+    const monthNames = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
+    
+    const legendContainer = document.createElement('div');
+    legendContainer.id = `credit-month-legend-${clientNumber}`;
+    legendContainer.style.cssText = `
+        margin-top: 20px;
+        padding: 15px;
+        background: #f8fafc;
+        border-radius: 12px;
+        border: 1px solid #e2e8f0;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    `;
+    
+    const legendTitle = document.createElement('div');
+    legendTitle.style.cssText = `
+        font-weight: 700;
+        color: #1e293b;
+        margin-bottom: 12px;
+        font-size: 13px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    `;
+    legendTitle.innerHTML = `
+        <span style="font-size: 16px;">🎨</span>
+        <span>Légende des couleurs par mois</span>
+        <span style="margin-left: auto; font-size: 11px; font-weight: normal; color: #64748b;">
+            🔴 Couleurs foncées = jours sans crédit
+        </span>
+    `;
+    legendContainer.appendChild(legendTitle);
+    
+    const legendGrid = document.createElement('div');
+    legendGrid.style.cssText = `
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+        gap: 10px;
+    `;
+    
+    for (let i = 0; i < 12; i++) {
+        const color = monthColors[i];
+        const darkColor = darkenColor(color, 30);
+        
+        const item = document.createElement('div');
+        item.style.cssText = `
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 10px;
+            background: white;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+            transition: transform 0.2s ease;
+            cursor: default;
+        `;
+        item.onmouseover = () => { item.style.transform = 'scale(1.02)'; };
+        item.onmouseout = () => { item.style.transform = 'scale(1)'; };
+        
+        item.innerHTML = `
+            <div style="display: flex; gap: 4px;">
+                <div style="width: 20px; height: 20px; background: ${color}; border-radius: 4px; border: 1px solid #cbd5e1;"></div>
+                <div style="width: 20px; height: 20px; background: ${darkColor}; border-radius: 4px; border: 1px solid #94a3b8;"></div>
+            </div>
+            <span style="font-size: 12px; font-weight: 500; color: #334155;">${monthNames[i]}</span>
+            <span style="font-size: 9px; color: #94a3b8; margin-left: auto;">↘️ sans crédit</span>
+        `;
+        
+        legendGrid.appendChild(item);
+    }
+    
+    legendContainer.appendChild(legendGrid);
+    
+    // Ajouter une note explicative
+    const note = document.createElement('div');
+    note.style.cssText = `
+        margin-top: 12px;
+        padding: 8px 12px;
+        background: #fef3c7;
+        border-radius: 8px;
+        font-size: 11px;
+        color: #92400e;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    `;
+    note.innerHTML = `
+        <span style="font-size: 14px;">ℹ️</span>
+        <span>Les barres en couleur foncée indiquent les jours où le crédit était à zéro (sans crédit).</span>
+    `;
+    legendContainer.appendChild(note);
+    
+    chartContainer.appendChild(legendContainer);
+}
+// ==================== STATISTIQUES MENSUELLES DU CRÉDIT ====================
+function addCreditMonthlyStats(data, clientNumber) {
+    if (!data || data.length === 0) {
+        console.log(`Aucune donnée pour le client ${clientNumber}`);
+        return;
+    }
+    
+    const canvas = document.getElementById(`credit-chart-${clientNumber}`);
+    if (!canvas) return;
+    
+    const chartContainer = canvas.closest('.client-credit-analysis');
+    if (!chartContainer) return;
+    
+    // Supprimer les anciennes statistiques si elles existent
+    const oldStats = document.getElementById(`credit-monthly-stats-${clientNumber}`);
+    if (oldStats) oldStats.remove();
+    
+    // Extraire l'année des données
+    const year = new Date(data[0].date).getFullYear();
+    
+    const statsContainer = document.createElement('div');
+    statsContainer.id = `credit-monthly-stats-${clientNumber}`;
+    statsContainer.style.cssText = `
+        margin-top: 20px;
+        padding: 15px;
+        background: linear-gradient(135deg, #f0f9ff 0%, #e6f7ff 100%);
+        border-radius: 12px;
+        border: 1px solid #bae6fd;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    `;
+    
+    const statsTitle = document.createElement('div');
+    statsTitle.style.cssText = `
+        font-weight: 700;
+        margin-bottom: 15px;
+        font-size: 14px;
+        color: #0c4a6e;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    `;
+    statsTitle.innerHTML = `
+        <span style="font-size: 18px;">📊</span>
+        <span>Statistiques mensuelles - ${year}</span>
+    `;
+    statsContainer.appendChild(statsTitle);
+    
+    // Palette de couleurs pour les mois (identique au graphique)
+    const monthColors = {
+        0: '#22c55e', 1: '#eab308', 2: '#a855f7', 3: '#f97316',
+        4: '#06b6d4', 5: '#ec4899', 6: '#84cc16', 7: '#f59e0b',
+        8: '#8b5cf6', 9: '#ef4444', 10: '#10b981', 11: '#6366f1'
+    };
+    
+    const monthNames = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 
+                        'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
+    
+    // Initialiser les stats pour chaque mois
+    const monthlyStats = {};
+    for (let i = 0; i < 12; i++) {
+        monthlyStats[i] = {
+            zeroCreditDays: 0,
+            maxCredit: 0,
+            totalDays: 0,
+            credits: [],
+            daysWithData: []
+        };
+    }
+    
+    // Analyser les données
+    data.forEach(item => {
+        const date = new Date(item.date);
+        const month = date.getMonth();
+        const day = date.getDate();
+        
+        monthlyStats[month].totalDays++;
+        monthlyStats[month].credits.push(item.value);
+        monthlyStats[month].daysWithData.push(day);
+        
+        if (item.value === 0) {
+            monthlyStats[month].zeroCreditDays++;
+        }
+        
+        if (item.value > monthlyStats[month].maxCredit) {
+            monthlyStats[month].maxCredit = item.value;
+        }
+    });
+    
+    // Créer le tableau des statistiques
+    const tableWrapper = document.createElement('div');
+    tableWrapper.style.cssText = `
+        overflow-x: auto;
+        margin-bottom: 15px;
+    `;
+    
+    const statsTable = document.createElement('table');
+    statsTable.style.cssText = `
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 12px;
+        background: white;
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    `;
+    
+    // En-tête du tableau
+    const thead = document.createElement('thead');
+    const headerRow = document.createElement('tr');
+    headerRow.style.cssText = 'background: #e0f2fe;';
+    
+    const headers = ['Mois', 'Jours avec données', 'Jours sans crédit', 'Taux', 'Crédit max', 'Crédit moyen', 'Tendance'];
+    headers.forEach(headerText => {
+        const th = document.createElement('th');
+        th.textContent = headerText;
+        th.style.cssText = 'padding: 10px 8px; text-align: left; border-bottom: 2px solid #bae6fd; font-weight: 600; color: #0369a1; font-size: 11px;';
+        headerRow.appendChild(th);
+    });
+    thead.appendChild(headerRow);
+    statsTable.appendChild(thead);
+    
+    // Corps du tableau
+    const tbody = document.createElement('tbody');
+    let previousMonthAvg = null;
+    
+    for (let i = 0; i < 12; i++) {
+        const stats = monthlyStats[i];
+        if (stats.totalDays === 0) continue;
+        
+        const row = document.createElement('tr');
+        row.style.cssText = i % 2 === 0 ? 'background: #ffffff;' : 'background: #fafcff;';
+        row.style.borderBottom = '1px solid #e2e8f0';
+        
+        // Mois avec indicateur de couleur
+        const monthCell = document.createElement('td');
+        monthCell.style.cssText = 'padding: 8px; border-bottom: 1px solid #e2e8f0;';
+        monthCell.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <div style="width: 14px; height: 14px; background: ${monthColors[i]}; border-radius: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.1);"></div>
+                <span style="font-weight: 500;">${monthNames[i]}</span>
+            </div>
+        `;
+        row.appendChild(monthCell);
+        
+        // Jours avec données
+        const daysCell = document.createElement('td');
+        daysCell.style.cssText = 'padding: 8px; text-align: center; border-bottom: 1px solid #e2e8f0;';
+        daysCell.textContent = `${stats.totalDays} jour(s)`;
+        row.appendChild(daysCell);
+        
+        // Jours sans crédit
+        const zeroCell = document.createElement('td');
+        zeroCell.style.cssText = 'padding: 8px; text-align: center; border-bottom: 1px solid #e2e8f0;';
+        const zeroPercent = (stats.zeroCreditDays / stats.totalDays * 100).toFixed(1);
+        zeroCell.innerHTML = `
+            <span style="color: ${stats.zeroCreditDays > 0 ? '#dc2626' : '#16a34a'}; font-weight: ${stats.zeroCreditDays > 0 ? '600' : '400'};">
+                ${stats.zeroCreditDays}
+            </span>
+            <span style="font-size: 10px; color: #94a3b8; margin-left: 4px;">(${zeroPercent}%)</span>
+        `;
+        row.appendChild(zeroCell);
+        
+        // Taux de disponibilité
+        const rateCell = document.createElement('td');
+        rateCell.style.cssText = 'padding: 8px; text-align: center; border-bottom: 1px solid #e2e8f0;';
+        const availabilityRate = ((stats.totalDays - stats.zeroCreditDays) / stats.totalDays * 100).toFixed(1);
+        const rateColor = availabilityRate >= 90 ? '#16a34a' : availabilityRate >= 70 ? '#f59e0b' : '#dc2626';
+        rateCell.innerHTML = `
+            <span style="color: ${rateColor}; font-weight: 600;">${availabilityRate}%</span>
+            <div style="margin-top: 4px; width: 60px; height: 4px; background: #e2e8f0; border-radius: 2px; overflow: hidden; margin: 4px auto 0;">
+                <div style="width: ${availabilityRate}%; height: 100%; background: ${rateColor}; border-radius: 2px;"></div>
+            </div>
+        `;
+        row.appendChild(rateCell);
+        
+        // Crédit maximum
+        const maxCell = document.createElement('td');
+        maxCell.style.cssText = 'padding: 8px; text-align: center; border-bottom: 1px solid #e2e8f0;';
+        maxCell.innerHTML = `<span style="color: #16a34a; font-weight: 600;">${stats.maxCredit} j</span>`;
+        row.appendChild(maxCell);
+        
+        // Crédit moyen
+        const avgCell = document.createElement('td');
+        avgCell.style.cssText = 'padding: 8px; text-align: center; border-bottom: 1px solid #e2e8f0;';
+        const avgCredit = (stats.credits.reduce((a, b) => a + b, 0) / stats.credits.length).toFixed(1);
+        avgCell.innerHTML = `<span style="font-weight: 500;">${avgCredit} j</span>`;
+        row.appendChild(avgCell);
+        
+        // Tendance
+        const trendCell = document.createElement('td');
+        trendCell.style.cssText = 'padding: 8px; text-align: center; border-bottom: 1px solid #e2e8f0;';
+        
+        if (previousMonthAvg !== null) {
+            const diff = parseFloat(avgCredit) - previousMonthAvg;
+            const trendIcon = diff > 0 ? '📈' : diff < 0 ? '📉' : '➡️';
+            const trendColor = diff > 0 ? '#16a34a' : diff < 0 ? '#dc2626' : '#64748b';
+            const diffText = diff > 0 ? `+${diff.toFixed(1)}` : diff.toFixed(1);
+            trendCell.innerHTML = `
+                <div style="display: flex; align-items: center; justify-content: center; gap: 4px;">
+                    <span style="font-size: 14px;">${trendIcon}</span>
+                    <span style="color: ${trendColor}; font-weight: 500;">${diffText}j</span>
+                </div>
+            `;
+        } else {
+            trendCell.innerHTML = `<span style="color: #94a3b8;">—</span>`;
+        }
+        row.appendChild(trendCell);
+        
+        tbody.appendChild(row);
+        previousMonthAvg = parseFloat(avgCredit);
+    }
+    
+    statsTable.appendChild(tbody);
+    tableWrapper.appendChild(statsTable);
+    statsContainer.appendChild(tableWrapper);
+    
+    // Résumé annuel
+    let totalZeroDays = 0;
+    let totalDays = 0;
+    let totalCredits = 0;
+    let totalMaxCredit = 0;
+    let monthsWithData = 0;
+    
+    for (let i = 0; i < 12; i++) {
+        if (monthlyStats[i].totalDays > 0) {
+            totalZeroDays += monthlyStats[i].zeroCreditDays;
+            totalDays += monthlyStats[i].totalDays;
+            totalCredits += monthlyStats[i].credits.reduce((a, b) => a + b, 0);
+            totalMaxCredit = Math.max(totalMaxCredit, monthlyStats[i].maxCredit);
+            monthsWithData++;
+        }
+    }
+    
+    const annualAvg = totalDays > 0 ? (totalCredits / totalDays).toFixed(1) : 0;
+    const zeroPercentAnnual = totalDays > 0 ? ((totalZeroDays / totalDays) * 100).toFixed(1) : 0;
+    const bestMonth = Object.entries(monthlyStats)
+        .filter(([_, stats]) => stats.totalDays > 0)
+        .sort((a, b) => (b[1].maxCredit - a[1].maxCredit))[0];
+    const worstMonth = Object.entries(monthlyStats)
+        .filter(([_, stats]) => stats.totalDays > 0)
+        .sort((a, b) => (a[1].zeroCreditDays / a[1].totalDays) - (b[1].zeroCreditDays / b[1].totalDays))[0];
+    
+    const summaryDiv = document.createElement('div');
+    summaryDiv.style.cssText = `
+        margin-top: 15px;
+        padding: 12px 16px;
+        background: white;
+        border-radius: 10px;
+        border: 1px solid #e2e8f0;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 12px;
+    `;
+    
+    summaryDiv.innerHTML = `
+        <div style="text-align: center;">
+            <div style="font-size: 11px; color: #64748b;">📅 Période analysée</div>
+            <div style="font-size: 16px; font-weight: 700; color: #0c4a6e;">${monthsWithData} mois</div>
+            <div style="font-size: 10px; color: #94a3b8;">${totalDays} jours</div>
+        </div>
+        <div style="text-align: center;">
+            <div style="font-size: 11px; color: #64748b;">⭐ Crédit moyen annuel</div>
+            <div style="font-size: 16px; font-weight: 700; color: #16a34a;">${annualAvg} jours</div>
+            <div style="font-size: 10px; color: #94a3b8;">moyenne sur l'année</div>
+        </div>
+        <div style="text-align: center;">
+            <div style="font-size: 11px; color: #64748b;">💰 Jours sans crédit</div>
+            <div style="font-size: 16px; font-weight: 700; color: ${totalZeroDays > 0 ? '#dc2626' : '#16a34a'};">${totalZeroDays}</div>
+            <div style="font-size: 10px; color: #94a3b8;">${zeroPercentAnnual}% des jours</div>
+        </div>
+        <div style="text-align: center;">
+            <div style="font-size: 11px; color: #64748b;">🏆 Meilleur mois</div>
+            <div style="font-size: 14px; font-weight: 700; color: #16a34a;">${bestMonth ? monthNames[parseInt(bestMonth[0])] : '-'}</div>
+            <div style="font-size: 10px; color: #94a3b8;">max: ${bestMonth ? bestMonth[1].maxCredit : 0} jours</div>
+        </div>
+        <div style="text-align: center;">
+            <div style="font-size: 11px; color: #64748b;">⚠️ Mois le plus critique</div>
+            <div style="font-size: 14px; font-weight: 700; color: #dc2626;">${worstMonth ? monthNames[parseInt(worstMonth[0])] : '-'}</div>
+            <div style="font-size: 10px; color: #94a3b8;">${worstMonth ? Math.round(worstMonth[1].zeroCreditDays / worstMonth[1].totalDays * 100) : 0}% sans crédit</div>
+        </div>
+    `;
+    
+    statsContainer.appendChild(summaryDiv);
+    
+    // Ajouter les statistiques après le graphique
+    const legendContainer = document.getElementById(`credit-month-legend-${clientNumber}`);
+    if (legendContainer) {
+        legendContainer.insertAdjacentElement('afterend', statsContainer);
+    } else {
+        chartContainer.appendChild(statsContainer);
+    }
+}
+
+
 // ==================== ANIMATIONS CSS ====================
 // Ajouter ces styles CSS au début du fichier ou dans la section des styles
 const style = document.createElement('style');

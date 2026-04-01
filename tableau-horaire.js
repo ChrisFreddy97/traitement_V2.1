@@ -1898,110 +1898,620 @@ function analyzeClientCreditDays(clientId) {
     };
 }
 
-// ======================== FONCTION SIMPLIFIÉE ========================
-// Crée la carte Crédit du client avec les séries sans crédit
+// ======================== CRÉATION DU GRAPHIQUE D'ÉVOLUTION DU CRÉDIT ========================
+function createCreditChart(creditData, clientId) {
+    console.log(`📊 Création graphique crédit pour client ${clientId}`, creditData);
+    
+    if (!creditData || !creditData.results || creditData.results.length === 0) {
+        console.warn(`⚠️ Aucune donnée de crédit pour client ${clientId}`);
+        return `<div style="text-align: center; padding: 40px; color: #64748b; background: #f8fafc; border-radius: 12px;">
+                    <span style="font-size: 48px; display: block; margin-bottom: 10px;">📭</span>
+                    <span>Aucune donnée de crédit disponible pour ce client</span>
+                </div>`;
+    }
+
+    // Préparer les données pour le graphique
+    const sortedResults = [...creditData.results].sort((a, b) => {
+        const dateA = new Date(a.date.split('/').reverse().join('-'));
+        const dateB = new Date(b.date.split('/').reverse().join('-'));
+        return dateA - dateB;
+    });
+
+    // Extraire les dates et valeurs
+    const dates = [];
+    const creditValues = [];
+
+    sortedResults.forEach((item) => {
+        const creditValue = parseFloat(item.credit || item.valeur || 0);
+        const dateStr = item.date;
+        dates.push(dateStr);
+        creditValues.push(creditValue);
+    });
+
+    console.log(`📈 Données préparées: ${dates.length} points, min=${Math.min(...creditValues)}, max=${Math.max(...creditValues)}`);
+
+    // Créer un ID unique pour le canvas
+    const chartId = `credit-chart-${clientId}-${Date.now()}`;
+    
+    // Attendre que le DOM soit prêt pour créer le graphique
+    setTimeout(() => {
+        const canvas = document.getElementById(chartId);
+        if (!canvas) {
+            console.error(`❌ Canvas ${chartId} non trouvé - réessai dans 200ms`);
+            // Réessayer une fois
+            setTimeout(() => {
+                const canvasRetry = document.getElementById(chartId);
+                if (!canvasRetry) {
+                    console.error(`❌ Canvas ${chartId} toujours non trouvé`);
+                    return;
+                }
+                createChartInstance(canvasRetry, dates, creditValues, clientId);
+            }, 200);
+            return;
+        }
+        createChartInstance(canvas, dates, creditValues, clientId);
+    }, 150);
+    
+    // Fonction interne pour créer l'instance du graphique
+    function createChartInstance(canvas, dates, creditValues, clientId) {
+        // Vérifier que Chart.js est chargé
+        if (typeof Chart === 'undefined') {
+            console.error('❌ Chart.js n\'est pas chargé!');
+            canvas.parentElement.innerHTML = `
+                <div style="text-align: center; padding: 40px; color: #ef4444; background: #fee2e2; border-radius: 12px;">
+                    <span style="font-size: 32px;">⚠️</span>
+                    <p style="margin-top: 10px;">Chart.js n'est pas chargé. Veuillez ajouter le script dans votre page HTML.</p>
+                </div>
+            `;
+            return;
+        }
+        
+        // Créer les couleurs pour chaque barre
+        const barColors = creditValues.map((value) => {
+            return value === 0 ? '#ef4444' : '#22c55e';  // Changé de #3b82f6 (bleu) à #22c55e (vert)
+        });
+        
+        // Détruire l'ancien graphique s'il existe
+        if (window[`creditChart_${clientId}`]) {
+            window[`creditChart_${clientId}`].destroy();
+        }
+        
+        const ctx = canvas.getContext('2d');
+        window[`creditChart_${clientId}`] = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: dates,
+                datasets: [{
+                    label: 'Crédit (jours)',
+                    data: creditValues,
+                    backgroundColor: barColors,
+                    borderColor: barColors.map(c => c === '#ef4444' ? '#dc2626' : '#16a34a'), // Vert foncé 
+                    borderWidth: 1,
+                    borderRadius: 6,
+                    barPercentage: 0.7,
+                    categoryPercentage: 0.9
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                        padding: 12,
+                        titleFont: { size: 13, weight: 'bold' },
+                        bodyFont: { size: 12 },
+                        callbacks: {
+                            title: (context) => {
+                                return context[0].label;
+                            },
+                            label: (context) => {
+                                const value = context.parsed.y;
+                                if (value === 0) {
+                                    return '💰 Crédit nul - risque de coupure';
+                                }
+                                return `${value} jour(s) de crédit restant`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Jours de crédit',
+                            font: { size: 11, weight: 'bold' },
+                            color: '#334155'
+                        },
+                        ticks: {
+                            stepSize: 10,
+                            callback: (value) => value + 'j',
+                            font: { size: 10 }
+                        },
+                        grid: {
+                            color: 'rgba(148, 163, 184, 0.1)'
+                        }
+                    },
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Date',
+                            font: { size: 11, weight: 'bold' },
+                            color: '#334155'
+                        },
+                        ticks: {
+                            maxRotation: 45,
+                            minRotation: 30,
+                            font: { size: 9 },
+                            autoSkip: true,
+                            maxTicksLimit: 12
+                        },
+                        grid: {
+                            display: false
+                        }
+                    }
+                },
+                layout: {
+                    padding: {
+                        top: 10,
+                        bottom: 10
+                    }
+                }
+            }
+        });
+        
+        console.log(`✅ Graphique crédit créé pour client ${clientId}`);
+    }
+
+    // Générer le HTML du conteneur
+    return `
+        <div style="background: white; border-radius: 16px; padding: 20px; margin-bottom: 20px; border: 1px solid #e2e8f0;">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 15px;">
+                <div style="width: 36px; height: 36px; background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); 
+                          border-radius: 10px; display: flex; align-items: center; justify-content: center;">
+                    <span style="font-size: 18px; color: white;">💰</span>
+                </div>
+                <div>
+                    <div style="font-weight: 700; color: #1e293b; font-size: 16px;">Évolution du Crédit</div>
+                    <div style="font-size: 11px; color: #64748b;">Évolution journalière du nombre de jours de crédit</div>
+                </div>
+                <div style="margin-left: auto; background: #fef3c7; padding: 4px 12px; border-radius: 20px; font-size: 12px; color: #92400e;">
+                    📊 ${sortedResults.length} relevés
+                </div>
+            </div>
+            
+            <div style="width: 100%; height: 300px;">
+                <canvas id="${chartId}" style="width: 100% !important; height: 100% !important;"></canvas>
+            </div>
+            
+            <div style="display: flex; justify-content: center; gap: 20px; margin-top: 15px; padding-top: 10px; border-top: 1px solid #e2e8f0;">
+                <div style="display: flex; align-items: center; gap: 6px;">
+                    <span style="width: 12px; height: 12px; background: #3b82f6; border-radius: 2px;"></span>
+                    <span style="font-size: 11px; color: #475569;">Jours de crédit</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 6px;">
+                    <span style="width: 12px; height: 12px; background: #ef4444; border-radius: 2px;"></span>
+                    <span style="font-size: 11px; color: #475569;">Crédit nul</span>
+                </div>
+            </div>
+        </div>
+    `;
+}
+// ======================== ANALYSE MENSUELLE DU CRÉDIT ========================
+function analyzeMonthlyCredit(creditResults, clientId) {
+    if (!creditResults || !creditResults.results || creditResults.results.length === 0) {
+        return [];
+    }
+
+    // Grouper par mois/année
+    const monthlyData = {};
+
+    creditResults.results.forEach(item => {
+        const dateStr = item.date;
+        const [day, month, year] = dateStr.split('/');
+        const monthKey = `${year}-${month.padStart(2, '0')}`;
+        const monthName = getMonthName(parseInt(month));
+        
+        const creditValue = parseFloat(item.credit || item.valeur || 0);
+        
+        if (!monthlyData[monthKey]) {
+            monthlyData[monthKey] = {
+                year: parseInt(year),
+                month: parseInt(month),
+                monthName: monthName,
+                days: new Set(),
+                daysWithoutCredit: new Set(),
+                creditValues: [],
+                totalCredit: 0,
+                creditCount: 0,
+                maxCredit: 0
+            };
+        }
+        
+        // Ajouter le jour
+        monthlyData[monthKey].days.add(dateStr);
+        
+        // Suivre les jours sans crédit
+        if (creditValue === 0) {
+            monthlyData[monthKey].daysWithoutCredit.add(dateStr);
+        }
+        
+        // Statistiques de crédit (uniquement valeurs > 0)
+        if (creditValue > 0) {
+            monthlyData[monthKey].creditValues.push(creditValue);
+            monthlyData[monthKey].totalCredit += creditValue;
+            monthlyData[monthKey].creditCount++;
+            if (creditValue > monthlyData[monthKey].maxCredit) {
+                monthlyData[monthKey].maxCredit = creditValue;
+            }
+        }
+    });
+
+    // Calculer les statistiques mensuelles
+    const monthlyStats = Object.values(monthlyData)
+        .map(data => {
+            const totalDays = data.days.size;
+            const daysWithoutCredit = data.daysWithoutCredit.size;
+            const tauxDisponibilite = totalDays > 0 
+                ? ((totalDays - daysWithoutCredit) / totalDays * 100).toFixed(1)
+                : 0;
+            
+            const creditMoyen = data.creditCount > 0 
+                ? (data.totalCredit / data.creditCount).toFixed(1)
+                : 0;
+            
+            return {
+                month: `${data.monthName} ${data.year}`,
+                monthKey: `${data.year}-${data.month.toString().padStart(2, '0')}`,
+                totalDays: totalDays,
+                daysWithoutCredit: daysWithoutCredit,
+                tauxDisponibilite: parseFloat(tauxDisponibilite),
+                maxCredit: data.maxCredit,
+                creditMoyen: parseFloat(creditMoyen),
+                pourcentageSansCredit: totalDays > 0 
+                    ? ((daysWithoutCredit / totalDays) * 100).toFixed(1)
+                    : 0
+            };
+        })
+        .sort((a, b) => a.monthKey.localeCompare(b.monthKey));
+
+    return monthlyStats;
+}
+
+// ======================== CRÉATION DU TABLEAU MENSUEL ========================
+function createMonthlyCreditTable(monthlyStats) {
+    if (!monthlyStats || monthlyStats.length === 0) {
+        return `
+            <div style="text-align: center; padding: 30px; color: #64748b; background: #f8fafc; border-radius: 12px;">
+                <span style="font-size: 32px;">📊</span>
+                <p style="margin-top: 10px;">Aucune donnée mensuelle disponible</p>
+            </div>
+        `;
+    }
+
+    const rows = monthlyStats.map(stat => {
+        // Déterminer la couleur du taux de disponibilité
+        let tauxColor = '#22c55e';
+        let tauxBg = '#f0fdf4';
+        if (stat.tauxDisponibilite < 80) {
+            tauxColor = '#ef4444';
+            tauxBg = '#fef2f2';
+        } else if (stat.tauxDisponibilite < 95) {
+            tauxColor = '#f59e0b';
+            tauxBg = '#fef3c7';
+        }
+        
+        // Déterminer la couleur pour les jours sans crédit
+        let sansCreditColor = '#64748b';
+        let sansCreditBg = '#f1f5f9';
+        let sansCreditBadge = '';
+        
+        if (stat.daysWithoutCredit > 0) {
+            const pourcentage = parseFloat(stat.pourcentageSansCredit);
+            if (pourcentage > 20) {
+                sansCreditColor = '#ef4444';
+                sansCreditBg = '#fee2e2';
+                sansCreditBadge = '🔴';
+            } else if (pourcentage > 10) {
+                sansCreditColor = '#f59e0b';
+                sansCreditBg = '#fef3c7';
+                sansCreditBadge = '⚠️';
+            } else {
+                sansCreditColor = '#f97316';
+                sansCreditBg = '#fff7ed';
+                sansCreditBadge = '⚠️';
+            }
+        } else {
+            sansCreditBadge = '✅';
+            sansCreditBg = '#f0fdf4';
+            sansCreditColor = '#22c55e';
+        }
+        
+        return `
+            <tr style="border-bottom: 1px solid #e2e8f0; transition: background 0.2s;" 
+                onmouseover="this.style.background='#f8fafc'" 
+                onmouseout="this.style.background='white'">
+                <td style="padding: 14px 12px; font-weight: 600; color: #1e293b;">
+                    ${stat.month}
+                 </td>
+                <td style="padding: 14px 12px; text-align: center; font-weight: 500;">
+                    ${stat.totalDays}
+                 </td>
+                <td style="padding: 14px 12px; text-align: center;">
+                    <span style="display: inline-flex; align-items: center; gap: 4px; 
+                             background: ${sansCreditBg}; 
+                             color: ${sansCreditColor}; 
+                             padding: 4px 12px; 
+                             border-radius: 20px; 
+                             font-weight: 600;
+                             font-size: 13px;">
+                        ${sansCreditBadge} ${stat.daysWithoutCredit}
+                        <span style="font-size: 11px; opacity: 0.8;">(${stat.pourcentageSansCredit}%)</span>
+                    </span>
+                  </td>
+                <td style="padding: 14px 12px; text-align: center;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <div style="flex: 1; background: #e2e8f0; border-radius: 20px; height: 6px; overflow: hidden;">
+                            <div style="width: ${stat.tauxDisponibilite}%; height: 100%; background: ${tauxColor}; border-radius: 20px;"></div>
+                        </div>
+                        <span style="font-weight: 700; color: ${tauxColor}; min-width: 45px;">
+                            ${stat.tauxDisponibilite}%
+                        </span>
+                    </div>
+                  </td>
+                <td style="padding: 14px 12px; text-align: center; font-weight: 700; color: #10b981;">
+                    ${stat.maxCredit} j
+                  </td>
+                <td style="padding: 14px 12px; text-align: center; font-weight: 600; color: #3b82f6;">
+                    ${stat.creditMoyen} j
+                  </td>
+              </tr>
+        `;
+    }).join('');
+
+    // Calculer les totaux globaux
+    const totalDays = monthlyStats.reduce((sum, s) => sum + s.totalDays, 0);
+    const totalDaysWithoutCredit = monthlyStats.reduce((sum, s) => sum + s.daysWithoutCredit, 0);
+    const globalTauxDisponibilite = totalDays > 0 
+        ? ((totalDays - totalDaysWithoutCredit) / totalDays * 100).toFixed(1)
+        : 0;
+    const globalMaxCredit = Math.max(...monthlyStats.map(s => s.maxCredit));
+    const globalCreditMoyen = (monthlyStats.reduce((sum, s) => sum + s.creditMoyen, 0) / monthlyStats.length).toFixed(1);
+    
+    // Déterminer la couleur globale du taux
+    let globalTauxColor = '#22c55e';
+    if (globalTauxDisponibilite < 80) {
+        globalTauxColor = '#ef4444';
+    } else if (globalTauxDisponibilite < 95) {
+        globalTauxColor = '#f59e0b';
+    }
+
+    return `
+        <div style="margin-top: 20px;">
+            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 15px;">
+                <div style="width: 36px; height: 36px; background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%); 
+                          border-radius: 10px; display: flex; align-items: center; justify-content: center;">
+                    <span style="font-size: 18px; color: white;">📅</span>
+                </div>
+                <div>
+                    <div style="font-weight: 700; color: #1e293b; font-size: 16px;">Analyse mensuelle du crédit</div>
+                    <div style="font-size: 11px; color: #64748b;">Évolution mensuelle de la disponibilité et du crédit</div>
+                </div>
+                <div style="margin-left: auto; background: #f1f5f9; padding: 4px 12px; border-radius: 20px; font-size: 12px;">
+                    📊 ${monthlyStats.length} mois analysés
+                </div>
+            </div>
+            
+            <div style="overflow-x: auto; border-radius: 12px; border: 1px solid #e2e8f0; background: white;">
+                <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+                    <thead>
+                        <tr style="background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); border-bottom: 2px solid #e2e8f0;">
+                            <th style="padding: 14px 12px; text-align: left; font-weight: 700; color: #334155;">Mois</th>
+                            <th style="padding: 14px 12px; text-align: center; font-weight: 700; color: #334155;">Jours analysés</th>
+                            <th style="padding: 14px 12px; text-align: center; font-weight: 700; color: #334155;">Jours sans crédit</th>
+                            <th style="padding: 14px 12px; text-align: center; font-weight: 700; color: #334155;">Taux de disponibilité</th>
+                            <th style="padding: 14px 12px; text-align: center; font-weight: 700; color: #334155;">Crédit maximum</th>
+                            <th style="padding: 14px 12px; text-align: center; font-weight: 700; color: #334155;">Crédit moyen</th>
+                         </tr>
+                    </thead>
+                    <tbody>
+                        ${rows}
+                    </tbody>
+                    <tfoot>
+                        <tr style="background: #f8fafc; border-top: 2px solid #e2e8f0; font-weight: 600;">
+                            <td style="padding: 14px 12px; font-weight: 700; color: #1e293b;">TOTAL / MOYENNE</td>
+                            <td style="padding: 14px 12px; text-align: center; font-weight: 700; color: #1e293b;">${totalDays}</td>
+                            <td style="padding: 14px 12px; text-align: center; font-weight: 700; color: #1e293b;">${totalDaysWithoutCredit}</td>
+                            <td style="padding: 14px 12px; text-align: center;">
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <div style="flex: 1; background: #e2e8f0; border-radius: 20px; height: 8px; overflow: hidden;">
+                                        <div style="width: ${globalTauxDisponibilite}%; height: 100%; background: ${globalTauxColor}; border-radius: 20px;"></div>
+                                    </div>
+                                    <span style="font-weight: 800; color: ${globalTauxColor}; min-width: 45px;">
+                                        ${globalTauxDisponibilite}%
+                                    </span>
+                                </div>
+                             </td>
+                            <td style="padding: 14px 12px; text-align: center; font-weight: 800; color: #10b981;">${globalMaxCredit} j</td>
+                            <td style="padding: 14px 12px; text-align: center; font-weight: 800; color: #3b82f6;">${globalCreditMoyen} j</td>
+                         </tr>
+                    </tfoot>
+                 </table>
+            </div>
+            
+            <!-- Légende -->
+            <div style="display: flex; gap: 20px; margin-top: 12px; padding: 10px 0; font-size: 11px; color: #64748b; flex-wrap: wrap;">
+                <div style="display: flex; align-items: center; gap: 6px;">
+                    <span style="width: 12px; height: 12px; background: #22c55e; border-radius: 2px;"></span>
+                    <span>Taux ≥ 95%</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 6px;">
+                    <span style="width: 12px; height: 12px; background: #f59e0b; border-radius: 2px;"></span>
+                    <span>Taux 80-95%</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 6px;">
+                    <span style="width: 12px; height: 12px; background: #ef4444; border-radius: 2px;"></span>
+                    <span>Taux < 80%</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 6px;">
+                    <span style="font-size: 12px;">✅</span>
+                    <span>0 jour sans crédit</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 6px;">
+                    <span style="font-size: 12px;">⚠️</span>
+                    <span>1-20% sans crédit</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 6px;">
+                    <span style="font-size: 12px;">🔴</span>
+                    <span>>20% sans crédit</span>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+// ======================== FONCTION CRÉDIT CARD MODIFIÉE AVEC TABLEAU MENSUEL ========================
 function createCreditCard(clientId) {
     const clientNumber = parseInt(clientId).toString().padStart(2, '0');
 
     // Analyser les jours sans crédit pour ce client
     const creditAnalysis = analyzeClientCreditDays(clientId);
+    
+    // Récupérer les données de crédit complètes pour le graphique
+    const creditData = creditResultsByClient[clientId];
+    
+    // ANALYSE MENSUELLE - NOUVEAU
+    const monthlyStats = analyzeMonthlyCredit(creditData, clientId);
+    
+    // Calculer quelques statistiques pour le résumé
+    const totalDays = creditAnalysis.totalDaysWithoutCredit;
+    const significantStreaks = creditAnalysis.significantStreaks;
+    const longestStreak = creditAnalysis.longestStreak;
+    
+    // Calculer le crédit moyen (hors zéros)
+    let avgCredit = 0;
+    let totalCredit = 0;
+    let creditCount = 0;
+    
+    if (creditData && creditData.results) {
+        creditData.results.forEach(item => {
+            const val = parseFloat(item.credit || item.valeur || 0);
+            if (val > 0) {
+                totalCredit += val;
+                creditCount++;
+            }
+        });
+        avgCredit = creditCount > 0 ? (totalCredit / creditCount).toFixed(1) : 0;
+    }
+    
+    // Déterminer le niveau de risque
+    let riskLevel = 'faible';
+    let riskColor = '#22c55e';
+    let riskIcon = '✅';
+    
+    if (totalDays > 20 || longestStreak > 7) {
+        riskLevel = 'élevé';
+        riskColor = '#ef4444';
+        riskIcon = '🔴';
+    } else if (totalDays > 10 || longestStreak > 3) {
+        riskLevel = 'moyen';
+        riskColor = '#f59e0b';
+        riskIcon = '⚠️';
+    }
 
     return `
-        <!-- CARTE CRÉDIT DU CLIENT -->
+        <!-- CARTE CRÉDIT DU CLIENT AVEC GRAPHIQUE ET TABLEAU MENSUEL -->
         <div style="background: white; border-radius: 16px; border: 2px solid #e2e8f0; margin: 25px 0; overflow: hidden; box-shadow: 0 8px 20px rgba(0,0,0,0.08);">
             
             <!-- En-tête avec le numéro du client -->
-            <div style="background: linear-gradient(135deg, #9f7aea 0%, #805ad5 100%); color: white; padding: 16px 22px; display: flex; align-items: center; gap: 12px;">
+            <div style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; padding: 16px 22px; display: flex; align-items: center; gap: 12px;">
                 <div style="width: 40px; height: 40px; background: rgba(255,255,255,0.2); border-radius: 10px; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(4px);">
                     <span style="font-size: 22px;">💰</span>
                 </div>
                 <div>
-                    <div style="font-weight: 700; font-size: 18px;">Crédit & Recharge - Client${clientNumber}</div>
+                    <div style="font-weight: 700; font-size: 18px;">Crédit & Recharge - Client ${clientNumber}</div>
+                    <div style="font-size: 12px; opacity: 0.9;">Suivi de l'évolution du crédit</div>
                 </div>
                 <div style="margin-left: auto; background: rgba(255,255,255,0.2); padding: 6px 16px; border-radius: 30px; font-size: 13px; font-weight: 600;">
-                    📊 ${creditAnalysis.totalDaysWithoutCredit} jour(s) sans crédit
+                    📊 ${creditCount} relevés
                 </div>
             </div>
             
-            <div style="padding: 22px;">
-                
-                <!-- SECTION 1 : SÉRIES SANS CRÉDIT (>1 jour) -->
-                <div style="margin-bottom: 25px;">
-                    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 15px;">
-                        <div style="width: 36px; height: 36px; background: #f59e0b20; border-radius: 8px; display: flex; align-items: center; justify-content: center;">
-                            <span style="font-size: 20px;">🔗</span>
-                        </div>
-                        <div>
-                            <span style="font-weight: 700; color: #1e293b; font-size: 16px;">Séries sans crédit (>1 jour)</span>
-                            <span style="margin-left: 12px; background: #f1f5f9; color: #475569; padding: 2px 10px; border-radius: 30px; font-size: 12px;">${creditAnalysis.significantStreaks.length}</span>
-                        </div>
-                    </div>
-                    
-                    ${creditAnalysis.significantStreaks.length > 0 ? `
-                        <!-- Grille des séries sans crédit - EXACTEMENT COMME DANS VOTRE EXEMPLE -->
-                        <div style="display: flex; flex-wrap: wrap; gap: 15px;">
-                            ${creditAnalysis.significantStreaks.map((streak, index) => {
-        const isLongest = streak.days === creditAnalysis.longestStreak;
-        return `
-                                    <div style="flex: 1 1 200px; min-width: 180px; background: white; border-radius: 10px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.04);">
-                                        <div style="background: ${isLongest ? '#ef4444' : '#f59e0b'}; padding: 8px 12px; display: flex; justify-content: space-between; align-items: center;">
-                                            <span style="color: white; font-weight: 600; font-size: 13px;">#${index + 1}</span>
-                                            ${isLongest ? '<span style="background: white; color: #ef4444; padding: 2px 8px; border-radius: 20px; font-size: 10px; font-weight: 700;">MAX</span>' : ''}
-                                        </div>
-                                        <div style="padding: 15px;">
-                                            <div style="font-size: 28px; font-weight: 800; color: ${isLongest ? '#ef4444' : '#f59e0b'}; margin-bottom: 5px;">${streak.days} jours</div>
-                                            <div style="font-size: 13px; color: #475569; font-family: monospace;">${streak.startDate} → ${streak.endDate}</div>
-                                        </div>
-                                    </div>
-                                `;
-    }).join('')}
-                        </div>
-                    ` : `
-                        <!-- Message si aucune série -->
-                        <div style="text-align: center; padding: 30px; background: #f8fafc; border-radius: 12px; border: 1px dashed #cbd5e1;">
-                            <span style="font-size: 48px; display: block; margin-bottom: 10px; color: #94a3b8;">✅</span>
-                            <span style="color: #64748b; font-size: 14px;">Aucune série sans crédit (>1 jour) détectée</span>
-                        </div>
-                    `}
+            <!-- GRAPHIQUE D'ÉVOLUTION DU CRÉDIT -->
+            <div style="padding: 0;">
+                ${createCreditChart(creditData, clientId)}
+            </div>
+            
+            <!-- TABLEAU D'ANALYSE MENSUELLE - NOUVEAU -->
+            <div style="padding: 20px; border-top: 1px solid #e2e8f0;">
+                ${createMonthlyCreditTable(monthlyStats)}
+            </div>
+            
+            <!-- RÉSUMÉ STATISTIQUE -->
+            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; padding: 15px 20px; background: #f8fafc; border-top: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0;">
+                <div style="text-align: center;">
+                    <div style="font-size: 11px; color: #64748b;">Crédit moyen</div>
+                    <div style="font-size: 22px; font-weight: 700; color: #f59e0b;">${avgCredit}j</div>
                 </div>
-                
-                <!-- SECTION 2 : LISTE DES JOURS SANS CRÉDIT -->
-                <div style="margin-top: 25px; padding-top: 20px; border-top: 1px solid #e2e8f0;">
-                    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 15px;">
-                        <div style="width: 36px; height: 36px; background: #94a3b820; border-radius: 8px; display: flex; align-items: center; justify-content: center;">
-                            <span style="font-size: 20px;">📋</span>
-                        </div>
-                        <span style="font-weight: 700; color: #1e293b; font-size: 16px;">Liste des jours sans crédit</span>
-                        <span style="margin-left: auto; background: #f1f5f9; color: #475569; padding: 4px 12px; border-radius: 30px; font-size: 12px;">${creditAnalysis.daysWithoutCredit.length} jour(s)</span>
+                <div style="text-align: center;">
+                    <div style="font-size: 11px; color: #64748b;">Jours sans crédit</div>
+                    <div style="font-size: 22px; font-weight: 700; color: ${totalDays > 0 ? '#ef4444' : '#22c55e'};">${totalDays}</div>
+                </div>
+                <div style="text-align: center;">
+                    <div style="font-size: 11px; color: #64748b;">Plus longue série</div>
+                    <div style="font-size: 22px; font-weight: 700; color: ${longestStreak > 3 ? '#ef4444' : '#f59e0b'};">${longestStreak}j</div>
+                </div>
+                <div style="text-align: center;">
+                    <div style="font-size: 11px; color: #64748b;">Risque</div>
+                    <div style="display: flex; align-items: center; justify-content: center; gap: 5px; margin-top: 5px;">
+                        <span style="font-size: 18px;">${riskIcon}</span>
+                        <span style="font-weight: 700; color: ${riskColor};">${riskLevel.toUpperCase()}</span>
                     </div>
-                    
-                    ${creditAnalysis.daysWithoutCredit.length > 0 ? `
-                        <div style="max-height: 150px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px;">
-                            <div style="display: flex; flex-wrap: wrap; gap: 8px;">
-                                ${creditAnalysis.daysWithoutCredit.slice(0, 50).map(day => `
-                                    <span style="background: #f1f5f9; padding: 5px 12px; border-radius: 20px; font-size: 12px; color: #475569; border-left: 3px solid #ef4444;">
-                                        ${day}
-                                    </span>
-                                `).join('')}
-                                ${creditAnalysis.daysWithoutCredit.length > 50 ? `
-                                    <span style="background: #f1f5f9; padding: 5px 12px; border-radius: 20px; font-size: 12px; color: #64748b; font-style: italic;">
-                                        + ${creditAnalysis.daysWithoutCredit.length - 50} autre(s)
-                                    </span>
-                                ` : ''}
-                            </div>
-                        </div>
-                    ` : `
-                        <div style="text-align: center; padding: 20px; background: #f8fafc; border-radius: 8px; color: #64748b;">
-                            ✅ Aucun jour sans crédit détecté
-                        </div>
-                    `}
                 </div>
             </div>
+            
+            <!-- SÉRIES SANS CRÉDIT (version compacte) -->
+            ${significantStreaks.length > 0 ? `
+            <div style="padding: 16px 20px;">
+                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+                    <span style="font-size: 16px;">🔗</span>
+                    <span style="font-weight: 600; color: #1e293b; font-size: 14px;">Périodes sans crédit</span>
+                    <span style="background: #f1f5f9; color: #475569; padding: 2px 10px; border-radius: 30px; font-size: 11px;">${significantStreaks.length} série(s)</span>
+                </div>
+                <div style="display: flex; flex-wrap: wrap; gap: 12px;">
+                    ${significantStreaks.slice(0, 5).map((streak, index) => {
+                        const isLongest = streak.days === longestStreak;
+                        return `
+                            <div style="flex: 1 1 180px; background: white; border-radius: 10px; border: 1px solid #e2e8f0; overflow: hidden;">
+                                <div style="background: ${isLongest ? '#ef4444' : '#f59e0b'}; padding: 6px 12px; display: flex; justify-content: space-between;">
+                                    <span style="color: white; font-weight: 600; font-size: 11px;">Série ${index + 1}</span>
+                                    ${isLongest ? '<span style="background: white; color: #ef4444; padding: 2px 8px; border-radius: 20px; font-size: 9px; font-weight: 700;">MAX</span>' : ''}
+                                </div>
+                                <div style="padding: 10px;">
+                                    <div style="font-size: 20px; font-weight: 800; color: ${isLongest ? '#ef4444' : '#f59e0b'};">${streak.days} jours</div>
+                                    <div style="font-size: 11px; color: #64748b; font-family: monospace;">${streak.startDate} → ${streak.endDate}</div>
+                                </div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+                ${significantStreaks.length > 5 ? `<div style="margin-top: 10px; font-size: 11px; color: #94a3b8; text-align: center;">+ ${significantStreaks.length - 5} autre(s) série(s)</div>` : ''}
+            </div>
+            ` : `
+            <div style="padding: 20px; text-align: center; background: #f8fafc;">
+                <span style="font-size: 48px; display: block; margin-bottom: 10px; color: #94a3b8;">✅</span>
+                <span style="color: #64748b; font-size: 13px;">Aucune période sans crédit (>1 jour) détectée</span>
+            </div>
+            `}
             
             <!-- Pied de carte -->
             <div style="padding: 12px 22px; background: #f8fafc; border-top: 1px solid #e2e8f0; font-size: 11px; color: #64748b; display: flex; justify-content: space-between;">
-                <span>Dernière analyse: ${new Date().toLocaleDateString('fr-FR')}</span>
-                <span>Client ${clientNumber} · Données issues de la colonne crédit</span>
+                <span>📈 Graphique: Évolution du crédit (jours) | 📊 Analyse mensuelle</span>
+                <span>Client ${clientNumber} · Dernière analyse: ${new Date().toLocaleDateString('fr-FR')}</span>
             </div>
         </div>
     `;
@@ -4733,8 +5243,7 @@ function getConclusionMessage(stabilityPercentage, stable, unstable, outOfLimits
     return message;
 }
 
-// ======================== FONCTIONS DE VISUALISATION DE STABILITÉ ========================
-
+// ======================== FONCTION DE VISUALISATION DE STABILITÉ AVEC STYLE CARTE ========================
 function createStabilityChart(containerId, stabilityData, tensionResults) {
     const container = document.getElementById(containerId);
     if (!container) return;
@@ -4742,30 +5251,32 @@ function createStabilityChart(containerId, stabilityData, tensionResults) {
     const { stable, unstable, outOfLimits, stabilityPercentage, systemType, averageVariation, days } = stabilityData;
     const totalDays = stable + unstable + outOfLimits;
 
-    // CALCULER LES JOURS D'ALERTE
-    const alertData = calculateAlertDays(tensionResults);
-
-    // Déterminer les couleurs selon le taux de stabilité
-    const getStatusColor = () => {
-        if (stabilityPercentage >= 90) return { bg: '#dcfce7', border: '#22c55e', text: '#166534', icon: '🟢' };
-        if (stabilityPercentage >= 75) return { bg: '#dbeafe', border: '#3b82f6', text: '#1e40af', icon: '🔵' };
-        if (stabilityPercentage >= 60) return { bg: '#fef3c7', border: '#f59e0b', text: '#92400e', icon: '🟡' };
-        return { bg: '#fee2e2', border: '#ef4444', text: '#991b1b', icon: '🔴' };
-    };
-
-    const statusColor = getStatusColor();
+    // CALCULER LES JOURS AVEC VARIATION HAUTE (instabilité)
+    const highVariationDays = calculateHighVariationDays(tensionResults);
     
-    // Générer un ID unique pour le tableau des dépassements
+    // CALCULER LES JOURS D'ALERTE (dépassements de seuil)
+    const alertData = calculateAlertDays(tensionResults);
+    
+    // Déterminer les seuils selon le système
+    const tensionMin = systemType === '24V' ? '22' : '11';
+    const tensionMax = systemType === '24V' ? '31' : '15';
+    const variationSeuil = systemType === '24V' ? '5' : '2.5';
+    
+    // Calculer les pourcentages pour les barres de progression
+    const percentConforme = totalDays > 0 ? Math.round((stable / totalDays) * 100) : 0;
+    const percentNonConforme = totalDays > 0 ? Math.round((outOfLimits / totalDays) * 100) : 0;
+    const percentVariationHaute = totalDays > 0 ? Math.round((highVariationDays.count / totalDays) * 100) : 0;
+    
+    // Générer un ID unique pour les tableaux
     const exceedanceTableId = `exceedance-table-${Date.now()}`;
+    const variationTableId = `variation-table-${Date.now()}`;
 
     // Fonction pour formater la date correctement
     const formatDate = (dateStr) => {
         if (!dateStr) return 'Date invalide';
-        // Si la date est déjà au format DD/MM/YYYY
         if (dateStr.includes('/')) {
             const [day, month, year] = dateStr.split('/');
             const date = new Date(year, month - 1, day);
-            // Vérifier si la date est valide
             if (!isNaN(date.getTime())) {
                 return date.toLocaleDateString('fr-FR', { 
                     day: '2-digit', 
@@ -4774,7 +5285,6 @@ function createStabilityChart(containerId, stabilityData, tensionResults) {
                 });
             }
         }
-        // Essayer de parser directement
         const date = new Date(dateStr);
         if (!isNaN(date.getTime())) {
             return date.toLocaleDateString('fr-FR', { 
@@ -4786,231 +5296,261 @@ function createStabilityChart(containerId, stabilityData, tensionResults) {
         return dateStr;
     };
 
-    container.innerHTML = `
-        <div class="stability-dashboard" style="background: linear-gradient(135deg, #f8fafc 0%, #ffffff 100%); border-radius: 12px; padding: 0; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
-            
-            <!-- En-tête avec statut global -->
-            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
-                <div style="display: flex; align-items: center; gap: 12px;">
-                    <span style="font-size: 32px;">🔄</span>
-                    <div>
-                        <div style="font-weight: 700; font-size: 18px;">Analyse globale de Tension</div>
-                        <div style="font-size: 12px; opacity: 0.9; margin-top: 4px;">Système ${systemType} DC - ${days} jour${days !== 1 ? 's' : ''} analysés</div>
+    // Générer le HTML pour le tableau des dépassements (si des jours non conformes existent)
+    let exceedanceTableHTML = '';
+    if (outOfLimits > 0 && alertData && alertData.daysList && alertData.daysList.length > 0) {
+        exceedanceTableHTML = `
+            <div style="background: #fef2f2; border-radius: 0; margin: 0; border-top: 1px solid #fee2e2; overflow: hidden;">
+                <div style="background: #fee2e2; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; transition: all 0.2s ease;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <span style="font-size: 16px;">🔴</span>
+                        <span style="font-weight: 600; color: #b91c1c;">Jours avec dépassement de seuil (${alertData.daysList.length})</span>
+                        <span style="font-size: 11px; color: #dc2626;">Total: ${alertData.daysList.reduce((sum, day) => sum + day.hoursAboveThreshold, 0)} heures d'alerte</span>
                     </div>
+                    <button id="toggle-${exceedanceTableId}" 
+                            data-table-id="${exceedanceTableId}"
+                            style="background: rgba(239, 68, 68, 0.15); border: 1px solid #ef4444; color: #b91c1c; padding: 5px 12px; border-radius: 20px; cursor: pointer; font-size: 11px; font-weight: 600; display: flex; align-items: center; gap: 5px;">
+                        <span style="font-size: 11px;">🔽</span>
+                        <span>Afficher le tableau</span>
+                    </button>
                 </div>
-                <div style="background: ${statusColor.bg}; border: 2px solid ${statusColor.border}; color: ${statusColor.text}; padding: 10px 16px; border-radius: 8px; text-align: center;">
-                    <div style="font-size: 28px; font-weight: 700;">${stabilityPercentage}%</div>
-                    <div style="font-size: 11px; font-weight: 600; margin-top: 4px;">Conformité Globale</div>
+                <div id="${exceedanceTableId}" style="display: none;">
+                    <div style="max-height: 260px; overflow-y: auto; padding: 16px; background: white;">
+                        <table style="width: 100%; font-size: 12px; border-collapse: collapse;">
+                            <thead style="background: #f1f5f9; position: sticky; top: 0;">
+                                <tr>
+                                    <th style="padding: 10px 8px; text-align: left;">Date</th>
+                                    <th style="padding: 10px 8px; text-align: center;">Variation</th>
+                                    <th style="padding: 10px 8px; text-align: center;">Tension Min</th>
+                                    <th style="padding: 10px 8px; text-align: center;">Tension Max</th>
+                                    <th style="padding: 10px 8px; text-align: center;">Heures alerte</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${alertData.daysList.map((day, index) => {
+                                    const rowBgColor = index % 2 === 0 ? '#ffffff' : '#fafbfc';
+                                    return `
+                                        <tr style="border-bottom: 1px solid #e2e8f0; background: ${rowBgColor};">
+                                            <td style="padding: 8px; font-weight: 500;">${formatDate(day.date)}</td>
+                                            <td style="padding: 8px; text-align: center; color: #f59e0b; font-weight: 600;">${day.dailyVariation}V</td>
+                                            <td style="padding: 8px; text-align: center; color: ${parseFloat(day.min) < (systemType === '24V' ? 22 : 11) ? '#ef4444' : '#1e293b'};">${day.min}V</td>
+                                            <td style="padding: 8px; text-align: center; color: ${parseFloat(day.max) > (systemType === '24V' ? 31 : 15) ? '#ef4444' : '#1e293b'};">${day.max}V</td>
+                                            <td style="padding: 8px; text-align: center;">
+                                                <span style="background: rgba(239, 68, 68, 0.1); color: #ef4444; padding: 3px 8px; border-radius: 20px; font-weight: 600; font-size: 11px;">
+                                                    ${day.hoursAboveThreshold}h
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    `;
+                                }).join('')}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
+        `;
+    }
 
-            <!-- Contenu principal -->
-            <div style="padding: 20px;">
-                
-                <!-- Stats principales - Grille 3x2 (modifié) -->
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; margin-bottom: 25px;">
-                    <!-- Jours Conforme -->
-                    <div style="background: linear-gradient(135deg, #f0fff4 0%, #ffffff 100%); padding: 16px; border-radius: 10px; border-left: 5px solid #22c55e; box-shadow: 0 2px 8px rgba(0,0,0,0.06); transition: all 0.3s ease;">
-                        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
-                            <div style="background: #22c55e; color: white; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px;">✅</div>
-                            <div style="font-size: 11px; color: #718096; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Jours Conforme</div>
-                        </div>
-                        <div style="font-size: 32px; font-weight: 800; color: #22c55e; text-align: center; margin-bottom: 8px;">${stable}</div>
-                        <div style="text-align: center; padding: 6px 12px; background: rgba(34, 197, 94, 0.1); border-radius: 6px; font-size: 12px; color: #15803d; font-weight: 600;">
-                            ${totalDays > 0 ? Math.round((stable / totalDays) * 100) : 0}% des jours
-                        </div>
+    // Générer le HTML pour le tableau des variations hautes
+    let variationTableHTML = '';
+    if (highVariationDays.count > 0 && highVariationDays.daysList && highVariationDays.daysList.length > 0) {
+        variationTableHTML = `
+            <div style="background: #fff7ed; border-radius: 0; margin: 0; border-top: 1px solid #fed7aa; overflow: hidden;">
+                <div style="background: #fff7ed; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; transition: all 0.2s ease;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <span style="font-size: 16px;">⚠️</span>
+                        <span style="font-weight: 600; color: #b45309;">Jours avec variation haute (${highVariationDays.count})</span>
+                        <span style="font-size: 11px; color: #f97316;">Variation max: ${highVariationDays.maxVariation}V</span>
                     </div>
-
-                    <!-- Jours Non Conformes -->
-                    <div style="background: linear-gradient(135deg, #fef3c7 0%, #ffffff 100%); padding: 16px; border-radius: 10px; border-left: 5px solid #f59e0b; box-shadow: 0 2px 8px rgba(0,0,0,0.06); transition: all 0.3s ease;">
-                        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
-                            <div style="background: #f59e0b; color: white; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px;">⚠️</div>
-                            <div style="font-size: 11px; color: #718096; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Jours Non Conformes</div>
-                        </div>
-                        <div style="font-size: 32px; font-weight: 800; color: #f59e0b; text-align: center; margin-bottom: 8px;">${unstable}</div>
-                        <div style="text-align: center; padding: 6px 12px; background: rgba(245, 158, 11, 0.1); border-radius: 6px; font-size: 12px; color: #92400e; font-weight: 600;">
-                            ${totalDays > 0 ? Math.round((unstable / totalDays) * 100) : 0}% des jours
-                        </div>
-                    </div>
-
-                    <!-- CARTE NOUVELLE : Jours d'Alerte -->
-                    <div style="background: linear-gradient(135deg, #fff7ed 0%, #ffffff 100%); padding: 16px; border-radius: 10px; border-left: 5px solid #f97316; box-shadow: 0 2px 8px rgba(0,0,0,0.06); transition: all 0.3s ease;">
-                        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
-                            <div style="background: #f97316; color: white; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px;">🚨</div>
-                            <div style="font-size: 11px; color: #718096; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Jours d'Alerte</div>
-                        </div>
-                        <div style="font-size: 32px; font-weight: 800; color: #f97316; text-align: center; margin-bottom: 8px;">
-                            ${alertData.alertDays} / ${alertData.totalDays}
-                        </div>
-                        <div style="text-align: center; padding: 6px 12px; background: rgba(249, 115, 22, 0.1); border-radius: 6px; font-size: 12px; color: #92400e; font-weight: 600;">
-                            ⚡ ${getSystemLimits(systemType).alertThreshold}V/h</div>
-                        </div>
+                    <button id="toggle-variation-${variationTableId}" 
+                            data-table-id="variation-${variationTableId}"
+                            style="background: rgba(245, 158, 11, 0.15); border: 1px solid #f59e0b; color: #b45309; padding: 5px 12px; border-radius: 20px; cursor: pointer; font-size: 11px; font-weight: 600; display: flex; align-items: center; gap: 5px;">
+                        <span style="font-size: 11px;">🔽</span>
+                        <span>Afficher le tableau</span>
+                    </button>
+                </div>
+                <div id="variation-${variationTableId}" style="display: none;">
+                    <div style="max-height: 260px; overflow-y: auto; padding: 16px; background: white;">
+                        <table style="width: 100%; font-size: 12px; border-collapse: collapse;">
+                            <thead style="background: #f1f5f9; position: sticky; top: 0;">
+                                <tr>
+                                    <th style="padding: 10px 8px; text-align: left;">Date</th>
+                                    <th style="padding: 10px 8px; text-align: center;">Variation journalière</th>
+                                    <th style="padding: 10px 8px; text-align: center;">Variation horaire</th>
+                                    <th style="padding: 10px 8px; text-align: center;">Tension Min</th>
+                                    <th style="padding: 10px 8px; text-align: center;">Tension Max</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${highVariationDays.daysList.map((day, index) => {
+                                    const rowBgColor = index % 2 === 0 ? '#ffffff' : '#fafbfc';
+                                    return `
+                                        <tr style="border-bottom: 1px solid #e2e8f0; background: ${rowBgColor};">
+                                            <td style="padding: 8px; font-weight: 500;">${formatDate(day.date)}</td>
+                                            <td style="padding: 8px; text-align: center; color: #f59e0b; font-weight: 600;">${day.dailyVariation}V</td>
+                                            <td style="padding: 8px; text-align: center; color: #f97316;">${day.avgHourlyVariation}V/h</td>
+                                            <td style="padding: 8px; text-align: center;">${day.min}V</td>
+                                            <td style="padding: 8px; text-align: center;">${day.max}V</td>
+                                        </tr>
+                                    `;
+                                }).join('')}
+                            </tbody>
+                        </table>
                     </div>
                 </div>
+            </div>
+        `;
+    }
 
-                ${alertData.daysList.length > 0 ? `
-                <!-- SECTION TABLEAU DES DÉPASSEMENTS AVEC BOUTON -->
-                <div style="background: #fff7ed; border-radius: 10px; margin-bottom: 15px; border: 1px solid #fed7aa; overflow: hidden;">
-                    
-                    <!-- En-tête avec bouton -->
-                    <div style="background: #fed7aa; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; transition: all 0.2s ease;">
-                        <div style="display: flex; align-items: center; gap: 10px;">
-                            <span style="font-size: 18px;">📅</span>
-                            <span style="font-weight: 700; color: #92400e;">Jours avec dépassement de seuil (${alertData.daysList.length})</span>
-                            <span style="font-size: 12px; color: #b45309;">Total: ${alertData.daysList.reduce((sum, day) => sum + day.hoursAboveThreshold, 0)} heures d'alerte</span>
-                        </div>
-                        <button id="toggle-${exceedanceTableId}" 
-                                data-table-id="${exceedanceTableId}"
-                                style="background: rgba(249, 115, 22, 0.2); border: 1px solid #f97316; color: #92400e; padding: 6px 14px; border-radius: 8px; cursor: pointer; font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 6px; transition: all 0.2s ease;">
-                            <span style="font-size: 12px;">🔽</span>
-                            <span>Afficher le tableau</span>
-                        </button>
+    container.innerHTML = `
+        <div style="background: white; border-radius: 20px; overflow: hidden; box-shadow: 0 8px 20px rgba(0,0,0,0.08); border: 1px solid #e2e8f0; margin: 0;">
+            
+            <!-- En-tête du card -->
+            <div style="background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%); color: white; padding: 18px 22px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 15px;">
+                <div style="display: flex; align-items: center; gap: 15px;">
+                    <div style="width: 48px; height: 48px; background: rgba(255,255,255,0.2); border-radius: 14px; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(4px);">
+                        <span style="font-size: 28px;">⚡</span>
                     </div>
-                    
-                    <!-- Tableau (caché par défaut) -->
-                    <div id="${exceedanceTableId}" style="display: none;">
-                        <div style="max-height: 260px; overflow-y: auto; padding: 16px; background: white;">
-                            <table style="width: 100%; font-size: 12px; border-collapse: collapse;">
-                                <thead style="background: #f1f5f9; position: sticky; top: 0;">
-                                    <tr>
-                                        <th style="padding: 12px 8px; text-align: left; color: #475569; font-weight: 600; border-bottom: 2px solid #cbd5e1;">Date</th>
-                                        <th style="padding: 12px 8px; text-align: center; color: #475569; font-weight: 600; border-bottom: 2px solid #cbd5e1;">Variation</th>
-                                        <th style="padding: 12px 8px; text-align: center; color: #475569; font-weight: 600; border-bottom: 2px solid #cbd5e1;">Heures alerte</th>
-                                        <th style="padding: 12px 8px; text-align: center; color: #475569; font-weight: 600; border-bottom: 2px solid #cbd5e1;">Min / Max</th>
-                                        <th style="padding: 12px 8px; text-align: center; color: #475569; font-weight: 600; border-bottom: 2px solid #cbd5e1;">Valeurs hors seuil</th>
-                                     </tr>
-                                </thead>
-                                <tbody>
-                                    ${alertData.daysList.map((day, index) => {
-                                        let rowBgColor = index % 2 === 0 ? '#ffffff' : '#fafbfc';
-                                        if (day.hoursAboveThreshold >= 3) rowBgColor = '#fff5f5';
-                                        let minMaxDisplay = `${day.min}V / ${day.max}V`;
-                                        let exceedanceValues = [];
-                                        
-                                        if (day.min !== '-' && parseFloat(day.min) < alertData.limits.min) {
-                                            exceedanceValues.push(`Min: ${day.min}V`);
-                                            minMaxDisplay = `<span style="color: #ef4444; font-weight: 700;">${day.min}V</span> / ${day.max}V`;
-                                        }
-                                        if (day.max !== '-' && parseFloat(day.max) > alertData.limits.max) {
-                                            exceedanceValues.push(`Max: ${day.max}V`);
-                                            minMaxDisplay = `${day.min}V / <span style="color: #ef4444; font-weight: 700;">${day.max}V</span>`;
-                                        }
-                                        const exceedanceText = exceedanceValues.length > 0 ? exceedanceValues.join(' • ') : '-';
-                                        
-                                        // Formater la date correctement
-                                        const formattedDate = formatDate(day.date);
-                                        
-                                        return `
-                                            <tr style="border-bottom: 1px solid #e2e8f0; background: ${rowBgColor};">
-                                                <td style="padding: 10px 8px; text-align: left; color: #1e293b; font-weight: 500;">
-                                                    <div style="display: flex; flex-direction: column;">
-                                                        <span>${formattedDate}</span>
-                                                        <span style="font-size: 10px; color: #64748b;">${day.date}</span>
-                                                    </div>
-                                                 </td>
-                                                <td style="padding: 10px 8px; text-align: center; color: ${parseFloat(day.dailyVariation) > alertData.limits.maxVariation ? '#f59e0b' : '#1e293b'}; font-weight: ${parseFloat(day.dailyVariation) > alertData.limits.maxVariation ? '700' : '400'};">
-                                                    ${day.dailyVariation}V
-                                                 </td>
-                                                <td style="padding: 10px 8px; text-align: center;">
-                                                    <span style="background: ${day.hoursAboveThreshold > 0 ? 'rgba(239, 68, 68, 0.1)' : 'transparent'}; color: ${day.hoursAboveThreshold > 0 ? '#ef4444' : '#64748b'}; padding: 4px 8px; border-radius: 4px; font-weight: ${day.hoursAboveThreshold > 0 ? '600' : '400'};">
-                                                        ${day.hoursAboveThreshold}h
-                                                    </span>
-                                                 </td>
-                                                <td style="padding: 10px 8px; text-align: center; color: #1e293b;">${minMaxDisplay}</td>
-                                                <td style="padding: 10px 8px; text-align: center;">
-                                                    <span style="background: rgba(239, 68, 68, 0.1); color: #ef4444; padding: 4px 8px; border-radius: 4px; font-weight: 600;">
-                                                        ${exceedanceText}
-                                                    </span>
-                                                 </td>
-                                             </tr>
-                                        `;
-                                    }).join('')}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-                ` : `
-                <div style="padding: 20px; background: #f0fff4; border: 1px solid #22c55e; border-radius: 10px; text-align: center; display: flex; align-items: center; justify-content: center; gap: 10px;">
-                    <span style="font-size: 24px;">✅</span>
                     <div>
-                        <span style="font-weight: 700; color: #15803d;">Aucun dépassement de seuil détecté</span>
-                        <div style="font-size: 12px; color: #64748b; margin-top: 4px;">La tension est restée dans les limites ${systemType} (${getSystemLimits(systemType).min}V - ${getSystemLimits(systemType).max}V) pendant toute la période</div>
+                        <h3 style="margin: 0; font-size: 20px; font-weight: 700;">Analyse globale de la Tension</h3>
+                        <p style="margin: 4px 0 0 0; font-size: 13px; opacity: 0.9;">Système ${systemType} DC · ${days} jours analysés</p>
                     </div>
                 </div>
-                `}
+                <div style="background: rgba(255,255,255,0.15); padding: 8px 20px; border-radius: 40px; font-size: 28px; font-weight: 700;">
+                    ${stabilityPercentage}%
+                </div>
+            </div>
+            
+            <!-- Grille des cartes statistiques (style identique à createDPDTOnlyTable) -->
+            <div class="dpdt-stats-grid" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: #e2e8f0;">
+                
+                <!-- CARTE 1 : CONFORMITÉ GLOBALE -->
+                <div class="dpdt-stat-card" style="background: white; padding: 20px; border-right: 1px solid #e2e8f0;">
+                    <div class="dpdt-stat-header" style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+                        <div class="dpdt-stat-icon" style="width: 40px; height: 40px; background: #22c55e20; border-radius: 12px; display: flex; align-items: center; justify-content: center;">
+                            <span style="font-size: 20px;">✅</span>
+                        </div>
+                        <div class="dpdt-stat-title" style="font-weight: 600; color: #334155; font-size: 13px;">CONFORMITÉ GLOBALE</div>
+                    </div>
+                    <div class="dpdt-stat-value" style="font-size: 36px; font-weight: 800; color: #22c55e; line-height: 1; margin-bottom: 8px;">
+                        ${stabilityPercentage}%
+                    </div>
+                    <div class="dpdt-stat-detail" style="display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: #64748b;">
+                        <span>Jours analysés</span>
+                        <span class="dpdt-stat-percent" style="font-weight: 700; color: #22c55e;">${days}</span>
+                    </div>
+                    
+                    <!-- Barre de progression -->
+                    <div class="progress-bar-container" style="width: 100%; height: 8px; background: #e2e8f0; border-radius: 20px; overflow: hidden; margin: 12px 0 8px 0;">
+                        <div class="progress-bar" style="width: ${stabilityPercentage}%; height: 100%; background: linear-gradient(90deg, #22c55e, #16a34a); border-radius: 20px;"></div>
+                    </div>
+                    <div class="progress-label" style="display: flex; justify-content: space-between; font-size: 11px; color: #64748b;">
+                        <span>Taux de conformité</span>
+                        <span>${stabilityPercentage}%</span>
+                    </div>
+                </div>
 
-                <!-- Normes système -->
-                <div style="background: #f8fafc; border-radius: 10px; padding: 16px; border: 1px solid #e2e8f0;">
-                    <div style="font-weight: 600; color: #2d3748; margin-bottom: 12px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 8px;">
-                        <span>⚡</span> Normes Système ${systemType}
+                <!-- CARTE 2 : JOURS CONFORMES -->
+                <div class="dpdt-stat-card" style="background: white; padding: 20px; border-right: 1px solid #e2e8f0;">
+                    <div class="dpdt-stat-header" style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+                        <div class="dpdt-stat-icon" style="width: 40px; height: 40px; background: #3b82f620; border-radius: 12px; display: flex; align-items: center; justify-content: center;">
+                            <span style="font-size: 20px;">📊</span>
+                        </div>
+                        <div class="dpdt-stat-title" style="font-weight: 600; color: #334155; font-size: 13px;">JOURS CONFORMES</div>
                     </div>
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px;">
-                        <div style="background: white; padding: 12px; border-radius: 8px; border-left: 3px solid #e53e3e;">
-                            <div style="font-size: 11px; color: #718096; margin-bottom: 4px;">Tension Min</div>
-                            <div style="font-size: 18px; font-weight: 700; color: #e53e3e;">${getSystemLimits(systemType).min}V</div>
-                        </div>
-                        <div style="background: white; padding: 12px; border-radius: 8px; border-left: 3px solid #f59e0b;">
-                            <div style="font-size: 11px; color: #718096; margin-bottom: 4px;">Plage Idéale</div>
-                            <div style="font-size: 18px; font-weight: 700; color: #f59e0b;">${getSystemLimits(systemType).ideal.min}V - ${getSystemLimits(systemType).ideal.max}V</div>
-                        </div>
-                        <div style="background: white; padding: 12px; border-radius: 8px; border-left: 3px solid #22c55e;">
-                            <div style="font-size: 11px; color: #718096; margin-bottom: 4px;">Tension Max</div>
-                            <div style="font-size: 18px; font-weight: 700; color: #22c55e;">${getSystemLimits(systemType).max}V</div>
-                        </div>
-                        <div style="background: white; padding: 12px; border-radius: 8px; border-left: 3px solid #3b82f6;">
-                            <div style="font-size: 11px; color: #718096; margin-bottom: 4px;">Seuil Alerte</div>
-                            <div style="font-size: 18px; font-weight: 700; color: #3b82f6;">${getSystemLimits(systemType).alertThreshold}V/h</div>
-                        </div>
+                    <div class="dpdt-stat-value" style="font-size: 36px; font-weight: 800; color: #3b82f6; line-height: 1; margin-bottom: 8px;">
+                        ${stable}
                     </div>
-                    <div style="margin-top: 12px; padding: 10px; background: #fef2f2; border-radius: 6px; font-size: 11px; color: #991b1b; display: flex; align-items: center; gap: 8px;">
-                        <span style="font-size: 14px;">🚨</span>
-                        <span><strong>Dépassement de seuil détecté</strong> lorsque Tension < ${getSystemLimits(systemType).min}V ou Tension > ${getSystemLimits(systemType).max}V</span>
+                    <div class="dpdt-stat-detail" style="display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: #64748b;">
+                        <span>Jours concernés</span>
+                        <span class="dpdt-stat-percent" style="font-weight: 700; color: #3b82f6;">${stable} / ${totalDays}</span>
+                    </div>
+                    
+                    <!-- Barre de progression -->
+                    <div class="progress-bar-container" style="width: 100%; height: 8px; background: #e2e8f0; border-radius: 20px; overflow: hidden; margin: 12px 0 8px 0;">
+                        <div class="progress-bar" style="width: ${percentConforme}%; height: 100%; background: linear-gradient(90deg, #3b82f6, #2563eb); border-radius: 20px;"></div>
+                    </div>
+                    <div class="progress-label" style="display: flex; justify-content: space-between; font-size: 11px; color: #64748b;">
+                        <span>Tension ${tensionMin}V - ${tensionMax}V</span>
+                        <span>Var ≤ ${variationSeuil}V</span>
                     </div>
                 </div>
+
+                <!-- CARTE 3 : JOURS NON CONFORMES -->
+                <div class="dpdt-stat-card" style="background: white; padding: 20px; border-right: 1px solid #e2e8f0;">
+                    <div class="dpdt-stat-header" style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+                        <div class="dpdt-stat-icon" style="width: 40px; height: 40px; background: #ef444420; border-radius: 12px; display: flex; align-items: center; justify-content: center;">
+                            <span style="font-size: 20px;">🔴</span>
+                        </div>
+                        <div class="dpdt-stat-title" style="font-weight: 600; color: #334155; font-size: 13px;">JOURS NON CONFORMES</div>
+                    </div>
+                    <div class="dpdt-stat-value" style="font-size: 36px; font-weight: 800; color: #ef4444; line-height: 1; margin-bottom: 8px;">
+                        ${outOfLimits}
+                    </div>
+                    <div class="dpdt-stat-detail" style="display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: #64748b;">
+                        <span>Jours concernés</span>
+                        <span class="dpdt-stat-percent" style="font-weight: 700; color: #ef4444;">${outOfLimits} / ${totalDays}</span>
+                    </div>
+                    
+                    <!-- Barre de progression -->
+                    <div class="progress-bar-container" style="width: 100%; height: 8px; background: #e2e8f0; border-radius: 20px; overflow: hidden; margin: 12px 0 8px 0;">
+                        <div class="progress-bar" style="width: ${percentNonConforme}%; height: 100%; background: linear-gradient(90deg, #ef4444, #dc2626); border-radius: 20px;"></div>
+                    </div>
+                    <div class="progress-label" style="display: flex; justify-content: space-between; font-size: 11px; color: #64748b;">
+                        <span>Hors seuils</span>
+                        <span>&lt; ${tensionMin}V ou &gt; ${tensionMax}V</span>
+                    </div>
+                </div>
+
+                <!-- CARTE 4 : VARIATION HAUTE -->
+                <div class="dpdt-stat-card" style="background: white; padding: 20px;">
+                    <div class="dpdt-stat-header" style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+                        <div class="dpdt-stat-icon" style="width: 40px; height: 40px; background: #f59e0b20; border-radius: 12px; display: flex; align-items: center; justify-content: center;">
+                            <span style="font-size: 20px;">⚠️</span>
+                        </div>
+                        <div class="dpdt-stat-title" style="font-weight: 600; color: #334155; font-size: 13px;">VARIATION HAUTE</div>
+                    </div>
+                    <div class="dpdt-stat-value" style="font-size: 36px; font-weight: 800; color: #f59e0b; line-height: 1; margin-bottom: 8px;">
+                        ${highVariationDays.count}
+                    </div>
+                    <div class="dpdt-stat-detail" style="display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: #64748b;">
+                        <span>Jours concernés</span>
+                        <span class="dpdt-stat-percent" style="font-weight: 700; color: #f59e0b;">${highVariationDays.count} / ${totalDays}</span>
+                    </div>
+                    
+                    <!-- Barre de progression -->
+                    <div class="progress-bar-container" style="width: 100%; height: 8px; background: #e2e8f0; border-radius: 20px; overflow: hidden; margin: 12px 0 8px 0;">
+                        <div class="progress-bar" style="width: ${percentVariationHaute}%; height: 100%; background: linear-gradient(90deg, #f59e0b, #d97706); border-radius: 20px;"></div>
+                    </div>
+                    <div class="progress-label" style="display: flex; justify-content: space-between; font-size: 11px; color: #64748b;">
+                        <span>Variation > ${variationSeuil}V</span>
+                        <span>Instabilité détectée</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Tableaux détaillés -->
+            ${exceedanceTableHTML}
+            ${variationTableHTML}
+            
+            <!-- Pied de carte avec normes système -->
+            <div style="padding: 12px 20px; background: #f8fafc; border-top: 1px solid #e2e8f0; font-size: 11px; color: #64748b; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                <div style="display: flex; gap: 15px;">
+                    <span>⚡ Système ${systemType}</span>
+                    <span>📊 Seuils: ${tensionMin}V - ${tensionMax}V</span>
+                    <span>📈 Variation max: ${variationSeuil}V</span>
+                    <span>📉 Variation moyenne: ${averageVariation}V/h</span>
+                </div>
+                <span>📅 ${new Date().toLocaleDateString('fr-FR')}</span>
             </div>
         </div>
     `;
-
-    // === AJOUT DU TABLEAU DES TENSIONS NOMINALES ===
-    if (tensionResults && tensionResults.length > 0) {
-        // 🔴 FILTRER LES DONNÉES SELON LE FILTRE ACTIF
-        const filteredTensionResults = window.filteredDates ?
-            tensionResults.filter(item => window.filteredDates.includes(item.date)) :
-            tensionResults;
-
-        // 🔴 RÉCUPÉRER TOUTES LES DATES DE LA PÉRIODE (FILTRÉES OU COMPLÈTES)
-        const allDatesInPeriod = window.filteredDates || allClientsHourlyMatrix.dates;
-
-        const nominalTableHTML = createNominalTensionTable(
-            filteredTensionResults,
-            systemType,
-            allDatesInPeriod
-        );
-
-        // Ajouter le tableau après le graphique de stabilité
-        const stabilityContainer = document.getElementById('stability-analysis-container');
-        if (stabilityContainer) {
-            let nominalContainer = document.getElementById('nominal-tension-table-container');
-            if (!nominalContainer) {
-                nominalContainer = document.createElement('div');
-                nominalContainer.id = 'nominal-tension-table-container';
-                stabilityContainer.parentNode.insertBefore(nominalContainer, stabilityContainer.nextSibling);
-            }
-            nominalContainer.innerHTML = nominalTableHTML;
-        }
-    }
     
-    // Create the pie chart
+    // Initialiser les boutons de toggle
     setTimeout(() => {
-        createStabilityPieChart(`${containerId}-stability-chart`, stable, unstable, outOfLimits);
-    }, 100);
-    
-    // Initialiser le bouton de toggle après l'insertion du HTML
-    setTimeout(() => {
+        // Bouton pour les dépassements de seuil
         const toggleBtn = document.getElementById(`toggle-${exceedanceTableId}`);
         const tableDiv = document.getElementById(exceedanceTableId);
-        
         if (toggleBtn && tableDiv) {
             let isVisible = false;
             toggleBtn.onclick = function(e) {
@@ -5018,14 +5558,111 @@ function createStabilityChart(containerId, stabilityData, tensionResults) {
                 isVisible = !isVisible;
                 if (isVisible) {
                     tableDiv.style.display = 'block';
-                    toggleBtn.innerHTML = '<span style="font-size: 12px;">🔼</span><span>Masquer le tableau</span>';
+                    toggleBtn.innerHTML = '<span style="font-size: 11px;">🔼</span><span>Masquer le tableau</span>';
                 } else {
                     tableDiv.style.display = 'none';
-                    toggleBtn.innerHTML = '<span style="font-size: 12px;">🔽</span><span>Afficher le tableau</span>';
+                    toggleBtn.innerHTML = '<span style="font-size: 11px;">🔽</span><span>Afficher le tableau</span>';
+                }
+            };
+        }
+        
+        // Bouton pour les variations hautes
+        const toggleVariationBtn = document.getElementById(`toggle-variation-${variationTableId}`);
+        const variationTableDiv = document.getElementById(`variation-${variationTableId}`);
+        if (toggleVariationBtn && variationTableDiv) {
+            let isVisible = false;
+            toggleVariationBtn.onclick = function(e) {
+                e.stopPropagation();
+                isVisible = !isVisible;
+                if (isVisible) {
+                    variationTableDiv.style.display = 'block';
+                    toggleVariationBtn.innerHTML = '<span style="font-size: 11px;">🔼</span><span>Masquer le tableau</span>';
+                } else {
+                    variationTableDiv.style.display = 'none';
+                    toggleVariationBtn.innerHTML = '<span style="font-size: 11px;">🔽</span><span>Afficher le tableau</span>';
                 }
             };
         }
     }, 100);
+}
+// ======================== CALCUL DES JOURS AVEC VARIATION HAUTE ========================
+function calculateHighVariationDays(tensionResults) {
+    if (!tensionResults || !tensionResults.length) {
+        return { count: 0, daysList: [], maxVariation: 0, averageVariation: 0 };
+    }
+
+    // Grouper par date
+    const dailyData = {};
+    tensionResults.forEach(item => {
+        const date = item.date;
+        if (!dailyData[date]) {
+            dailyData[date] = {
+                values: [],
+                min: Infinity,
+                max: -Infinity,
+                variations: []
+            };
+        }
+        const tension = parseFloat(item.tension || item.valeur || 0);
+        dailyData[date].values.push(tension);
+        dailyData[date].min = Math.min(dailyData[date].min, tension);
+        dailyData[date].max = Math.max(dailyData[date].max, tension);
+        
+        // Calculer les variations entre mesures successives
+        if (dailyData[date].values.length > 1) {
+            const lastValue = dailyData[date].values[dailyData[date].values.length - 2];
+            const variation = Math.abs(tension - lastValue);
+            dailyData[date].variations.push(variation);
+        }
+    });
+
+    // Détecter le type de système
+    const systemType = detectSystemType(tensionResults);
+    const maxVariationAllowed = systemType === '24V' ? 5 : 2.5;
+    
+    let highVariationDays = 0;
+    const daysList = [];
+    let totalVariation = 0;
+    let variationCount = 0;
+
+    // Analyser chaque jour
+    Object.entries(dailyData).forEach(([date, data]) => {
+        const dailyVariation = data.max - data.min;
+        
+        // Calculer la variation moyenne horaire
+        const avgHourlyVariation = data.variations.length > 0
+            ? data.variations.reduce((a, b) => a + b, 0) / data.variations.length
+            : 0;
+        
+        totalVariation += avgHourlyVariation;
+        variationCount++;
+        
+        if (dailyVariation > maxVariationAllowed) {
+            highVariationDays++;
+            daysList.push({
+                date: date,
+                dailyVariation: dailyVariation.toFixed(2),
+                avgHourlyVariation: avgHourlyVariation.toFixed(2),
+                min: data.min.toFixed(2),
+                max: data.max.toFixed(2),
+                variationCount: data.variations.length
+            });
+        }
+    });
+    
+    const averageVariation = variationCount > 0 ? totalVariation / variationCount : 0;
+    
+    // Trier par variation décroissante
+    daysList.sort((a, b) => parseFloat(b.dailyVariation) - parseFloat(a.dailyVariation));
+    
+    return {
+        count: highVariationDays,
+        daysList: daysList,
+        maxVariation: daysList.length > 0 ? parseFloat(daysList[0].dailyVariation) : 0,
+        averageVariation: parseFloat(averageVariation.toFixed(2)),
+        maxVariationAllowed: maxVariationAllowed,
+        systemType: systemType
+    };
 }
 // ======================== CALCUL DES JOURS D'ALERTE ========================
 function calculateAlertDays(tensionResults) {
@@ -5269,6 +5906,7 @@ function createStabilityPieChart(canvasId, stable, unstable, outOfLimits) {
 }
 
 // ======================== TABLEAU DES ATTEINTES DE TENSION NOMINALE ========================
+// ======================== TABLEAU DES ATTEINTES DE TENSION NOMINALE ========================
 function createNominalTensionTable(tensionResults, systemType, allDates) {
     if (!tensionResults || tensionResults.length === 0) {
         return `
@@ -5371,7 +6009,8 @@ function createNominalTensionTable(tensionResults, systemType, allDates) {
     let daysWithData = 0;
 
     // Compter les jours par catégorie d'atteintes
-    let daysWith4Plus = 0;  // ≥4 atteintes
+    let daysWith8Plus = 0;   // NOUVEAU : ≥8 atteintes (EXCÈS DE CHARGE)
+    let daysWith4Plus = 0;   // ≥4 atteintes
     let daysWith3 = 0;       // 3 atteintes
     let daysWith2 = 0;       // 2 atteintes
     let daysWith1 = 0;       // 1 atteinte
@@ -5387,15 +6026,24 @@ function createNominalTensionTable(tensionResults, systemType, allDates) {
         // Catégoriser les jours
         if (!day.hasData) {
             daysWithoutData++;
-        } else if (day.nominalCount >= 4) {
+        } 
+        // NOUVEAU : ≥8 atteintes (excès de charge) - priorité la plus haute
+        else if (day.nominalCount >= 8) {
+            daysWith8Plus++;
+        }
+        else if (day.nominalCount >= 4) {
             daysWith4Plus++;
-        } else if (day.nominalCount === 3) {
+        }
+        else if (day.nominalCount === 3) {
             daysWith3++;
-        } else if (day.nominalCount === 2) {
+        }
+        else if (day.nominalCount === 2) {
             daysWith2++;
-        } else if (day.nominalCount === 1) {
+        }
+        else if (day.nominalCount === 1) {
             daysWith1++;
-        } else {
+        }
+        else {
             daysWith0++;
         }
     });
@@ -5405,6 +6053,7 @@ function createNominalTensionTable(tensionResults, systemType, allDates) {
         : 0;
 
     // Calculer les pourcentages pour chaque catégorie
+    const percent8Plus = daysWithData > 0 ? ((daysWith8Plus / daysWithData) * 100).toFixed(1) : 0;
     const percent4Plus = daysWithData > 0 ? ((daysWith4Plus / daysWithData) * 100).toFixed(1) : 0;
     const percent3 = daysWithData > 0 ? ((daysWith3 / daysWithData) * 100).toFixed(1) : 0;
     const percent2 = daysWithData > 0 ? ((daysWith2 / daysWithData) * 100).toFixed(1) : 0;
@@ -5425,7 +6074,7 @@ function createNominalTensionTable(tensionResults, systemType, allDates) {
 
     // Trouver les valeurs min/max pour le graphique
     const validCounts = chartData.filter(d => d.hasData).map(d => d.count);
-    const maxCount = validCounts.length > 0 ? Math.max(...validCounts, 4) : 4;
+    const maxCount = validCounts.length > 0 ? Math.max(...validCounts, 8) : 8;
     const minCount = 0;
 
     // Dimensions du graphique
@@ -5446,7 +6095,6 @@ function createNominalTensionTable(tensionResults, systemType, allDates) {
     };
 
     // Créer les points du graphique
-    let points = [];
     let linePath = '';
     let areaPath = '';
     let validPoints = [];
@@ -5461,11 +6109,6 @@ function createNominalTensionTable(tensionResults, systemType, allDates) {
                 linePath += `M ${x} ${y}`;
                 areaPath += `M ${x} ${y}`;
             } else {
-                // Créer une courbe lisse avec des points de contrôle
-                const prev = validPoints[validPoints.length - 2];
-                const midX = (prev.x + x) / 2;
-                const midY = (prev.y + y) / 2;
-
                 linePath += ` L ${x} ${y}`;
                 areaPath += ` L ${x} ${y}`;
             }
@@ -5495,7 +6138,7 @@ function createNominalTensionTable(tensionResults, systemType, allDates) {
 
     // Créer les marqueurs de dates
     const dateMarkers = [];
-    const step = Math.max(1, Math.floor(sortedDates.length / 8)); // Afficher max 8 dates
+    const step = Math.max(1, Math.floor(sortedDates.length / 8));
     chartData.forEach((item, index) => {
         if (index % step === 0 || index === sortedDates.length - 1) {
             const x = getX(index);
@@ -5513,10 +6156,12 @@ function createNominalTensionTable(tensionResults, systemType, allDates) {
     // Créer les points de données avec tooltips
     const dataPoints = validPoints.map(point => {
         let dotColor = '#22c55e';
-        if (point.count === 0) dotColor = '#ef4444';
-        else if (point.count === 1) dotColor = '#f97316';
-        else if (point.count === 2) dotColor = '#f59e0b';
-        else if (point.count === 3) dotColor = '#eab308';
+        if (point.count >= 8) dotColor = '#a855f7';      // VIOLET pour excès de charge
+        else if (point.count >= 4) dotColor = '#22c55e';  // Vert pour ≥4
+        else if (point.count === 3) dotColor = '#eab308'; // Jaune
+        else if (point.count === 2) dotColor = '#f59e0b'; // Orange
+        else if (point.count === 1) dotColor = '#f97316'; // Orange clair
+        else dotColor = '#ef4444';                         // Rouge pour 0
 
         return `
             <circle cx="${point.x}" cy="${point.y}" r="6" fill="white" 
@@ -5545,26 +6190,37 @@ function createNominalTensionTable(tensionResults, systemType, allDates) {
             bgColor = '#f8fafc';
             badgeColor = '#94a3b8';
             textColor = '#64748b';
-        } else if (day.nominalCount === 0) {
-            bgColor = '#fef2f2';
-            badgeColor = '#ef4444';
-            textColor = '#b91c1c';
-        } else if (day.nominalCount === 1) {
-            bgColor = '#fff7ed';
-            badgeColor = '#f97316';
-            textColor = '#9a3412';
-        } else if (day.nominalCount === 2) {
-            bgColor = '#fef3c7';
-            badgeColor = '#f59e0b';
-            textColor = '#92400e';
-        } else if (day.nominalCount === 3) {
-            bgColor = '#fef9c3';
-            badgeColor = '#eab308';
-            textColor = '#854d0e';
-        } else if (day.nominalCount >= 4) {
+        } 
+        // NOUVEAU : ≥8 atteintes (EXCÈS DE CHARGE) - VIOLET
+        else if (day.nominalCount >= 8) {
+            bgColor = '#f5f3ff';
+            badgeColor = '#a855f7';
+            textColor = '#6d28d9';
+        }
+        else if (day.nominalCount >= 4) {
             bgColor = '#f0fdf4';
             badgeColor = '#22c55e';
             textColor = '#166534';
+        }
+        else if (day.nominalCount === 3) {
+            bgColor = '#fef9c3';
+            badgeColor = '#eab308';
+            textColor = '#854d0e';
+        }
+        else if (day.nominalCount === 2) {
+            bgColor = '#fef3c7';
+            badgeColor = '#f59e0b';
+            textColor = '#92400e';
+        }
+        else if (day.nominalCount === 1) {
+            bgColor = '#fff7ed';
+            badgeColor = '#f97316';
+            textColor = '#9a3412';
+        }
+        else {
+            bgColor = '#fef2f2';
+            badgeColor = '#ef4444';
+            textColor = '#b91c1c';
         }
 
         // Formatage des échantillons
@@ -5604,11 +6260,11 @@ function createNominalTensionTable(tensionResults, systemType, allDates) {
                         ${samplesHTML}
                     </div>
                 </td>
-            </tr>
+             </tr>
         `;
     });
 
-    // Créer le HTML des barres de progression
+    // Créer le HTML des barres de progression AVEC LE 6ÈME TABLEAU (EXCÈS DE CHARGE)
     const progressBarsHTML = `
         <div style="background: white; border-radius: 20px; padding: 24px; margin-bottom: 30px; 
                     border: 2px solid #e2e8f0; box-shadow: 0 8px 20px rgba(0,0,0,0.05);">
@@ -5630,9 +6286,30 @@ function createNominalTensionTable(tensionResults, systemType, allDates) {
                 </div>
             </div>
 
-            <!-- Grille des pourcentages -->
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 25px;">
+            <!-- Grille des pourcentages - 6 TABLEAUX MAINTENANT -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 20px; margin-bottom: 25px;">
                 
+                <!-- NOUVEAU : ≥8 atteintes (EXCÈS DE CHARGE) - VIOLET -->
+                <div style="background: linear-gradient(135deg, #f5f3ff 0%, #ffffff 100%); 
+                          border-radius: 16px; padding: 16px; border-left: 5px solid #a855f7;
+                          box-shadow: 0 4px 12px rgba(168, 85, 247, 0.15);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <span style="width: 20px; height: 20px; background: #a855f7; border-radius: 6px;"></span>
+                            <span style="font-weight: 600; color: #6d28d9;">≥8 atteintes</span>
+                        </div>
+                        <span style="font-size: 24px; font-weight: 800; color: #a855f7;">${percent8Plus}%</span>
+                    </div>
+                    <div style="background: #e2e8f0; height: 12px; border-radius: 20px; overflow: hidden; margin: 10px 0;">
+                        <div style="width: ${percent8Plus}%; height: 100%; background: linear-gradient(90deg, #a855f7, #7e22ce); 
+                                  border-radius: 20px; transition: width 0.5s ease;"></div>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; font-size: 12px; color: #64748b;">
+                        <span>${daysWith8Plus} jour(s)</span>
+                        <span>🟣 Excès de charge</span>
+                    </div>
+                </div>
+
                 <!-- ≥4 atteintes (Vert) -->
                 <div style="background: linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%); 
                           border-radius: 16px; padding: 16px; border-left: 5px solid #22c55e;
@@ -5676,16 +6353,16 @@ function createNominalTensionTable(tensionResults, systemType, allDates) {
 
                 <!-- 2 atteintes (Orange) -->
                 <div style="background: linear-gradient(135deg, #ffedd5 0%, #ffffff 100%); 
-                          border-radius: 16px; padding: 16px; border-left: 5px solid #f97316;">
+                          border-radius: 16px; padding: 16px; border-left: 5px solid #f59e0b;">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
                         <div style="display: flex; align-items: center; gap: 8px;">
-                            <span style="width: 20px; height: 20px; background: #f97316; border-radius: 6px;"></span>
-                            <span style="font-weight: 600; color: #9a3412;">2 atteintes</span>
+                            <span style="width: 20px; height: 20px; background: #f59e0b; border-radius: 6px;"></span>
+                            <span style="font-weight: 600; color: #92400e;">2 atteintes</span>
                         </div>
-                        <span style="font-size: 24px; font-weight: 800; color: #f97316;">${percent2}%</span>
+                        <span style="font-size: 24px; font-weight: 800; color: #f59e0b;">${percent2}%</span>
                     </div>
                     <div style="background: #e2e8f0; height: 12px; border-radius: 20px; overflow: hidden; margin: 10px 0;">
-                        <div style="width: ${percent2}%; height: 100%; background: linear-gradient(90deg, #f97316, #ea580c); 
+                        <div style="width: ${percent2}%; height: 100%; background: linear-gradient(90deg, #f59e0b, #d97706); 
                                   border-radius: 20px; transition: width 0.5s ease;"></div>
                     </div>
                     <div style="display: flex; justify-content: space-between; font-size: 12px; color: #64748b;">
@@ -5695,17 +6372,17 @@ function createNominalTensionTable(tensionResults, systemType, allDates) {
                 </div>
 
                 <!-- 1 atteinte (Orange clair) -->
-                <div style="background: linear-gradient(135deg, #fef9c3 0%, #ffffff 100%); 
-                          border-radius: 16px; padding: 16px; border-left: 5px solid #f59e0b;">
+                <div style="background: linear-gradient(135deg, #fff7ed 0%, #ffffff 100%); 
+                          border-radius: 16px; padding: 16px; border-left: 5px solid #f97316;">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
                         <div style="display: flex; align-items: center; gap: 8px;">
-                            <span style="width: 20px; height: 20px; background: #f59e0b; border-radius: 6px;"></span>
-                            <span style="font-weight: 600; color: #92400e;">1 atteinte</span>
+                            <span style="width: 20px; height: 20px; background: #f97316; border-radius: 6px;"></span>
+                            <span style="font-weight: 600; color: #9a3412;">1 atteinte</span>
                         </div>
-                        <span style="font-size: 24px; font-weight: 800; color: #f59e0b;">${percent1}%</span>
+                        <span style="font-size: 24px; font-weight: 800; color: #f97316;">${percent1}%</span>
                     </div>
                     <div style="background: #e2e8f0; height: 12px; border-radius: 20px; overflow: hidden; margin: 10px 0;">
-                        <div style="width: ${percent1}%; height: 100%; background: linear-gradient(90deg, #f59e0b, #d97706); 
+                        <div style="width: ${percent1}%; height: 100%; background: linear-gradient(90deg, #f97316, #ea580c); 
                                   border-radius: 20px; transition: width 0.5s ease;"></div>
                     </div>
                     <div style="display: flex; justify-content: space-between; font-size: 12px; color: #64748b;">
@@ -5736,6 +6413,7 @@ function createNominalTensionTable(tensionResults, systemType, allDates) {
             </div>
     `;
 
+    // Le reste de la fonction reste identique (retour HTML)
     return `
         <div style="background: linear-gradient(145deg, #f0fdf4 0%, #dcfce7 100%); 
                     border-radius: 20px; padding: 24px; margin-top: 25px;
@@ -5773,10 +6451,10 @@ function createNominalTensionTable(tensionResults, systemType, allDates) {
                 </div>
             </div>
             
-            <!-- SECTION BARRES DE PROGRESSION -->
+            <!-- SECTION BARRES DE PROGRESSION AVEC LE 6ÈME TABLEAU -->
             ${progressBarsHTML}
             
-            <!-- Tableau scrollable -->
+            <!-- Tableau scrollable (reste identique) -->
             <div style="background: white; border-radius: 16px; border: 1px solid #86efac; overflow: hidden;
                       box-shadow: 0 8px 20px rgba(0,0,0,0.05); margin-bottom: 20px;">
                 <div style="max-height: 400px; overflow-y: auto; overflow-x: auto;">
@@ -5806,7 +6484,7 @@ function createNominalTensionTable(tensionResults, systemType, allDates) {
                 </div>
             </div>
 
-            <!-- GRAPHIQUE EN LIGNE AMÉLIORÉ -->
+            <!-- GRAPHIQUE EN LIGNE (reste identique) -->
             <div style="background: white; border-radius: 16px; border: 1px solid #86efac; padding: 20px; box-shadow: 0 8px 20px rgba(0,0,0,0.05);">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
                     <div style="display: flex; align-items: center; gap: 8px;">
@@ -5887,9 +6565,13 @@ function createNominalTensionTable(tensionResults, systemType, allDates) {
                 
             </div>
             
-            <!-- Légende des couleurs -->
+            <!-- Légende des couleurs AVEC LE VIOLET POUR ≥8 -->
             <div style="display: flex; gap: 20px; margin-top: 20px; padding: 12px 16px; 
                       background: white; border-radius: 12px; border: 1px solid #86efac; font-size: 12px; flex-wrap: wrap;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="width: 14px; height: 14px; background: #a855f7; border-radius: 4px;"></span>
+                    <span style="color: #6d28d9;">≥8 atteintes (Excès de charge)</span>
+                </div>
                 <div style="display: flex; align-items: center; gap: 8px;">
                     <span style="width: 14px; height: 14px; background: #22c55e; border-radius: 4px;"></span>
                     <span style="color: #166534;">≥4 atteintes</span>
@@ -5922,7 +6604,8 @@ function createNominalTensionTable(tensionResults, systemType, allDates) {
                 <span style="font-size: 16px;">ℹ️</span>
                 <span>
                     <strong>Tension ≥ ${targetTension.toFixed(1)}V</strong> • 
-                    Comptage des mesures où la tension atteint ou dépasse ${targetTension.toFixed(1)}V
+                    Comptage des mesures où la tension atteint ou dépasse ${targetTension.toFixed(1)}V • 
+                    <strong style="color: #a855f7;">🟣 Excès de charge détecté pour ≥8 atteintes</strong>
                 </span>
             </div>
         </div>
@@ -8393,10 +9076,10 @@ function displayAllClientsTab() {
         // 2. Graphique de tension min/max par jour
         createAllClientsTensionChart(datesToUse, filteredTensionData, systemType, systemLimits);
 
-        // 3. Graphique de stabilité
+        // 3. Graphique de stabilité (avec les trois nouvelles cartes)
         if (stabilityData) {
             createStabilityChart('stability-analysis-container', stabilityData, filteredTensionResults);
-
+            
             setTimeout(() => {
                 const allDatesInPeriod = window.filteredDates || allClientsHourlyMatrix.dates;
                 const nominalTableHTML = createNominalTensionTable(
@@ -8404,7 +9087,7 @@ function displayAllClientsTab() {
                     systemType,
                     allDatesInPeriod
                 );
-
+                
                 const nominalContainer = document.getElementById('nominal-tension-table-container');
                 if (nominalContainer) {
                     nominalContainer.innerHTML = nominalTableHTML;
@@ -8663,8 +9346,7 @@ function createDailyIntensityChart(dailyIntensityStats) {
     });
 }
 
-// ======================== TABLEAU COMBINÉ DP/DT UNIQUEMENT (pour onglet TECHNIQUE) ========================
-// Tableau combiné DP/DT uniquement (pour onglet TECHNIQUE) avec bouton
+// ======================== TABLEAU DES ÉVÉNEMENTS DP/DT SIMPLIFIÉ (UNIQUEMENT LES HEURES) ========================
 function createDPDTOnlyTable(combinedAnalysis) {
     const { dailyEvents, eventTypes } = combinedAnalysis;
 
@@ -8732,514 +9414,160 @@ function createDPDTOnlyTable(combinedAnalysis) {
     const tableId = `dpdt-detailed-table-${Date.now()}`;
     const buttonId = `toggle-dpdt-table-${Date.now()}`;
 
-    // Créer le HTML du tableau
-    let tableHTML = `
-        <style>
-            .dpdt-analysis-container {
-                background: white;
-                border-radius: 20px;
-                overflow: hidden;
-                box-shadow: 0 8px 20px rgba(0,0,0,0.08);
-                border: 1px solid #e2e8f0;
-                margin: 15px 0;
-            }
-            
-            /* En-tête du card */
-            .dpdt-header {
-                background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
-                color: white;
-                padding: 18px 22px;
-                display: flex;
-                align-items: center;
-                justify-content: space-between;
-                flex-wrap: wrap;
-                gap: 15px;
-            }
-            
-            .dpdt-header-left {
-                display: flex;
-                align-items: center;
-                gap: 15px;
-            }
-            
-            .dpdt-header-icon {
-                width: 48px;
-                height: 48px;
-                background: rgba(255,255,255,0.2);
-                border-radius: 14px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                font-size: 28px;
-                backdrop-filter: blur(4px);
-            }
-            
-            .dpdt-header-title h3 {
-                margin: 0;
-                font-size: 20px;
-                font-weight: 700;
-                display: flex;
-                align-items: center;
-                gap: 10px;
-            }
-            
-            .dpdt-header-stats {
-                display: flex;
-                gap: 20px;
-                background: rgba(255,255,255,0.15);
-                padding: 10px 18px;
-                border-radius: 40px;
-                font-size: 14px;
-                font-weight: 600;
-                backdrop-filter: blur(4px);
-            }
-            
-            .dpdt-header-stats span {
-                display: flex;
-                align-items: center;
-                gap: 6px;
-            }
-            
-            /* Grille de statistiques */
-            .dpdt-stats-grid {
-                display: grid;
-                grid-template-columns: repeat(4, 1fr);
-                gap: 15px;
-                padding: 20px;
-                background: #f8fafc;
-                border-bottom: 1px solid #e2e8f0;
-            }
-            
-            .dpdt-stat-card {
-                background: white;
-                border-radius: 16px;
-                padding: 16px;
-                box-shadow: 0 2px 8px rgba(0,0,0,0.04);
-                border: 1px solid #e2e8f0;
-            }
-            
-            .dpdt-stat-card.partial {
-                border-left: 4px solid #f59e0b;
-            }
-            
-            .dpdt-stat-card.total {
-                border-left: 4px solid #ef4444;
-            }
-            
-            .dpdt-stat-card.both {
-                border-left: 4px solid #8b5cf6;
-            }
-            
-            .dpdt-stat-card.summary {
-                border-left: 4px solid #3b82f6;
-                background: linear-gradient(135deg, #f0f9ff 0%, #ffffff 100%);
-            }
-            
-            .dpdt-stat-header {
-                display: flex;
-                align-items: center;
-                gap: 10px;
-                margin-bottom: 12px;
-            }
-            
-            .dpdt-stat-icon {
-                width: 36px;
-                height: 36px;
-                border-radius: 10px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                font-size: 18px;
-            }
-            
-            .dpdt-stat-icon.partial {
-                background: #fef3c7;
-                color: #f59e0b;
-            }
-            
-            .dpdt-stat-icon.total {
-                background: #fee2e2;
-                color: #ef4444;
-            }
-            
-            .dpdt-stat-icon.both {
-                background: #ede9fe;
-                color: #8b5cf6;
-            }
-            
-            .dpdt-stat-icon.summary {
-                background: #dbeafe;
-                color: #3b82f6;
-            }
-            
-            .dpdt-stat-title {
-                font-weight: 600;
-                color: #334155;
-                font-size: 13px;
-            }
-            
-            .dpdt-stat-value {
-                font-size: 28px;
-                font-weight: 800;
-                color: #0f172a;
-                line-height: 1.2;
-                margin-bottom: 8px;
-            }
-            
-            .dpdt-stat-detail {
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                font-size: 12px;
-                color: #64748b;
-                margin-top: 8px;
-                padding-top: 8px;
-                border-top: 1px dashed #e2e8f0;
-            }
-            
-            .dpdt-stat-percent {
-                font-weight: 700;
-                color: #0f172a;
-            }
-            
-            .dpdt-stat-badge {
-                background: #f1f5f9;
-                padding: 4px 10px;
-                border-radius: 30px;
-                font-size: 11px;
-                font-weight: 600;
-            }
-            
-            /* Barres de progression */
-            .progress-bar-container {
-                width: 100%;
-                height: 8px;
-                background: #e2e8f0;
-                border-radius: 20px;
-                overflow: hidden;
-                margin: 10px 0 5px 0;
-            }
-            
-            .progress-bar {
-                height: 100%;
-                border-radius: 20px;
-                transition: width 0.5s ease;
-            }
-            
-            .progress-bar.partial {
-                background: linear-gradient(90deg, #f59e0b, #ea580c);
-            }
-            
-            .progress-bar.total {
-                background: linear-gradient(90deg, #ef4444, #dc2626);
-            }
-            
-            .progress-bar.both {
-                background: linear-gradient(90deg, #8b5cf6, #7c3aed);
-            }
-            
-            .progress-bar.summary {
-                background: linear-gradient(90deg, #3b82f6, #2563eb);
-            }
-            
-            .progress-label {
-                display: flex;
-                justify-content: space-between;
-                font-size: 10px;
-                color: #64748b;
-                margin-top: 2px;
-            }
-            
-            /* Bouton toggle */
-            .toggle-table-btn {
-                width: 100%;
-                padding: 12px 20px;
-                background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-                color: white;
-                border: none;
-                border-radius: 8px;
-                font-size: 14px;
-                font-weight: 600;
-                cursor: pointer;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                gap: 10px;
-                transition: all 0.3s ease;
-                margin: 0 20px 20px 20px;
-            }
-            
-            .toggle-table-btn:hover {
-                transform: translateY(-2px);
-                box-shadow: 0 6px 16px rgba(59, 130, 246, 0.4);
-            }
-            
-            /* Tableau */
-            .dpdt-table-wrapper {
-                max-height: 450px;
-                overflow-y: auto;
-                overflow-x: auto;
-                border-radius: 16px;
-                border: 1px solid #e2e8f0;
-                background: white;
-                margin: 0 20px 20px 20px;
-            }
-            
-            .dpdt-table {
-                width: 100%;
-                border-collapse: collapse;
-                font-size: 12px;
-                min-width: 800px;
-            }
-            
-            .dpdt-table thead {
-                position: sticky;
-                top: 0;
-                z-index: 20;
-            }
-            
-            .dpdt-table th {
-                background: #f8fafc;
-                padding: 14px 10px;
-                text-align: center;
-                font-weight: 700;
-                color: #334155;
-                border-bottom: 2px solid #e2e8f0;
-                font-size: 12px;
-                text-transform: uppercase;
-                letter-spacing: 0.5px;
-            }
-            
-            .dpdt-table .date-col {
-                background: #f1f5f9;
-                min-width: 100px;
-                border-right: 2px solid #cbd5e1;
-                font-size: 13px;
-            }
-            
-            .dpdt-table .type-header {
-                font-size: 13px;
-                padding: 12px 5px;
-            }
-            
-            .dpdt-table .type-header.partial {
-                background: #fef3c7;
-                color: #b45309;
-            }
-            
-            .dpdt-table .type-header.total {
-                background: #fee2e2;
-                color: #b91c1c;
-            }
-            
-            .dpdt-table .sub-header {
-                background: #f1f5f9;
-                font-size: 11px;
-                font-weight: 600;
-                color: #475569;
-                padding: 8px 5px;
-            }
-            
-            .dpdt-table td {
-                padding: 12px 8px;
-                border: 1px solid #e2e8f0;
-                text-align: center;
-                vertical-align: middle;
-            }
-            
-            .dpdt-table .date-cell {
-                background: #f8fafc;
-                font-weight: 700;
-                color: #0f172a;
-                position: sticky;
-                left: 0;
-                z-index: 10;
-                border-right: 2px solid #cbd5e1;
-                font-size: 13px;
-            }
-            
-            .dpdt-table .event-multiple {
-                display: inline-block;
-                background: #f1f5f9;
-                padding: 2px 6px;
-                border-radius: 12px;
-                font-size: 10px;
-                margin-left: 5px;
-                color: #475569;
-            }
-            
-            .dpdt-table .empty-cell {
-                background: #fafafa;
-                color: #cbd5e1;
-                font-style: italic;
-            }
-            
-            .dpdt-table tbody tr:hover td:not(.date-cell) {
-                background: #f8fafc;
-            }
-            
-            .dpdt-table tbody tr:hover .date-cell {
-                background: #e6f0fa;
-            }
-            
-            /* Pied de tableau */
-            .dpdt-table-footer {
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                padding: 16px 20px;
-                background: #f8fafc;
-                border-top: 2px solid #e2e8f0;
-                font-size: 13px;
-                margin: 0 20px 20px 20px;
-            }
-            
-            .dpdt-total-events {
-                display: flex;
-                gap: 25px;
-            }
-            
-            .dpdt-total-item {
-                display: flex;
-                align-items: center;
-                gap: 8px;
-            }
-            
-            .dpdt-total-value {
-                font-weight: 800;
-                font-size: 16px;
-            }
-            
-            .dpdt-total-label {
-                color: #64748b;
-            }
-            
-            /* Légende compacte */
-            .dpdt-compact-legend {
-                display: flex;
-                gap: 20px;
-                padding: 12px 20px;
-                background: white;
-                border-top: 1px solid #e2e8f0;
-                font-size: 11px;
-                margin: 0 20px 20px 20px;
-            }
-            
-            .dpdt-legend-item {
-                display: flex;
-                align-items: center;
-                gap: 6px;
-            }
-            
-            .dpdt-legend-color {
-                width: 12px;
-                height: 12px;
-                border-radius: 3px;
-            }
-            
-            .dpdt-legend-color.partial {
-                background: #f59e0b;
-            }
-            
-            .dpdt-legend-color.total {
-                background: #ef4444;
-            }
-            
-            @media (max-width: 1200px) {
-                .dpdt-stats-grid {
-                    grid-template-columns: repeat(2, 1fr);
-                }
-            }
-            
-            @media (max-width: 768px) {
-                .dpdt-stats-grid {
-                    grid-template-columns: 1fr;
-                }
-                .dpdt-header {
-                    flex-direction: column;
-                    align-items: flex-start;
-                }
-                .dpdt-header-stats {
-                    width: 100%;
-                    justify-content: space-around;
-                }
-            }
-        </style>
+    // Créer le HTML du tableau (version simplifiée avec heures uniquement)
+    let tableHTML = '';
+    
+    // Créer les lignes du tableau avec les heures uniquement
+    const tableRows = sortedDates.map(date => {
+        const dateEvents = dailyEvents[date];
         
-        <div class="dpdt-analysis-container">
+        // Récupérer les heures des événements DP
+        let dpHours = [];
+        if (dateEvents['DP'] && dateEvents['DP'].events.length > 0) {
+            dpHours = dateEvents['DP'].events.map(e => e.heure).sort();
+        }
+        
+        // Récupérer les heures des événements DT
+        let dtHours = [];
+        if (dateEvents['DT'] && dateEvents['DT'].events.length > 0) {
+            dtHours = dateEvents['DT'].events.map(e => e.heure).sort();
+        }
+        
+        return `
+            <tr style="border-bottom: 1px solid #e2e8f0;">
+                <td style="padding: 14px 12px; font-weight: 700; color: #0f172a; background: #f8fafc; border-right: 2px solid #e2e8f0;">
+                    ${date}
+                </td>
+                <td style="padding: 14px 12px; vertical-align: top;">
+                    ${dpHours.length > 0 ? 
+                        `<div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                            ${dpHours.map(hour => `
+                                <span style="display: inline-block; background: #fef3c7; color: #b45309; 
+                                           padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 600;
+                                           border: 1px solid #fed7aa;">
+                                    ${hour}
+                                </span>
+                            `).join('')}
+                        </div>` : 
+                        `<span style="color: #cbd5e1; font-style: italic;">-</span>`
+                    }
+                </td>
+                <td style="padding: 14px 12px; vertical-align: top;">
+                    ${dtHours.length > 0 ? 
+                        `<div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                            ${dtHours.map(hour => `
+                                <span style="display: inline-block; background: #fee2e2; color: #b91c1c; 
+                                           padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 600;
+                                           border: 1px solid #fecaca;">
+                                    ${hour}
+                                </span>
+                            `).join('')}
+                        </div>` : 
+                        `<span style="color: #cbd5e1; font-style: italic;">-</span>`
+                    }
+                </td>
+            </tr>
+        `;
+    }).join('');
+
+    tableHTML = `
+        <div class="dpdt-analysis-container" style="background: white; border-radius: 20px; overflow: hidden; box-shadow: 0 8px 20px rgba(0,0,0,0.08); border: 1px solid #e2e8f0; margin: 15px 0;">
+            
             <!-- En-tête du card -->
-            <div class="dpdt-header">
-                <div class="dpdt-header-left">
-                    <div class="dpdt-header-icon">🔌</div>
+            <div style="background: linear-gradient(135deg, #f97316 0%, #ea580c 100%); color: white; padding: 18px 22px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 15px;">
+                <div class="dpdt-header-left" style="display: flex; align-items: center; gap: 15px;">
+                    <div class="dpdt-header-icon" style="width: 48px; height: 48px; background: rgba(255,255,255,0.2); border-radius: 14px; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(4px);">
+                        <span style="font-size: 28px;">🔌</span>
+                    </div>
                     <div class="dpdt-header-title">
-                        <h3>
-                            Événements de Délestage
-                            <span style="font-size: 14px; background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 30px;">
-                                📅 ${diagnosticDays} jour(s) de diagnostic
-                            </span>
-                        </h3>
+                        <h3 style="margin: 0; font-size: 20px; font-weight: 700;">Événements de Délestage</h3>
+                        <p style="margin: 4px 0 0 0; font-size: 13px; opacity: 0.9;">📅 ${diagnosticDays} jour(s) de diagnostic</p>
                     </div>
                 </div>
-                <div class="dpdt-header-stats">
-                    <span>🔌 Partiel: ${totalDP}</span>
-                    <span>🔋 Total: ${totalDT}</span>
+                <div class="dpdt-header-stats" style="display: flex; gap: 20px; background: rgba(255,255,255,0.15); padding: 10px 18px; border-radius: 40px;">
+                    <span style="display: flex; align-items: center; gap: 6px;">🔌 Partiel: ${totalDP}</span>
+                    <span style="display: flex; align-items: center; gap: 6px;">🔋 Total: ${totalDT}</span>
                 </div>
             </div>
             
-            <!-- Grille de statistiques avec barres de progression (TOUJOURS VISIBLE) -->
-            <div class="dpdt-stats-grid">
+            <!-- Grille de statistiques -->
+            <div class="dpdt-stats-grid" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; padding: 20px; background: #f8fafc; border-bottom: 1px solid #e2e8f0;">
+                
                 <!-- Délestage Partiel -->
-                <div class="dpdt-stat-card partial">
-                    <div class="dpdt-stat-header">
-                        <div class="dpdt-stat-icon partial">🔌</div>
-                        <div class="dpdt-stat-title">DÉLESTAGE PARTIEL</div>
+                <div class="dpdt-stat-card" style="background: white; border-radius: 16px; padding: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); border: 1px solid #e2e8f0; border-left: 4px solid #f59e0b;">
+                    <div class="dpdt-stat-header" style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+                        <div class="dpdt-stat-icon" style="width: 36px; height: 36px; background: #fef3c7; border-radius: 10px; display: flex; align-items: center; justify-content: center; color: #f59e0b;">
+                            <span style="font-size: 18px;">🔌</span>
+                        </div>
+                        <div class="dpdt-stat-title" style="font-weight: 600; color: #334155; font-size: 13px;">DÉLESTAGE PARTIEL</div>
                     </div>
-                    <div class="dpdt-stat-value">${totalDP} fois</div>
-                    <div class="dpdt-stat-detail">
+                    <div class="dpdt-stat-value" style="font-size: 28px; font-weight: 800; color: #0f172a; line-height: 1.2; margin-bottom: 8px;">${totalDP} fois</div>
+                    <div class="dpdt-stat-detail" style="display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: #64748b; margin-top: 8px; padding-top: 8px; border-top: 1px dashed #e2e8f0;">
                         <span>Jours concernés</span>
-                        <span class="dpdt-stat-percent">${daysWithDPCount} / ${diagnosticDays}</span>
+                        <span class="dpdt-stat-percent" style="font-weight: 700; color: #f59e0b;">${daysWithDPCount} / ${diagnosticDays}</span>
                     </div>
-                    
-                    <!-- Barre de progression -->
-                    <div class="progress-bar-container">
-                        <div class="progress-bar partial" style="width: ${percentPartielBar}%;"></div>
+                    <div class="progress-bar-container" style="width: 100%; height: 8px; background: #e2e8f0; border-radius: 20px; overflow: hidden; margin: 10px 0 5px 0;">
+                        <div class="progress-bar" style="width: ${percentPartielBar}%; height: 100%; background: linear-gradient(90deg, #f59e0b, #ea580c); border-radius: 20px;"></div>
                     </div>
-                    <div class="progress-label">
+                    <div class="progress-label" style="display: flex; justify-content: space-between; font-size: 10px; color: #64748b; margin-top: 2px;">
                         <span>${percentDP}% des jours</span>
                         <span>${daysWithDPCount} jour(s)</span>
                     </div>
                 </div>
                 
                 <!-- Délestage Total -->
-                <div class="dpdt-stat-card total">
-                    <div class="dpdt-stat-header">
-                        <div class="dpdt-stat-icon total">🔋</div>
-                        <div class="dpdt-stat-title">DÉLESTAGE TOTAL</div>
+                <div class="dpdt-stat-card" style="background: white; border-radius: 16px; padding: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); border: 1px solid #e2e8f0; border-left: 4px solid #ef4444;">
+                    <div class="dpdt-stat-header" style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+                        <div class="dpdt-stat-icon" style="width: 36px; height: 36px; background: #fee2e2; border-radius: 10px; display: flex; align-items: center; justify-content: center; color: #ef4444;">
+                            <span style="font-size: 18px;">🔋</span>
+                        </div>
+                        <div class="dpdt-stat-title" style="font-weight: 600; color: #334155; font-size: 13px;">DÉLESTAGE TOTAL</div>
                     </div>
-                    <div class="dpdt-stat-value">${totalDT} fois</div>
-                    <div class="dpdt-stat-detail">
+                    <div class="dpdt-stat-value" style="font-size: 28px; font-weight: 800; color: #0f172a; line-height: 1.2; margin-bottom: 8px;">${totalDT} fois</div>
+                    <div class="dpdt-stat-detail" style="display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: #64748b; margin-top: 8px; padding-top: 8px; border-top: 1px dashed #e2e8f0;">
                         <span>Jours concernés</span>
-                        <span class="dpdt-stat-percent">${daysWithDTCount} / ${diagnosticDays}</span>
+                        <span class="dpdt-stat-percent" style="font-weight: 700; color: #ef4444;">${daysWithDTCount} / ${diagnosticDays}</span>
                     </div>
-                    
-                    <!-- Barre de progression -->
-                    <div class="progress-bar-container">
-                        <div class="progress-bar total" style="width: ${percentTotalBar}%;"></div>
+                    <div class="progress-bar-container" style="width: 100%; height: 8px; background: #e2e8f0; border-radius: 20px; overflow: hidden; margin: 10px 0 5px 0;">
+                        <div class="progress-bar" style="width: ${percentTotalBar}%; height: 100%; background: linear-gradient(90deg, #ef4444, #dc2626); border-radius: 20px;"></div>
                     </div>
-                    <div class="progress-label">
+                    <div class="progress-label" style="display: flex; justify-content: space-between; font-size: 10px; color: #64748b; margin-top: 2px;">
                         <span>${percentDT}% des jours</span>
                         <span>${daysWithDTCount} jour(s)</span>
                     </div>
                 </div>
                 
+                <!-- Jours avec les deux -->
+                <div class="dpdt-stat-card" style="background: white; border-radius: 16px; padding: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); border: 1px solid #e2e8f0; border-left: 4px solid #8b5cf6;">
+                    <div class="dpdt-stat-header" style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+                        <div class="dpdt-stat-icon" style="width: 36px; height: 36px; background: #ede9fe; border-radius: 10px; display: flex; align-items: center; justify-content: center; color: #8b5cf6;">
+                            <span style="font-size: 18px;">🔄</span>
+                        </div>
+                        <div class="dpdt-stat-title" style="font-weight: 600; color: #334155; font-size: 13px;">JOURS AVEC LES DEUX</div>
+                    </div>
+                    <div class="dpdt-stat-value" style="font-size: 28px; font-weight: 800; color: #0f172a; line-height: 1.2; margin-bottom: 8px;">${daysWithBothCount}</div>
+                    <div class="dpdt-stat-detail" style="display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: #64748b; margin-top: 8px; padding-top: 8px; border-top: 1px dashed #e2e8f0;">
+                        <span>Jours concernés</span>
+                        <span class="dpdt-stat-percent" style="font-weight: 700; color: #8b5cf6;">${daysWithBothCount} / ${diagnosticDays}</span>
+                    </div>
+                    <div class="progress-bar-container" style="width: 100%; height: 8px; background: #e2e8f0; border-radius: 20px; overflow: hidden; margin: 10px 0 5px 0;">
+                        <div class="progress-bar" style="width: ${percentBothBar}%; height: 100%; background: linear-gradient(90deg, #8b5cf6, #7c3aed); border-radius: 20px;"></div>
+                    </div>
+                    <div class="progress-label" style="display: flex; justify-content: space-between; font-size: 10px; color: #64748b; margin-top: 2px;">
+                        <span>${percentBoth}% des jours</span>
+                        <span>${daysWithBothCount} jour(s)</span>
+                    </div>
+                </div>
+                
                 <!-- Synthèse -->
-                <div class="dpdt-stat-card summary">
-                    <div class="dpdt-stat-header">
-                        <div class="dpdt-stat-icon summary">📊</div>
-                        <div class="dpdt-stat-title">SYNTHÈSE</div>
+                <div class="dpdt-stat-card" style="background: linear-gradient(135deg, #f0f9ff 0%, #ffffff 100%); border-radius: 16px; padding: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); border: 1px solid #e2e8f0; border-left: 4px solid #3b82f6;">
+                    <div class="dpdt-stat-header" style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+                        <div class="dpdt-stat-icon" style="width: 36px; height: 36px; background: #dbeafe; border-radius: 10px; display: flex; align-items: center; justify-content: center; color: #3b82f6;">
+                            <span style="font-size: 18px;">📊</span>
+                        </div>
+                        <div class="dpdt-stat-title" style="font-weight: 600; color: #334155; font-size: 13px;">SYNTHÈSE</div>
                     </div>
                     
-                    <!-- Première ligne : Jours diagnostic / Jours avec dél. -->
                     <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
                         <div>
                             <div style="font-size: 11px; color: #64748b;">Jours diagnostic</div>
@@ -9251,16 +9579,14 @@ function createDPDTOnlyTable(combinedAnalysis) {
                         </div>
                     </div>
                     
-                    <!-- Barre de progression pour le taux d'occurrence -->
-                    <div class="progress-bar-container" style="margin: 10px 0;">
-                        <div class="progress-bar summary" style="width: ${percentOccurrenceBar}%;"></div>
+                    <div class="progress-bar-container" style="width: 100%; height: 8px; background: #e2e8f0; border-radius: 20px; overflow: hidden; margin: 10px 0;">
+                        <div class="progress-bar" style="width: ${percentOccurrenceBar}%; height: 100%; background: linear-gradient(90deg, #3b82f6, #2563eb); border-radius: 20px;"></div>
                     </div>
-                    <div class="progress-label" style="margin-bottom: 10px;">
+                    <div class="progress-label" style="display: flex; justify-content: space-between; font-size: 10px; color: #64748b; margin-bottom: 10px;">
                         <span>Taux d'occurrence: ${percentTotal}%</span>
                         <span>${totalDaysWithEvents} jour(s)</span>
                     </div>
                     
-                    <!-- Deuxième ligne : Dernier événement -->
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 5px; padding-top: 8px; border-top: 1px dashed #e2e8f0;">
                         <div style="font-size: 11px; color: #64748b;">Dernier événement</div>
                         <div style="font-size: 16px; font-weight: 700; color: #3b82f6;">${lastEventDate}</div>
@@ -9269,117 +9595,54 @@ function createDPDTOnlyTable(combinedAnalysis) {
             </div>
             
             <!-- BOUTON POUR AFFICHER/MASQUER LE TABLEAU DÉTAILLÉ -->
-            <button id="${buttonId}" class="toggle-table-btn" data-table-id="${tableId}">
+            <button id="${buttonId}" class="toggle-table-btn" data-table-id="${tableId}" style="width: 100%; padding: 12px 20px; background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: white; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; transition: all 0.3s ease; margin: 0;">
                 <span style="font-size: 18px;">🔽</span>
                 <span>Afficher le tableau détaillé</span>
             </button>
             
             <!-- TABLEAU DÉTAILLÉ (CACHÉ PAR DÉFAUT) -->
             <div id="${tableId}" class="dpdt-detailed-table" style="display: none;">
-                <div class="dpdt-table-wrapper">
-                    <table class="dpdt-table">
-                        <thead>
-                            <tr>
-                                <th rowspan="2" class="date-col">📅 DATE</th>
-                                <th colspan="3" class="type-header partial">🔌 DÉLESTAGE PARTIEL</th>
-                                <th colspan="3" class="type-header total">🔋 DÉLESTAGE TOTAL</th>
-                            </tr>
-                            <tr>
-                                <th class="sub-header">Début</th>
-                                <th class="sub-header">Fin</th>
-                                <th class="sub-header">Durée</th>
-                                <th class="sub-header">Début</th>
-                                <th class="sub-header">Fin</th>
-                                <th class="sub-header">Durée</th>
+                <div style="max-height: 450px; overflow-y: auto; overflow-x: auto; border-radius: 0; background: white;">
+                    <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+                        <thead style="position: sticky; top: 0; background: #f8fafc; z-index: 10;">
+                            <tr style="border-bottom: 2px solid #e2e8f0;">
+                                <th style="padding: 16px 12px; text-align: left; font-weight: 700; color: #334155; background: #f8fafc; min-width: 100px;">📅 DATE</th>
+                                <th style="padding: 16px 12px; text-align: left; font-weight: 700; color: #b45309; background: #fef3c7;">🔌 DÉLESTAGE PARTIEL</th>
+                                <th style="padding: 16px 12px; text-align: left; font-weight: 700; color: #b91c1c; background: #fee2e2;">🔋 DÉLESTAGE TOTAL</th>
                             </tr>
                         </thead>
                         <tbody>
-    `;
-
-    // Remplir les lignes du tableau
-    sortedDates.forEach(date => {
-        const dateEvents = dailyEvents[date];
-
-        tableHTML += `<tr>`;
-        tableHTML += `<td class="date-cell">${date}</td>`;
-
-        // Délestage Partiel
-        const dpPeriods = dateEvents['DP'] ? dateEvents['DP'].periods : [];
-        if (dpPeriods.length > 0) {
-            const period = dpPeriods.reduce((longest, current) =>
-                current.dureeMinutes > longest.dureeMinutes ? current : longest
-            );
-            const multiple = dpPeriods.length > 1 ?
-                `<span class="event-multiple" title="${dpPeriods.length} périodes">${dpPeriods.length}x</span>` : '';
-
-            tableHTML += `
-                <td style="background: #fef3c7; color: #b45309; font-weight: 600;">${period.debut}</td>
-                <td style="background: #fef3c7; color: #b45309; font-weight: 600;">${period.fin}</td>
-                <td style="background: #fef3c7; color: #b45309; font-weight: 700;">
-                    ${period.duree} ${multiple}
-                </td>
-            `;
-        } else {
-            tableHTML += `<td class="empty-cell" colspan="3">-</td>`;
-        }
-
-        // Délestage Total
-        const dtPeriods = dateEvents['DT'] ? dateEvents['DT'].periods : [];
-        if (dtPeriods.length > 0) {
-            const period = dtPeriods.reduce((longest, current) =>
-                current.dureeMinutes > longest.dureeMinutes ? current : longest
-            );
-            const multiple = dtPeriods.length > 1 ?
-                `<span class="event-multiple" title="${dtPeriods.length} périodes">${dtPeriods.length}x</span>` : '';
-
-            tableHTML += `
-                <td style="background: #fee2e2; color: #b91c1c; font-weight: 600;">${period.debut}</td>
-                <td style="background: #fee2e2; color: #b91c1c; font-weight: 600;">${period.fin}</td>
-                <td style="background: #fee2e2; color: #b91c1c; font-weight: 700;">
-                    ${period.duree} ${multiple}
-                </td>
-            `;
-        } else {
-            tableHTML += `<td class="empty-cell" colspan="3">-</td>`;
-        }
-
-        tableHTML += `</tr>`;
-    });
-
-    tableHTML += `
+                            ${tableRows}
                         </tbody>
                     </table>
                 </div>
                 
                 <!-- Pied du tableau avec totaux -->
-                <div class="dpdt-table-footer">
-                    <div class="dpdt-total-events">
-                        <div class="dpdt-total-item">
-                            <span class="dpdt-total-value" style="color: #f59e0b;">${totalDP}</span>
-                            <span class="dpdt-total-label">événement(s) partiel</span>
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; background: #f8fafc; border-top: 2px solid #e2e8f0;">
+                    <div style="display: flex; gap: 25px;">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <span class="dpdt-total-value" style="font-weight: 800; font-size: 16px; color: #f59e0b;">${totalDP}</span>
+                            <span class="dpdt-total-label" style="color: #64748b;">événement(s) partiel</span>
                         </div>
-                        <div class="dpdt-total-item">
-                            <span class="dpdt-total-value" style="color: #ef4444;">${totalDT}</span>
-                            <span class="dpdt-total-label">événement(s) total</span>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <span class="dpdt-total-value" style="font-weight: 800; font-size: 16px; color: #ef4444;">${totalDT}</span>
+                            <span class="dpdt-total-label" style="color: #64748b;">événement(s) total</span>
                         </div>
                     </div>
                     <div style="color: #64748b; font-size: 11px;">
-                        Affichage de la période la plus longue par jour
+                        📊 ${totalDaysWithEvents} jour(s) avec événement sur ${diagnosticDays}
                     </div>
                 </div>
                 
                 <!-- Légende compacte -->
-                <div class="dpdt-compact-legend">
-                    <div class="dpdt-legend-item">
-                        <span class="dpdt-legend-color partial"></span>
+                <div style="display: flex; gap: 20px; padding: 12px 20px; background: white; border-top: 1px solid #e2e8f0; font-size: 11px;">
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        <span style="width: 12px; height: 12px; background: #f59e0b; border-radius: 3px;"></span>
                         <span>🔌 Délestage Partiel (DP)</span>
                     </div>
-                    <div class="dpdt-legend-item">
-                        <span class="dpdt-legend-color total"></span>
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        <span style="width: 12px; height: 12px; background: #ef4444; border-radius: 3px;"></span>
                         <span>🔋 Délestage Total (DT)</span>
-                    </div>
-                    <div class="dpdt-legend-item">
-                        <span>📊 ${totalDaysWithEvents} jour(s) avec événement sur ${diagnosticDays}</span>
                     </div>
                 </div>
             </div>
