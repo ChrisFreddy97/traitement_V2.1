@@ -9537,27 +9537,6 @@ function createDPDTOnlyTable(combinedAnalysis) {
                     </div>
                 </div>
                 
-                <!-- Jours avec les deux -->
-                <div class="dpdt-stat-card" style="background: white; border-radius: 16px; padding: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); border: 1px solid #e2e8f0; border-left: 4px solid #8b5cf6;">
-                    <div class="dpdt-stat-header" style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
-                        <div class="dpdt-stat-icon" style="width: 36px; height: 36px; background: #ede9fe; border-radius: 10px; display: flex; align-items: center; justify-content: center; color: #8b5cf6;">
-                            <span style="font-size: 18px;">🔄</span>
-                        </div>
-                        <div class="dpdt-stat-title" style="font-weight: 600; color: #334155; font-size: 13px;">JOURS AVEC LES DEUX</div>
-                    </div>
-                    <div class="dpdt-stat-value" style="font-size: 28px; font-weight: 800; color: #0f172a; line-height: 1.2; margin-bottom: 8px;">${daysWithBothCount}</div>
-                    <div class="dpdt-stat-detail" style="display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: #64748b; margin-top: 8px; padding-top: 8px; border-top: 1px dashed #e2e8f0;">
-                        <span>Jours concernés</span>
-                        <span class="dpdt-stat-percent" style="font-weight: 700; color: #8b5cf6;">${daysWithBothCount} / ${diagnosticDays}</span>
-                    </div>
-                    <div class="progress-bar-container" style="width: 100%; height: 8px; background: #e2e8f0; border-radius: 20px; overflow: hidden; margin: 10px 0 5px 0;">
-                        <div class="progress-bar" style="width: ${percentBothBar}%; height: 100%; background: linear-gradient(90deg, #8b5cf6, #7c3aed); border-radius: 20px;"></div>
-                    </div>
-                    <div class="progress-label" style="display: flex; justify-content: space-between; font-size: 10px; color: #64748b; margin-top: 2px;">
-                        <span>${percentBoth}% des jours</span>
-                        <span>${daysWithBothCount} jour(s)</span>
-                    </div>
-                </div>
                 
                 <!-- Synthèse -->
                 <div class="dpdt-stat-card" style="background: linear-gradient(135deg, #f0f9ff 0%, #ffffff 100%); border-radius: 16px; padding: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); border: 1px solid #e2e8f0; border-left: 4px solid #3b82f6;">
