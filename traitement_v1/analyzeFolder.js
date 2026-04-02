@@ -9327,10 +9327,7 @@ function createClientEventsTable(clientNumber) {
     const content = document.createElement('div');
     content.style.cssText = `padding: 20px;`;
     
-    // Calculer le nombre total de jours de diagnostic pour ce client
     const totalDiagnosticDays = getTotalDiagnosticDaysForClient(clientNumber);
-    
-    // Récupérer les événements pour ce client
     const eventsByDay = getEventsForClientGroupedByDay(clientNumber);
     
     if (eventsByDay.length === 0) {
@@ -9357,15 +9354,11 @@ function createClientEventsTable(clientNumber) {
         if (day.SuspendE > 0) daysWithSuspendE.add(day.date);
     });
     
-    // Calculer les pourcentages
-    const percentCreditNul = totalDiagnosticDays > 0 ? 
-        ((daysWithCreditNul.size / totalDiagnosticDays) * 100).toFixed(1) : 0;
-    const percentSuspendP = totalDiagnosticDays > 0 ? 
-        ((daysWithSuspendP.size / totalDiagnosticDays) * 100).toFixed(1) : 0;
-    const percentSuspendE = totalDiagnosticDays > 0 ? 
-        ((daysWithSuspendE.size / totalDiagnosticDays) * 100).toFixed(1) : 0;
+    const percentCreditNul = totalDiagnosticDays > 0 ? ((daysWithCreditNul.size / totalDiagnosticDays) * 100).toFixed(1) : 0;
+    const percentSuspendP = totalDiagnosticDays > 0 ? ((daysWithSuspendP.size / totalDiagnosticDays) * 100).toFixed(1) : 0;
+    const percentSuspendE = totalDiagnosticDays > 0 ? ((daysWithSuspendE.size / totalDiagnosticDays) * 100).toFixed(1) : 0;
     
-    // ✅ TABLEAU DE BORD COMPACT (cartes plus petites)
+    // Tableau de bord compact
     const statsGrid = document.createElement('div');
     statsGrid.style.cssText = `
         display: grid;
@@ -9375,7 +9368,6 @@ function createClientEventsTable(clientNumber) {
     `;
     
     statsGrid.innerHTML = `
-        <!-- Crédit nul -->
         <div style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); border-radius: 10px; padding: 12px; color: white;">
             <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
                 <span style="font-size: 20px;">💰</span>
@@ -9389,7 +9381,6 @@ function createClientEventsTable(clientNumber) {
             <div style="margin-top: 5px; font-size: 11px; font-weight: 600;">${percentCreditNul}%</div>
         </div>
         
-        <!-- Puissance dépassée -->
         <div style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); border-radius: 10px; padding: 12px; color: white;">
             <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
                 <span style="font-size: 20px;">📈</span>
@@ -9403,7 +9394,6 @@ function createClientEventsTable(clientNumber) {
             <div style="margin-top: 5px; font-size: 11px; font-weight: 600;">${percentSuspendP}%</div>
         </div>
         
-        <!-- Énergie épuisée -->
         <div style="background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%); border-radius: 10px; padding: 12px; color: white;">
             <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
                 <span style="font-size: 20px;">🔋</span>
@@ -9420,7 +9410,7 @@ function createClientEventsTable(clientNumber) {
     
     content.appendChild(statsGrid);
     
-    // ✅ Informations période compactes
+    // Informations période
     const periodInfo = document.createElement('div');
     periodInfo.style.cssText = `
         background: #f8fafc;
@@ -9440,7 +9430,7 @@ function createClientEventsTable(clientNumber) {
     `;
     content.appendChild(periodInfo);
     
-    // ✅ FILTRE PAR ÉVÉNEMENT
+    // Filtre par événement
     const filterContainer = document.createElement('div');
     filterContainer.style.cssText = `
         background: #f8fafc;
@@ -9469,7 +9459,7 @@ function createClientEventsTable(clientNumber) {
     `;
     content.appendChild(filterContainer);
     
-    // ✅ Bouton Plus de détails
+    // Bouton Plus de détails
     const toggleBtn = document.createElement('button');
     toggleBtn.id = `toggle-events-${clientNumber}`;
     toggleBtn.style.cssText = `
@@ -9494,7 +9484,7 @@ function createClientEventsTable(clientNumber) {
     `;
     content.appendChild(toggleBtn);
     
-    // ✅ TABLEAU (gardé exactement comme avant)
+    // TABLEAU DÉTAILLÉ AVEC COLONNES SÉPARÉES
     const tableWrapper = document.createElement('div');
     tableWrapper.id = `events-table-${clientNumber}`;
     tableWrapper.style.cssText = `
@@ -9515,16 +9505,15 @@ function createClientEventsTable(clientNumber) {
             <thead style="position: sticky; top: 0; z-index: 10;">
                 <tr>
                     <th rowspan="2" style="padding: 15px 10px; text-align: left; border-right: 2px solid #cbd5e1; background: #f1f5f9; font-size: 14px; position: sticky; left: 0; z-index: 11;">📅 DATE</th>
-                    <th style="padding: 12px 10px; text-align: center; background: #3b82f6; color: white; border-right: 2px solid #2563eb;">📈 PUISSANCE DÉPASSÉE</th>
-                    <th style="padding: 12px 10px; text-align: center; background: #f59e0b; color: white; border-right: 2px solid #d97706;">💰 CRÉDIT NUL</th>
-                    <th style="padding: 12px 10px; text-align: center; background: #0ea5e9; color: white;">🔋 ÉNERGIE ÉPUISÉE</th>
+                    <th colspan="2" style="padding: 12px 10px; text-align: center; background: #3b82f6; color: white; border-right: 2px solid #2563eb;">📈 PUISSANCE DÉPASSÉE</th>
+                    <th rowspan="2" style="padding: 12px 10px; text-align: center; background: #f59e0b; color: white; border-right: 2px solid #d97706;">💰 CRÉDIT NUL</th>
+                    <th colspan="2" style="padding: 12px 10px; text-align: center; background: #0ea5e9; color: white;">🔋 ÉNERGIE ÉPUISÉE</th>
                 </tr>
                 <tr style="background: #f1f5f9;">
-                    <th style="padding: 10px 8px; text-align: center; border-bottom: 1px solid #cbd5e1; border-right: 2px solid #cbd5e1;">Heure</th>
-                    
-                    <th style="padding: 10px 8px; text-align: center; border-bottom: 1px solid #cbd5e1; border-right: 2px solid #cbd5e1;">Signalement</th>
-                    
-                    <th style="padding: 10px 8px; text-align: center; border-bottom: 1px solid #cbd5e1;">Heure</th>
+                    <th style="padding: 10px 8px; text-align: center; border-bottom: 1px solid #cbd5e1; border-right: 2px solid #cbd5e1; width: 80px;">Heure</th>
+                    <th style="padding: 10px 8px; text-align: center; border-bottom: 1px solid #cbd5e1; border-right: 2px solid #cbd5e1; width: 80px;">Valeur (A)</th>
+                    <th style="padding: 10px 8px; text-align: center; border-bottom: 1px solid #cbd5e1; border-right: 2px solid #cbd5e1; width: 80px;">Heure</th>
+                    <th style="padding: 10px 8px; text-align: center; border-bottom: 1px solid #cbd5e1; width: 80px;">Valeur (Wh)</th>
                 </tr>
             </thead>
             <tbody>
@@ -9535,7 +9524,6 @@ function createClientEventsTable(clientNumber) {
     eventsByDay.forEach((day, index) => {
         const bgColor = index % 2 === 0 ? '#ffffff' : '#fafbfc';
         
-        // Déterminer les classes pour le filtrage
         const hasSuspendP = day.SuspendP > 0;
         const hasCreditNul = day.CreditNul > 0;
         const hasSuspendE = day.SuspendE > 0;
@@ -9545,6 +9533,22 @@ function createClientEventsTable(clientNumber) {
             hasSuspendE ? 'event-suspende' : ''
         ].filter(cls => cls).join(' ');
         
+        // Formatage des heures et valeurs pour SuspendP
+        let suspendPHoursHtml = '-';
+        let suspendPValuesHtml = '-';
+        if (day.SuspendP_times && day.SuspendP_times.length > 0) {
+            suspendPHoursHtml = day.SuspendP_times.map(t => `<div style="margin: 2px 0;">${t}</div>`).join('');
+            suspendPValuesHtml = day.SuspendP_values.map(v => `<div style="margin: 2px 0;"><span style="color: #1d4ed8; font-weight: 700;">${v}</span></div>`).join('');
+        }
+        
+        // Formatage des heures et valeurs pour SuspendE
+        let suspendEHoursHtml = '-';
+        let suspendEValuesHtml = '-';
+        if (day.SuspendE_times && day.SuspendE_times.length > 0) {
+            suspendEHoursHtml = day.SuspendE_times.map(t => `<div style="margin: 2px 0;">${t}</div>`).join('');
+            suspendEValuesHtml = day.SuspendE_values.map(v => `<div style="margin: 2px 0;"><span style="color: #0369a1; font-weight: 700;">${v}</span></div>`).join('');
+        }
+        
         tableHTML += `
             <tr class="${rowClasses}" style="border-bottom: 1px solid #e2e8f0; background: ${bgColor};">
                 <td style="padding: 12px 10px; font-weight: 600; border-right: 2px solid #e2e8f0; position: sticky; left: 0; background: ${bgColor};">
@@ -9553,19 +9557,29 @@ function createClientEventsTable(clientNumber) {
                     })}
                 </td>
                 
-                <!-- SuspendP -->
-                <td style="padding: 10px 8px; text-align: center; border-right: 2px solid #e2e8f0; ${day.SuspendP > 0 ? 'background: #3b82f620; font-weight: 700; color: #2563eb;' : 'color: #94a3b8;'}">
-                    ${day.SuspendP_start || '-'}
+                <!-- SuspendP : Heure -->
+                <td style="padding: 10px 8px; text-align: center; border-right: 1px solid #e2e8f0; ${hasSuspendP ? 'background: #3b82f620;' : 'color: #94a3b8;'}">
+                    ${suspendPHoursHtml}
+                </td>
+                
+                <!-- SuspendP : Valeur -->
+                <td style="padding: 10px 8px; text-align: center; border-right: 2px solid #e2e8f0; ${hasSuspendP ? 'background: #3b82f620;' : 'color: #94a3b8;'}">
+                    ${suspendPValuesHtml}
                 </td>
                 
                 <!-- Crédit Nul -->
-                <td style="padding: 10px 8px; text-align: center; border-right: 2px solid #e2e8f0; ${day.CreditNul > 0 ? 'background: #f59e0b; color: white; font-weight: 700;' : 'background: #f1f5f9; color: #94a3b8;'}">
-                    ${day.CreditNul > 0 ? '⚠️ CRÉDIT NUL' : '✓ Normal'}
+                <td style="padding: 10px 8px; text-align: center; border-right: 2px solid #e2e8f0; ${hasCreditNul ? 'background: #f59e0b; color: white; font-weight: 700;' : 'background: #f1f5f9; color: #94a3b8;'}">
+                    ${hasCreditNul ? '⚠️ CRÉDIT NUL' : '✓ Normal'}
                 </td>
                 
-                <!-- SuspendE -->
-                <td style="padding: 10px 8px; text-align: center; ${day.SuspendE > 0 ? 'background: #0ea5e920; font-weight: 700; color: #0284c7;' : 'color: #94a3b8;'}">
-                    ${day.SuspendE_start || '-'}
+                <!-- SuspendE : Heure -->
+                <td style="padding: 10px 8px; text-align: center; border-right: 1px solid #e2e8f0; ${hasSuspendE ? 'background: #0ea5e920;' : 'color: #94a3b8;'}">
+                    ${suspendEHoursHtml}
+                </td>
+                
+                <!-- SuspendE : Valeur -->
+                <td style="padding: 10px 8px; text-align: center; ${hasSuspendE ? 'background: #0ea5e920;' : 'color: #94a3b8;'}">
+                    ${suspendEValuesHtml}
                 </td>
             </tr>
         `;
@@ -9591,15 +9605,15 @@ function createClientEventsTable(clientNumber) {
     `;
     
     legend.innerHTML = `
-        <span><span style="color:#3b82f6;">⬤</span> Puissance dépassée</span>
+        <span><span style="color:#3b82f6;">⬤</span> Puissance dépassée (heure / valeur en A)</span>
         <span><span style="color:#f59e0b;">⬤</span> Crédit nul</span>
-        <span><span style="color:#0ea5e9;">⬤</span> Énergie épuisée</span>
+        <span><span style="color:#0ea5e9;">⬤</span> Énergie épuisée (heure / valeur en Wh)</span>
     `;
     content.appendChild(legend);
     
     container.appendChild(content);
     
-    // Événement bouton
+    // Événements
     setTimeout(() => {
         const btn = document.getElementById(`toggle-events-${clientNumber}`);
         const table = document.getElementById(`events-table-${clientNumber}`);
@@ -9607,7 +9621,7 @@ function createClientEventsTable(clientNumber) {
             btn.addEventListener('click', () => {
                 if (table.style.display === 'none') {
                     table.style.display = 'block';
-                    btn.innerHTML = `<span style="font-size:16px;">🔼</span><span>Masquer le tableau</span>`;
+                    btn.innerHTML = `<span style="font-size:16px;">🔼</span><span>Masquer le tableau détaillé</span>`;
                 } else {
                     table.style.display = 'none';
                     btn.innerHTML = `<span style="font-size:16px;">🔽</span><span>Afficher le tableau détaillé</span>`;
@@ -9615,7 +9629,6 @@ function createClientEventsTable(clientNumber) {
             });
         }
         
-        // ✅ LOGIQUE DE FILTRAGE DES ÉVÉNEMENTS
         const filterSuspendP = document.getElementById(`filter-suspendp-${clientNumber}`);
         const filterCreditNul = document.getElementById(`filter-creditnul-${clientNumber}`);
         const filterSuspendE = document.getElementById(`filter-suspende-${clientNumber}`);
@@ -9633,7 +9646,6 @@ function createClientEventsTable(clientNumber) {
                 const hasCreditNul = row.classList.contains('event-creditnul');
                 const hasSuspendE = row.classList.contains('event-suspende');
                 
-                // Montrer la ligne si elle a au moins un événement coché
                 const shouldShow = 
                     (hasSuspendP && showSuspendP) ||
                     (hasCreditNul && showCreditNul) ||
@@ -9643,12 +9655,10 @@ function createClientEventsTable(clientNumber) {
             });
         }
         
-        // Attacher les événements aux checkboxes
         if (filterSuspendP) filterSuspendP.addEventListener('change', applyEventFilter);
         if (filterCreditNul) filterCreditNul.addEventListener('change', applyEventFilter);
         if (filterSuspendE) filterSuspendE.addEventListener('change', applyEventFilter);
         
-        // Appliquer le filtre initial
         applyEventFilter();
     }, 100);
     
@@ -9701,31 +9711,44 @@ function getEventsForClientGroupedByDay(clientNumber, forfaitStartDate = null, f
         const [date, time] = dateTime.split(' ');
         const event = row['Évènements'].trim();
         const code1 = row['Code 1']?.toString().trim() || '';
+        const code2 = row['Code 2']?.toString().trim() || '';
         
-        // Filtrer par période si spécifiée
         if (forfaitStartDate || forfaitEndDate) {
             const eventDateObj = new Date(date);
             if (forfaitStartDate && eventDateObj < forfaitStartDate) return;
             if (forfaitEndDate && eventDateObj > forfaitEndDate) return;
         }
         
-        // Initialiser le jour si nécessaire
         if (!eventsByDay[date]) {
             eventsByDay[date] = {
                 date: date,
                 dateObj: new Date(date),
-                SuspendP: 0, SuspendP_start: null, SuspendP_end: null, SuspendP_duration: '-',
-                SuspendE: 0, SuspendE_start: null, SuspendE_end: null, SuspendE_duration: '-',
-                CreditNul: 0, CreditNul_start: null, CreditNul_end: null, CreditNul_duration: '-'
+                SuspendP: 0, 
+                SuspendP_start: null, 
+                SuspendP_end: null, 
+                SuspendP_duration: '-', 
+                SuspendP_times: [],     // Heures uniquement
+                SuspendP_values: [],    // Valeurs uniquement
+                SuspendE: 0, 
+                SuspendE_start: null, 
+                SuspendE_end: null, 
+                SuspendE_duration: '-', 
+                SuspendE_times: [],     // Heures uniquement
+                SuspendE_values: [],    // Valeurs uniquement
+                CreditNul: 0, 
+                CreditNul_start: null, 
+                CreditNul_end: null, 
+                CreditNul_duration: '-'
             };
         }
         
         const day = eventsByDay[date];
         
-        // Déterminer le type d'événement
         if (event.includes('SuspendP')) {
             if (code1 && code1.slice(-1) === clientStr) {
                 day.SuspendP++;
+                day.SuspendP_times.push(time.substring(0, 5));
+                day.SuspendP_values.push(code2);
                 if (!day.SuspendP_start || time < day.SuspendP_start) day.SuspendP_start = time.substring(0, 5);
                 if (!day.SuspendP_end || time > day.SuspendP_end) day.SuspendP_end = time.substring(0, 5);
             }
@@ -9733,11 +9756,12 @@ function getEventsForClientGroupedByDay(clientNumber, forfaitStartDate = null, f
         else if (event.includes('SuspendE')) {
             if (code1 && code1.slice(-1) === clientStr) {
                 day.SuspendE++;
+                day.SuspendE_times.push(time.substring(0, 5));
+                day.SuspendE_values.push(code2);
                 if (!day.SuspendE_start || time < day.SuspendE_start) day.SuspendE_start = time.substring(0, 5);
                 if (!day.SuspendE_end || time > day.SuspendE_end) day.SuspendE_end = time.substring(0, 5);
             }
         }
-        // SUPPRESSION DU BLOC "Surcharge"
     });
     
     // Ajouter les données de crédit nul
@@ -9751,7 +9775,6 @@ function getEventsForClientGroupedByDay(clientNumber, forfaitStartDate = null, f
             const [date, time] = dateTime.split(' ');
             const value = parseFloat(row[creditKey]) || 0;
             
-            // Filtrer par période si spécifiée
             if (forfaitStartDate || forfaitEndDate) {
                 const creditDateObj = new Date(date);
                 if (forfaitStartDate && creditDateObj < forfaitStartDate) return;
@@ -9763,8 +9786,8 @@ function getEventsForClientGroupedByDay(clientNumber, forfaitStartDate = null, f
                     eventsByDay[date] = {
                         date: date,
                         dateObj: new Date(date),
-                        SuspendP: 0, SuspendP_start: null, SuspendP_end: null, SuspendP_duration: '-',
-                        SuspendE: 0, SuspendE_start: null, SuspendE_end: null, SuspendE_duration: '-',
+                        SuspendP: 0, SuspendP_start: null, SuspendP_end: null, SuspendP_duration: '-', SuspendP_times: [], SuspendP_values: [],
+                        SuspendE: 0, SuspendE_start: null, SuspendE_end: null, SuspendE_duration: '-', SuspendE_times: [], SuspendE_values: [],
                         CreditNul: 0, CreditNul_start: null, CreditNul_end: null, CreditNul_duration: '-'
                     };
                 }
