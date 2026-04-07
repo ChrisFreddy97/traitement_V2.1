@@ -880,6 +880,9 @@ function renderCreditBoard() {
     `;
 
     html += renderCreditEvolutionChart(credits, client.id);
+    html += renderMonthlyCreditAnalysis(credits, zeroCreditDates);
+    const summaryHTML = renderCreditSummaryDashboard(credits, zeroCreditDates);
+    if (summaryHTML) html += summaryHTML;
     html += renderStreaksCard(streaksData);
     html
     
@@ -1380,4 +1383,317 @@ function destroyCreditChart() {
         currentCreditChartClientId = null;
     }
     window.__pendingCreditChart = null;
+}
+
+// ===========================================
+// ANALYSE MENSUELLE DU CRÉDIT
+// ===========================================
+
+function renderMonthlyCreditAnalysis(credits, zeroCreditDates) {
+    if (!credits || credits.length === 0) {
+        return `
+            <div style="background: white; border-radius: ${STYLES.borderRadius.md}; margin-bottom: ${STYLES.spacing.md}; overflow: hidden; border: 1px solid ${STYLES.colors.border};">
+                <div style="padding: ${STYLES.spacing.md}; text-align: center; color: ${STYLES.colors.gray};">
+                    <span style="font-size: 14px;">📊</span>
+                    <span>Aucune donnée de crédit disponible pour l'analyse mensuelle</span>
+                </div>
+            </div>
+        `;
+    }
+    
+    // 1. Construire un Map jour par jour avec les valeurs de crédit
+    const creditByDate = new Map();
+    
+    credits.forEach(c => {
+        if (c.date) {
+            const dateStr = c.date.split('T')[0];
+            creditByDate.set(dateStr, c.value ?? 0);
+        }
+    });
+    
+    // Ajouter les jours sans crédit (valeur 0)
+    zeroCreditDates.forEach(date => {
+        const dateStr = date.split('T')[0];
+        creditByDate.set(dateStr, 0);
+    });
+    
+    // 2. Grouper par mois et analyser
+    const monthlyData = new Map();
+    
+    creditByDate.forEach((value, dateStr) => {
+        const [year, month, day] = dateStr.split('-');
+        const monthKey = `${year}-${month}`;
+        
+        if (!monthlyData.has(monthKey)) {
+            monthlyData.set(monthKey, {
+                year: parseInt(year),
+                month: parseInt(month),
+                days: [],
+                totalDays: 0,
+                zeroDays: 0,
+                maxCredit: 0,
+                sumCredit: 0
+            });
+        }
+        
+        const monthData = monthlyData.get(monthKey);
+        monthData.days.push({ date: dateStr, value });
+        monthData.totalDays++;
+        
+        if (value === 0) {
+            monthData.zeroDays++;
+        }
+        
+        if (value > monthData.maxCredit) {
+            monthData.maxCredit = value;
+        }
+        
+        monthData.sumCredit += value;
+    });
+    
+    // 3. Calculer les stats par mois et trier par date décroissante
+    const sortedMonths = Array.from(monthlyData.values())
+        .map(month => {
+            const avgCredit = month.sumCredit / month.totalDays;
+            const percentZeroDays = (month.zeroDays / month.totalDays) * 100;
+            const availabilityRate = 100 - percentZeroDays;
+            
+            return {
+                ...month,
+                avgCredit: avgCredit,
+                percentZeroDays: percentZeroDays,
+                availabilityRate: availabilityRate
+            };
+        })
+        .sort((a, b) => {
+            if (a.year !== b.year) return b.year - a.year;
+            return b.month - a.month;
+        });
+    
+    if (sortedMonths.length === 0) {
+        return `
+            <div style="background: white; border-radius: ${STYLES.borderRadius.md}; margin-bottom: ${STYLES.spacing.md}; overflow: hidden; border: 1px solid ${STYLES.colors.border};">
+                <div style="padding: ${STYLES.spacing.md}; text-align: center; color: ${STYLES.colors.gray};">
+                    <span>⚠️ Aucune donnée mensuelle disponible</span>
+                </div>
+            </div>
+        `;
+    }
+    
+    // 4. Fonction pour obtenir l'icône et la couleur selon le taux de disponibilité
+    function getAvailabilityStatus(rate, zeroPercent) {
+        if (zeroPercent === 0) {
+            return { icon: '✅', color: '#22c55e', bgOpacity: '20', label: 'Parfait' };
+        } else if (rate >= 95) {
+            return { icon: '🟢', color: '#22c55e', bgOpacity: '20', label: 'Excellent' };
+        } else if (rate >= 80) {
+            return { icon: '⚠️', color: '#f59e0b', bgOpacity: '20', label: 'Attention' };
+        } else {
+            return { icon: '🔴', color: '#ef4444', bgOpacity: '20', label: 'Critique' };
+        }
+    }
+    
+    // 5. Générer le HTML du tableau
+    const monthNames = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
+    
+    const rowsHTML = sortedMonths.map(month => {
+        const monthName = monthNames[month.month - 1];
+        const percentZeroDays = month.percentZeroDays.toFixed(1);
+        const availabilityRate = month.availabilityRate.toFixed(1);
+        const status = getAvailabilityStatus(month.availabilityRate, month.zeroDays);
+        
+        return `
+            <tr style="border-bottom: 1px solid ${STYLES.colors.border};">
+                <td style="padding: ${STYLES.spacing.md} ${STYLES.spacing.sm}; font-weight: 600;">
+                    ${monthName} ${month.year}
+                </td>
+                <td style="padding: ${STYLES.spacing.md} ${STYLES.spacing.sm}; text-align: center;">
+                    ${month.totalDays}
+                    <span style="font-size: 10px; color: ${STYLES.colors.gray};"> (100%)</span>
+                </td>
+                <td style="padding: ${STYLES.spacing.md} ${STYLES.spacing.sm}; text-align: center;">
+                    ${month.zeroDays}
+                    <span style="font-size: 10px; color: ${STYLES.colors.gray};"> (${percentZeroDays}%)</span>
+                </td>
+                <td style="padding: ${STYLES.spacing.md} ${STYLES.spacing.sm}; text-align: center;">
+                    <span style="display: inline-flex; align-items: center; gap: 6px; background: ${status.color}${status.bgOpacity}; color: ${status.color}; font-weight: 600; padding: 4px 10px; border-radius: 20px; font-size: 12px;">
+                        ${status.icon} ${availabilityRate}%
+                    </span>
+                </td>
+                <td style="padding: ${STYLES.spacing.md} ${STYLES.spacing.sm}; text-align: center; font-weight: 600; color: ${STYLES.colors.primary};">
+                    ${month.maxCredit}
+                </td>
+                <td style="padding: ${STYLES.spacing.md} ${STYLES.spacing.sm}; text-align: center;">
+                    ${month.avgCredit.toFixed(1)}
+                </td>
+            </tr>
+        `;
+    }).join('');
+    
+    // Calcul des totaux généraux
+    const totalDays = sortedMonths.reduce((sum, m) => sum + m.totalDays, 0);
+    const totalZeroDays = sortedMonths.reduce((sum, m) => sum + m.zeroDays, 0);
+    const totalAvailabilityRate = totalDays > 0 ? ((totalDays - totalZeroDays) / totalDays * 100).toFixed(1) : 0;
+    const totalZeroPercent = totalDays > 0 ? (totalZeroDays / totalDays * 100).toFixed(1) : 0;
+    const overallMaxCredit = Math.max(...sortedMonths.map(m => m.maxCredit), 0);
+    const overallAvgCredit = sortedMonths.reduce((sum, m) => sum + (m.avgCredit * m.totalDays), 0) / totalDays;
+    const totalStatus = getAvailabilityStatus(parseFloat(totalAvailabilityRate), totalZeroDays);
+    
+    return `
+        <div style="background: white; border-radius: ${STYLES.borderRadius.md}; margin-bottom: ${STYLES.spacing.md}; overflow: hidden; border: 1px solid ${STYLES.colors.border};">
+            <div style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: white; padding: ${STYLES.spacing.sm} ${STYLES.spacing.lg};">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="font-size: 16px;">📅</span>
+                    <span style="font-weight: 600; font-size: 14px;">Analyse mensuelle du crédit</span>
+                </div>
+            </div>
+            
+            <div style="overflow-x: auto;">
+                <table style="width: 100%; border-collapse: collapse; font-size: 13px; min-width: 700px;">
+                    <thead style="background: ${STYLES.colors.grayBg}; border-bottom: 2px solid ${STYLES.colors.border};">
+                        <tr>
+                            <th style="padding: ${STYLES.spacing.md} ${STYLES.spacing.sm}; text-align: left;">Mois</th>
+                            <th style="padding: ${STYLES.spacing.md} ${STYLES.spacing.sm}; text-align: center;">Jours analysés</th>
+                            <th style="padding: ${STYLES.spacing.md} ${STYLES.spacing.sm}; text-align: center;">Jours sans crédit</th>
+                            <th style="padding: ${STYLES.spacing.md} ${STYLES.spacing.sm}; text-align: center;">Taux de disponibilité</th>
+                            <th style="padding: ${STYLES.spacing.md} ${STYLES.spacing.sm}; text-align: center;">Crédit max</th>
+                            <th style="padding: ${STYLES.spacing.md} ${STYLES.spacing.sm}; text-align: center;">Crédit moyen</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${rowsHTML}
+                    </tbody>
+                    <tfoot style="background: ${STYLES.colors.grayBg}; border-top: 2px solid ${STYLES.colors.border}; font-weight: 600;">
+                        <tr>
+                            <td style="padding: ${STYLES.spacing.md} ${STYLES.spacing.sm}; text-align: left;">📊 TOTAL</td>
+                            <td style="padding: ${STYLES.spacing.md} ${STYLES.spacing.sm}; text-align: center;">${totalDays}</td>
+                            <td style="padding: ${STYLES.spacing.md} ${STYLES.spacing.sm}; text-align: center;">${totalZeroDays} <span style="font-size: 10px; color: ${STYLES.colors.gray};"> (${totalZeroPercent}%)</span></td>
+                            <td style="padding: ${STYLES.spacing.md} ${STYLES.spacing.sm}; text-align: center;">
+                                <span style="display: inline-flex; align-items: center; gap: 6px; background: ${totalStatus.color}${totalStatus.bgOpacity}; color: ${totalStatus.color}; font-weight: 600; padding: 4px 10px; border-radius: 20px; font-size: 12px;">
+                                    ${totalStatus.icon} ${totalAvailabilityRate}%
+                                </span>
+                            </td>
+                            <td style="padding: ${STYLES.spacing.md} ${STYLES.spacing.sm}; text-align: center; color: ${STYLES.colors.primary};">${overallMaxCredit}</td>
+                            <td style="padding: ${STYLES.spacing.md} ${STYLES.spacing.sm}; text-align: center;">${overallAvgCredit.toFixed(1)}</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+            
+            <div style="padding: ${STYLES.spacing.sm} ${STYLES.spacing.lg}; background: ${STYLES.colors.grayBg}; font-size: 11px; color: ${STYLES.colors.gray}; border-top: 1px solid ${STYLES.colors.border}; display: flex; flex-wrap: wrap; gap: 20px; justify-content: center;">
+                <span><span style="color: #22c55e;">✅</span> 0% sans crédit</span>
+                <span><span style="color: #f59e0b;">⚠️</span> 1-20% sans crédit</span>
+                <span><span style="color: #ef4444;">🔴</span> >20% sans crédit</span>
+            </div>
+        </div>
+    `;
+}
+// ===========================================
+// TABLEAU DE BORD RÉCAPITULATIF CRÉDIT
+// ===========================================
+
+function renderCreditSummaryDashboard(credits, zeroCreditDates) {
+    if (!credits || credits.length === 0) {
+        return null;
+    }
+    
+    // 1. Construire le Map jour par jour
+    const creditByDate = new Map();
+    
+    credits.forEach(c => {
+        if (c.date) {
+            const dateStr = c.date.split('T')[0];
+            creditByDate.set(dateStr, c.value ?? 0);
+        }
+    });
+    
+    zeroCreditDates.forEach(date => {
+        const dateStr = date.split('T')[0];
+        creditByDate.set(dateStr, 0);
+    });
+    
+    // 2. Trier les dates
+    const sortedDates = Array.from(creditByDate.keys()).sort();
+    
+    if (sortedDates.length === 0) return null;
+    
+    const firstDate = sortedDates[0];
+    const lastDate = sortedDates[sortedDates.length - 1];
+    const totalDays = sortedDates.length;
+    
+    // 3. Compter les jours sans crédit
+    let zeroCreditDays = 0;
+    creditByDate.forEach(value => {
+        if (value === 0) zeroCreditDays++;
+    });
+    
+    // 4. Calculer la disponibilité moyenne (tous les jours)
+    let totalCredit = 0;
+    creditByDate.forEach(value => {
+        totalCredit += value;
+    });
+    const avgCredit = totalCredit / totalDays;
+    
+    // 5. Calculer le taux de disponibilité (jours avec crédit > 0)
+    const daysWithCredit = totalDays - zeroCreditDays;
+    const availabilityRate = (daysWithCredit / totalDays) * 100;
+    
+    // 6. Formater la période
+    const formatDate = (dateStr) => {
+        const [year, month, day] = dateStr.split('-');
+        return `${day}/${month}/${year}`;
+    };
+    
+    // 7. Déterminer la couleur et l'icône selon le taux
+    let availabilityIcon = '✅';
+    let availabilityColor = STYLES.colors.success;
+    if (zeroCreditDays === 0) {
+        availabilityIcon = '✅';
+        availabilityColor = '#22c55e';
+    } else if (availabilityRate >= 95) {
+        availabilityIcon = '🟢';
+        availabilityColor = '#22c55e';
+    } else if (availabilityRate >= 80) {
+        availabilityIcon = '⚠️';
+        availabilityColor = '#f59e0b';
+    } else {
+        availabilityIcon = '🔴';
+        availabilityColor = '#ef4444';
+    }
+    
+    return `
+        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: ${STYLES.spacing.md}; margin-bottom: ${STYLES.spacing.lg};">
+            <!-- Carte 1 : Période observée -->
+            <div style="background: white; border-radius: ${STYLES.borderRadius.md}; padding: ${STYLES.spacing.lg}; border: 1px solid ${STYLES.colors.border}; text-align: center;">
+                <div style="font-size: 28px; margin-bottom: 8px;">📅</div>
+                <div style="font-size: 12px; color: ${STYLES.colors.gray}; margin-bottom: 4px;">Période observée</div>
+                <div style="font-size: 14px; font-weight: 600; color: ${STYLES.colors.textDark};">${formatDate(firstDate)} → ${formatDate(lastDate)}</div>
+                <div style="font-size: 11px; color: ${STYLES.colors.gray}; margin-top: 4px;">${totalDays} jours</div>
+            </div>
+            
+            <!-- Carte 2 : Disponibilité crédit -->
+            <div style="background: white; border-radius: ${STYLES.borderRadius.md}; padding: ${STYLES.spacing.lg}; border: 1px solid ${STYLES.colors.border}; text-align: center;">
+                <div style="font-size: 28px; margin-bottom: 8px;">${availabilityIcon}</div>
+                <div style="font-size: 12px; color: ${STYLES.colors.gray}; margin-bottom: 4px;">Disponibilité crédit</div>
+                <div style="font-size: 24px; font-weight: 700; color: ${availabilityColor};">${availabilityRate.toFixed(1)}%</div>
+                <div style="font-size: 11px; color: ${STYLES.colors.gray}; margin-top: 4px;">${daysWithCredit} jours avec crédit</div>
+            </div>
+            
+            <!-- Carte 3 : Jours sans crédit -->
+            <div style="background: white; border-radius: ${STYLES.borderRadius.md}; padding: ${STYLES.spacing.lg}; border: 1px solid ${STYLES.colors.border}; text-align: center;">
+                <div style="font-size: 28px; margin-bottom: 8px;">⚠️</div>
+                <div style="font-size: 12px; color: ${STYLES.colors.gray}; margin-bottom: 4px;">Jours sans crédit</div>
+                <div style="font-size: 24px; font-weight: 700; color: ${zeroCreditDays > 0 ? STYLES.colors.danger : STYLES.colors.success};">${zeroCreditDays}</div>
+                <div style="font-size: 11px; color: ${STYLES.colors.gray}; margin-top: 4px;">${((zeroCreditDays / totalDays) * 100).toFixed(1)}% du total</div>
+            </div>
+            
+            <!-- Carte 4 : Moyenne du crédit -->
+            <div style="background: white; border-radius: ${STYLES.borderRadius.md}; padding: ${STYLES.spacing.lg}; border: 1px solid ${STYLES.colors.border}; text-align: center;">
+                <div style="font-size: 28px; margin-bottom: 8px;">💰</div>
+                <div style="font-size: 12px; color: ${STYLES.colors.gray}; margin-bottom: 4px;">Crédit moyen</div>
+                <div style="font-size: 24px; font-weight: 700; color: ${STYLES.colors.primary};">${avgCredit.toFixed(1)}</div>
+                <div style="font-size: 11px; color: ${STYLES.colors.gray}; margin-top: 4px;">jours disponibles</div>
+            </div>
+        </div>
+    `;
 }
