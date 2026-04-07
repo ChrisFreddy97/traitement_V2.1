@@ -1,10 +1,418 @@
 // dashboards/commercial/CommercialDashboard.js
 import { database } from '../../arduinoCore.js';
-import { FORFAIT_LIMITS } from '../../arduinoConstants.js';
-import { FORFAIT_NAMES } from '../../arduinoConstants.js';
-import {renderFilterPanel}from '../technical/TechnicalDashboard.js';
+import { FORFAIT_LIMITS, FORFAIT_NAMES } from '../../arduinoConstants.js';
 
-// Variable globale pour suivre le client actif
+// ===========================================
+// STYLES CENTRALISÉS
+// ===========================================
+const STYLES = {
+    colors: {
+        primary: '#9f7aea',
+        primaryDark: '#805ad5',
+        success: '#22c55e',
+        warning: '#f59e0b',
+        danger: '#ef4444',
+        info: '#0ea5e9',
+        infoDark: '#0284c7',
+        blue: '#3b82f6',
+        blueDark: '#2563eb',
+        gray: '#64748b',
+        grayLight: '#94a3b8',
+        grayBg: '#f8fafc',
+        border: '#e2e8f0',
+        borderDark: '#cbd5e1',
+        text: '#334155',
+        textDark: '#1e293b'
+    },
+    gradients: {
+        creditNul: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+        puissance: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+        energie: 'linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%)',
+        creditRecharge: 'linear-gradient(135deg, #9f7aea 0%, #805ad5 100%)',
+        solde: 'linear-gradient(135deg, #48bb78 0%, #38a169 100%)'
+    },
+    borderRadius: {
+        sm: '6px',
+        md: '8px',
+        lg: '10px',
+        xl: '12px',
+        full: '30px'
+    },
+    spacing: {
+        xs: '8px',
+        sm: '10px',
+        md: '12px',
+        lg: '15px',
+        xl: '20px'
+    }
+};
+
+// ===========================================
+// FONCTIONS UTILITAIRES
+// ===========================================
+
+/**
+ * Formate une date au format jj/mm/aaaa
+ */
+function formatDateToFrench(dateInput) {
+    if (!dateInput) return '-';
+    
+    try {
+        let date;
+        if (dateInput instanceof Date) {
+            date = dateInput;
+        } else if (typeof dateInput === 'string') {
+            const cleanDate = dateInput.split('T')[0];
+            date = new Date(cleanDate);
+        } else {
+            return '-';
+        }
+        
+        if (isNaN(date.getTime())) return '-';
+        
+        const day = String(date.getDate()).padStart(2, '0');
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const year = date.getFullYear();
+        
+        return `${day}/${month}/${year}`;
+    } catch {
+        return '-';
+    }
+}
+
+/**
+ * Formate une date courte (jj/mm/aa)
+ */
+function formatDateShort(dateInput) {
+    const fullDate = formatDateToFrench(dateInput);
+    if (fullDate === '-') return '-';
+    const parts = fullDate.split('/');
+    return `${parts[0]}/${parts[1]}/${parts[2].slice(-2)}`;
+}
+
+/**
+ * Retourne la couleur en fonction du nombre de jours
+ */
+function getDaysColor(days) {
+    if (days >= 30) return STYLES.colors.success;
+    if (days >= 20) return '#84cc16';
+    if (days >= 15) return '#eab308';
+    if (days >= 10) return STYLES.colors.warning;
+    if (days >= 7) return STYLES.colors.danger;
+    if (days >= 5) return '#ec4899';
+    if (days >= 3) return '#8b5cf6';
+    if (days === 2) return '#60a5fa';
+    return STYLES.colors.grayLight;
+}
+
+/**
+ * Vérifie si un client est fantôme
+ */
+function isGhostClient(client) {
+    const hasRecharges = (client.recharges?.length ?? 0) > 0;
+    const hasConso = (client.consommation?.journaliere?.length ?? 0) > 0;
+    const hasEvents = (client.events?.length ?? 0) > 0;
+    const hasCredits = (client.credits?.length ?? 0) > 0;
+    
+    if (!hasRecharges && !hasConso && !hasEvents && !hasCredits) return true;
+    
+    const allConsoZero = client.consommation?.journaliere?.every(c => c.valeur === 0) ?? true;
+    const allCreditsZero = client.credits?.every(c => c.value === 0) ?? true;
+    
+    return (hasConso && allConsoZero) || (hasCredits && allCreditsZero);
+}
+
+// ===========================================
+// TRAITEMENT DES DONNÉES (CACHE)
+// ===========================================
+
+const dataCache = new Map();
+
+function getCachedData(client, key, computeFn) {
+    const cacheKey = `${client.id}_${key}_${client.forfaitChanges?.length ?? 0}_${client.consommation?.journaliere?.length ?? 0}`;
+    
+    if (dataCache.has(cacheKey)) {
+        return dataCache.get(cacheKey);
+    }
+    
+    const result = computeFn(client);
+    dataCache.set(cacheKey, result);
+    return result;
+}
+
+function clearCache() {
+    dataCache.clear();
+}
+
+// ===========================================
+// TRAITEMENT DES DONNÉES FORFAIT
+// ===========================================
+
+function buildForfaitHistory(client) {
+    const changes = client.forfaitChanges ?? [];
+    const consoJournaliere = client.consommation?.journaliere ?? [];
+    const firstDate = consoJournaliere.length > 0 ? consoJournaliere[0].date : '2024-01-01';
+    const history = [];
+    
+    if (changes.length === 0) {
+        history.push({
+            forfait: client.forfaitName || 'ECO',
+            code: client.forfaitActuel || 1,
+            startDate: firstDate,
+            endDate: null,
+            isCurrent: true
+        });
+        return history;
+    }
+    
+    const sortedChanges = [...changes].sort((a, b) => new Date(a.date) - new Date(b.date));
+    
+    history.push({
+        forfait: FORFAIT_NAMES[sortedChanges[0].ancien] || `Forfait ${sortedChanges[0].ancien}`,
+        code: sortedChanges[0].ancien,
+        startDate: firstDate,
+        endDate: sortedChanges[0].date,
+        isCurrent: false
+    });
+    
+    for (let i = 0; i < sortedChanges.length; i++) {
+        const change = sortedChanges[i];
+        const nextChange = sortedChanges[i + 1];
+        
+        history.push({
+            forfait: FORFAIT_NAMES[change.nouveau] || `Forfait ${change.nouveau}`,
+            code: change.nouveau,
+            startDate: change.date,
+            endDate: nextChange?.date ?? null,
+            isCurrent: !nextChange
+        });
+    }
+    
+    return history;
+}
+
+function computeForfaitStats(client, forfaitHistory) {
+    const consoJournaliere = client.consommation?.journaliere ?? [];
+    const events = client.events ?? [];
+    
+    const suspendEDates = new Set(
+        events.filter(e => e.type === 'SuspendE' && e.date)
+              .map(e => e.date.split('T')[0])
+    );
+    
+    return forfaitHistory.map((forfait, index, array) => {
+        const forfaitMax = FORFAIT_LIMITS[forfait.forfait]?.max || 100;
+        const seuil85 = forfaitMax * 0.85;
+        const seuil115 = forfaitMax * 1.15;
+        
+        const daysInPeriod = [];
+        const daysWithConso = [];
+        
+        for (const day of consoJournaliere) {
+            const dayDate = day.date;
+            if (!dayDate) continue;
+            
+            const inPeriod = forfait.endDate 
+                ? (dayDate >= forfait.startDate && dayDate <= forfait.endDate)
+                : (dayDate >= forfait.startDate);
+            
+            if (inPeriod) {
+                daysInPeriod.push(day);
+                if (day.valeur > 0) daysWithConso.push(day);
+            }
+        }
+        
+        const maxEnergy = daysWithConso.length > 0 
+            ? Math.max(...daysWithConso.map(d => d.valeur)).toFixed(1) : 0;
+        
+        const avgEnergy = daysWithConso.length > 0 
+            ? (daysWithConso.reduce((sum, d) => sum + d.valeur, 0) / daysWithConso.length).toFixed(1) : 0;
+        
+        const daysBelow85 = daysWithConso.filter(d => d.valeur <= seuil85).length;
+        const daysInTolerance = daysWithConso.filter(d => d.valeur > seuil85 && d.valeur <= seuil115).length;
+        const daysAbove115 = daysWithConso.filter(d => {
+            const dateStr = d.date.split('T')[0];
+            return d.valeur > seuil115 || suspendEDates.has(dateStr);
+        }).length;
+        
+        let changeText = index === 0 
+            ? '<span style="color: #64748b;">Premier forfait</span>'
+            : `
+                <span style="background: #f97315; color: white; padding: 4px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; margin-right: 5px;">
+                    ${array[index-1].forfait}
+                </span>
+                →
+                <span style="background: #22c55e; color: white; padding: 4px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; margin-left: 5px;">
+                    ${forfait.forfait}
+                </span>
+            `;
+        
+        return {
+            ...forfait,
+            changeText,
+            totalDays: daysInPeriod.length,
+            daysWithConso: daysWithConso.length,
+            daysWithoutConso: daysInPeriod.length - daysWithConso.length,
+            maxEnergy,
+            avgEnergy,
+            daysBelow85,
+            daysInTolerance,
+            daysAbove115,
+            percentBelow85: daysWithConso.length > 0 ? ((daysBelow85 / daysWithConso.length) * 100).toFixed(1) : 0,
+            percentInTolerance: daysWithConso.length > 0 ? ((daysInTolerance / daysWithConso.length) * 100).toFixed(1) : 0,
+            percentAbove115: daysWithConso.length > 0 ? ((daysAbove115 / daysWithConso.length) * 100).toFixed(1) : 0,
+            forfaitMax,
+            seuil85,
+            seuil115,
+            suspendECount: suspendEDates.size
+        };
+    });
+}
+
+// ===========================================
+// TRAITEMENT DES DONNÉES CRÉDIT
+// ===========================================
+
+
+function processCreditStreaks(credits, zeroCreditDates) {
+    const creditByDate = new Map();
+    
+    credits.forEach(c => {
+        if (c.date) {
+            const dateStr = c.date.split('T')[0];
+            creditByDate.set(dateStr, c.value ?? 0);
+        }
+    });
+    
+    zeroCreditDates.forEach(date => {
+        const dateStr = date.split('T')[0];
+        creditByDate.set(dateStr, 0);
+    });
+    
+    const sortedEntries = Array.from(creditByDate.entries())
+        .map(([date, value]) => ({ date, dateObj: new Date(date), value }))
+        .sort((a, b) => a.dateObj - b.dateObj);
+    
+    const consecutiveGroups = [];
+    let currentGroup = [];
+    
+    for (let i = 0; i < sortedEntries.length; i++) {
+        const record = sortedEntries[i];
+        
+        if (record.value === 0) {
+            if (currentGroup.length === 0) {
+                currentGroup = [record];
+            } else {
+                const prevDate = sortedEntries[i-1].dateObj;
+                const dayDiff = Math.round((record.dateObj - prevDate) / (1000 * 60 * 60 * 24));
+                
+                if (dayDiff === 1 && sortedEntries[i-1].value === 0) {
+                    currentGroup.push(record);
+                } else {
+                    if (currentGroup.length > 1) consecutiveGroups.push([...currentGroup]);
+                    currentGroup = [record];
+                }
+            }
+        } else {
+            if (currentGroup.length > 1) consecutiveGroups.push([...currentGroup]);
+            currentGroup = [];
+        }
+    }
+    
+    if (currentGroup.length > 1) consecutiveGroups.push(currentGroup);
+    
+    return {
+        hasData: consecutiveGroups.length > 0,
+        consecutiveDays: consecutiveGroups
+    };
+}
+
+function processRechargeData(recharges) {
+    if (!recharges?.length) {
+        return { hasData: false, purchaseDays: [], totalRecharges: 0 };
+    }
+    
+    const purchaseDays = recharges
+        .map(r => ({ date: r.date, days: r.credit ?? 0, status: r.status || 'Réussie' }))
+        .filter(item => item.days > 0);
+    
+    const daysCountMap = new Map();
+    purchaseDays.forEach(item => {
+        daysCountMap.set(item.days, (daysCountMap.get(item.days) || 0) + 1);
+    });
+    
+    const sortedDays = Array.from(daysCountMap.entries()).sort((a, b) => b[0] - a[0]);
+    
+    let intervalJours = 0, intervalSemaine = 0, intervalMois = 0;
+    purchaseDays.forEach(item => {
+        const days = item.days;
+        if (days >= 1 && days <= 6) intervalJours++;
+        else if (days >= 7 && days <= 28) intervalSemaine++;
+        else if (days >= 29) intervalMois++;
+    });
+    
+    const total = purchaseDays.length;
+    
+    return {
+        hasData: true,
+        totalRecharges: recharges.length,
+        purchaseDays,
+        rawData: recharges,
+        daysCountMap,
+        sortedDays,
+        intervals: {
+            jours: { count: intervalJours, percent: ((intervalJours / total) * 100).toFixed(1) },
+            semaine: { count: intervalSemaine, percent: ((intervalSemaine / total) * 100).toFixed(1) },
+            mois: { count: intervalMois, percent: ((intervalMois / total) * 100).toFixed(1) }
+        }
+    };
+}
+
+// ===========================================
+// COMPOSANTS UI RÉUTILISABLES
+// ===========================================
+
+function renderBadge(text, color, isCurrent = false) {
+    const bgColor = isCurrent ? `${color}20` : `${color}20`;
+    const textColor = isCurrent ? color : color;
+    return `<span class="client-badge" style="background: ${bgColor}; color: ${textColor};">${text}${isCurrent ? ' (actuel)' : ''}</span>`;
+}
+
+function renderProgressBar(percentages, labels, colors) {
+    return `
+        <div class="unified-progress-bar" style="height: 40px; margin-bottom: 10px; display: flex;">
+            ${percentages.map((pct, idx) => `
+                <div class="progress-segment" 
+                     style="width: ${pct}%; height: 100%; background: ${colors[idx]}; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: white; text-shadow: 0 1px 2px rgba(0,0,0,0.2);" 
+                     title="${labels[idx]}">
+                    ${pct > 8 ? pct + '%' : ''}
+                </div>
+            `).join('')}
+        </div>
+    `;
+}
+
+function renderGhostCard(title, clientId, message) {
+    return `
+        <h3 class="card-title">${title} - Client ${clientId}</h3>
+        <div class="client-card ghost">
+            <div class="client-header">
+                <span class="client-icon">👻</span>
+                <span class="client-id">Client ${clientId}</span>
+                <span class="client-badge ghost">Client fantôme</span>
+            </div>
+            <div class="message-container">
+                <p class="client-message ghost">👻 ${message}</p>
+            </div>
+        </div>
+    `;
+}
+
+// ===========================================
+// RENDU DES BOARDS
+// ===========================================
+
+// Variables globales
 let activeClientId = null;
 let clientsList = [];
 
@@ -12,16 +420,12 @@ export function renderCommercialDashboard() {
     const container = document.getElementById('commercialDashboard');
     if (!container) return;
     
-    // Récupérer la liste des clients une fois pour toutes
-    clientsList = Array.from(database.commercialData?.clients?.values() || [])
+    clientsList = Array.from(database.commercialData?.clients?.values() ?? [])
         .filter(c => typeof c.id === 'number' && c.id <= 50);
     
-    // Définir le premier client comme actif par défaut
     activeClientId = clientsList.length > 0 ? clientsList[0].id : null;
     
-    // Structure avec onglet client en haut
-    const html = `
-        <!-- Onglet client global en haut -->
+    container.innerHTML = `
         <div class="global-client-tabs-container">
             <h3>👥 Sélection client</h3>
             <div class="client-tabs-header">
@@ -39,22 +443,14 @@ export function renderCommercialDashboard() {
         
         <div class="section-title"><h2>📊 SOLDE ET RECHARGE</h2></div>
         <div id="creditBoard" class="card"></div>
-                
-        <!-- 👉 BOUTON POUR AFFICHER LES TABLEAUX -->
-        <button class="toggle-tables-btn" onclick="toggleTablesContainer()">
+        
+        <button class="toggle-tables-btn" onclick="window.toggleTablesContainer?.()">
             📋 Afficher les tableaux détaillés
         </button>
-        `;
+    `;
     
-    container.innerHTML = html;
-    
-    // Rendre l'onglet client global
     renderGlobalClientTabs();
-    
-    // Rendre tous les boards avec le client actif
     renderAllBoards();
-    
-    // Attacher la navigation globale
     attachGlobalNavigation();
 }
 
@@ -63,7 +459,6 @@ function renderGlobalClientTabs() {
     if (!container || clientsList.length === 0) return;
     
     container.innerHTML = clientsList.map(client => {
-        // Vérifier si c'est un client fantôme pour le style de l'onglet
         const isGhost = isGhostClient(client);
         return `
             <button class="client-tab ${client.id === activeClientId ? 'active' : ''} ${isGhost ? 'ghost-client' : ''}" 
@@ -85,22 +480,16 @@ function attachGlobalNavigation() {
         
         function switchToClient(clientId) {
             activeClientId = parseInt(clientId);
-            
-            // Mettre à jour les classes actives des onglets
             tabs.forEach(tab => {
                 tab.classList.toggle('active', parseInt(tab.dataset.clientId) === activeClientId);
             });
-            
-            // Re-rendre tous les boards avec le nouveau client
             renderAllBoards();
         }
         
-        // Ajouter les événements de clic sur les onglets
         tabs.forEach(tab => {
             tab.addEventListener('click', () => switchToClient(tab.dataset.clientId));
         });
         
-        // Navigation précédent/suivant
         if (prevBtn) {
             prevBtn.addEventListener('click', () => {
                 const currentIndex = clientsList.findIndex(c => c.id === activeClientId);
@@ -119,52 +508,19 @@ function attachGlobalNavigation() {
     }, 100);
 }
 
-// ===========================================
-// FONCTIONS UTILITAIRES
-// ===========================================
-
-/**
- * Détecter si un client est fantôme
- */
-function isGhostClient(client) {
-    const aDesRecharges = (client.recharges?.length > 0);
-    const aDesConso = (client.consommation?.journaliere?.length > 0);
-    const aDesEvents = (client.events?.length > 0);
-    const aDesCredits = (client.credits?.length > 0);
-    
-    if (!aDesRecharges && !aDesConso && !aDesEvents && !aDesCredits) {
-        return true;
-    }
-    
-    const consoToutesNulles = (client.consommation?.journaliere?.every(c => c.valeur === 0) ?? true);
-    const creditsTousNuls = (client.credits?.every(c => c.value === 0) ?? true);
-    
-    return (aDesConso && consoToutesNulles) || (aDesCredits && creditsTousNuls);
-}
-
-
-
-
-
 function renderAllBoards() {
-    // Rendre tous les boards avec le client actif
     renderConsumptionBoard();
     renderEventsBoard();
     renderCreditBoard();
 }
 
-// Rendre accessible la fonction de détail
-window.showClientDetail = (clientId) => {
-    document.getElementById('clientDetailView').style.display = 'block';
-    import('./ClientDetail.js').then(module => {
-        module.renderClientDetail(clientId);
-    });
-};
+// ===========================================
+// RENDU CONSOMMATION BOARD
+// ===========================================
 
 function renderConsumptionBoard() {
     const container = document.getElementById('consumptionBoard');
     if (!container) return;
-    
     if (!activeClientId) {
         container.innerHTML = '<p class="no-data">❌ Aucun client sélectionné</p>';
         return;
@@ -176,269 +532,80 @@ function renderConsumptionBoard() {
         return;
     }
     
-    // Si client fantôme
     if (isGhostClient(client)) {
-        container.innerHTML = `
-            <h3 class="card-title">📋 HISTORIQUE FORFAITS & CONSOMMATION - Client ${client.id}</h3>
-            <div class="client-card ghost">
-                <div class="client-header">
-                    <span class="client-icon">👻</span>
-                    <span class="client-id">Client ${client.id}</span>
-                    <span class="client-badge ghost">Client fantôme</span>
-                </div>
-                <div class="message-container">
-                    <p class="client-message ghost">👻 Aucune donnée de consommation ou forfait disponible.</p>
-                </div>
-            </div>
-        `;
+        container.innerHTML = renderGhostCard('📋 HISTORIQUE FORFAITS & CONSOMMATION', client.id, 'Aucune donnée de consommation ou forfait disponible.');
         return;
     }
     
-    // ===== CONSTRUCTION DE L'HISTORIQUE DES FORFAITS =====
-    const forfaitHistory = [];
-    const changes = client.forfaitChanges || [];
-    const consoJournaliere = client.consommation?.journaliere || []; // ✅ Contient TOUS les jours (0 inclus)
-    const events = client.events || [];
+    const forfaitHistory = buildForfaitHistory(client);
+    const forfaitStats = computeForfaitStats(client, forfaitHistory);
     
-    // Récupérer les dates de SuspendE pour ce client
-    const suspendEDates = new Set();
-    events.forEach(e => {
-        if (e.type === 'SuspendE' && e.date) {
-            suspendEDates.add(e.date.split('T')[0]);
-        }
-    });
-    
-    // Construire l'historique des forfaits à partir des changements
-    if (changes.length === 0) {
-        const premiereDate = consoJournaliere.length > 0 
-            ? consoJournaliere[0].date 
-            : '2024-01-01';
-        
-        forfaitHistory.push({
-            forfait: client.forfaitName || 'ECO',
-            code: client.forfaitActuel || 1,
-            startDate: premiereDate,
-            endDate: null,
-            isCurrent: true
-        });
-    } else {
-        const sortedChanges = [...changes].sort((a, b) => 
-            new Date(a.date) - new Date(b.date)
-        );
-        
-        const premiereDate = consoJournaliere.length > 0 
-            ? consoJournaliere[0].date 
-            : '2024-01-01';
-        
-        forfaitHistory.push({
-            forfait: FORFAIT_NAMES[sortedChanges[0].ancien] || `Forfait ${sortedChanges[0].ancien}`,
-            code: sortedChanges[0].ancien,
-            startDate: premiereDate,
-            endDate: sortedChanges[0].date,
-            isCurrent: false
-        });
-        
-        for (let i = 0; i < sortedChanges.length; i++) {
-            const change = sortedChanges[i];
-            const nextChange = sortedChanges[i + 1];
-            
-            forfaitHistory.push({
-                forfait: FORFAIT_NAMES[change.nouveau] || `Forfait ${change.nouveau}`,
-                code: change.nouveau,
-                startDate: change.date,
-                endDate: nextChange ? nextChange.date : null,
-                isCurrent: !nextChange
-            });
-        }
-    }
-    
-    // ===== ANALYSER LA CONSO POUR CHAQUE PÉRIODE =====
-    const forfaitStats = forfaitHistory.map((forfait, index, array) => {
-        const allDaysInPeriod = [];
-        const daysWithConsumption = [];
-        const forfaitMax = FORFAIT_LIMITS[forfait.forfait]?.max || 100;
-        const seuil85 = forfaitMax * 0.85;
-        const seuil115 = forfaitMax * 1.15;
-        
-        // ✅ Parcourir TOUS les jours (avec et sans conso)
-        consoJournaliere.forEach(day => {
-            const dayDate = day.date;
-            if (!dayDate) return;
-            
-            let inPeriod = false;
-            if (forfait.endDate) {
-                if (dayDate >= forfait.startDate && dayDate <= forfait.endDate) {
-                    inPeriod = true;
-                }
-            } else {
-                if (dayDate >= forfait.startDate) {
-                    inPeriod = true;
-                }
-            }
-            
-            if (inPeriod) {
-                allDaysInPeriod.push(day); // ✅ On garde TOUS les jours de la période
-                if (day.valeur > 0) {
-                    daysWithConsumption.push(day);
-                }
-            }
-        });
-        
-        // Stats sur les jours avec conso
-        const maxEnergy = daysWithConsumption.length > 0 
-            ? Math.max(...daysWithConsumption.map(d => d.valeur)).toFixed(1)
-            : 0;
-        
-        const avgEnergy = daysWithConsumption.length > 0 
-            ? (daysWithConsumption.reduce((sum, d) => sum + d.valeur, 0) / daysWithConsumption.length).toFixed(1)
-            : 0;
-        
-        // Répartition par seuils (uniquement sur les jours avec conso)
-        const daysBelow85 = daysWithConsumption.filter(d => d.valeur <= seuil85).length;
-        const daysInTolerance = daysWithConsumption.filter(d => d.valeur > seuil85 && d.valeur <= seuil115).length;
-        const daysAbove115 = daysWithConsumption.filter(d => {
-            const dateStr = d.date.split('T')[0];
-            return d.valeur > seuil115 || suspendEDates.has(dateStr);
-        }).length;
-        
-        // Calcul du changement pour l'affichage
-        let changeText = '';
-        if (index === 0) {
-            changeText = '<span style="color: #64748b;">Premier forfait</span>';
-        } else {
-            const previousForfait = array[index-1].forfait;
-            changeText = `
-                <span style="background: #f97315; color: white; padding: 4px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; margin-right: 5px;">
-                    ${previousForfait}
-                </span>
-                →
-                <span style="background: #22c55e; color: white; padding: 4px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; margin-left: 5px;">
-                    ${forfait.forfait}
-                </span>
-            `;
-        }
-        
-        return {
-            ...forfait,
-            changeText,
-            totalDays: allDaysInPeriod.length,                    // ✅ Tous les jours de la période
-            daysWithConso: daysWithConsumption.length,             // ✅ Jours avec conso
-            daysWithoutConso: allDaysInPeriod.length - daysWithConsumption.length, // ✅ Jours sans conso
-            maxEnergy,
-            avgEnergy,
-            daysBelow85,
-            daysInTolerance,
-            daysAbove115,
-            percentBelow85: daysWithConsumption.length > 0 ? ((daysBelow85 / daysWithConsumption.length) * 100).toFixed(1) : 0,
-            percentInTolerance: daysWithConsumption.length > 0 ? ((daysInTolerance / daysWithConsumption.length) * 100).toFixed(1) : 0,
-            percentAbove115: daysWithConsumption.length > 0 ? ((daysAbove115 / daysWithConsumption.length) * 100).toFixed(1) : 0,
-            forfaitMax,
-            seuil85,
-            seuil115
-        };
-    });
-    
-    // ===== RENDU HTML =====
-    let html = `
-        <h3 class="card-title">📋 HISTORIQUE FORFAITS & CONSOMMATION - Client ${client.id}</h3>
-        <div class="client-card">
-    `;
+    let html = `<h3 class="card-title">📋 HISTORIQUE FORFAITS & CONSOMMATION - Client ${client.id}</h3><div class="client-card">`;
     
     if (forfaitStats.length > 0) {
-        // TABLEAU RÉCAPITULATIF
         html += `
             <div style="overflow-x: auto; margin-bottom: 25px;">
                 <table style="width: 100%; border-collapse: collapse; font-size: 13px; min-width: 1100px;">
-                    <thead style="background: #f8fafc; border-bottom: 2px solid #e2e8f0;">
+                    <thead style="background: ${STYLES.colors.grayBg}; border-bottom: 2px solid ${STYLES.colors.border};">
                         <tr>
-                            <th style="padding: 12px 10px; text-align: center;">Forfait</th>
-                            <th style="padding: 12px 10px; text-align: center;">Changement</th>
-                            <th style="padding: 12px 10px; text-align: center;">Jours totaux</th>
-                            <th style="padding: 12px 10px; text-align: center;">Jours avec conso</th>
-                            <th style="padding: 12px 10px; text-align: center;">Jours sans conso</th>
-                            <th style="padding: 12px 10px; text-align: center;">Énergie max</th>
-                            <th style="padding: 12px 10px; text-align: center;">Énergie moy</th>
+                            <th style="padding: ${STYLES.spacing.md} 10px; text-align: center;">Forfait</th>
+                            <th style="padding: ${STYLES.spacing.md} 10px; text-align: center;">Changement</th>
+                            <th style="padding: ${STYLES.spacing.md} 10px; text-align: center;">Jours totaux</th>
+                            <th style="padding: ${STYLES.spacing.md} 10px; text-align: center;">Jours avec conso</th>
+                            <th style="padding: ${STYLES.spacing.md} 10px; text-align: center;">Jours sans conso</th>
+                            <th style="padding: ${STYLES.spacing.md} 10px; text-align: center;">Énergie max</th>
+                            <th style="padding: ${STYLES.spacing.md} 10px; text-align: center;">Énergie moy</th>
                         </tr>
                     </thead>
                     <tbody>
-        `;
-        
-        forfaitStats.forEach((stat, index) => {
-            const bgColor = index % 2 === 0 ? '#ffffff' : '#fafbfc';
-            
-            html += `
-                <tr style="border-bottom: 1px solid #e2e8f0; background: ${bgColor};">
-                    <td style="padding: 12px 10px; text-align: center;">
-                        <span class="client-badge" style="background: ${stat.isCurrent ? '#22c55e20' : '#9f7aea20'}; color: ${stat.isCurrent ? '#22c55e' : '#9f7aea'};">
-                            ${stat.forfait}
-                            ${stat.isCurrent ? ' (actuel)' : ''}
-                        </span>
-                    </td>
-                    <td style="padding: 12px 10px; text-align: center; white-space: nowrap;">
-                        ${stat.changeText}
-                    </td>
-                    <td style="padding: 12px 10px; text-align: center; font-weight: 600;">${stat.totalDays}</td>
-                    <td style="padding: 12px 10px; text-align: center; font-weight: 600; color: #22c55e;">${stat.daysWithConso}</td>
-                    <td style="padding: 12px 10px; text-align: center; font-weight: 600; color: #64748b;">${stat.daysWithoutConso}</td>
-                    <td style="padding: 12px 10px; text-align: center;">${stat.maxEnergy} Wh</td>
-                    <td style="padding: 12px 10px; text-align: center;">${stat.avgEnergy} Wh</td>
-                </tr>
-            `;
-        });
-        
-        html += `
+                        ${forfaitStats.map((stat, idx) => {
+                            const bgColor = idx % 2 === 0 ? '#ffffff' : '#fafbfc';
+                            return `
+                                <tr style="border-bottom: 1px solid ${STYLES.colors.border}; background: ${bgColor};">
+                                    <td style="padding: ${STYLES.spacing.md} 10px; text-align: center;">${renderBadge(stat.forfait, stat.isCurrent ? STYLES.colors.success : STYLES.colors.primary, stat.isCurrent)}</td>
+                                    <td style="padding: ${STYLES.spacing.md} 10px; text-align: center; white-space: nowrap;">${stat.changeText}</td>
+                                    <td style="padding: ${STYLES.spacing.md} 10px; text-align: center; font-weight: 600;">${stat.totalDays}</td>
+                                    <td style="padding: ${STYLES.spacing.md} 10px; text-align: center; font-weight: 600; color: ${STYLES.colors.success};">${stat.daysWithConso}</td>
+                                    <td style="padding: ${STYLES.spacing.md} 10px; text-align: center; font-weight: 600; color: ${STYLES.colors.gray};">${stat.daysWithoutConso}</td>
+                                    <td style="padding: ${STYLES.spacing.md} 10px; text-align: center;">${stat.maxEnergy} Wh</td>
+                                    <td style="padding: ${STYLES.spacing.md} 10px; text-align: center;">${stat.avgEnergy} Wh</td>
+                                </tr>
+                            `;
+                        }).join('')}
                     </tbody>
                 </table>
             </div>
         `;
         
-        // BARRES DE PROGRESSION PAR PÉRIODE
         forfaitStats.forEach(stat => {
-            const startDate = new Date(stat.startDate).toLocaleDateString('fr-FR');
-            const endDate = stat.endDate 
-                ? new Date(stat.endDate).toLocaleDateString('fr-FR') 
-                : 'Présent';
+            const startDate = formatDateToFrench(stat.startDate);
+            const endDate = stat.endDate ? formatDateToFrench(stat.endDate) : 'Présent';
             
             html += `
-                <div style="margin-bottom: 20px; padding: 15px; background: #f8fafc; border-radius: 12px; border: 1px solid #e2e8f0;">
+                <div style="margin-bottom: 20px; padding: ${STYLES.spacing.lg}; background: ${STYLES.colors.grayBg}; border-radius: ${STYLES.borderRadius.xl}; border: 1px solid ${STYLES.colors.border};">
                     <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
                         <div>
-                            <span class="client-badge" style="background: ${stat.isCurrent ? '#22c55e' : '#9f7aea'}; color: white; margin-right: 10px;">
-                                ${stat.forfait}
-                            </span>
-                            <span style="font-size: 12px; color: #64748b;">${startDate} → ${endDate}</span>
+                            ${renderBadge(stat.forfait, stat.isCurrent ? STYLES.colors.success : STYLES.colors.primary, false)}
+                            <span style="font-size: 12px; color: ${STYLES.colors.gray};">${startDate} → ${endDate}</span>
                         </div>
                         <span style="font-size: 12px;">${stat.daysWithConso} jours avec conso</span>
                     </div>
-                    
-                    <!-- Barre de progression -->
-                    <div class="unified-progress-bar" style="height: 40px; margin-bottom: 10px; display: flex;">
-                        <div class="progress-segment success" style="width: ${stat.percentBelow85}%; height: 100%; background: #22c55e; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: white; text-shadow: 0 1px 2px rgba(0,0,0,0.2);" 
-                             title="≤85% : ${stat.daysBelow85} jours">
-                            ${stat.percentBelow85 > 8 ? stat.percentBelow85 + '%' : ''}
-                        </div>
-                        <div class="progress-segment warning" style="width: ${stat.percentInTolerance}%; height: 100%; background: #f59e0b; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: white; text-shadow: 0 1px 2px rgba(0,0,0,0.2);"
-                             title="85-115% : ${stat.daysInTolerance} jours">
-                            ${stat.percentInTolerance > 8 ? stat.percentInTolerance + '%' : ''}
-                        </div>
-                        <div class="progress-segment danger" style="width: ${stat.percentAbove115}%; height: 100%; background: #ef4444; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: white; text-shadow: 0 1px 2px rgba(0,0,0,0.2);"
-                             title=">115% : ${stat.daysAbove115} jours">
-                            ${stat.percentAbove115 > 8 ? stat.percentAbove115 + '%' : ''}
-                        </div>
-                    </div>
-                    
-                    <!-- Légende -->
+                    ${renderProgressBar(
+                        [stat.percentBelow85, stat.percentInTolerance, stat.percentAbove115],
+                        [`≤85% : ${stat.daysBelow85} jours`, `85-115% : ${stat.daysInTolerance} jours`, `>115% : ${stat.daysAbove115} jours`],
+                        [STYLES.colors.success, STYLES.colors.warning, STYLES.colors.danger]
+                    )}
                     <div class="progress-legend" style="display: flex; flex-wrap: wrap; gap: 20px; justify-content: center;">
                         <div class="legend-item" style="display: flex; align-items: center; gap: 5px;">
-                            <span class="legend-dot success" style="width: 12px; height: 12px; background: #22c55e; border-radius: 3px;"></span>
+                            <span class="legend-dot success" style="width: 12px; height: 12px; background: ${STYLES.colors.success}; border-radius: 3px;"></span>
                             <span style="font-size: 12px;">≤${stat.seuil85.toFixed(0)}Wh: ${stat.daysBelow85}j (${stat.percentBelow85}%)</span>
                         </div>
                         <div class="legend-item" style="display: flex; align-items: center; gap: 5px;">
-                            <span class="legend-dot warning" style="width: 12px; height: 12px; background: #f59e0b; border-radius: 3px;"></span>
+                            <span class="legend-dot warning" style="width: 12px; height: 12px; background: ${STYLES.colors.warning}; border-radius: 3px;"></span>
                             <span style="font-size: 12px;">${stat.seuil85.toFixed(0)}-${stat.seuil115.toFixed(0)}Wh: ${stat.daysInTolerance}j (${stat.percentInTolerance}%)</span>
                         </div>
                         <div class="legend-item" style="display: flex; align-items: center; gap: 5px;">
-                            <span class="legend-dot danger" style="width: 12px; height: 12px; background: #ef4444; border-radius: 3px;"></span>
+                            <span class="legend-dot danger" style="width: 12px; height: 12px; background: ${STYLES.colors.danger}; border-radius: 3px;"></span>
                             <span style="font-size: 12px;">>${stat.seuil115.toFixed(0)}Wh: ${stat.daysAbove115}j (${stat.percentAbove115}%)</span>
                         </div>
                     </div>
@@ -446,11 +613,10 @@ function renderConsumptionBoard() {
             `;
         });
         
-        // Note sur les SuspendE
-        if (suspendEDates.size > 0) {
+        if (forfaitStats[0]?.suspendECount > 0) {
             html += `
-                <div class="info-note" style="margin-top: 15px; padding: 10px; background: #fee2e2; border-radius: 8px; font-size: 12px;">
-                    ⚠️ ${suspendEDates.size} jour(s) avec SuspendE détecté(s) (comptés dans la zone rouge)
+                <div class="info-note" style="margin-top: ${STYLES.spacing.lg}; padding: ${STYLES.spacing.sm}; background: #fee2e2; border-radius: ${STYLES.borderRadius.md}; font-size: 12px;">
+                    ⚠️ ${forfaitStats[0].suspendECount} jour(s) avec SuspendE détecté(s) (comptés dans la zone rouge)
                 </div>
             `;
         }
@@ -462,10 +628,13 @@ function renderConsumptionBoard() {
     container.innerHTML = html;
 }
 
+// ===========================================
+// RENDU EVENTS BOARD
+// ===========================================
+
 function renderEventsBoard() {
     const container = document.getElementById('commercialEventsBoard');
     if (!container) return;
-    
     if (!activeClientId) {
         container.innerHTML = '<p class="no-data">❌ Aucun client sélectionné</p>';
         return;
@@ -477,45 +646,21 @@ function renderEventsBoard() {
         return;
     }
     
-    // Si client fantôme, afficher un message spécifique
     if (isGhostClient(client)) {
-        container.innerHTML = `
-            <h3 class="card-title">⚠️ ÉVÉNEMENTS - Client ${client.id}</h3>
-            <div class="client-card ghost">
-                <div class="client-header">
-                    <span class="client-icon">👻</span>
-                    <span class="client-id">Client ${client.id}</span>
-                    <span class="client-badge ghost">Client fantôme</span>
-                </div>
-                <div class="message-container">
-                    <p class="client-message ghost">👻 Aucun événement enregistré pour ce client.</p>
-                </div>
-            </div>
-        `;
+        container.innerHTML = renderGhostCard('⚠️ ÉVÉNEMENTS', client.id, 'Aucun événement enregistré pour ce client.');
         return;
     }
     
-    container.innerHTML = `
-        <h3 class="card-title">⚠️ ÉVÉNEMENTS - Client ${client.id}</h3>
-        ${renderEventsClient(client)}
-    `;
+    container.innerHTML = renderEventsClient(client);
 }
 
 function renderEventsClient(client) {
-    const events = client.events || [];
-    const zeroCreditDates = client.zeroCreditDates || [];
+    const events = client.events ?? [];
+    const zeroCreditDates = client.zeroCreditDates ?? [];
+    const totalDays = client.consommation?.journaliere?.length ?? client.credits?.length ?? zeroCreditDates.length ?? 1;
     
-    // Récupérer le nombre total de jours analysés (si disponible)
-    const totalDays = client.consommation?.journaliere?.length || 
-                     client.credits?.length || 
-                     zeroCreditDates.length || 
-                     1;
-    
-    // Regrouper les événements par jour (comme dans le nouveau code)
-    const eventsByDay = [];
     const eventsMap = new Map();
     
-    // Traiter les événements SuspendE et SuspendP
     events.forEach(event => {
         if (!event.date) return;
         const dateStr = event.date.split('T')[0];
@@ -525,14 +670,8 @@ function renderEventsClient(client) {
             eventsMap.set(dateStr, {
                 date: dateStr,
                 dateObj: new Date(event.date),
-                SuspendE: 0,
-                SuspendE_start: '',
-                SuspendE_end: '',
-                SuspendE_duration: '',
-                SuspendP: 0,
-                SuspendP_start: '',
-                SuspendP_end: '',
-                SuspendP_duration: '',
+                SuspendE: 0, SuspendE_start: '', SuspendE_end: '', SuspendE_duration: '',
+                SuspendP: 0, SuspendP_start: '', SuspendP_end: '', SuspendP_duration: '',
                 CreditNul: 0
             });
         }
@@ -543,41 +682,24 @@ function renderEventsClient(client) {
             dayData.SuspendE++;
             if (!dayData.SuspendE_start) dayData.SuspendE_start = hour;
             dayData.SuspendE_end = hour;
-            // Calcul approximatif de la durée (si plusieurs événements)
-            if (dayData.SuspendE > 1) {
-                dayData.SuspendE_duration = `${dayData.SuspendE} évts`;
-            } else {
-                dayData.SuspendE_duration = '-';
-            }
+            dayData.SuspendE_duration = dayData.SuspendE > 1 ? `${dayData.SuspendE} évts` : '-';
         }
         
         if (event.type === 'SuspendP') {
             dayData.SuspendP++;
             if (!dayData.SuspendP_start) dayData.SuspendP_start = hour;
             dayData.SuspendP_end = hour;
-            if (dayData.SuspendP > 1) {
-                dayData.SuspendP_duration = `${dayData.SuspendP} évts`;
-            } else {
-                dayData.SuspendP_duration = '-';
-            }
+            dayData.SuspendP_duration = dayData.SuspendP > 1 ? `${dayData.SuspendP} évts` : '-';
         }
     });
     
-    // Ajouter les jours avec crédit nul
     zeroCreditDates.forEach(date => {
         const dateStr = date.split('T')[0];
         if (!eventsMap.has(dateStr)) {
             eventsMap.set(dateStr, {
-                date: dateStr,
-                dateObj: new Date(date),
-                SuspendE: 0,
-                SuspendE_start: '',
-                SuspendE_end: '',
-                SuspendE_duration: '',
-                SuspendP: 0,
-                SuspendP_start: '',
-                SuspendP_end: '',
-                SuspendP_duration: '',
+                date: dateStr, dateObj: new Date(date),
+                SuspendE: 0, SuspendE_start: '', SuspendE_end: '', SuspendE_duration: '',
+                SuspendP: 0, SuspendP_start: '', SuspendP_end: '', SuspendP_duration: '',
                 CreditNul: 1
             });
         } else {
@@ -585,25 +707,16 @@ function renderEventsClient(client) {
         }
     });
     
-    // Convertir la Map en array
-    eventsMap.forEach(dayData => eventsByDay.push(dayData));
+    const eventsByDay = Array.from(eventsMap.values());
     
-    // Statistiques
-    const daysWithCreditNul = new Set();
-    const daysWithSuspendP = new Set();
-    const daysWithSuspendE = new Set();
-    
-    eventsByDay.forEach(day => {
-        if (day.CreditNul > 0) daysWithCreditNul.add(day.date);
-        if (day.SuspendP > 0) daysWithSuspendP.add(day.date);
-        if (day.SuspendE > 0) daysWithSuspendE.add(day.date);
-    });
+    const daysWithCreditNul = new Set(eventsByDay.filter(d => d.CreditNul > 0).map(d => d.date));
+    const daysWithSuspendP = new Set(eventsByDay.filter(d => d.SuspendP > 0).map(d => d.date));
+    const daysWithSuspendE = new Set(eventsByDay.filter(d => d.SuspendE > 0).map(d => d.date));
     
     const percentCreditNul = ((daysWithCreditNul.size / totalDays) * 100).toFixed(1);
     const percentSuspendP = ((daysWithSuspendP.size / totalDays) * 100).toFixed(1);
     const percentSuspendE = ((daysWithSuspendE.size / totalDays) * 100).toFixed(1);
     
-    // Génération du HTML avec le nouveau look
     let html = `
         <div class="client-card">
             <div class="client-header">
@@ -612,154 +725,78 @@ function renderEventsClient(client) {
                 <span class="client-badge">${events.length + zeroCreditDates.length} signalements</span>
             </div>
             
-            <!-- Statistiques sous forme de cartes -->
-            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 20px;">
-                <!-- Crédit nul -->
-                <div style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); border-radius: 10px; padding: 12px; color: white;">
-                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
-                        <span style="font-size: 20px;">💰</span>
-                        <span style="font-size: 12px; font-weight: 600; opacity: 0.9;">CRÉDIT NUL</span>
-                    </div>
-                    <div style="font-size: 28px; font-weight: 800; margin-bottom: 4px;">${daysWithCreditNul.size}</div>
-                    <div style="font-size: 11px; opacity: 0.9;">jour(s) concerné(s)</div>
-                    <div style="margin-top: 8px; background: rgba(255,255,255,0.2); height: 4px; border-radius: 2px; overflow: hidden;">
-                        <div style="width: ${percentCreditNul}%; height: 100%; background: white; border-radius: 2px;"></div>
-                    </div>
-                    <div style="margin-top: 5px; font-size: 11px; font-weight: 600;">${percentCreditNul}%</div>
-                </div>
-                
-                <!-- Puissance dépassée -->
-                <div style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); border-radius: 10px; padding: 12px; color: white;">
-                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
-                        <span style="font-size: 20px;">📈</span>
-                        <span style="font-size: 12px; font-weight: 600; opacity: 0.9;">PUISSANCE</span>
-                    </div>
-                    <div style="font-size: 28px; font-weight: 800; margin-bottom: 4px;">${daysWithSuspendP.size}</div>
-                    <div style="font-size: 11px; opacity: 0.9;">jour(s) concerné(s)</div>
-                    <div style="margin-top: 8px; background: rgba(255,255,255,0.2); height: 4px; border-radius: 2px; overflow: hidden;">
-                        <div style="width: ${percentSuspendP}%; height: 100%; background: white; border-radius: 2px;"></div>
-                    </div>
-                    <div style="margin-top: 5px; font-size: 11px; font-weight: 600;">${percentSuspendP}%</div>
-                </div>
-                
-                <!-- Énergie épuisée -->
-                <div style="background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%); border-radius: 10px; padding: 12px; color: white;">
-                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
-                        <span style="font-size: 20px;">🔋</span>
-                        <span style="font-size: 12px; font-weight: 600; opacity: 0.9;">ÉNERGIE</span>
-                    </div>
-                    <div style="font-size: 28px; font-weight: 800; margin-bottom: 4px;">${daysWithSuspendE.size}</div>
-                    <div style="font-size: 11px; opacity: 0.9;">jour(s) concerné(s)</div>
-                    <div style="margin-top: 8px; background: rgba(255,255,255,0.2); height: 4px; border-radius: 2px; overflow: hidden;">
-                        <div style="width: ${percentSuspendE}%; height: 100%; background: white; border-radius: 2px;"></div>
-                    </div>
-                    <div style="margin-top: 5px; font-size: 11px; font-weight: 600;">${percentSuspendE}%</div>
-                </div>
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: ${STYLES.spacing.sm}; margin-bottom: 20px;">
+                ${renderStatCard('💰', 'CRÉDIT NUL', daysWithCreditNul.size, percentCreditNul, STYLES.gradients.creditNul)}
+                ${renderStatCard('📈', 'PUISSANCE', daysWithSuspendP.size, percentSuspendP, STYLES.gradients.puissance)}
+                ${renderStatCard('🔋', 'ÉNERGIE', daysWithSuspendE.size, percentSuspendE, STYLES.gradients.energie)}
             </div>
             
-            <!-- Info période -->
-            <div style="background: #f8fafc; border-radius: 8px; padding: 10px 15px; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; font-size: 12px; border: 1px solid #e2e8f0;">
+            <div style="background: ${STYLES.colors.grayBg}; border-radius: ${STYLES.borderRadius.md}; padding: ${STYLES.spacing.sm} ${STYLES.spacing.lg}; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; font-size: 12px; border: 1px solid ${STYLES.colors.border};">
                 <span>📅 ${totalDays} jours analysés</span>
                 <span>📊 ${eventsByDay.length} jours avec événements</span>
                 <span>⚡ ${events.length + zeroCreditDates.length} signalements</span>
             </div>
     `;
     
-    // Bouton toggle si il y a des événements
     if (eventsByDay.length > 0) {
         const toggleId = `toggle-events-${client.id}`;
         const tableId = `events-table-${client.id}`;
         
         html += `
-            <button id="${toggleId}" style="width: 100%; padding: 12px; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 8px; color: #334155; font-size: 14px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 15px;">
-                <span style="font-size: 16px;">🔽</span>
-                <span>Afficher le tableau détaillé</span>
+            <button id="${toggleId}" style="width: 100%; padding: ${STYLES.spacing.md}; background: #f1f5f9; border: 1px solid ${STYLES.colors.borderDark}; border-radius: ${STYLES.borderRadius.md}; color: ${STYLES.colors.text}; font-size: 14px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: ${STYLES.spacing.lg};">
+                <span style="font-size: 16px;">🔽</span> Afficher le tableau détaillé
             </button>
             
-            <div id="${tableId}" style="display: none; border: 2px solid #e2e8f0; border-radius: 12px; overflow: hidden; margin-bottom: 15px; max-height: 350px; overflow-y: auto; overflow-x: auto;">
+            <div id="${tableId}" style="display: none; border: 2px solid ${STYLES.colors.border}; border-radius: ${STYLES.borderRadius.xl}; overflow: hidden; margin-bottom: ${STYLES.spacing.lg}; max-height: 350px; overflow-y: auto; overflow-x: auto;">
                 <table style="width: 100%; border-collapse: collapse; font-size: 12px; min-width: 900px;">
                     <thead style="position: sticky; top: 0; z-index: 10;">
                         <tr>
-                            <th rowspan="2" style="padding: 15px 10px; text-align: left; border-right: 2px solid #cbd5e1; background: #f1f5f9; font-size: 14px; position: sticky; left: 0; z-index: 11;">📅 DATE</th>
-                            <th colspan="3" style="padding: 12px 10px; text-align: center; background: #3b82f6; color: white; border-right: 2px solid #2563eb;">📈 PUISSANCE DÉPASSÉE</th>
-                            <th colspan="1" style="padding: 12px 10px; text-align: center; background: #f59e0b; color: white; border-right: 2px solid #d97706;">💰 CRÉDIT NUL</th>
-                            <th colspan="3" style="padding: 12px 10px; text-align: center; background: #0ea5e9; color: white;">🔋 ÉNERGIE ÉPUISÉE</th>
+                            <th rowspan="2" style="padding: ${STYLES.spacing.lg} ${STYLES.spacing.sm}; text-align: left; border-right: 2px solid ${STYLES.colors.borderDark}; background: #f1f5f9; font-size: 14px; position: sticky; left: 0; z-index: 11;">📅 DATE</th>
+                            <th colspan="3" style="padding: ${STYLES.spacing.md} ${STYLES.spacing.sm}; text-align: center; background: ${STYLES.colors.blue}; color: white; border-right: 2px solid ${STYLES.colors.blueDark};">📈 PUISSANCE DÉPASSÉE</th>
+                            <th colspan="1" style="padding: ${STYLES.spacing.md} ${STYLES.spacing.sm}; text-align: center; background: ${STYLES.colors.warning}; color: white; border-right: 2px solid #d97706;">💰 CRÉDIT NUL</th>
+                            <th colspan="3" style="padding: ${STYLES.spacing.md} ${STYLES.spacing.sm}; text-align: center; background: ${STYLES.colors.info}; color: white;">🔋 ÉNERGIE ÉPUISÉE</th>
                         </tr>
                         <tr style="background: #f1f5f9;">
-                            <th style="padding: 10px 8px; text-align: center; border-bottom: 1px solid #cbd5e1;">Début</th>
-                            <th style="padding: 10px 8px; text-align: center; border-bottom: 1px solid #cbd5e1;">Fin</th>
-                            <th style="padding: 10px 8px; text-align: center; border-bottom: 1px solid #cbd5e1; border-right: 2px solid #cbd5e1;">Durée</th>
-                            <th style="padding: 10px 8px; text-align: center; border-bottom: 1px solid #cbd5e1; border-right: 2px solid #cbd5e1;">Signalement</th>
-                            <th style="padding: 10px 8px; text-align: center; border-bottom: 1px solid #cbd5e1;">Début</th>
-                            <th style="padding: 10px 8px; text-align: center; border-bottom: 1px solid #cbd5e1;">Fin</th>
-                            <th style="padding: 10px 8px; text-align: center; border-bottom: 1px solid #cbd5e1;">Durée</th>
+                            <th style="padding: ${STYLES.spacing.sm} 8px; text-align: center;">Début</th>
+                            <th style="padding: ${STYLES.spacing.sm} 8px; text-align: center;">Fin</th>
+                            <th style="padding: ${STYLES.spacing.sm} 8px; text-align: center; border-right: 2px solid ${STYLES.colors.borderDark};">Durée</th>
+                            <th style="padding: ${STYLES.spacing.sm} 8px; text-align: center; border-right: 2px solid ${STYLES.colors.borderDark};">Signalement</th>
+                            <th style="padding: ${STYLES.spacing.sm} 8px; text-align: center;">Début</th>
+                            <th style="padding: ${STYLES.spacing.sm} 8px; text-align: center;">Fin</th>
+                            <th style="padding: ${STYLES.spacing.sm} 8px; text-align: center;">Durée</th>
                         </tr>
                     </thead>
                     <tbody>
-        `;
-        
-        // Trier par date décroissante
-        eventsByDay.sort((a, b) => new Date(b.dateObj) - new Date(a.dateObj));
-        
-        eventsByDay.forEach((day, index) => {
-            const bgColor = index % 2 === 0 ? '#ffffff' : '#fafbfc';
-            const formattedDate = new Date(day.date).toLocaleDateString('fr-FR', {
-                day: '2-digit', month: '2-digit', year: 'numeric'
-            });
-            
-            html += `
-                <tr style="border-bottom: 1px solid #e2e8f0; background: ${bgColor};">
-                    <td style="padding: 12px 10px; font-weight: 600; border-right: 2px solid #e2e8f0; position: sticky; left: 0; background: ${bgColor};">
-                        ${formattedDate}
-                    </td>
-                    
-                    <!-- SuspendP -->
-                    <td style="padding: 10px 8px; text-align: center; ${day.SuspendP > 0 ? 'background: #3b82f610; font-weight: 600; color: #2563eb;' : 'color: #94a3b8;'}">
-                        ${day.SuspendP_start || '-'}
-                    </td>
-                    <td style="padding: 10px 8px; text-align: center; ${day.SuspendP > 0 ? 'background: #3b82f610; font-weight: 600; color: #2563eb;' : 'color: #94a3b8;'}">
-                        ${day.SuspendP_end || '-'}
-                    </td>
-                    <td style="padding: 10px 8px; text-align: center; border-right: 2px solid #e2e8f0; ${day.SuspendP > 0 ? 'background: #3b82f620; font-weight: 700; color: #2563eb;' : 'color: #94a3b8;'}">
-                        ${day.SuspendP_duration || '-'}
-                    </td>
-                    
-                    <!-- Crédit Nul -->
-                    <td style="padding: 10px 8px; text-align: center; border-right: 2px solid #e2e8f0; ${day.CreditNul > 0 ? 'background: #f59e0b; color: white; font-weight: 700;' : 'background: #f1f5f9; color: #94a3b8;'}">
-                        ${day.CreditNul > 0 ? '⚠️ CRÉDIT NUL' : '✓ Normal'}
-                    </td>
-                    
-                    <!-- SuspendE -->
-                    <td style="padding: 10px 8px; text-align: center; ${day.SuspendE > 0 ? 'background: #0ea5e910; font-weight: 600; color: #0284c7;' : 'color: #94a3b8;'}">
-                        ${day.SuspendE_start || '-'}
-                    </td>
-                    <td style="padding: 10px 8px; text-align: center; ${day.SuspendE > 0 ? 'background: #0ea5e910; font-weight: 600; color: #0284c7;' : 'color: #94a3b8;'}">
-                        ${day.SuspendE_end || '-'}
-                    </td>
-                    <td style="padding: 10px 8px; text-align: center; ${day.SuspendE > 0 ? 'background: #0ea5e920; font-weight: 700; color: #0284c7;' : 'color: #94a3b8;'}">
-                        ${day.SuspendE_duration || '-'}
-                    </td>
-                </tr>
-            `;
-        });
-        
-        html += `
+                        ${eventsByDay.sort((a, b) => b.dateObj - a.dateObj).map((day, idx) => {
+                            const bgColor = idx % 2 === 0 ? '#ffffff' : '#fafbfc';
+                            return `
+                                <tr style="border-bottom: 1px solid ${STYLES.colors.border}; background: ${bgColor};">
+                                    <td style="padding: ${STYLES.spacing.md} ${STYLES.spacing.sm}; font-weight: 600; border-right: 2px solid ${STYLES.colors.border}; position: sticky; left: 0; background: ${bgColor};">${formatDateToFrench(day.date)}</td>
+                                    <td style="padding: ${STYLES.spacing.sm} 8px; text-align: center; ${day.SuspendP > 0 ? `background: ${STYLES.colors.blue}10; font-weight: 600; color: ${STYLES.colors.blueDark};` : `color: ${STYLES.colors.grayLight};`}">${day.SuspendP_start || '-'}</td>
+                                    <td style="padding: ${STYLES.spacing.sm} 8px; text-align: center; ${day.SuspendP > 0 ? `background: ${STYLES.colors.blue}10; font-weight: 600; color: ${STYLES.colors.blueDark};` : `color: ${STYLES.colors.grayLight};`}">${day.SuspendP_end || '-'}</td>
+                                    <td style="padding: ${STYLES.spacing.sm} 8px; text-align: center; border-right: 2px solid ${STYLES.colors.border}; ${day.SuspendP > 0 ? `background: ${STYLES.colors.blue}20; font-weight: 700; color: ${STYLES.colors.blueDark};` : `color: ${STYLES.colors.grayLight};`}">${day.SuspendP_duration || '-'}</td>
+                                    <td style="padding: ${STYLES.spacing.sm} 8px; text-align: center; border-right: 2px solid ${STYLES.colors.border}; ${day.CreditNul > 0 ? `background: ${STYLES.colors.warning}; color: white; font-weight: 700;` : `background: #f1f5f9; color: ${STYLES.colors.grayLight};`}">${day.CreditNul > 0 ? '⚠️ CRÉDIT NUL' : '✓ Normal'}</td>
+                                    <td style="padding: ${STYLES.spacing.sm} 8px; text-align: center; ${day.SuspendE > 0 ? `background: ${STYLES.colors.info}10; font-weight: 600; color: ${STYLES.colors.infoDark};` : `color: ${STYLES.colors.grayLight};`}">${day.SuspendE_start || '-'}</td>
+                                    <td style="padding: ${STYLES.spacing.sm} 8px; text-align: center; ${day.SuspendE > 0 ? `background: ${STYLES.colors.info}10; font-weight: 600; color: ${STYLES.colors.infoDark};` : `color: ${STYLES.colors.grayLight};`}">${day.SuspendE_end || '-'}</td>
+                                    <td style="padding: ${STYLES.spacing.sm} 8px; text-align: center; ${day.SuspendE > 0 ? `background: ${STYLES.colors.info}20; font-weight: 700; color: ${STYLES.colors.infoDark};` : `color: ${STYLES.colors.grayLight};`}">${day.SuspendE_duration || '-'}</td>
+                                </tr>
+                            `;
+                        }).join('')}
                     </tbody>
                 </table>
             </div>
             
-            <!-- Légende -->
-            <div style="margin-top: 15px; padding: 12px 20px; background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0; display: flex; align-items: center; gap: 20px; flex-wrap: wrap; font-size: 12px;">
-                <span><span style="color:#3b82f6;">⬤</span> Puissance dépassée (SuspendP)</span>
-                <span><span style="color:#f59e0b;">⬤</span> Crédit nul</span>
-                <span><span style="color:#0ea5e9;">⬤</span> Énergie épuisée (SuspendE)</span>
+            <div style="margin-top: ${STYLES.spacing.lg}; padding: ${STYLES.spacing.md} ${STYLES.spacing.xl}; background: ${STYLES.colors.grayBg}; border-radius: ${STYLES.borderRadius.md}; border: 1px solid ${STYLES.colors.border}; display: flex; align-items: center; gap: 20px; flex-wrap: wrap; font-size: 12px;">
+                <span><span style="color:${STYLES.colors.blue};">⬤</span> Puissance dépassée (SuspendP)</span>
+                <span><span style="color:${STYLES.colors.warning};">⬤</span> Crédit nul</span>
+                <span><span style="color:${STYLES.colors.info};">⬤</span> Énergie épuisée (SuspendE)</span>
             </div>
         `;
     } else {
         html += `
-            <div style="text-align: center; padding: 40px; color: #94a3b8; background: #f8fafc; border-radius: 12px;">
-                <span style="font-size: 48px; display: block; margin-bottom: 15px;">✅</span>
-                <h3 style="margin: 0 0 10px 0; color: #1e293b;">Aucun événement</h3>
+            <div style="text-align: center; padding: 40px; color: ${STYLES.colors.grayLight}; background: ${STYLES.colors.grayBg}; border-radius: ${STYLES.borderRadius.xl};">
+                <span style="font-size: 48px; display: block; margin-bottom: ${STYLES.spacing.lg};">✅</span>
+                <h3 style="margin: 0 0 10px 0; color: ${STYLES.colors.textDark};">Aucun événement</h3>
                 <p style="margin: 0; font-size: 14px;">Aucun événement pour ce client</p>
             </div>
         `;
@@ -767,30 +804,48 @@ function renderEventsClient(client) {
     
     html += `</div>`;
     
-    // Ajouter le script pour le toggle après le rendu
     setTimeout(() => {
         const toggleBtn = document.getElementById(`toggle-events-${client.id}`);
         const table = document.getElementById(`events-table-${client.id}`);
         if (toggleBtn && table) {
-            toggleBtn.addEventListener('click', () => {
-                if (table.style.display === 'none') {
-                    table.style.display = 'block';
-                    toggleBtn.innerHTML = `<span style="font-size:16px;">🔼</span><span>Masquer le tableau</span>`;
-                } else {
-                    table.style.display = 'none';
-                    toggleBtn.innerHTML = `<span style="font-size:16px;">🔽</span><span>Afficher le tableau détaillé</span>`;
-                }
-            });
+            toggleBtn.onclick = () => {
+                const isHidden = table.style.display === 'none';
+                table.style.display = isHidden ? 'block' : 'none';
+                toggleBtn.innerHTML = isHidden 
+                    ? '<span style="font-size:16px;">🔼</span> Masquer le tableau'
+                    : '<span style="font-size:16px;">🔽</span> Afficher le tableau détaillé';
+            };
         }
     }, 100);
     
     return html;
 }
 
+function renderStatCard(icon, label, value, percent, gradient) {
+    return `
+        <div style="background: ${gradient}; border-radius: ${STYLES.borderRadius.lg}; padding: ${STYLES.spacing.md}; color: white;">
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                <span style="font-size: 20px;">${icon}</span>
+                <span style="font-size: 12px; font-weight: 600; opacity: 0.9;">${label}</span>
+            </div>
+            <div style="font-size: 28px; font-weight: 800; margin-bottom: 4px;">${value}</div>
+            <div style="font-size: 11px; opacity: 0.9;">jour(s) concerné(s)</div>
+            <div style="margin-top: 8px; background: rgba(255,255,255,0.2); height: 4px; border-radius: 2px; overflow: hidden;">
+                <div style="width: ${percent}%; height: 100%; background: white; border-radius: 2px;"></div>
+            </div>
+            <div style="margin-top: 5px; font-size: 11px; font-weight: 600;">${percent}%</div>
+        </div>
+    `;
+}
+
+// ===========================================
+// RENDU CREDIT BOARD
+// ===========================================
+
 function renderCreditBoard() {
+    destroyCreditChart(); 
     const container = document.getElementById('creditBoard');
     if (!container) return;
-    
     if (!activeClientId) {
         container.innerHTML = '<p class="no-data">❌ Aucun client sélectionné</p>';
         return;
@@ -803,73 +858,52 @@ function renderCreditBoard() {
     }
     
     if (isGhostClient(client)) {
-        container.innerHTML = `
-            <h3 class="card-title">💰 CRÉDIT & RECHARGES - Client ${client.id}</h3>
-            <div class="client-card ghost">
-                <div class="client-header">
-                    <span class="client-icon">👻</span>
-                    <span class="client-id">Client ${client.id}</span>
-                    <span class="client-badge ghost">Client fantôme</span>
-                </div>
-                <div class="message-container">
-                    <p class="client-message ghost">👻 Aucune donnée de crédit ou recharge disponible.</p>
-                </div>
-            </div>
-        `;
+        container.innerHTML = renderGhostCard('💰 CRÉDIT & RECHARGES', client.id, 'Aucune donnée de crédit ou recharge disponible.');
         return;
     }
     
-    // ===== RÉCUPÉRATION DES DONNÉES =====
-    const credits = client.credits || [];
-    const recharges = client.recharges || [];
-    const zeroCreditDates = client.zeroCreditDates || [];
+    const credits = client.credits ?? [];
+    const recharges = client.recharges ?? [];
+    const zeroCreditDates = client.zeroCreditDates ?? [];
     
-    // Traitement des données pour les séries sans crédit
     const streaksData = processCreditStreaks(credits, zeroCreditDates);
-    
-    // Traitement des données de recharge
     const rechargeData = processRechargeData(recharges);
     
-    // ===== CONSTRUCTION DU HTML =====
     let html = `
-        <h3 class="card-title">💰 CRÉDIT & RECHARGES - Client ${client.id}</h3>
         <div class="client-card" style="padding: 0; overflow: hidden;">
-            <!-- En-tête violet -->
-            <div style="background: linear-gradient(135deg, #9f7aea 0%, #805ad5 100%); color: white; padding: 10px 18px; font-size: 15px; font-weight: 600; display: flex; align-items: center; gap: 8px;">
+            <div style="background: ${STYLES.gradients.creditRecharge}; color: white; padding: ${STYLES.spacing.sm} 18px; font-size: 15px; font-weight: 600; display: flex; align-items: center; gap: 8px;">
                 <span style="font-size: 18px;">💰</span>
                 <span>Crédit & Recharges - Client ${client.id}</span>
             </div>
-            
-            <div style="padding: 15px;">
+            <div style="padding: ${STYLES.spacing.lg};">
+
     `;
+
+    html += renderCreditEvolutionChart(credits, client.id);
+    html += renderStreaksCard(streaksData);
+    html
     
-    // ===== 1. CARTE DES SÉRIES SANS CRÉDIT =====
-    html += createStreaksCardHTML(streaksData);
-    
-    // ===== 2. ANALYSE DES HABITUDES DE RECHARGE =====
     if (rechargeData.hasData) {
-        html += createRechargeHabitsHTML(rechargeData);
+        html += renderRechargeHabits(rechargeData);
     }
     
-    // ===== 3. BOUTON TOGGLE =====
     const toggleId = `toggle-credit-${client.id}`;
     const detailsId = `credit-details-${client.id}`;
     
     html += `
-        <button id="${toggleId}" style="width: 100%; padding: 8px; margin-top: 12px; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 5px;">
+        <button id="${toggleId}" style="width: 100%; padding: 8px; margin-top: ${STYLES.spacing.md}; background: #f1f5f9; border: 1px solid ${STYLES.colors.borderDark}; border-radius: ${STYLES.borderRadius.sm}; font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 5px;">
             <span style="font-size:14px;">🔽</span> Afficher les détails
         </button>
         
-        <div id="${detailsId}" style="display: none; margin-top: 15px;">
+        <div id="${detailsId}" style="display: none; margin-top: ${STYLES.spacing.lg};">
     `;
     
-    // ===== 4. TABLEAUX DÉTAILS =====
     if (rechargeData.hasData) {
-        html += createRechargeTableHTML(rechargeData, client.id);
+        html += renderRechargeTable(rechargeData);
     }
     
     if (credits.length > 0) {
-        html += createSoldeTableHTML(credits, client.id);
+        html += renderSoldeTable(credits);
     }
     
     html += `
@@ -878,142 +912,31 @@ function renderCreditBoard() {
     </div>`;
     
     container.innerHTML = html;
+    // Créer le graphique après le rendu
+    requestAnimationFrame(() => {
+        initCreditChart();
+    });
     
-    // ===== ATTACHER L'ÉVÉNEMENT AU BOUTON =====
     setTimeout(() => {
         const toggleBtn = document.getElementById(toggleId);
         const detailsDiv = document.getElementById(detailsId);
         if (toggleBtn && detailsDiv) {
-            toggleBtn.addEventListener('click', () => {
-                if (detailsDiv.style.display === 'none') {
-                    detailsDiv.style.display = 'block';
-                    toggleBtn.innerHTML = `<span style="font-size:14px;">🔼</span> Masquer les détails`;
-                } else {
-                    detailsDiv.style.display = 'none';
-                    toggleBtn.innerHTML = `<span style="font-size:14px;">🔽</span> Afficher les détails`;
-                }
-            });
+            toggleBtn.onclick = () => {
+                const isHidden = detailsDiv.style.display === 'none';
+                detailsDiv.style.display = isHidden ? 'block' : 'none';
+                toggleBtn.innerHTML = isHidden 
+                    ? '<span style="font-size:14px;">🔼</span> Masquer les détails'
+                    : '<span style="font-size:14px;">🔽</span> Afficher les détails';
+            };
         }
     }, 100);
 }
 
-// ===== FONCTIONS DE TRAITEMENT DES DONNÉES =====
-
-function processCreditStreaks(credits, zeroCreditDates) {
-    // Construire un tableau jour par jour avec les valeurs de crédit
-    const creditByDate = new Map();
-    
-    // D'abord, ajouter tous les credits
-    credits.forEach(c => {
-        if (c.date) {
-            const dateStr = c.date.split('T')[0];
-            creditByDate.set(dateStr, c.value || 0);
-        }
-    });
-    
-    // Marquer les jours sans crédit (zeroCreditDates)
-    zeroCreditDates.forEach(date => {
-        const dateStr = date.split('T')[0];
-        creditByDate.set(dateStr, 0);
-    });
-    
-    // Convertir en tableau trié
-    const sortedEntries = Array.from(creditByDate.entries())
-        .map(([date, value]) => ({
-            date,
-            dateObj: new Date(date),
-            value
-        }))
-        .sort((a, b) => a.dateObj - b.dateObj);
-    
-    // Détecter les séries consécutives de jours à 0
-    const consecutiveGroups = [];
-    let currentGroup = [];
-    
-    sortedEntries.forEach((record, index) => {
-        if (record.value === 0) {
-            if (index === 0) {
-                currentGroup = [record];
-            } else {
-                const prevDate = sortedEntries[index-1].dateObj;
-                const currDate = record.dateObj;
-                const dayDiff = Math.round((currDate - prevDate) / (1000 * 60 * 60 * 24));
-                
-                if (dayDiff === 1 && sortedEntries[index-1].value === 0) {
-                    currentGroup.push(record);
-                } else {
-                    if (currentGroup.length > 1) {
-                        consecutiveGroups.push([...currentGroup]);
-                    }
-                    currentGroup = [record];
-                }
-            }
-        }
-    });
-    
-    if (currentGroup.length > 1) {
-        consecutiveGroups.push(currentGroup);
-    }
-    
-    return {
-        hasData: consecutiveGroups.length > 0,
-        consecutiveDays: consecutiveGroups
-    };
-}
-
-function processRechargeData(recharges) {
-    if (!recharges || recharges.length === 0) {
-        return { hasData: false, purchaseDays: [], totalRecharges: 0 };
-    }
-    
-    const purchaseDays = recharges.map(r => ({
-        date: r.date,
-        days: r.credit || 0,
-        status: r.status || 'Réussie'
-    })).filter(item => item.days > 0);
-    
-    // Compter les occurrences par nombre de jours
-    const daysCountMap = new Map();
-    purchaseDays.forEach(item => {
-        const days = item.days;
-        daysCountMap.set(days, (daysCountMap.get(days) || 0) + 1);
-    });
-    
-    const sortedDays = Array.from(daysCountMap.entries()).sort((a, b) => b[0] - a[0]);
-    
-    // Répartition par intervalles
-    let intervalJours = 0, intervalSemaine = 0, intervalMois = 0;
-    purchaseDays.forEach(item => {
-        const days = item.days;
-        if (days >= 1 && days <= 6) intervalJours++;
-        else if (days >= 7 && days <= 28) intervalSemaine++;
-        else if (days >= 29) intervalMois++;
-    });
-    
-    const total = purchaseDays.length;
-    
-    return {
-        hasData: true,
-        totalRecharges: recharges.length,
-        purchaseDays: purchaseDays,
-        rawData: recharges,
-        daysCountMap,
-        sortedDays,
-        intervals: {
-            jours: { count: intervalJours, percent: ((intervalJours / total) * 100).toFixed(1) },
-            semaine: { count: intervalSemaine, percent: ((intervalSemaine / total) * 100).toFixed(1) },
-            mois: { count: intervalMois, percent: ((intervalMois / total) * 100).toFixed(1) }
-        }
-    };
-}
-
-// ===== FONCTIONS DE RENDU HTML =====
-
-function createStreaksCardHTML(streaksData) {
+function renderStreaksCard(streaksData) {
     if (!streaksData.hasData) {
         return `
-            <div style="background: white; border-radius: 8px; margin-bottom: 12px; overflow: hidden; border: 1px solid #e2e8f0;">
-                <div style="padding: 10px; text-align: center; color: #64748b; background: #f8fafc; display: flex; align-items: center; justify-content: center; gap: 5px; font-size: 11px;">
+            <div style="background: white; border-radius: ${STYLES.borderRadius.md}; margin-bottom: ${STYLES.spacing.md}; overflow: hidden; border: 1px solid ${STYLES.colors.border};">
+                <div style="padding: ${STYLES.spacing.sm}; text-align: center; color: ${STYLES.colors.gray}; background: ${STYLES.colors.grayBg}; display: flex; align-items: center; justify-content: center; gap: 5px; font-size: 11px;">
                     <span style="font-size: 14px;">🔗</span>
                     <span>Aucune série >1 jour sans crédit</span>
                 </div>
@@ -1025,8 +948,8 @@ function createStreaksCardHTML(streaksData) {
     
     if (significantStreaks.length === 0) {
         return `
-            <div style="background: white; border-radius: 8px; margin-bottom: 12px; overflow: hidden; border: 1px solid #e2e8f0;">
-                <div style="padding: 10px; text-align: center; color: #64748b; background: #f8fafc; display: flex; align-items: center; justify-content: center; gap: 5px; font-size: 11px;">
+            <div style="background: white; border-radius: ${STYLES.borderRadius.md}; margin-bottom: ${STYLES.spacing.md}; overflow: hidden; border: 1px solid ${STYLES.colors.border};">
+                <div style="padding: ${STYLES.spacing.sm}; text-align: center; color: ${STYLES.colors.gray}; background: ${STYLES.colors.grayBg}; display: flex; align-items: center; justify-content: center; gap: 5px; font-size: 11px;">
                     <span style="font-size: 14px;">🔗</span>
                     <span>Aucune série >1 jour sans crédit</span>
                 </div>
@@ -1034,56 +957,41 @@ function createStreaksCardHTML(streaksData) {
         `;
     }
     
-    let longestStreak = 0;
-    significantStreaks.forEach(group => {
-        if (group.length > longestStreak) longestStreak = group.length;
-    });
+    const longestStreak = Math.max(...significantStreaks.map(g => g.length));
     
     const streaksHTML = significantStreaks.map((group, idx) => {
-        const start = new Date(group[0].date).toLocaleDateString('fr-FR', {
-            day: '2-digit', month: '2-digit'
-        });
-        const end = new Date(group[group.length - 1].date).toLocaleDateString('fr-FR', {
-            day: '2-digit', month: '2-digit'
-        });
         const isLongest = group.length === longestStreak;
-        
         return `
-            <div style="background: white; padding: 8px 10px; border-radius: 6px; border-left: 3px solid ${isLongest ? '#ef4444' : '#f97316'}; min-width: 140px; flex: 1 1 auto; border: 1px solid #e2e8f0; font-size: 11px;">
+            <div style="background: white; padding: ${STYLES.spacing.xs} ${STYLES.spacing.sm}; border-radius: ${STYLES.borderRadius.sm}; border-left: 3px solid ${isLongest ? STYLES.colors.danger : '#f97316'}; min-width: 140px; flex: 1 1 auto; border: 1px solid ${STYLES.colors.border}; font-size: 11px;">
                 <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 3px;">
-                    <span style="color: #64748b;">#${idx+1}</span>
+                    <span style="color: ${STYLES.colors.gray};">#${idx+1}</span>
                     ${isLongest ? '<span style="background: #ef4444; color: white; padding: 1px 6px; border-radius: 10px; font-size: 8px;">MAX</span>' : ''}
                 </div>
-                <div style="font-weight: 700; color: ${isLongest ? '#ef4444' : '#f97316'}; font-size: 16px;">${group.length} jours</div>
-                <div style="color: #475569;">${start} → ${end}</div>
+                <div style="font-weight: 700; color: ${isLongest ? STYLES.colors.danger : '#f97316'}; font-size: 16px;">${group.length} jours</div>
+                <div style="color: #475569;">${formatDateShort(group[0].date)} → ${formatDateShort(group[group.length-1].date)}</div>
             </div>
         `;
     }).join('');
     
     return `
-        <div style="background: white; border-radius: 8px; margin-bottom: 12px; overflow: hidden; border: 1px solid #e2e8f0;">
-            <div style="padding: 12px;">
-                <div style="display: flex; align-items: center; gap: 5px; margin-bottom: 10px;">
+        <div style="background: white; border-radius: ${STYLES.borderRadius.md}; margin-bottom: ${STYLES.spacing.md}; overflow: hidden; border: 1px solid ${STYLES.colors.border};">
+            <div style="padding: ${STYLES.spacing.md};">
+                <div style="display: flex; align-items: center; gap: 5px; margin-bottom: ${STYLES.spacing.sm};">
                     <span style="font-size: 16px;">🔗</span>
                     <span style="font-weight: 600; font-size: 13px;">Séries sans crédit (>1 jour)</span>
-                    <span style="margin-left: auto; background: #e2e8f0; padding: 2px 8px; border-radius: 12px; font-size: 10px;">
-                        ${significantStreaks.length}
-                    </span>
+                    <span style="margin-left: auto; background: ${STYLES.colors.border}; padding: 2px 8px; border-radius: ${STYLES.borderRadius.md}; font-size: 10px;">${significantStreaks.length}</span>
                 </div>
-                <div style="display: flex; flex-wrap: wrap; gap: 8px;">
-                    ${streaksHTML}
-                </div>
+                <div style="display: flex; flex-wrap: wrap; gap: 8px;">${streaksHTML}</div>
             </div>
         </div>
     `;
 }
 
-function createRechargeHabitsHTML(rechargeData) {
+function renderRechargeHabits(rechargeData) {
     const totalPurchases = rechargeData.totalRecharges;
     const sortedDays = rechargeData.sortedDays;
     const intervals = rechargeData.intervals;
     
-    // Déterminer l'habitude principale
     let mainHabit = { days: 0, count: 0, percentage: 0 };
     sortedDays.forEach(([days, count]) => {
         if (count > mainHabit.count) {
@@ -1091,93 +999,41 @@ function createRechargeHabitsHTML(rechargeData) {
         }
     });
     
-    // Déterminer l'intervalle principal
     const intervalList = [
         { name: 'Jours', value: intervals.jours.count, percent: intervals.jours.percent, color: '#f97316', range: '1-6j' },
         { name: 'Semaine', value: intervals.semaine.count, percent: intervals.semaine.percent, color: '#3b82f6', range: '7-28j' },
         { name: 'Mois', value: intervals.mois.count, percent: intervals.mois.percent, color: '#22c55e', range: '>28j' }
     ];
     
-    const mainInterval = intervalList.reduce((max, interval) => 
-        interval.value > max.value ? interval : max
-    );
+    const mainInterval = intervalList.reduce((max, interval) => interval.value > max.value ? interval : max);
     
-    // Barre des habitudes
     const habitBarHTML = sortedDays.map(([days, count]) => {
         const percentage = ((count / totalPurchases) * 100).toFixed(1);
-        const bgColor = getDaysColor(days);
-        
-        return `
-            <div style="width: ${percentage}%; height: 100%; background: ${bgColor}; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: white;" 
-                title="${days} jours : ${count} recharge(s) (${percentage}%)">
-                ${percentage > 8 ? percentage + '%' : ''}
-            </div>
-        `;
-    }).join('');
-    
-    // Légende des habitudes
-    const habitLegendHTML = sortedDays.map(([days, count]) => {
-        const percentage = ((count / totalPurchases) * 100).toFixed(1);
-        const bgColor = getDaysColor(days);
-        const isMain = days === mainHabit.days;
-        
-        return `
-            <div style="display: flex; align-items: center; gap: 5px; ${isMain ? 'background: #f1f5f9; padding: 2px 8px; border-radius: 16px; border: 1px solid #cbd5e1;' : ''}">
-                <div style="width: 12px; height: 12px; background: ${bgColor}; border-radius: 3px;"></div>
-                <span style="font-size: 11px; color: #334155;">
-                    <strong>${days}j</strong>
-                    <span style="color: #64748b;"> ${count}x</span>
-                    <span style="color: #475569; font-weight: 600;"> ${percentage}%</span>
-                    ${isMain ? '<span style="margin-left: 4px; font-size: 12px;">👑</span>' : ''}
-                </span>
-            </div>
-        `;
-    }).join('');
-    
-    // Barre des intervalles
-    const intervalBarHTML = `
-        <div style="width: ${intervals.jours.percent}%; height: 100%; background: #f97316; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: white;" 
-            title="1-6 jours : ${intervals.jours.count} recharge(s) (${intervals.jours.percent}%)">
-            ${intervals.jours.percent > 8 ? intervals.jours.percent + '%' : ''}
-        </div>
-        <div style="width: ${intervals.semaine.percent}%; height: 100%; background: #3b82f6; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: white;" 
-            title="7-28 jours : ${intervals.semaine.count} recharge(s) (${intervals.semaine.percent}%)">
-            ${intervals.semaine.percent > 8 ? intervals.semaine.percent + '%' : ''}
-        </div>
-        <div style="width: ${intervals.mois.percent}%; height: 100%; background: #22c55e; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: white;" 
-            title=">28 jours : ${intervals.mois.count} recharge(s) (${intervals.mois.percent}%)">
-            ${intervals.mois.percent > 8 ? intervals.mois.percent + '%' : ''}
-        </div>
-    `;
-    
-    // Légende des intervalles
-    const intervalLegendHTML = intervalList.map(interval => {
-        const isMain = interval.name === mainInterval.name;
-        return `
-            <div style="display: flex; align-items: center; gap: 5px; ${isMain ? 'background: #f1f5f9; padding: 3px 10px; border-radius: 20px;' : ''}">
-                <div style="width: 14px; height: 14px; background: ${interval.color}; border-radius: 3px;"></div>
-                <span style="font-size: 11px;"><strong>${interval.name}</strong> ${interval.range}: ${interval.value}x (${interval.percent}%)</span>
-                ${isMain ? '<span style="font-size: 14px;">👑</span>' : ''}
-            </div>
-        `;
+        return `<div style="width: ${percentage}%; height: 100%; background: ${getDaysColor(days)}; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: white;" title="${days} jours : ${count} recharge(s) (${percentage}%)">${percentage > 8 ? percentage + '%' : ''}</div>`;
     }).join('');
     
     return `
-        <div style="margin-top: 10px;">
+        <div style="margin-top: ${STYLES.spacing.sm};">
             <div style="display: flex; align-items: center; gap: 5px; margin-bottom: 8px;">
                 <span style="font-size: 14px;">📈</span>
                 <span style="font-weight: 600; font-size: 12px;">Habitude de recharge</span>
             </div>
-            
             <div style="height: 36px; background: #f1f5f9; border-radius: 18px; overflow: hidden; display: flex; margin-bottom: 10px; box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);">
-                ${intervalBarHTML}
+                ${habitBarHTML}
             </div>
-            
-            <div style="display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-around; margin-bottom: 8px;">
-                ${intervalLegendHTML}
+            <div style="display: flex; flex-wrap: wrap; gap: ${STYLES.spacing.md}; justify-content: space-around; margin-bottom: 8px;">
+                ${intervalList.map(interval => {
+                    const isMain = interval.name === mainInterval.name;
+                    return `
+                        <div style="display: flex; align-items: center; gap: 5px; ${isMain ? `background: #f1f5f9; padding: 3px 10px; border-radius: 20px;` : ''}">
+                            <div style="width: 14px; height: 14px; background: ${interval.color}; border-radius: 3px;"></div>
+                            <span style="font-size: 11px;"><strong>${interval.name}</strong> ${interval.range}: ${interval.value}x (${interval.percent}%)</span>
+                            ${isMain ? '<span style="font-size: 14px;">👑</span>' : ''}
+                        </div>
+                    `;
+                }).join('')}
             </div>
-            
-            <div style="background: #f1f5f9; padding: 6px 10px; border-radius: 6px; font-size: 11px; display: flex; align-items: center; gap: 8px;">
+            <div style="background: #f1f5f9; padding: 6px 10px; border-radius: ${STYLES.borderRadius.sm}; font-size: 11px; display: flex; align-items: center; gap: 8px;">
                 <span style="font-size: 14px;">🏆</span>
                 <span><strong>Intervalle principal :</strong> <span style="background: ${mainInterval.color}20; color: ${mainInterval.color}; padding: 2px 12px; border-radius: 20px; font-weight: 700;">${mainInterval.name}</span> (${mainInterval.percent}%, ${mainInterval.range})</span>
             </div>
@@ -1185,57 +1041,40 @@ function createRechargeHabitsHTML(rechargeData) {
     `;
 }
 
-function createRechargeTableHTML(rechargeData, clientId) {
-    const sortedData = [...rechargeData.rawData].sort((a, b) => 
-        new Date(b.date) - new Date(a.date)
-    );
-    
-    let rowsHTML = '';
-    sortedData.forEach((row, index) => {
-        const date = row.date || '-';
-        const days = row.credit || 0;
-        const status = row.status || 'Réussie';
-        
-        const statusColor = status.toLowerCase().includes('reussie') ? '#22c55e' : 
-                           status.toLowerCase().includes('echoue') ? '#ef4444' : '#f59e0b';
-        
-        const bgColor = index % 2 === 0 ? '#ffffff' : '#fafbfc';
-        
-        rowsHTML += `
-            <tr style="border-bottom: 1px solid #e2e8f0; background: ${bgColor};">
-                <td style="padding: 10px; white-space: nowrap;">${date}</td>
-                <td style="padding: 10px; text-align: center; font-weight: 600; color: #f97316;">${days}</td>
-                <td style="padding: 10px; text-align: center;">
-                    <span style="background: ${statusColor}20; color: ${statusColor}; padding: 3px 10px; border-radius: 20px; font-weight: 600; font-size: 11px;">
-                        ${status}
-                    </span>
-                </td>
-            </tr>
-        `;
-    });
+function renderRechargeTable(rechargeData) {
+    const sortedData = [...rechargeData.rawData].sort((a, b) => new Date(b.date) - new Date(a.date));
     
     return `
-        <div style="border: 2px solid #e2e8f0; border-radius: 12px; overflow: hidden; margin-bottom: 20px;">
-            <div style="background: linear-gradient(135deg, #9f7aea 0%, #805ad5 100%); color: white; padding: 15px 20px; font-size: 16px; font-weight: 700; display: flex; justify-content: space-between; align-items: center;">
-                <span style="display: flex; align-items: center; gap: 10px;">
+        <div style="border: 2px solid ${STYLES.colors.border}; border-radius: ${STYLES.borderRadius.xl}; overflow: hidden; margin-bottom: 20px;">
+            <div style="background: ${STYLES.gradients.creditRecharge}; color: white; padding: ${STYLES.spacing.lg} ${STYLES.spacing.xl}; font-size: 16px; font-weight: 700; display: flex; justify-content: space-between; align-items: center;">
+                <span style="display: flex; align-items: center; gap: ${STYLES.spacing.sm};">
                     <span style="font-size: 20px;">⚡</span>
                     Historique des recharges
                 </span>
-                <span style="background: rgba(255,255,255,0.2); padding: 5px 15px; border-radius: 30px; font-size: 13px;">
-                    ${rechargeData.totalRecharges} opération(s)
-                </span>
+                <span style="background: rgba(255,255,255,0.2); padding: 5px ${STYLES.spacing.lg}; border-radius: ${STYLES.borderRadius.full}; font-size: 13px;">${rechargeData.totalRecharges} opération(s)</span>
             </div>
             <div style="max-height: 350px; overflow-y: auto; overflow-x: auto; background: white;">
                 <table style="width: 100%; border-collapse: collapse; font-size: 12px; min-width: 700px;">
-                    <thead style="position: sticky; top: 0; background: #f8fafc; z-index: 10;">
-                        <tr style="border-bottom: 2px solid #e2e8f0;">
-                            <th style="padding: 12px 10px; text-align: left;">Date</th>
-                            <th style="padding: 12px 10px; text-align: center;">Jours rechargés</th>
-                            <th style="padding: 12px 10px; text-align: center;">Statut</th>
+                    <thead style="position: sticky; top: 0; background: ${STYLES.colors.grayBg}; z-index: 10;">
+                        <tr style="border-bottom: 2px solid ${STYLES.colors.border};">
+                            <th style="padding: ${STYLES.spacing.md} ${STYLES.spacing.sm}; text-align: left;">Date</th>
+                            <th style="padding: ${STYLES.spacing.md} ${STYLES.spacing.sm}; text-align: center;">Jours rechargés</th>
+                            <th style="padding: ${STYLES.spacing.md} ${STYLES.spacing.sm}; text-align: center;">Statut</th>
                         </tr>
                     </thead>
                     <tbody>
-                        ${rowsHTML}
+                        ${sortedData.map((row, idx) => {
+                            const statusColor = row.status?.toLowerCase().includes('reussie') ? STYLES.colors.success : 
+                                               row.status?.toLowerCase().includes('echoue') ? STYLES.colors.danger : STYLES.colors.warning;
+                            const bgColor = idx % 2 === 0 ? '#ffffff' : '#fafbfc';
+                            return `
+                                <tr style="border-bottom: 1px solid ${STYLES.colors.border}; background: ${bgColor};">
+                                    <td style="padding: ${STYLES.spacing.sm}; white-space: nowrap;">${formatDateToFrench(row.date)}</td>
+                                    <td style="padding: ${STYLES.spacing.sm}; text-align: center; font-weight: 600; color: #f97316;">${row.credit ?? 0}</td>
+                                    <td style="padding: ${STYLES.spacing.sm}; text-align: center;"><span style="background: ${statusColor}20; color: ${statusColor}; padding: 3px 10px; border-radius: 20px; font-weight: 600; font-size: 11px;">${row.status || 'Réussie'}</span></td>
+                                </tr>
+                            `;
+                        }).join('')}
                     </tbody>
                 </table>
             </div>
@@ -1243,50 +1082,39 @@ function createRechargeTableHTML(rechargeData, clientId) {
     `;
 }
 
-function createSoldeTableHTML(credits, clientId) {
+function renderSoldeTable(credits) {
     const sortedData = [...credits].sort((a, b) => new Date(b.date) - new Date(a.date));
     
-    let rowsHTML = '';
-    sortedData.forEach((row, index) => {
-        const date = row.date || '-';
-        const value = row.value || 0;
-        const bgColor = index % 2 === 0 ? '#ffffff' : '#fafbfc';
-        
-        rowsHTML += `
-            <tr style="border-bottom: 1px solid #e2e8f0; background: ${bgColor};">
-                <td style="padding: 10px; white-space: nowrap;">${date}</td>
-                <td style="padding: 10px; text-align: center; font-weight: 600; color: ${value === 0 ? '#ef4444' : '#48bb78'};">${value}</td>
-                <td style="padding: 10px; text-align: center;">
-                    ${value === 0 ? 
-                        '<span style="background: #ef444420; color: #ef4444; padding: 3px 10px; border-radius: 20px; font-size: 11px;">Sans crédit</span>' : 
-                        '<span style="background: #48bb7820; color: #48bb78; padding: 3px 10px; border-radius: 20px; font-size: 11px;">Crédit disponible</span>'}
-                </td>
-            </tr>
-        `;
-    });
-    
     return `
-        <div style="border: 2px solid #e2e8f0; border-radius: 12px; overflow: hidden;">
-            <div style="background: linear-gradient(135deg, #48bb78 0%, #38a169 100%); color: white; padding: 15px 20px; font-size: 16px; font-weight: 700; display: flex; justify-content: space-between; align-items: center;">
-                <span style="display: flex; align-items: center; gap: 10px;">
+        <div style="border: 2px solid ${STYLES.colors.border}; border-radius: ${STYLES.borderRadius.xl}; overflow: hidden;">
+            <div style="background: ${STYLES.gradients.solde}; color: white; padding: ${STYLES.spacing.lg} ${STYLES.spacing.xl}; font-size: 16px; font-weight: 700; display: flex; justify-content: space-between; align-items: center;">
+                <span style="display: flex; align-items: center; gap: ${STYLES.spacing.sm};">
                     <span style="font-size: 20px;">💰</span>
                     Historique des soldes (crédits)
                 </span>
-                <span style="background: rgba(255,255,255,0.2); padding: 5px 15px; border-radius: 30px; font-size: 13px;">
-                    ${credits.length} relevé(s)
-                </span>
+                <span style="background: rgba(255,255,255,0.2); padding: 5px ${STYLES.spacing.lg}; border-radius: ${STYLES.borderRadius.full}; font-size: 13px;">${credits.length} relevé(s)</span>
             </div>
             <div style="max-height: 350px; overflow-y: auto; overflow-x: auto; background: white;">
                 <table style="width: 100%; border-collapse: collapse; font-size: 12px; min-width: 400px;">
-                    <thead style="position: sticky; top: 0; background: #f8fafc; z-index: 10;">
-                        <tr style="border-bottom: 2px solid #e2e8f0;">
-                            <th style="padding: 12px 10px; text-align: left;">Date</th>
-                            <th style="padding: 12px 10px; text-align: center;">Crédit (jours)</th>
-                            <th style="padding: 12px 10px; text-align: center;">Statut</th>
+                    <thead style="position: sticky; top: 0; background: ${STYLES.colors.grayBg}; z-index: 10;">
+                        <tr style="border-bottom: 2px solid ${STYLES.colors.border};">
+                            <th style="padding: ${STYLES.spacing.md} ${STYLES.spacing.sm}; text-align: left;">Date</th>
+                            <th style="padding: ${STYLES.spacing.md} ${STYLES.spacing.sm}; text-align: center;">Crédit (jours)</th>
+                            <th style="padding: ${STYLES.spacing.md} ${STYLES.spacing.sm}; text-align: center;">Statut</th>
                         </tr>
                     </thead>
                     <tbody>
-                        ${rowsHTML}
+                        ${sortedData.map((row, idx) => {
+                            const value = row.value ?? 0;
+                            const bgColor = idx % 2 === 0 ? '#ffffff' : '#fafbfc';
+                            return `
+                                <tr style="border-bottom: 1px solid ${STYLES.colors.border}; background: ${bgColor};">
+                                    <td style="padding: ${STYLES.spacing.sm}; white-space: nowrap;">${formatDateToFrench(row.date)}</td>
+                                    <td style="padding: ${STYLES.spacing.sm}; text-align: center; font-weight: 600; color: ${value === 0 ? STYLES.colors.danger : '#48bb78'};">${value}</td>
+                                    <td style="padding: ${STYLES.spacing.sm}; text-align: center;">${value === 0 ? '<span style="background: #ef444420; color: #ef4444; padding: 3px 10px; border-radius: 20px; font-size: 11px;">Sans crédit</span>' : '<span style="background: #48bb7820; color: #48bb78; padding: 3px 10px; border-radius: 20px; font-size: 11px;">Crédit disponible</span>'}</td>
+                                </tr>
+                            `;
+                        }).join('')}
                     </tbody>
                 </table>
             </div>
@@ -1294,14 +1122,262 @@ function createSoldeTableHTML(credits, clientId) {
     `;
 }
 
-function getDaysColor(days) {
-    if (days >= 30) return '#22c55e';      // Vert
-    if (days >= 20) return '#84cc16';      // Vert clair
-    if (days >= 15) return '#eab308';      // Jaune
-    if (days >= 10) return '#f97316';      // Orange
-    if (days >= 7) return '#ef4444';       // Rouge
-    if (days >= 5) return '#ec4899';       // Rose
-    if (days >= 3) return '#8b5cf6';       // Violet
-    if (days === 2) return '#60a5fa';       // Bleu clair pour 2j
-    return '#94a3b8';                        // Gris clair pour 1j
+// Exposer la fonction de détail
+window.showClientDetail = (clientId) => {
+    const detailView = document.getElementById('clientDetailView');
+    if (detailView) {
+        detailView.style.display = 'block';
+        import('./ClientDetail.js').then(module => {
+            module.renderClientDetail(clientId);
+        });
+    }
+};
+
+// ===========================================
+// GRAPHIQUE ÉVOLUTION DU CRÉDIT
+// ===========================================
+
+let currentCreditChart = null;
+let currentCreditChartClientId = null;
+
+function renderCreditEvolutionChart(credits, clientId) {
+    if (!credits || credits.length === 0) {
+        return `
+            <div style="background: white; border-radius: ${STYLES.borderRadius.md}; margin-bottom: ${STYLES.spacing.md}; padding: ${STYLES.spacing.xl}; text-align: center; color: ${STYLES.colors.gray}; border: 1px solid ${STYLES.colors.border};">
+                📊 Aucune donnée de crédit disponible
+            </div>
+        `;
+    }
+    
+    // Traiter les données : regrouper par date
+    const creditByDate = new Map();
+    credits.forEach(c => {
+        if (c.date) {
+            const dateStr = c.date.split('T')[0];
+            creditByDate.set(dateStr, c.value ?? 0);
+        }
+    });
+    
+    // Convertir en tableau trié
+    const sortedData = Array.from(creditByDate.entries())
+        .map(([date, value]) => ({ date, value }))
+        .sort((a, b) => a.date.localeCompare(b.date));
+    
+    // Extraire les années disponibles
+    const years = [...new Set(sortedData.map(d => parseInt(d.date.split('-')[0])))].sort((a, b) => b - a);
+    const currentYear = years[0];
+    
+    const chartId = `credit-chart-${clientId}`;
+    const filterId = `credit-chart-filter-${clientId}`;
+    
+    // Générer les options du filtre
+    const yearOptions = years.map(year => 
+        `<option value="${year}" ${year === currentYear ? 'selected' : ''}>${year}</option>`
+    ).join('');
+    
+    // Stocker les données pour la création différée
+    window.__pendingCreditChart = {
+        chartId: chartId,
+        filterId: filterId,
+        allData: sortedData,
+        years: years,
+        clientId: clientId
+    };
+    
+    return `
+        <div style="background: white; border-radius: ${STYLES.borderRadius.md}; margin-bottom: ${STYLES.spacing.md}; overflow: hidden; border: 1px solid ${STYLES.colors.border};">
+            <div style="padding: ${STYLES.spacing.md};">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: ${STYLES.spacing.lg}; flex-wrap: wrap; gap: ${STYLES.spacing.sm};">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span style="font-size: 16px;">📈</span>
+                        <span style="font-weight: 600; font-size: 13px;">Évolution du crédit (jours)</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <label style="font-size: 12px; color: ${STYLES.colors.gray};">Année :</label>
+                        <select id="${filterId}" style="padding: 4px 8px; border-radius: ${STYLES.borderRadius.sm}; border: 1px solid ${STYLES.colors.border}; font-size: 12px; background: white; cursor: pointer;">
+                            ${yearOptions}
+                        </select>
+                    </div>
+                </div>
+                <div style="position: relative; width: 100%; height: 300px; min-height: 300px;">
+                    <canvas id="${chartId}" style="width: 100%; height: 100%;"></canvas>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function initCreditChart() {
+    if (!window.__pendingCreditChart) return;
+    
+    const { chartId, filterId, allData, clientId } = window.__pendingCreditChart;
+    const canvas = document.getElementById(chartId);
+    const filterSelect = document.getElementById(filterId);
+    const container = canvas?.parentElement;
+    
+    if (!canvas || !container) {
+        setTimeout(initCreditChart, 50);
+        return;
+    }
+    
+    // FORCER les dimensions du conteneur et du canvas
+    const rect = container.getBoundingClientRect();
+    const width = rect.width || 600;
+    const height = 300;
+    
+    canvas.style.width = '100%';
+    canvas.style.height = '300px';
+    canvas.width = width;
+    canvas.height = height;
+    
+    function filterDataByYear(year) {
+        return allData.filter(d => parseInt(d.date.split('-')[0]) === year);
+    }
+    
+    function formatDateLabel(dateStr) {
+        const [year, month, day] = dateStr.split('-');
+        return `${day}/${month}`;
+    }
+    
+    function renderChart(year) {
+        const filtered = filterDataByYear(year);
+        if (filtered.length === 0) return;
+        
+        const labels = filtered.map(d => formatDateLabel(d.date));
+        const values = filtered.map(d => d.value);
+        
+        const maxValue = Math.max(...values, 1);
+        const yMax = Math.ceil(maxValue * 1.1);
+        
+        if (currentCreditChart && currentCreditChartClientId === clientId) {
+            currentCreditChart.destroy();
+        }
+        
+        currentCreditChart = new Chart(canvas, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Crédit (jours)',
+                    data: values,
+                    borderColor: '#9f7aea',
+                    backgroundColor: 'rgba(159, 122, 234, 0.1)',
+                    borderWidth: 2,
+                    pointRadius: 4,
+                    pointHoverRadius: 6,
+                    pointBackgroundColor: '#805ad5',
+                    pointBorderColor: 'white',
+                    pointBorderWidth: 2,
+                    tension: 0.1,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,  // ← CRUCIAL : empêche le redimensionnement automatique
+                plugins: {
+                    legend: {
+                        position: 'top',
+                        labels: {
+                            boxWidth: 12,
+                            font: { size: 11 },
+                            usePointStyle: true
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return `💰 ${context.raw} jour(s)`;
+                            },
+                            title: function(context) {
+                                const index = context[0].dataIndex;
+                                const dateStr = filtered[index].date;
+                                const [year, month, day] = dateStr.split('-');
+                                return `${day}/${month}/${year}`;
+                            }
+                        },
+                        backgroundColor: '#1e293b',
+                        titleColor: '#f8fafc',
+                        bodyColor: '#cbd5e1',
+                        borderColor: '#334155',
+                        borderWidth: 1,
+                        padding: 10,
+                        cornerRadius: 8
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: yMax,
+                        title: {
+                            display: true,
+                            text: 'Jours de crédit',
+                            font: { size: 11 },
+                            color: '#64748b'
+                        },
+                        ticks: {
+                            stepSize: Math.ceil(yMax / 5),
+                            callback: function(value) {
+                                return value + 'j';
+                            },
+                            font: { size: 10 }
+                        },
+                        grid: {
+                            color: '#e9ecef'
+                        }
+                    },
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Date (jj/mm)',
+                            font: { size: 11 },
+                            color: '#64748b'
+                        },
+                        ticks: {
+                            maxRotation: 45,
+                            minRotation: 45,
+                            autoSkip: true,
+                            maxTicksLimit: 8,
+                            font: { size: 9 }
+                        },
+                        grid: {
+                            display: false
+                        }
+                    }
+                },
+                interaction: {
+                    intersect: false,
+                    mode: 'index'
+                },
+                layout: {
+                    padding: {
+                        top: 10,
+                        bottom: 10,
+                        left: 10,
+                        right: 10
+                    }
+                }
+            }
+        });
+        
+        currentCreditChartClientId = clientId;
+    }
+    
+    const initialYear = parseInt(filterSelect?.value || allData[0]?.date.split('-')[0]);
+    renderChart(initialYear);
+    
+    if (filterSelect) {
+        filterSelect.addEventListener('change', function() {
+            renderChart(parseInt(this.value));
+        });
+    }
+}
+
+function destroyCreditChart() {
+    if (currentCreditChart) {
+        currentCreditChart.destroy();
+        currentCreditChart = null;
+        currentCreditChartClientId = null;
+    }
+    window.__pendingCreditChart = null;
 }
