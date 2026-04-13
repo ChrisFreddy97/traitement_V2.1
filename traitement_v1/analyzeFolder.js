@@ -2266,18 +2266,20 @@ function displayTensionStabilityAnalysis() {
         // APPELER LE GRAPHIQUE SANS CRÉER LE FILTRE À L'INTÉRIEUR
         createHourlyTensionChart('all');
         
-        // ✅ AFFICHER LE TABLEAU DES DÉLESTAGES DANS LA CARD DÉDIÉE
+        // ✅ AFFICHER LE TABLEAU DES DÉLESTAGES SPÉCIFIQUE
         const delestageContainer = document.getElementById('card-delestage-content');
         if (delestageContainer) {
+            delestageContainer.innerHTML = ''; // On vide le conteneur
+            
             if (combinedEventData.length > 0) {
-                delestageContainer.innerHTML = '';
+                // On appelle la fonction spécialisée pour les délestages
                 const delestageTable = createDelestageEventsTable();
                 delestageContainer.appendChild(delestageTable);
             } else {
                 delestageContainer.innerHTML = `
                     <div style="padding: 40px; text-align: center; color: #64748b; background: #f8fafc;">
-                        <span style="font-size: 48px; display: block; margin-bottom: 15px;">📭</span>
-                        <p style="margin: 0;">Aucune donnée d'événement disponible pour l'analyse des délestages</p>
+                        <span style="font-size: 48px; display: block; margin-bottom: 20px;">📭</span>
+                        <p style="margin: 0;">Aucune donnée d'événement disponible</p>
                     </div>
                 `;
             }
@@ -2438,10 +2440,12 @@ function analyzeDelestageEvents() {
 
             const dayData = eventsByDayMap.get(dateKey);
 
-            // Ajouter l'événement individuel
+            // Ajouter l'événement individuel avec heure et valeur formatée
+            const formattedValue = parseFloat(value).toFixed(2);
             dayData[eventType].push({
                 time: time,
-                value: value
+                value: value,
+                display: `${time} (${formattedValue})`  // ← Format "heure (valeur)"
             });
         }
     });
@@ -2508,11 +2512,8 @@ function createDelestageEventsTable() {
     `;
     
     const delestageData = analyzeDelestageEvents();
-    
-    // ✅ Utiliser les jours de diagnostic calculés dans analyzeDelestageEvents
     const totalDays = delestageData.totalDiagnosticDays;
     
-    // Vérifier si des données existent
     if (!delestageData || delestageData.totalEvents === 0) {
         const noData = document.createElement('div');
         noData.style.cssText = `
@@ -2530,50 +2531,30 @@ function createDelestageEventsTable() {
         return container;
     }
     
-    // Calculer les statistiques pour les pourcentages
     const daysWithPartiel = delestageData.eventsByDay.filter(day => day.partiel.length > 0).length;
     const daysWithTotal = delestageData.eventsByDay.filter(day => day.total.length > 0).length;
-    const daysWithBoth = delestageData.eventsByDay.filter(day => day.partiel.length > 0 && day.total.length > 0).length;
     
-    // ✅ CALCULER LE NOMBRE DE JOURS DANS LA PÉRIODE FILTRÉE
-    let filteredDaysCount = totalDays; // Par défaut, utiliser le total
-    
+    let filteredDaysCount = totalDays;
     if (filteredEnergyData.length > 0 || filteredTensionData.length > 0) {
-        // Utiliser les données déjà filtrées pour compter les jours uniques
         const filteredDates = new Set();
-        
-        // Collecter les dates des données d'énergie filtrées
         filteredEnergyData.forEach(row => {
-            if (row['Date et Heure']) {
-                const dateStr = row['Date et Heure'].split(' ')[0];
-                filteredDates.add(dateStr);
-            }
+            if (row['Date et Heure']) filteredDates.add(row['Date et Heure'].split(' ')[0]);
         });
-        
-        // Collecter les dates des données de tension filtrées
         filteredTensionData.forEach(row => {
-            if (row['Date et Heure']) {
-                const dateStr = row['Date et Heure'].split(' ')[0];
-                filteredDates.add(dateStr);
-            }
+            if (row['Date et Heure']) filteredDates.add(row['Date et Heure'].split(' ')[0]);
         });
-        
         filteredDaysCount = filteredDates.size;
     }
     
-    // ✅ POURCENTAGES PAR RAPPORT AU NOMBRE DE JOURS FILTRÉS
     const percentPartiel = filteredDaysCount > 0 ? ((daysWithPartiel / filteredDaysCount) * 100).toFixed(1) : 0;
     const percentTotal = filteredDaysCount > 0 ? ((daysWithTotal / filteredDaysCount) * 100).toFixed(1) : 0;
-    const percentBoth = filteredDaysCount > 0 ? ((daysWithBoth / filteredDaysCount) * 100).toFixed(1) : 0;
     
-    // ========== EN-TÊTE AVEC BOUTON ==========
+    // ========== EN-TÊTE ==========
     const header = document.createElement('div');
     header.style.cssText = `
         background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%);
         color: white;
         padding: 15px 25px;
-        font-size: 16px;
-        font-weight: 700;
         display: flex;
         align-items: center;
         justify-content: space-between;
@@ -2581,36 +2562,114 @@ function createDelestageEventsTable() {
         gap: 15px;
     `;
     
-    // Partie gauche de l'en-tête
-    const headerLeft = document.createElement('div');
-    headerLeft.style.cssText = `display: flex; align-items: center; gap: 12px;`;
-    headerLeft.innerHTML = `
-        <span style="font-size: 24px;">🔌</span>
-        <span>Événements de Délestage - Analyse détaillée</span>
+    header.innerHTML = `
+        <div style="display: flex; align-items: center; gap: 12px;">
+            <span style="font-size: 24px;">🔌</span>
+            <span style="font-weight: 700;">Événements de Délestage - Analyse détaillée</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 15px;">
+            <span style="background: rgba(255,255,255,0.15); padding: 6px 16px; border-radius: 30px; font-size: 12px;">
+                📅 ${totalDays} jour(s)
+            </span>
+            <span style="background: #ea580c80; padding: 6px 16px; border-radius: 30px; font-size: 12px;">
+                🔌 Partiel: ${delestageData.totalPartiel}
+            </span>
+            <span style="background: #991b1b80; padding: 6px 16px; border-radius: 30px; font-size: 12px;">
+                🔋 Total: ${delestageData.totalTotal}
+            </span>
+        </div>
+    `;
+    container.appendChild(header);
+    
+    // ========== STATS CARTES ==========
+    const statsCards = document.createElement('div');
+    statsCards.style.cssText = `
+        padding: 20px 25px;
+        background: #f8fafc;
+        border-bottom: 1px solid #e2e8f0;
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 15px;
     `;
     
-    // Badges de statistiques
-    const headerStats = document.createElement('div');
-    headerStats.style.cssText = `display: flex; align-items: center; gap: 15px;`;
-    headerStats.innerHTML = `
-        <span style="background: rgba(255,255,255,0.15); padding: 6px 16px; border-radius: 30px; font-size: 12px; font-weight: 600;">
-            📅 ${totalDays} jour(s) de diagnostic
-        </span>
-        <span style="background: #ea580c80; padding: 6px 16px; border-radius: 30px; font-size: 12px; font-weight: 600;">
-            🔌 Partiel: ${delestageData.totalPartiel}
-        </span>
-        <span style="background: #991b1b80; padding: 6px 16px; border-radius: 30px; font-size: 12px; font-weight: 600;">
-            🔋 Total: ${delestageData.totalTotal}
-        </span>
+    statsCards.innerHTML = `
+        <div style="background: white; padding: 15px; border-radius: 12px; border-left: 5px solid #ea580c;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                <span style="font-size: 13px; color: #ea580c; font-weight: 700;">🔌 DÉLESTAGE PARTIEL</span>
+                <span style="background: #ea580c20; color: #ea580c; padding: 4px 12px; border-radius: 20px; font-size: 12px;">${delestageData.totalPartiel} fois</span>
+            </div>
+            <div style="margin-bottom: 12px;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                    <span style="font-size: 12px; color: #64748b;">Jours concernés</span>
+                    <span style="font-weight: 700;">${daysWithPartiel} / ${totalDays}</span>
+                </div>
+                <div style="width: 100%; height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden;">
+                    <div style="width: ${percentPartiel}%; height: 100%; background: #ea580c; border-radius: 4px;"></div>
+                </div>
+            </div>
+            <div><span style="font-size: 24px; font-weight: 800; color: #ea580c;">${percentPartiel}%</span></div>
+        </div>
+        
+        <div style="background: white; padding: 15px; border-radius: 12px; border-left: 5px solid #991b1b;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                <span style="font-size: 13px; color: #991b1b; font-weight: 700;">🔋 DÉLESTAGE TOTAL</span>
+                <span style="background: #991b1b20; color: #991b1b; padding: 4px 12px; border-radius: 20px; font-size: 12px;">${delestageData.totalTotal} fois</span>
+            </div>
+            <div style="margin-bottom: 12px;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                    <span style="font-size: 12px; color: #64748b;">Jours concernés</span>
+                    <span style="font-weight: 700;">${daysWithTotal} / ${totalDays}</span>
+                </div>
+                <div style="width: 100%; height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden;">
+                    <div style="width: ${percentTotal}%; height: 100%; background: #991b1b; border-radius: 4px;"></div>
+                </div>
+            </div>
+            <div><span style="font-size: 24px; font-weight: 800; color: #991b1b;">${percentTotal}%</span></div>
+        </div>
+        
+        <div style="background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); padding: 15px; border-radius: 12px; color: white;">
+            <div style="font-size: 13px; font-weight: 700; margin-bottom: 15px;">📊 SYNTHÈSE</div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                <div><div style="font-size: 11px; opacity: 0.8;">Jours diagnostic</div><div style="font-size: 24px; font-weight: 800;">${totalDays}</div></div>
+                <div><div style="font-size: 11px; opacity: 0.8;">Jours avec dél.</div><div style="font-size: 24px; font-weight: 800;">${delestageData.eventsByDay.length}</div></div>
+            </div>
+        </div>
+    `;
+    container.appendChild(statsCards);
+    
+    // ========== BOUTON ET TABLEAU ==========
+    const toggleWrapper = document.createElement('div');
+    toggleWrapper.style.cssText = `
+        padding: 15px 25px;
+        background: white;
+        border-bottom: 1px solid #e2e8f0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 15px;
     `;
     
-    // Bouton pour afficher/masquer le tableau
+    const legend = document.createElement('div');
+    legend.style.cssText = `display: flex; align-items: center; gap: 20px; font-size: 12px; flex-wrap: wrap;`;
+    legend.innerHTML = `
+        <div style="display: flex; align-items: center; gap: 6px;">
+            <div style="width: 14px; height: 14px; background: #ea580c; border-radius: 3px;"></div>
+            <span>🔌 Délestage Partiel</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 6px;">
+            <div style="width: 14px; height: 14px; background: #991b1b; border-radius: 3px;"></div>
+            <span>🔋 Délestage Total</span>
+        </div>
+    `;
+    
     const toggleBtn = document.createElement('button');
+    toggleBtn.id = 'toggle-delestage-table';
     toggleBtn.style.cssText = `
-        background: rgba(255,255,255,0.2);
-        border: 1px solid rgba(255,255,255,0.4);
-        color: white;
-        padding: 8px 16px;
+        background: #f1f5f9;
+        border: 1px solid #cbd5e1;
+        color: #334155;
+        padding: 8px 20px;
         border-radius: 8px;
         cursor: pointer;
         font-size: 13px;
@@ -2620,213 +2679,140 @@ function createDelestageEventsTable() {
         gap: 8px;
         transition: all 0.2s ease;
     `;
-    toggleBtn.innerHTML = `
-        <span style="font-size: 14px;">🔽</span>
-        <span>Afficher le tableau détaillé</span>
-    `;
-    toggleBtn.onmouseover = () => {
-        toggleBtn.style.background = 'rgba(255,255,255,0.3)';
-    };
-    toggleBtn.onmouseout = () => {
-        toggleBtn.style.background = 'rgba(255,255,255,0.2)';
-    };
+    toggleBtn.innerHTML = `<span>🔽</span> Afficher le tableau détaillé`;
+    toggleBtn.onmouseover = () => { toggleBtn.style.background = '#e2e8f0'; };
+    toggleBtn.onmouseout = () => { toggleBtn.style.background = '#f1f5f9'; };
     
-    const headerWrapper = document.createElement('div');
-    headerWrapper.style.cssText = `display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 15px; width: 100%;`;
-    headerWrapper.appendChild(headerLeft);
-    headerWrapper.appendChild(headerStats);
-    headerWrapper.appendChild(toggleBtn);
+    toggleWrapper.appendChild(legend);
+    toggleWrapper.appendChild(toggleBtn);
+    container.appendChild(toggleWrapper);
     
-    header.appendChild(headerWrapper);
-    container.appendChild(header);
-    
-    // ========== CARTES DE POURCENTAGES (TOUJOURS VISIBLES) ==========
-    const statsCards = document.createElement('div');
-    statsCards.style.cssText = `
-        padding: 20px 25px;
-        background: #f8fafc;
-        border-bottom: 1px solid #e2e8f0;
-        display: grid;
-        grid-template-columns: repeat(4, 1fr);
-        gap: 15px;
-    `;
-    
-    statsCards.innerHTML = `
-        <!-- Délestage Partiel -->
-        <div style="background: white; padding: 15px; border-radius: 12px; border-left: 5px solid #ea580c; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                <span style="font-size: 13px; color: #ea580c; font-weight: 700;">🔌 DÉLESTAGE PARTIEL</span>
-                <span style="background: #ea580c20; color: #ea580c; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 700;">${delestageData.totalPartiel} fois</span>
-            </div>
-            <div style="margin-bottom: 12px;">
-                <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
-                    <span style="font-size: 12px; color: #64748b;">Jours concernés</span>
-                    <span style="font-weight: 700; color: #1e293b;">${daysWithPartiel} / ${totalDays}</span>
-                </div>
-                <div style="width: 100%; height: 10px; background: #e2e8f0; border-radius: 6px; overflow: hidden;">
-                    <div style="width: ${percentPartiel}%; height: 100%; background: #ea580c; border-radius: 6px;"></div>
-                </div>
-            </div>
-            <div style="display: flex; justify-content: space-between; align-items: baseline;">
-                <span style="font-size: 24px; font-weight: 800; color: #ea580c;">${percentPartiel}%</span>
-                <span style="font-size: 11px; color: #64748b;">des jours de diagnostic</span>
-            </div>
-        </div>
-        
-        <!-- Délestage Total -->
-        <div style="background: white; padding: 15px; border-radius: 12px; border-left: 5px solid #991b1b; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                <span style="font-size: 13px; color: #991b1b; font-weight: 700;">🔋 DÉLESTAGE TOTAL</span>
-                <span style="background: #991b1b20; color: #991b1b; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 700;">${delestageData.totalTotal} fois</span>
-            </div>
-            <div style="margin-bottom: 12px;">
-                <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
-                    <span style="font-size: 12px; color: #64748b;">Jours concernés</span>
-                    <span style="font-weight: 700; color: #1e293b;">${daysWithTotal} / ${totalDays}</span>
-                </div>
-                <div style="width: 100%; height: 10px; background: #e2e8f0; border-radius: 6px; overflow: hidden;">
-                    <div style="width: ${percentTotal}%; height: 100%; background: #991b1b; border-radius: 6px;"></div>
-                </div>
-            </div>
-            <div style="display: flex; justify-content: space-between; align-items: baseline;">
-                <span style="font-size: 24px; font-weight: 800; color: #991b1b;">${percentTotal}%</span>
-                <span style="font-size: 11px; color: #64748b;">des jours de diagnostic</span>
-            </div>
-        </div>
-        
-        <!-- Synthèse -->
-        <div style="background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); padding: 15px; border-radius: 12px; color: white;">
-            <div style="font-size: 13px; font-weight: 700; margin-bottom: 15px; opacity: 0.9;">📊 SYNTHÈSE</div>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-                <div>
-                    <div style="font-size: 11px; opacity: 0.8;">Jours diagnostic</div>
-                    <div style="font-size: 28px; font-weight: 800;">${totalDays}</div>
-                </div>
-                <div>
-                    <div style="font-size: 11px; opacity: 0.8;">Jours avec dél.</div>
-                    <div style="font-size: 28px; font-weight: 800;">${delestageData.eventsByDay.length}</div>
-                </div>
-                <div>
-                    <div style="font-size: 11px; opacity: 0.8;">Taux d'occurrence</div>
-                    <div style="font-size: 20px; font-weight: 700;">${totalDays > 0 ? ((delestageData.eventsByDay.length / totalDays) * 100).toFixed(1) : 0}%</div>
-                </div>
-                <div>
-                    <div style="font-size: 11px; opacity: 0.8;">Dernier</div>
-                    <div style="font-size: 14px; font-weight: 600;">${delestageData.eventsByDay[0]?.date || '-'}</div>
-                </div>
-            </div>
-        </div>
-    `;
-    
-    container.appendChild(statsCards);
-    
-    // ========== LÉGENDE (TOUJOURS VISIBLE) ==========
-    const legend = document.createElement('div');
-    legend.style.cssText = `
-        padding: 12px 25px;
-        background: #f1f5f9;
-        border-bottom: 1px solid #e2e8f0;
-        display: flex;
-        align-items: center;
-        gap: 25px;
-        flex-wrap: wrap;
-        font-size: 12px;
-    `;
-    
-    legend.innerHTML = `
-        <div style="display: flex; align-items: center; gap: 8px;">
-            <div style="width: 14px; height: 14px; background: #ea580c; border-radius: 4px;"></div>
-            <span style="color: #9a3412; font-weight: 600;">🔌 Délestage Partiel</span>
-        </div>
-        <div style="display: flex; align-items: center; gap: 8px;">
-            <div style="width: 14px; height: 14px; background: #991b1b; border-radius: 4px;"></div>
-            <span style="color: #7f1d1d; font-weight: 600;">🔋 Délestage Total</span>
-        </div>
-        <div style="margin-left: auto; background: white; padding: 4px 12px; border-radius: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-            <span style="color: #475569;">⏱️ Valeurs individuelles par événement</span>
-        </div>
-    `;
-    
-    container.appendChild(legend);
-    
-    // ========== TABLEAU (CACHÉ PAR DÉFAUT) ==========
+    // ========== TABLEAU AVEC LIAISON HEURE ↔ VALEUR ==========
     const tableWrapper = document.createElement('div');
     tableWrapper.id = 'delestage-table-wrapper';
     tableWrapper.style.cssText = `
-        max-height: 350px;
+        max-height: 450px;
         overflow-y: auto;
         overflow-x: auto;
-        position: relative;
-        scrollbar-width: thin;
         background: white;
-        display: none; /* ✅ CACHÉ PAR DÉFAUT */
+        display: none;
+        scrollbar-width: thin;
     `;
     
     let tableHTML = `
-        <table style="width: 100%; border-collapse: collapse; font-size: 12px; min-width: 600px;">
-            <thead style="position: sticky; top: 0; z-index: 20; background: white;">
+        <table style="width: 100%; border-collapse: collapse; font-size: 12px; min-width: 750px;">
+            <thead style="position: sticky; top: 0; z-index: 20;">
                 <tr style="background: #334155; color: white;">
-                    <th style="padding: 14px 10px; text-align: left; border-bottom: 3px solid #1e293b; position: sticky; left: 0; background: #334155; color: white; font-weight: 700;">📅 DATE</th>
-                    <th style="padding: 14px 10px; text-align: center; border-bottom: 3px solid #1e293b; background: #334155; color: white; font-weight: 700;">🔌 DÉLESTAGE PARTIEL</th>
-                    <th style="padding: 14px 10px; text-align: center; border-bottom: 3px solid #1e293b; background: #334155; color: white; font-weight: 700;">🔋 DÉLESTAGE TOTAL</th>
+                    <th rowspan="2" style="padding: 14px 12px; text-align: left; border-bottom: 2px solid #1e293b; position: sticky; left: 0; background: #334155; min-width: 110px;">
+                        📅 DATE
+                    </th>
+                    <th colspan="2" style="padding: 12px 10px; text-align: center; border-bottom: 2px solid #1e293b; background: #ea580c;">
+                        🔌 DÉLESTAGE PARTIEL
+                    </th>
+                    <th colspan="2" style="padding: 12px 10px; text-align: center; border-bottom: 2px solid #1e293b; background: #991b1b;">
+                        🔋 DÉLESTAGE TOTAL
+                    </th>
+                </tr>
+                <tr style="background: #475569;">
+                    <th style="padding: 10px 10px; text-align: center; background: #ea580c; min-width: 90px; color: #fef3c7; font-weight: 600;">
+                        ⏰ Heure
+                    </th>
+                    <th style="padding: 10px 10px; text-align: center; background: #c2410c; min-width: 90px; color: #ffedd5; font-weight: 700;">
+                        📊 Valeur (V)
+                    </th>
+                    <th style="padding: 10px 10px; text-align: center; background: #991b1b; min-width: 90px; color: #fecaca; font-weight: 600;">
+                        ⏰ Heure
+                    </th>
+                    <th style="padding: 10px 10px; text-align: center; background: #7f1d1d; min-width: 90px; color: #fee2e2; font-weight: 700;">
+                        📊 Valeur (V)
+                    </th>
                 </tr>
             </thead>
             <tbody>
     `;
     
-    // Grouper les événements par jour
-    delestageData.eventsByDay.forEach((day, index) => {
-        const bgColor = index % 2 === 0 ? '#ffffff' : '#fafbfc';
+    // ✅ CORRECTION : Affichage avec tableau à 2 colonnes pour lier heure et valeur
+    delestageData.eventsByDay.forEach((day, dayIndex) => {
+        const bgColor = dayIndex % 2 === 0 ? '#ffffff' : '#fafbfc';
         
-        // Collecter les heures pour partiel et total
-        const partielTimes = day.partiel.map(p => p.time).join(', ');
-        const totalTimes = day.total.map(t => t.time).join(', ');
+        // Construire un tableau HTML pour Partiel (2 colonnes : Heure | Valeur)
+        let partielRowsHtml = '';
+        if (day.partiel.length > 0) {
+            partielRowsHtml = '<table style="width: 100%; border-collapse: collapse;">';
+            day.partiel.forEach((event, idx) => {
+                const isEven = idx % 2 === 0;
+                partielRowsHtml += `
+                    <tr style="border-bottom: ${idx < day.partiel.length - 1 ? '1px dashed #fed7aa' : 'none'};">
+                        <td style="padding: 6px 4px; text-align: center; background: #eff6ff; color: #2563eb; font-weight: 600; font-family: monospace; border-right: 2px solid #fbbf24;">
+                            ${event.time}
+                        </td>
+                        <td style="padding: 6px 4px; text-align: center; background: #fff7ed;">
+                            <span style="background: #fff7ed; color: #ea580c; font-weight: 800; padding: 2px 8px; border-radius: 4px;">
+                                ${parseFloat(event.value).toFixed(2)}
+                            </span>
+                        </td>
+                    </tr>
+                `;
+            });
+            partielRowsHtml += '</table>';
+        } else {
+            partielRowsHtml = '<div style="color: #cbd5e1; font-style: italic; text-align: center; padding: 10px;">-</div>';
+        }
         
-        tableHTML += `<tr style="border-bottom: 1px solid #e2e8f0; background: ${bgColor};">`;
+        // Construire un tableau HTML pour Total (2 colonnes : Heure | Valeur)
+        let totalRowsHtml = '';
+        if (day.total.length > 0) {
+            totalRowsHtml = '<table style="width: 100%; border-collapse: collapse;">';
+            day.total.forEach((event, idx) => {
+                const isEven = idx % 2 === 0;
+                totalRowsHtml += `
+                    <tr style="border-bottom: ${idx < day.total.length - 1 ? '1px dashed #fecaca' : 'none'};">
+                        <td style="padding: 6px 4px; text-align: center; background: #f1f5f9; color: #475569; font-weight: 600; font-family: monospace; border-right: 2px solid #fbbf24;">
+                            ${event.time}
+                        </td>
+                        <td style="padding: 6px 4px; text-align: center; background: #fef2f2;">
+                            <span style="background: #fef2f2; color: #dc2626; font-weight: 800; padding: 2px 8px; border-radius: 4px;">
+                                ${parseFloat(event.value).toFixed(2)}
+                            </span>
+                        </td>
+                    </tr>
+                `;
+            });
+            totalRowsHtml += '</table>';
+        } else {
+            totalRowsHtml = '<div style="color: #cbd5e1; font-style: italic; text-align: center; padding: 10px;">-</div>';
+        }
         
-        // Date
         tableHTML += `
-            <td style="padding: 12px 10px; position: sticky; left: 0; background: ${bgColor}; font-weight: 700; border-right: 1px solid #e2e8f0;">
-                <span style="font-size: 13px;">${day.date}</span>
-            </td>
+            <tr style="border-bottom: 1px solid #e2e8f0; background: ${bgColor};">
+                <td style="padding: 12px 12px; position: sticky; left: 0; background: ${bgColor}; font-weight: 700; border-right: 2px solid #e2e8f0; vertical-align: top; color: #1e293b;">
+                    ${day.date}
+                </td>
+                <!-- Partiel : tableau interne avec heure et valeur liées -->
+                <td colspan="2" style="padding: 5px; vertical-align: top; background: #fefaf5;">
+                    ${partielRowsHtml}
+                </td>
+                <!-- Total : tableau interne avec heure et valeur liées -->
+                <td colspan="2" style="padding: 5px; vertical-align: top; background: #fef8f8;">
+                    ${totalRowsHtml}
+                </td>
+            </tr>
         `;
-        
-        // Délestage Partiel
-        if (partielTimes) {
-            tableHTML += `
-                <td style="padding: 12px 10px; text-align: center; background: #ea580c10; color: #9a3412; font-weight: 600; font-family: monospace;">${partielTimes}</td>
-            `;
-        } else {
-            tableHTML += `
-                <td style="padding: 12px 10px; text-align: center; color: #cbd5e1; font-style: italic;">-</td>
-            `;
-        }
-        
-        // Délestage Total
-        if (totalTimes) {
-            tableHTML += `
-                <td style="padding: 12px 10px; text-align: center; background: #991b1b10; color: #7f1d1d; font-weight: 600; font-family: monospace;">${totalTimes}</td>
-            `;
-        } else {
-            tableHTML += `
-                <td style="padding: 12px 10px; text-align: center; color: #cbd5e1; font-style: italic;">-</td>
-            `;
-        }
-        
-        tableHTML += `</tr>`;
     });
     
     // Ligne de total
     tableHTML += `
-        <tr style="background: #1e293b; color: white; font-weight: 700; position: sticky; bottom: 0; z-index: 15;">
-            <td style="padding: 14px 10px; text-align: left; background: #1e293b; position: sticky; left: 0;">TOTAL GÉNÉRAL</td>
-            <td style="padding: 14px 10px; text-align: center; background: #1e293b;">
-                <span style="background: #ea580c; padding: 6px 16px; border-radius: 30px; font-size: 12px;">
+        <tr style="background: #1e293b; color: white; font-weight: 700;">
+            <td style="padding: 14px 12px; text-align: left; background: #1e293b; position: sticky; left: 0;">
+                TOTAL GÉNÉRAL
+            </td>
+            <td colspan="2" style="padding: 14px 10px; text-align: center; background: #1e293b;">
+                <span style="background: #ea580c; padding: 4px 16px; border-radius: 30px; font-size: 12px;">
                     ${delestageData.totalPartiel} événement(s)
                 </span>
             </td>
-            <td style="padding: 14px 10px; text-align: center; background: #1e293b;">
-                <span style="background: #991b1b; padding: 6px 16px; border-radius: 30px; font-size: 12px;">
+            <td colspan="2" style="padding: 14px 10px; text-align: center; background: #1e293b;">
+                <span style="background: #991b1b; padding: 4px 16px; border-radius: 30px; font-size: 12px;">
                     ${delestageData.totalTotal} événement(s)
                 </span>
             </td>
@@ -2837,53 +2823,27 @@ function createDelestageEventsTable() {
     tableWrapper.innerHTML = tableHTML;
     container.appendChild(tableWrapper);
     
-    // Pied de tableau (caché avec le tableau)
+    // Pied de tableau
     const footer = document.createElement('div');
+    footer.id = 'delestage-table-footer';
     footer.style.cssText = `
-        padding: 15px 25px;
+        padding: 12px 25px;
         background: #f8fafc;
         border-top: 1px solid #e2e8f0;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        font-size: 12px;
-        color: #475569;
-        flex-wrap: wrap;
-        gap: 15px;
-        display: none; /* ✅ CACHÉ PAR DÉFAUT AVEC LE TABLEAU */
+        font-size: 11px;
+        color: #64748b;
+        display: none;
     `;
-    footer.id = 'delestage-table-footer';
-    
-    footer.innerHTML = `
-        <div style="display: flex; align-items: center; gap: 20px;">
-            <span>📊 <strong>${delestageData.eventsByDay.length}</strong> jour(s) avec délestages</span>
-            <span>🔌 Partiel: <strong style="color: #ea580c;">${delestageData.totalPartiel}</strong> événements</span>
-            <span>🔋 Total: <strong style="color: #991b1b;">${delestageData.totalTotal}</strong> événements</span>
-        </div>
-    `;
-    
-    container.appendChild(footer);
-    
-    // ========== ÉVÉNEMENT DU BOUTON ==========
-    let isTableVisible = false;
-    toggleBtn.onclick = (e) => {
-        e.stopPropagation();
-        isTableVisible = !isTableVisible;
-        if (isTableVisible) {
-            tableWrapper.style.display = 'block';
-            footer.style.display = 'flex';
-            toggleBtn.innerHTML = `
-                <span style="font-size: 14px;">🔼</span>
-                <span>Masquer le tableau détaillé</span>
-            `;
-        } else {
-            tableWrapper.style.display = 'none';
-            footer.style.display = 'none';
-            toggleBtn.innerHTML = `
-                <span style="font-size: 14px;">🔽</span>
-                <span>Afficher le tableau détaillé</span>
-            `;
-        }
+
+    // Événement du bouton toggle
+    let isVisible = false;
+    toggleBtn.onclick = () => {
+        isVisible = !isVisible;
+        tableWrapper.style.display = isVisible ? 'block' : 'none';
+        footer.style.display = isVisible ? 'block' : 'none';
+        toggleBtn.innerHTML = isVisible 
+            ? `<span>🔼</span> Masquer le tableau détaillé`
+            : `<span>🔽</span> Afficher le tableau détaillé`;
     };
     
     return container;
@@ -11384,43 +11344,6 @@ function createDaysWithoutCreditCard(clientNumber) {
         // Si égalité sur la longueur, trier par date de début la plus récente d'abord
         return new Date(b[0].date) - new Date(a[0].date);
     });
-    
-    if (significantStreaks.length > 0) {
-        const streaksSection = document.createElement('div');
-        streaksSection.innerHTML = `
-            <div style="display: flex; align-items: center; gap: 5px; margin-bottom: 10px;">
-                <span style="font-size: 16px;">🔗</span>
-                <span style="font-weight: 600; font-size: 13px;">Séries sans crédit (>1 jour)</span>
-                <span style="margin-left: auto; background: #e2e8f0; padding: 2px 8px; border-radius: 12px; font-size: 10px;">
-                    ${significantStreaks.length}
-                </span>
-            </div>
-            <div style="display: flex; flex-wrap: wrap; gap: 8px;">
-                ${significantStreaks.map((group, idx) => {
-                    const start = new Date(group[0].date).toLocaleDateString('fr-FR', {
-                        day: '2-digit', month: '2-digit', year: 'numeric'
-                    });
-                    const end = new Date(group[group.length - 1].date).toLocaleDateString('fr-FR', {
-                        day: '2-digit', month: '2-digit', year: 'numeric'
-                    });
-                    const isLongest = group.length === analysis.longestStreak;
-                    
-                    return `
-                        <div style="background: white; padding: 8px 10px; border-radius: 6px; border-left: 3px solid ${isLongest ? '#ef4444' : '#f97316'}; min-width: 140px; flex: 1 1 auto; border: 1px solid #e2e8f0; font-size: 11px;">
-                            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 3px;">
-                                <span style="color: #64748b;">#${idx+1}</span>
-                                ${isLongest ? '<span style="background: #ef4444; color: white; padding: 1px 6px; border-radius: 10px; font-size: 8px;">MAX</span>' : ''}
-                            </div>
-                            <div style="font-weight: 700; color: ${isLongest ? '#ef4444' : '#f97316'}; font-size: 16px;">${group.length} jours</div>
-                            <div style="color: #475569;">${start} → ${end}</div>
-                        </div>
-                    `;
-                }).join('')}
-            </div>
-        `;
-        
-        content.appendChild(streaksSection);
-    }
     
     card.appendChild(content);
     return card;
