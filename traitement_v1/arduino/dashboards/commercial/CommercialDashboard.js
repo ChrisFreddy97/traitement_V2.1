@@ -882,9 +882,7 @@ function renderCreditBoard() {
     html += renderCreditEvolutionChart(credits, client.id);
     html += renderMonthlyCreditAnalysis(credits, zeroCreditDates);
     const summaryHTML = renderCreditSummaryDashboard(credits, zeroCreditDates);
-    if (summaryHTML) html += summaryHTML;
-    html += renderStreaksCard(streaksData);
-    html
+    
     
     if (rechargeData.hasData) {
         html += renderRechargeHabits(rechargeData);
