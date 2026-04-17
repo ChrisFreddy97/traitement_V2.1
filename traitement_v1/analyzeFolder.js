@@ -1767,6 +1767,7 @@ function displayTensionStabilityAnalysis() {
         createHourlyTensionChart('all');
     }, 100);
 }
+
 function analyzeDelestageEvents() {
     if (combinedEventData.length === 0) {
         return { 
@@ -1959,6 +1960,7 @@ function analyzeDelestageEvents() {
         totalDuration: totalDuration || '0h'
     };
 }
+
 function createDelestageEventsTable() {
     const container = document.createElement('div');
     container.id = 'delestage-events-table-container';
@@ -10417,6 +10419,8 @@ function analyzeVoltageThresholdExceedances(tensionData, systemType = null) {
     };
 }
 
+// ==================== CARTE RÉCAPITULATIVE DES DÉPASSEMENTS DE TENSION ====================
+
 function createVoltageThresholdTable() {
     const container = document.getElementById('voltage-threshold-table-container');
     if (!container) return;
@@ -11140,6 +11144,7 @@ function createVoltageThresholdChart(dates, counts, colors, threshold) {
         }
     });
 }
+
 function analyzeVoltageThresholdExceedances(tensionData) {
     if (!tensionData || tensionData.length === 0) {
         return { threshold: 0, days: [] };
@@ -11216,6 +11221,7 @@ function analyzeVoltageThresholdExceedances(tensionData) {
         totalExceedances: days.reduce((sum, day) => sum + day.count, 0)
     };
 }
+
 // ==================== CRÉATION DES TABLEAUX COMBINÉS (STRUCTURE DES CARDS) ====================
 function createCombinedTables() {
     const techniqueContent = document.getElementById('main-tab-content-technique');

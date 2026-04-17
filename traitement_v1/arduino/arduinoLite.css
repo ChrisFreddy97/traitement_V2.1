@@ -872,7 +872,7 @@ input[type="file"] {
 
 /* ----- BASE HTML ----- */
 html {
-    font-size: 16px;
+    font-size: 18px;
     scroll-behavior: smooth;
 }
 
@@ -880,7 +880,7 @@ html {
 /* Ces classes sont à appliquer sur le body ou un conteneur parent */
 .web, 
 .electron { 
-    font-size: 12px; 
+    font-size: 14px; 
 }
 
 .tablet { 
@@ -1253,3 +1253,98 @@ html {
         display: none;
     }
 }
+
+/* ===== CARTES STATS (thème unifié) ===== */
+.stat-card {
+    text-align: center;
+    border-radius: 12px;
+    padding: 16px 12px;
+    color: white;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+.stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.2);
+}
+
+/* Variantes de couleurs (thème violet) */
+.stat-card.extreme { background: linear-gradient(135deg, #667eea, #764ba2); }
+.stat-card.excellent { background: linear-gradient(135deg, #27ae60, #1e8449); }
+.stat-card.bon { background: linear-gradient(135deg, #f39c12, #e67e22); }
+.stat-card.mauvais { background: linear-gradient(135deg, #e67e22, #d35400); }
+.stat-card.critique { background: linear-gradient(135deg, #e74c3c, #c0392b); }
+
+.stat-value {
+    font-size: 28px;
+    font-weight: 700;
+    line-height: 1.2;
+}
+.stat-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-top: 4px;
+}
+.stat-sub {
+    font-size: 10px;
+    opacity: 0.85;
+    margin-top: 4px;
+}
+.stat-detail {
+    font-size: 10px;
+    opacity: 0.7;
+    margin-top: 2px;
+}
+
+/* ===== BADGES UNIFORMES ===== */
+.badge {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+}
+.badge-extreme { background: #a855f7; color: white; }
+.badge-excellent { background: #22c55e; color: white; }
+.badge-bon { background: #eab308; color: white; }
+.badge-mauvais { background: #f97316; color: white; }
+.badge-critique { background: #ef4444; color: white; }
+
+/* ===== TABLEAUX DÉTAILS (unifiés) ===== */
+.table-details-wrapper {
+    max-height: 400px;
+    overflow-y: auto;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    margin-top: 15px;
+}
+.table-details {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+.table-details thead {
+    position: sticky;
+    top: 0;
+    background: #f1f5f9;
+    z-index: 10;
+}
+.table-details th,
+.table-details td {
+    padding: 10px 12px;
+    text-align: left;
+    border-bottom: 1px solid #e2e8f0;
+}
+.table-details .text-center {
+    text-align: center;
+}
+
+/* ===== CONTENEURS CACHÉS (toggle) ===== */
+.hidden-details {
+    display: none;
+}
+.hidden-details.show {
+    display: block;
+}
+

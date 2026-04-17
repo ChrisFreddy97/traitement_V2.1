@@ -867,5 +867,90 @@ body {
     animation: highlight-pulse 1s ease;
 }
 
-/* Note: @keyframes fadeIn est déjà défini plusieurs fois
-   Nous gardons une seule version unifiée plus haut */
+/* ===== UTILITAIRES MARGIN & TEXT ===== */
+.mt-10 { margin-top: 10px; }
+.mt-20 { margin-top: 20px; }
+.mb-10 { margin-bottom: 10px; }
+.mb-20 { margin-bottom: 20px; }
+.text-center { text-align: center; }
+.text-left { text-align: left; }
+.text-right { text-align: right; }
+
+/* ===== STAT NORM (détail conformité) ===== */
+.stat-norm {
+    display: block;
+    font-size: 11px;
+    color: #7f8c8d;
+    margin-top: 8px;
+    padding-top: 6px;
+    border-top: 1px dashed #ecf0f1;
+}
+
+/* ===== NORMS CARD (accordéon) ===== */
+.norms-card-wrapper {
+    background: white;
+    border-radius: 12px;
+    border: 1px solid #ecf0f1;
+    overflow: hidden;
+    margin-bottom: 15px;
+}
+
+.norms-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    padding: 15px 20px;
+    background: #f8f9fa;
+    transition: all 0.3s ease;
+}
+
+.norms-card-header:hover {
+    background: #f0f2ff;
+}
+
+.norms-card-header .card-title {
+    margin: 0;
+    border-bottom: none;
+    padding-bottom: 0;
+}
+
+.norms-toggle {
+    font-size: 18px;
+    transition: transform 0.3s ease;
+    color: #667eea;
+}
+
+.norms-card-header.active .norms-toggle {
+    transform: rotate(180deg);
+}
+
+.norms-card-content {
+    padding: 20px;
+    border-top: 1px solid #ecf0f1;
+    animation: fadeIn 0.3s ease;
+}
+.stats-grid-5 {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+@media (max-width: 768px) {
+    .stats-grid-5 {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 480px) {
+    .stats-grid-5 {
+        grid-template-columns: 1fr;
+    }
+}
+
+.stat-card.extreme { background: linear-gradient(135deg, #764ba2, #667eea); }
+.stat-card.excellent { background: linear-gradient(135deg, #27ae60, #1e8449); }
+.stat-card.bon { background: linear-gradient(135deg, #f39c12, #e67e22); }
+.stat-card.mauvais { background: linear-gradient(135deg, #e67e22, #d35400); }
+.stat-card.critique { background: linear-gradient(135deg, #e74c3c, #c0392b); }

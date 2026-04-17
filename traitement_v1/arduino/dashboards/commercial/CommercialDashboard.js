@@ -1135,7 +1135,7 @@ window.showClientDetail = (clientId) => {
 };
 
 // ===========================================
-// GRAPHIQUE ÉVOLUTION DU CRÉDIT
+// GRAPHIQUE ÉVOLUTION DU CRÉDIT (VERSION BARRES AVEC COULEURS PAR MOIS)
 // ===========================================
 
 let currentCreditChart = null;
@@ -1190,8 +1190,8 @@ function renderCreditEvolutionChart(credits, clientId) {
             <div style="padding: ${STYLES.spacing.md};">
                 <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: ${STYLES.spacing.lg}; flex-wrap: wrap; gap: ${STYLES.spacing.sm};">
                     <div style="display: flex; align-items: center; gap: 8px;">
-                        <span style="font-size: 16px;">📈</span>
-                        <span style="font-weight: 600; font-size: 13px;">Évolution du crédit (jours)</span>
+                        <span style="font-size: 16px;">📊</span>
+                        <span style="font-weight: 600; font-size: 13px;">Évolution du crédit (jours) - Graphique à barres</span>
                     </div>
                     <div style="display: flex; align-items: center; gap: 8px;">
                         <label style="font-size: 12px; color: ${STYLES.colors.gray};">Année :</label>
@@ -1231,6 +1231,26 @@ function initCreditChart() {
     canvas.width = width;
     canvas.height = height;
     
+    // Palette de couleurs pour les mois (dégradé du violet au rose)
+    const monthColors = {
+        1: '#8b5cf6',  // Janvier - Violet
+        2: '#FF0000',  // Février - Violet clair
+        3: '#008000',  // Mars - Lavande
+        4: '#0000FF',  // Avril - Rose violet
+        5: '#f472b6',  // Mai - Rose
+        6: '#fb7185',  // Juin - Rose saumon
+        7: '#FF8C00',  // Juillet - Orange
+        8: '#FF00FF',  // Août - Jaune orange
+        9: '#00CED1',  // Septembre - Jaune
+        10: '#8B4513', // Octobre - Vert lime
+        11: '#808080', // Novembre - Vert
+        12: '#FFD700'  // Décembre - Cyan
+    };
+    
+    function getMonthColor(month) {
+        return monthColors[month] || '#9f7aea';
+    }
+    
     function filterDataByYear(year) {
         return allData.filter(d => parseInt(d.date.split('-')[0]) === year);
     }
@@ -1240,12 +1260,34 @@ function initCreditChart() {
         return `${day}/${month}`;
     }
     
+    function getMonthFromDate(dateStr) {
+        return parseInt(dateStr.split('-')[1]);
+    }
+    
+    // Générer un tableau de couleurs basé sur les mois des données
+    function generateBackgroundColors(data) {
+        return data.map(d => {
+            const month = getMonthFromDate(d.date);
+            const color = getMonthColor(month);
+            return color + '80'; // 50% d'opacité (hex 80 = 128/255)
+        });
+    }
+    
+    function generateBorderColors(data) {
+        return data.map(d => {
+            const month = getMonthFromDate(d.date);
+            return getMonthColor(month);
+        });
+    }
+    
     function renderChart(year) {
         const filtered = filterDataByYear(year);
         if (filtered.length === 0) return;
         
         const labels = filtered.map(d => formatDateLabel(d.date));
         const values = filtered.map(d => d.value);
+        const backgroundColors = generateBackgroundColors(filtered);
+        const borderColors = generateBorderColors(filtered);
         
         const maxValue = Math.max(...values, 1);
         const yMax = Math.ceil(maxValue * 1.1);
@@ -1255,27 +1297,23 @@ function initCreditChart() {
         }
         
         currentCreditChart = new Chart(canvas, {
-            type: 'line',
+            type: 'bar',  // ← CHANGEMENT ICI : bar au lieu de line
             data: {
                 labels: labels,
                 datasets: [{
                     label: 'Crédit (jours)',
                     data: values,
-                    borderColor: '#9f7aea',
-                    backgroundColor: 'rgba(159, 122, 234, 0.1)',
-                    borderWidth: 2,
-                    pointRadius: 4,
-                    pointHoverRadius: 6,
-                    pointBackgroundColor: '#805ad5',
-                    pointBorderColor: 'white',
-                    pointBorderWidth: 2,
-                    tension: 0.1,
-                    fill: true
+                    backgroundColor: backgroundColors,  // Couleurs différentes par mois
+                    borderColor: borderColors,
+                    borderWidth: 1,
+                    borderRadius: 6,  // Coins arrondis pour les barres
+                    barPercentage: 0.7,  // Largeur des barres
+                    categoryPercentage: 0.8
                 }]
             },
             options: {
                 responsive: true,
-                maintainAspectRatio: false,  // ← CRUCIAL : empêche le redimensionnement automatique
+                maintainAspectRatio: false,
                 plugins: {
                     legend: {
                         position: 'top',
@@ -1294,7 +1332,14 @@ function initCreditChart() {
                                 const index = context[0].dataIndex;
                                 const dateStr = filtered[index].date;
                                 const [year, month, day] = dateStr.split('-');
-                                return `${day}/${month}/${year}`;
+                                const monthNames = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc'];
+                                return `${day} ${monthNames[parseInt(month)-1]} ${year}`;
+                            },
+                            afterTitle: function(context) {
+                                const index = context[0].dataIndex;
+                                const month = getMonthFromDate(filtered[index].date);
+                                const monthNames = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
+                                return `📅 ${monthNames[month-1]}`;
                             }
                         },
                         backgroundColor: '#1e293b',
@@ -1368,7 +1413,11 @@ function initCreditChart() {
     renderChart(initialYear);
     
     if (filterSelect) {
-        filterSelect.addEventListener('change', function() {
+        // Supprimer l'ancien listener pour éviter les doublons
+        const newFilter = filterSelect.cloneNode(true);
+        filterSelect.parentNode.replaceChild(newFilter, filterSelect);
+        
+        newFilter.addEventListener('change', function() {
             renderChart(parseInt(this.value));
         });
     }
@@ -1382,6 +1431,7 @@ function destroyCreditChart() {
     }
     window.__pendingCreditChart = null;
 }
+
 
 // ===========================================
 // ANALYSE MENSUELLE DU CRÉDIT
