@@ -1240,113 +1240,80 @@ function displayClientsTabs() {
         return numA - numB;
     });
 
-    // === ONGLETS PRINCIPAUX ===
-    let mainTabsHTML = '<div class="main-tabs-header">';
-    mainTabsHTML += `
-        <button class="main-tab active" 
-                data-main-tab="TECHNIQUE" 
-                onclick="switchMainTab('TECHNIQUE', this)">
-            <span class="tab-icon">⚙️</span>
-            <span class="tab-label">TECHNIQUE</span>
-        </button>
-        <button class="main-tab" 
-                data-main-tab="COMMERCIALE" 
-                onclick="switchMainTab('COMMERCIALE', this)">
-            <span class="tab-icon">💼</span>
-            <span class="tab-label">COMMERCIALE</span>
-        </button>
-        <!-- NOUVEAU : Onglet FRAUDE -->
-        <button class="main-tab" 
-                data-main-tab="FRAUDE" 
-                onclick="switchMainTab('FRAUDE', this)">
-            <span class="tab-icon">🚨</span>
-            <span class="tab-label">FRAUDE</span>
-        </button>
-    `;
-    mainTabsHTML += '</div>';
+    // ======================== 1. ONGLETS PRINCIPAUX ========================
+    let mainTabsHTML = `<div class="main-tabs-container">`;
 
-    // === ONGLETS SECONDAIRES ===
-    let subTabsHTML = '<div class="sub-tabs-header">';
+    const mainTabs = [
+        { id: 'TECHNIQUE', label: 'TECHNIQUE', icon: '⚙️' },
+        { id: 'COMMERCIALE', label: 'COMMERCIALE', icon: '💼' }
+    ];
 
-    // Onglet "TOUS LES CLIENTS" (TECHNIQUE)
+    mainTabs.forEach(tab => {
+        mainTabsHTML += `
+            <button class="main-tab ${tab.id === 'TECHNIQUE' ? 'active' : ''}" 
+                    data-main-tab="${tab.id}" 
+                    onclick="switchMainTab('${tab.id}', this)">
+                <span class="tab-icon">${tab.icon}</span>
+                <span class="tab-label">${tab.label}</span>
+            </button>
+        `;
+    });
+
+    mainTabsHTML += `</div>`;
+
+    // ======================== 2. SOUS-ONGLETS ========================
+    let subTabsHTML = `<div class="sub-tabs-container">`;
+
+    // TECHNIQUE → Tous les clients
     subTabsHTML += `
         <button class="sub-tab active" 
                 data-sub-tab="ALL" 
                 data-main="TECHNIQUE"
                 onclick="switchSubTab('ALL', 'TECHNIQUE', this)">
-            <span class="tab-icon">👥</span>
-            <span class="tab-label">TOUS LES CLIENTS</span>
+            👥 TOUS LES CLIENTS
         </button>
     `;
 
-    // Onglets clients individuels (COMMERCIALE)
-    sortedClients.forEach((clientId, index) => {
+    // COMMERCIALE → clients
+    sortedClients.forEach((clientId) => {
         const clientData = allResultsByClient[clientId];
-        const tabLabel = `Client ${parseInt(clientId).toString().padStart(2, '0')}(${clientData.forfait || 'N/A'})`;
+        const tabLabel = `Client ${parseInt(clientId).toString().padStart(2, '0')} (${clientData.forfait || 'N/A'})`;
 
         subTabsHTML += `
             <button class="sub-tab" 
                     data-sub-tab="${clientId}" 
                     data-main="COMMERCIALE"
                     onclick="switchSubTab('${clientId}', 'COMMERCIALE', this)">
-                <span class="tab-icon">👤</span>
-                <span class="tab-label">${tabLabel}</span>
+                👤 ${tabLabel}
             </button>
         `;
     });
 
-    // NOUVEAU : Sous-onglet pour FRAUDE (optionnel - si vous voulez des sous-onglets)
-    subTabsHTML += `
-        <button class="sub-tab" 
-                data-sub-tab="DETECTION" 
-                data-main="FRAUDE"
-                onclick="switchSubTab('DETECTION', 'FRAUDE', this)">
-            <span class="tab-icon">🔍</span>
-            <span class="tab-label">DÉTECTION</span>
-        </button>
-    `;
+    subTabsHTML += `</div>`;
 
-    subTabsHTML += '</div>';
-
-    // === CONTENU DES ONGLETS ===
+    // ======================== 3. CONTENU ========================
     let contentHTML = '';
 
-    // Contenu TECHNIQUE
+    // TECHNIQUE
     contentHTML += `
         <div class="main-content active" id="main-content-TECHNIQUE">
-            <div class="sub-content active" id="sub-content-ALL">
-            </div>
+            <div class="sub-content active" id="sub-content-ALL"></div>
         </div>
     `;
 
-    // Contenu COMMERCIALE
-    contentHTML += `
-        <div class="main-content" id="main-content-COMMERCIALE">
-    `;
-    sortedClients.forEach((clientId, index) => {
+    // COMMERCIALE
+    contentHTML += `<div class="main-content" id="main-content-COMMERCIALE">`;
+    sortedClients.forEach((clientId) => {
         contentHTML += `
-            <div class="sub-content" id="sub-content-${clientId}">
-            </div>
+            <div class="sub-content" id="sub-content-${clientId}"></div>
         `;
     });
-    contentHTML += '</div>';
+    contentHTML += `</div>`;
 
-    // NOUVEAU : Contenu FRAUDE
-    contentHTML += `
-        <div class="main-content" id="main-content-FRAUDE">
-            <div class="sub-content" id="sub-content-DETECTION">
-                <!-- Le contenu de détection sera ajouté ici plus tard -->
-            </div>
-            <div class="sub-content" id="sub-content-HISTORIQUE">
-                <!-- Le contenu historique sera ajouté ici plus tard -->
-            </div>
-        </div>
-    `;
-
+    // ======================== 4. RENDER ========================
     tabsContainer.innerHTML = mainTabsHTML + subTabsHTML;
     tabsContent.innerHTML = contentHTML;
 
-    // Initialiser le premier client COMMERCIALE
     if (sortedClients.length > 0) {
         currentSubClientTab = sortedClients[0];
     }
@@ -1378,11 +1345,18 @@ window.switchMainTab = function (mainTab, tabElement) {
     // Gérer la visibilité des sous-onglets
     document.querySelectorAll('.sub-tab').forEach(tab => {
         const tabMainAttr = tab.getAttribute('data-main');
-        if (tabMainAttr === mainTab) {
-            tab.classList.remove('hidden');
-        } else {
+
+        if (mainTab === 'TECHNIQUE') {
+            // 🔥 cacher tous les sous-onglets en TECHNIQUE
             tab.classList.add('hidden');
+        } else {
+            if (tabMainAttr === mainTab) {
+                tab.classList.remove('hidden');
+            } else {
+                tab.classList.add('hidden');
+            }
         }
+
         tab.classList.remove('active');
     });
 
@@ -1401,8 +1375,19 @@ window.switchMainTab = function (mainTab, tabElement) {
             subContentElement.classList.add('active');
 
             // Appeler les fonctions d'affichage selon l'onglet
-            if (mainTab === 'TECHNIQUE' && subTabValue === 'ALL') {
-                displayAllClientsTab();
+            if (mainTab === 'TECHNIQUE') {
+                // 🔥 activer directement le contenu ALL sans bouton
+                document.querySelectorAll('.sub-content').forEach(content => {
+                    content.classList.remove('active');
+                });
+
+                const subContentElement = document.getElementById(`sub-content-ALL`);
+                if (subContentElement) {
+                    subContentElement.classList.add('active');
+                    displayAllClientsTab();
+                }
+
+                return; // important : stop ici
             }
             else if (mainTab === 'COMMERCIALE' && allResultsByClient[subTabValue]) {
                 displayClientData(subTabValue, allResultsByClient[subTabValue]);
@@ -5404,131 +5389,39 @@ function createStabilityChart(containerId, stabilityData, tensionResults) {
 
     container.innerHTML = `
         <div style="background: white; border-radius: 20px; overflow: hidden; box-shadow: 0 8px 20px rgba(0,0,0,0.08); border: 1px solid #e2e8f0; margin: 0;">
-            
-            <!-- En-tête du card -->
-            <div style="background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%); color: white; padding: 18px 22px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 15px;">
-                <div style="display: flex; align-items: center; gap: 15px;">
-                    <div style="width: 48px; height: 48px; background: rgba(255,255,255,0.2); border-radius: 14px; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(4px);">
-                        <span style="font-size: 28px;">⚡</span>
-                    </div>
-                    <div>
-                        <h3 style="margin: 0; font-size: 20px; font-weight: 700;">Analyse globale de la Tension</h3>
-                        <p style="margin: 4px 0 0 0; font-size: 13px; opacity: 0.9;">Système ${systemType} DC · ${days} jours analysés</p>
-                    </div>
+            <div class="dpdt-stats-grid" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px;">
+                <!-- CONFORMITÉ -->
+                <div style="background: linear-gradient(135deg, #f0fff4 0%, #ffffff 100%); padding: 16px; border-radius: 10px; border-left: 5px solid #22c55e; box-shadow: 0 2px 8px rgba(0,0,0,0.06); text-align: center;">
+                    <div style="font-size: 11px; color: #718096; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px;">📊 CONFORMITÉ</div>
+                    <div style="font-size: 32px; font-weight: 800; color: #22c55e; margin-bottom: 8px;">${stabilityPercentage}%</div>
+                    <div style="font-size: 12px; color: #64748b;">${days} jour${days !== 1 ? 's' : ''} analysés</div>
                 </div>
-                <div style="background: rgba(255,255,255,0.15); padding: 8px 20px; border-radius: 40px; font-size: 28px; font-weight: 700;">
-                    ${stabilityPercentage}%
+
+                <!-- JOURS CONFORMES -->
+                <div style="background: linear-gradient(135deg, #e8f0fe 0%, #ffffff 100%); padding: 16px; border-radius: 10px; border-left: 5px solid #3b82f6; box-shadow: 0 2px 8px rgba(0,0,0,0.06); text-align: center;">
+                    <div style="font-size: 11px; color: #718096; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px;">✅ JOURS CONFORMES</div>
+                    <div style="font-size: 28px; font-weight: 800; color: #3b82f6; margin-bottom: 8px;">${stable}</div>
+                    <div style="font-size: 12px; color: #64748b;">Tension dans les seuils</div>
+                    <div style="font-size: 11px; color: #475569; margin-top: 5px;">${tensionMin}V - ${tensionMax}V et Variation < ${variationSeuil}V</div>
+                </div>
+
+                <!-- JOURS NON CONFORMES -->
+                <div style="background: linear-gradient(135deg, #fee2e2 0%, #ffffff 100%); padding: 16px; border-radius: 10px; border-left: 5px solid #ef4444; box-shadow: 0 2px 8px rgba(0,0,0,0.06); text-align: center;">
+                    <div style="font-size: 11px; color: #718096; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px;">🔴 JOURS NON CONFORMES</div>
+                    <div style="font-size: 28px; font-weight: 800; color: #ef4444; margin-bottom: 8px;">${outOfLimits}</div>
+                    <div style="font-size: 12px; color: #64748b;">Hors seuils (min/max)</div>
+                    <div style="font-size: 11px; color: #991b1b; margin-top: 5px;">&lt; ${tensionMin}V ou &gt; ${tensionMax}V</div>
+                </div>
+
+                <!-- VARIATION HAUTE -->
+                <div style="background: linear-gradient(135deg, #fef3c7 0%, #ffffff 100%); padding: 16px; border-radius: 10px; border-left: 5px solid #f59e0b; box-shadow: 0 2px 8px rgba(0,0,0,0.06); text-align: center;">
+                    <div style="font-size: 11px; color: #718096; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px;">⚠️ VARIATION HAUTE</div>
+                    <div style="font-size: 28px; font-weight: 800; color: #f59e0b; margin-bottom: 8px;">${highVariationDays.count}</div>
+                    <div style="font-size: 12px; color: #64748b;">Variation > ${variationSeuil}V</div>
+                    <div style="font-size: 11px; color: #92400e; margin-top: 5px;">Instabilité détectée</div>
                 </div>
             </div>
-            
-            <!-- Grille des cartes statistiques (style identique à createDPDTOnlyTable) -->
-            <div class="dpdt-stats-grid" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: #e2e8f0;">
-                
-                <!-- CARTE 1 : CONFORMITÉ GLOBALE -->
-                <div class="dpdt-stat-card" style="background: white; padding: 20px; border-right: 1px solid #e2e8f0;">
-                    <div class="dpdt-stat-header" style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
-                        <div class="dpdt-stat-icon" style="width: 40px; height: 40px; background: #22c55e20; border-radius: 12px; display: flex; align-items: center; justify-content: center;">
-                            <span style="font-size: 20px;">✅</span>
-                        </div>
-                        <div class="dpdt-stat-title" style="font-weight: 600; color: #334155; font-size: 13px;">CONFORMITÉ GLOBALE</div>
-                    </div>
-                    <div class="dpdt-stat-value" style="font-size: 36px; font-weight: 800; color: #22c55e; line-height: 1; margin-bottom: 8px;">
-                        ${stabilityPercentage}%
-                    </div>
-                    <div class="dpdt-stat-detail" style="display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: #64748b;">
-                        <span>Jours analysés</span>
-                        <span class="dpdt-stat-percent" style="font-weight: 700; color: #22c55e;">${days}</span>
-                    </div>
-                    
-                    <!-- Barre de progression -->
-                    <div class="progress-bar-container" style="width: 100%; height: 8px; background: #e2e8f0; border-radius: 20px; overflow: hidden; margin: 12px 0 8px 0;">
-                        <div class="progress-bar" style="width: ${stabilityPercentage}%; height: 100%; background: linear-gradient(90deg, #22c55e, #16a34a); border-radius: 20px;"></div>
-                    </div>
-                    <div class="progress-label" style="display: flex; justify-content: space-between; font-size: 11px; color: #64748b;">
-                        <span>Taux de conformité</span>
-                        <span>${stabilityPercentage}%</span>
-                    </div>
-                </div>
-
-                <!-- CARTE 2 : JOURS CONFORMES -->
-                <div class="dpdt-stat-card" style="background: white; padding: 20px; border-right: 1px solid #e2e8f0;">
-                    <div class="dpdt-stat-header" style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
-                        <div class="dpdt-stat-icon" style="width: 40px; height: 40px; background: #3b82f620; border-radius: 12px; display: flex; align-items: center; justify-content: center;">
-                            <span style="font-size: 20px;">📊</span>
-                        </div>
-                        <div class="dpdt-stat-title" style="font-weight: 600; color: #334155; font-size: 13px;">JOURS CONFORMES</div>
-                    </div>
-                    <div class="dpdt-stat-value" style="font-size: 36px; font-weight: 800; color: #3b82f6; line-height: 1; margin-bottom: 8px;">
-                        ${stable}
-                    </div>
-                    <div class="dpdt-stat-detail" style="display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: #64748b;">
-                        <span>Jours concernés</span>
-                        <span class="dpdt-stat-percent" style="font-weight: 700; color: #3b82f6;">${stable} / ${totalDays}</span>
-                    </div>
-                    
-                    <!-- Barre de progression -->
-                    <div class="progress-bar-container" style="width: 100%; height: 8px; background: #e2e8f0; border-radius: 20px; overflow: hidden; margin: 12px 0 8px 0;">
-                        <div class="progress-bar" style="width: ${percentConforme}%; height: 100%; background: linear-gradient(90deg, #3b82f6, #2563eb); border-radius: 20px;"></div>
-                    </div>
-                    <div class="progress-label" style="display: flex; justify-content: space-between; font-size: 11px; color: #64748b;">
-                        <span>Tension ${tensionMin}V - ${tensionMax}V</span>
-                        <span>Var ≤ ${variationSeuil}V</span>
-                    </div>
-                </div>
-
-                <!-- CARTE 3 : JOURS NON CONFORMES -->
-                <div class="dpdt-stat-card" style="background: white; padding: 20px; border-right: 1px solid #e2e8f0;">
-                    <div class="dpdt-stat-header" style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
-                        <div class="dpdt-stat-icon" style="width: 40px; height: 40px; background: #ef444420; border-radius: 12px; display: flex; align-items: center; justify-content: center;">
-                            <span style="font-size: 20px;">🔴</span>
-                        </div>
-                        <div class="dpdt-stat-title" style="font-weight: 600; color: #334155; font-size: 13px;">JOURS NON CONFORMES</div>
-                    </div>
-                    <div class="dpdt-stat-value" style="font-size: 36px; font-weight: 800; color: #ef4444; line-height: 1; margin-bottom: 8px;">
-                        ${outOfLimits}
-                    </div>
-                    <div class="dpdt-stat-detail" style="display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: #64748b;">
-                        <span>Jours concernés</span>
-                        <span class="dpdt-stat-percent" style="font-weight: 700; color: #ef4444;">${outOfLimits} / ${totalDays}</span>
-                    </div>
-                    
-                    <!-- Barre de progression -->
-                    <div class="progress-bar-container" style="width: 100%; height: 8px; background: #e2e8f0; border-radius: 20px; overflow: hidden; margin: 12px 0 8px 0;">
-                        <div class="progress-bar" style="width: ${percentNonConforme}%; height: 100%; background: linear-gradient(90deg, #ef4444, #dc2626); border-radius: 20px;"></div>
-                    </div>
-                    <div class="progress-label" style="display: flex; justify-content: space-between; font-size: 11px; color: #64748b;">
-                        <span>Hors seuils</span>
-                        <span>&lt; ${tensionMin}V ou &gt; ${tensionMax}V</span>
-                    </div>
-                </div>
-
-                <!-- CARTE 4 : VARIATION HAUTE -->
-                <div class="dpdt-stat-card" style="background: white; padding: 20px;">
-                    <div class="dpdt-stat-header" style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
-                        <div class="dpdt-stat-icon" style="width: 40px; height: 40px; background: #f59e0b20; border-radius: 12px; display: flex; align-items: center; justify-content: center;">
-                            <span style="font-size: 20px;">⚠️</span>
-                        </div>
-                        <div class="dpdt-stat-title" style="font-weight: 600; color: #334155; font-size: 13px;">VARIATION HAUTE</div>
-                    </div>
-                    <div class="dpdt-stat-value" style="font-size: 36px; font-weight: 800; color: #f59e0b; line-height: 1; margin-bottom: 8px;">
-                        ${highVariationDays.count}
-                    </div>
-                    <div class="dpdt-stat-detail" style="display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: #64748b;">
-                        <span>Jours concernés</span>
-                        <span class="dpdt-stat-percent" style="font-weight: 700; color: #f59e0b;">${highVariationDays.count} / ${totalDays}</span>
-                    </div>
-                    
-                    <!-- Barre de progression -->
-                    <div class="progress-bar-container" style="width: 100%; height: 8px; background: #e2e8f0; border-radius: 20px; overflow: hidden; margin: 12px 0 8px 0;">
-                        <div class="progress-bar" style="width: ${percentVariationHaute}%; height: 100%; background: linear-gradient(90deg, #f59e0b, #d97706); border-radius: 20px;"></div>
-                    </div>
-                    <div class="progress-label" style="display: flex; justify-content: space-between; font-size: 11px; color: #64748b;">
-                        <span>Variation > ${variationSeuil}V</span>
-                        <span>Instabilité détectée</span>
-                    </div>
-                </div>
-            </div>
-            
+    
             <!-- Tableaux détaillés -->
             ${exceedanceTableHTML}
             ${variationTableHTML}
@@ -5541,7 +5434,6 @@ function createStabilityChart(containerId, stabilityData, tensionResults) {
                     <span>📈 Variation max: ${variationSeuil}V</span>
                     <span>📉 Variation moyenne: ${averageVariation}V/h</span>
                 </div>
-                <span>📅 ${new Date().toLocaleDateString('fr-FR')}</span>
             </div>
         </div>
     `;
@@ -6751,242 +6643,138 @@ function convertTimeToMinutes(timeStr) {
     return (hours || 0) * 60 + (minutes || 0);
 }
 // ======================== FILTRE GLOBAL PAR DATES ========================
-// Crée le filtre global des données avec tous les filtres sur la même ligne
 function createGlobalDateFilter() {
     const allDates = allClientsHourlyMatrix.dates || [];
     if (allDates.length === 0) return null;
 
-    // Vérifier si un filtre est actif
     const isFilterActive = window.filteredDates &&
         window.filteredDates.length > 0 &&
         window.filteredDates.length < allDates.length;
 
-    // Déterminer la plage de dates à afficher
-    let dateRangeText = '';
-    let fullRangeText = '';
-
-    // Trier toutes les dates pour référence
     const sortedAllDates = [...allDates].sort((a, b) => {
         const [da, ma, ya] = a.split('/');
         const [db, mb, yb] = b.split('/');
         return new Date(ya, ma - 1, da) - new Date(yb, mb - 1, db);
     });
-    fullRangeText = `${sortedAllDates[0]} → ${sortedAllDates[sortedAllDates.length - 1]}`;
+
+    let dateRangeText = `${sortedAllDates[0]} → ${sortedAllDates.at(-1)}`;
 
     if (isFilterActive) {
-        // Trier les dates filtrées
-        const sortedFilteredDates = [...window.filteredDates].sort((a, b) => {
+        const sortedFiltered = [...window.filteredDates].sort((a, b) => {
             const [da, ma, ya] = a.split('/');
             const [db, mb, yb] = b.split('/');
             return new Date(ya, ma - 1, da) - new Date(yb, mb - 1, db);
         });
-
-        const firstDate = sortedFilteredDates[0];
-        const lastDate = sortedFilteredDates[sortedFilteredDates.length - 1];
-        dateRangeText = `${firstDate} → ${lastDate}`;
-    } else {
-        dateRangeText = fullRangeText;
+        dateRangeText = `${sortedFiltered[0]} → ${sortedFiltered.at(-1)}`;
     }
 
-    // Déterminer la classe CSS selon l'état
-    const containerClass = isFilterActive ? 'global-filter-container filter-active' : 'global-filter-container';
-
     return `
-        <div class="${containerClass}">
-            <!-- En-tête avec titre et actions -->
-            <div class="filter-header">
-                <div class="filter-title">
-                    <span class="filter-title-icon">🔍</span>
-                    <div>
-                        <div>Filtre Global des Données</div>
-                        <div style="font-size: 12px; color: #718096; margin-top: 2px;">
-                            ${allDates.length} jour${allDates.length !== 1 ? 's' : ''} disponibles
-                            ${isFilterActive ? ` · <strong>${window.filteredDates.length}</strong> sélectionné${window.filteredDates.length !== 1 ? 's' : ''}` : ''}
-                        </div>
-                        <!-- Affichage de la plage de dates -->
-                        <div style="font-size: 13px; color: #2563eb; margin-top: 4px; font-weight: 500; background: #dbeafe; padding: 4px 10px; border-radius: 20px; display: inline-block;">
-                            📅 ${dateRangeText}
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="filter-actions">
-                    <button id="reset-all-filters-btn" class="filter-btn filter-btn-secondary">
-                        <span style="font-size: 14px;">🔄</span>
-                        Réinitialiser
-                    </button>
-                    <button id="apply-filter-btn" class="filter-btn filter-btn-primary">
-                        <span style="font-size: 14px;">✅</span>
-                        Appliquer
-                    </button>
-                </div>
-            </div>
-            
-            <!-- TOUS LES FILTRES SUR UNE SEULE LIGNE -->
-            <div style="display: flex; gap: 15px; margin-bottom: 20px; flex-wrap: wrap;">
-                
-                <!-- 1. FILTRE PAR PÉRIODE (30% de largeur) -->
-                <div class="filter-group" style="flex: 3; min-width: 250px;">
-                    <div class="filter-group-title">
-                        <span>📅</span> Période
-                    </div>
-                    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-                        <div style="flex: 1;">
-                            <input type="date" id="filter-start-date" class="filter-date-input" 
-                                   style="width: 100%; padding: 8px 10px; border: 2px solid #e2e8f0; border-radius: 6px; font-size: 12px;">
-                        </div>
-                        <div style="flex: 1;">
-                            <input type="date" id="filter-end-date" class="filter-date-input" 
-                                   style="width: 100%; padding: 8px 10px; border: 2px solid #e2e8f0; border-radius: 6px; font-size: 12px;">
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- 2. FILTRE PAR ANNÉE/MOIS (20% de largeur) -->
-                <div class="filter-group" style="flex: 2; min-width: 180px;">
-                    <div class="filter-group-title">
-                        <span>🗓️</span> Année/Mois
-                    </div>
-                    <div style="display: flex; gap: 8px;">
-                        <select id="filter-year" class="filter-select" 
-                                style="flex: 1; padding: 8px 10px; border: 2px solid #e2e8f0; border-radius: 6px; font-size: 12px; background: white;">
-                            <option value="all">Année</option>
-                            ${[...new Set(allDates.map(d => d.split('/')[2]))].sort((a, b) => b - a).map(year =>
-        `<option value="${year}">${year}</option>`
-    ).join('')}
-                        </select>
-                        <select id="filter-month" class="filter-select" 
-                                style="flex: 1; padding: 8px 10px; border: 2px solid #e2e8f0; border-radius: 6px; font-size: 12px; background: white;">
-                            <option value="all">Mois</option>
-                            <option value="1">Jan</option>
-                            <option value="2">Fév</option>
-                            <option value="3">Mar</option>
-                            <option value="4">Avr</option>
-                            <option value="5">Mai</option>
-                            <option value="6">Juin</option>
-                            <option value="7">Juil</option>
-                            <option value="8">Aoû</option>
-                            <option value="9">Sep</option>
-                            <option value="10">Oct</option>
-                            <option value="11">Nov</option>
-                            <option value="12">Déc</option>
-                        </select>
-                    </div>
-                </div>
-                
-                <!-- 3. SÉLECTION DE DATES SPÉCIFIQUES (50% de largeur) -->
-                <div class="filter-group" style="flex: 5; min-width: 300px;">
-                    <div class="filter-group-title">
-                        <span>📌</span> Sélection de dates spécifiques
-                        <span style="margin-left: 10px; font-size: 11px; color: #64748b; font-weight: normal;">
-                            ${allDates.length} date${allDates.length > 1 ? 's' : ''}
-                        </span>
-                    </div>
-                    
-                    <!-- Boutons de sélection rapide -->
-                    <div style="display: flex; gap: 5px; margin-bottom: 8px; flex-wrap: wrap;">
-                        <button class="quick-select-btn" onclick="selectLastNDays(3)" style="padding: 4px 8px; font-size: 11px;">3j</button>
-                        <button class="quick-select-btn" onclick="selectLastNDays(7)" style="padding: 4px 8px; font-size: 11px;">7j</button>
-                        <button class="quick-select-btn" onclick="selectLastNDays(15)" style="padding: 4px 8px; font-size: 11px;">15j</button>
-                        <button class="quick-select-btn" onclick="selectLastNDays(30)" style="padding: 4px 8px; font-size: 11px;">30j</button>
-                        <button id="select-all-dates" class="date-select-btn date-select-btn-primary" style="padding: 4px 8px; font-size: 11px;">✅ Tout</button>
-                        <button id="deselect-all-dates" class="date-select-btn date-select-btn-secondary" style="padding: 4px 8px; font-size: 11px;">❌ Rien</button>
-                    </div>
-                    
-                    <!-- Grille des dates (en dessous) -->
-                    <div class="date-checkbox-container" style="
-                        max-height: 100px;
-                        overflow-y: auto;
-                        display: flex;
-                        flex-wrap: wrap;
-                        gap: 5px;
-                        padding: 5px;
-                        background: white;
-                        border: 1px solid #e2e8f0;
-                        border-radius: 6px;
-                    ">
-                        ${allDates.map(date => {
-        const isChecked = window.filteredDates ?
-            window.filteredDates.includes(date) : true;
-        const labelClass = isChecked ? 'date-checkbox-label checked' : 'date-checkbox-label';
+        <div class="filter-container">
 
-        return `
-                                <label class="${labelClass}" style="
-                                    display: inline-flex;
-                                    align-items: center;
-                                    gap: 3px;
-                                    padding: 3px 8px;
-                                    background: ${isChecked ? '#dbeafe' : '#f1f5f9'};
-                                    border-radius: 15px;
-                                    font-size: 11px;
-                                    cursor: pointer;
-                                    border: 1px solid ${isChecked ? '#3b82f6' : '#cbd5e1'};
-                                ">
-                                    <input type="checkbox" class="date-checkbox" value="${date}" ${isChecked ? 'checked' : ''} style="display: none;">
-                                    <span>${date}</span>
-                                </label>
-                            `;
-    }).join('')}
-                    </div>
-                    
-                    <!-- Compteur compact -->
-                    <div style="
-                        margin-top: 8px;
-                        font-size: 11px;
-                        color: #475569;
-                        display: flex;
-                        justify-content: space-between;
-                        align-items: center;
-                    ">
-                        <span>
-                            📊 <strong id="selected-count-display">${document.querySelectorAll('.date-checkbox:checked').length}</strong> sélectionnée(s)
-                        </span>
-                        <span style="color: #64748b;">
-                            Total: ${allDates.length}
-                        </span>
-                    </div>
+            <!-- HEADER -->
+            <div class="filter-header">
+                <div class="filter-title">📅 Filtres de Date</div>
+
+                <div style="display:flex; gap:10px;">
+                    <button id="reset-all-filters-btn" class="btn btn-reset">
+                        🔄 Réinitialiser
+                    </button>
+                    <button id="apply-filter-btn" class="btn btn-apply">
+                        ✅ Appliquer
+                    </button>
                 </div>
             </div>
-            
-            <!-- Indicateur de sélection -->
-            <div id="filter-indicator" class="filter-indicator ${isFilterActive ? 'filtered' : ''}" style="
-                display: flex;
-                align-items: center;
-                gap: 12px;
-                padding: 10px 16px;
-                background: ${isFilterActive ? '#dcfce7' : '#f0f9ff'};
-                border-radius: 8px;
-                border: 2px solid ${isFilterActive ? '#86efac' : '#bae6fd'};
-                margin-top: 15px;
-            ">
-                <span class="filter-indicator-icon">📊</span>
-                <div class="filter-indicator-info" style="flex: 1;">
-                    <div class="filter-indicator-title" style="font-weight: 700; color: ${isFilterActive ? '#166534' : '#0369a1'}; font-size: 13px;">
-                        <span id="selected-dates-count">${isFilterActive ? window.filteredDates.length : allDates.length}</span>
-                        jour${(isFilterActive ? window.filteredDates.length : allDates.length) !== 1 ? 's' : ''} sélectionné${(isFilterActive ? window.filteredDates.length : allDates.length) !== 1 ? 's' : ''}
-                    </div>
-                    <div class="filter-indicator-description" style="font-size: 11px; color: ${isFilterActive ? '#166534' : '#0c4a6e'};">
-                        Période: <strong>${dateRangeText}</strong>
+
+            <!-- BARRE BLEUE -->
+            <div class="selected-period">
+                <div class="selected-period-left">
+                    📅 <span>Période sélectionnée : ${dateRangeText}</span>
+                </div>
+
+                ${isFilterActive ? `
+                <div class="selected-period-close" onclick="resetAllFilters()">
+                    ✕
+                </div>` : ''}
+            </div>
+
+            <div style="display:flex; gap:16px; flex-wrap:wrap;">
+
+                <!-- PREDEFINED -->
+                <div class="filter-block">
+                    <div class="filter-block-title">📅 Période Prédéfinie</div>
+
+                    <div class="filter-grid">
+                        <button class="filter-btn" onclick="selectLastNDays(5)">5 jours</button>
+                        <button class="filter-btn" onclick="selectLastNDays(7)">7 jours</button>
+                        <button class="filter-btn" onclick="selectLastNDays(15)">15 jours</button>
+
+                        <button class="filter-btn" onclick="selectLastNDays(30)">30 jours</button>
+                        <button class="filter-btn" onclick="selectLastNDays(60)">2 mois</button>
+                        <button class="filter-btn" onclick="selectLastNDays(90)">3 mois</button>
+
+                        <button class="filter-btn" onclick="selectLastNDays(180)">6 mois</button>
+                        <button class="filter-btn" onclick="selectLastNDays(365)">1 an</button>
+                        <button class="filter-btn primary" onclick="selectAllDates()">Tout</button>
                     </div>
                 </div>
-                ${isFilterActive ? `
-                <button onclick="resetAllFilters()" style="
-                    background: white; 
-                    border: 1px solid #cbd5e1; 
-                    padding: 5px 12px; 
-                    border-radius: 20px; 
-                    font-size: 11px; 
-                    cursor: pointer; 
-                    color: #64748b; 
-                    font-weight: 500;
-                ">
-                    Effacer
-                </button>
-                ` : ''}
+
+                <!-- MANUEL -->
+                <div class="filter-block">
+                    <div class="filter-block-title">📆 Sélection Manuelle</div>
+
+                    <div style="display:flex; gap:10px;">
+                        <div class="filter-input-group">
+                            <label class="filter-label">Date début</label>
+                            <input type="date" id="filter-start-date">
+                        </div>
+
+                        <div class="filter-input-group">
+                            <label class="filter-label">Date fin</label>
+                            <input type="date" id="filter-end-date">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- MOIS/ANNEE -->
+                <div class="filter-block">
+                    <div class="filter-block-title">🗓️ Filtre Mois/Année</div>
+
+                    <div style="display:flex; gap:10px;">
+                        <div class="filter-input-group">
+                            <label class="filter-label">Année</label>
+                            <select id="filter-year">
+                                <option value="all">Toutes les années</option>
+                                ${[...new Set(allDates.map(d => d.split('/')[2]))]
+                                    .sort((a,b)=>b-a)
+                                    .map(y => `<option value="${y}">${y}</option>`).join('')}
+                            </select>
+                        </div>
+
+                        <div class="filter-input-group">
+                            <label class="filter-label">Mois</label>
+                            <select id="filter-month">
+                                <option value="all">Tous les mois</option>
+                                <option value="1">Janvier</option>
+                                <option value="2">Février</option>
+                                <option value="3">Mars</option>
+                                <option value="4">Avril</option>
+                                <option value="5">Mai</option>
+                                <option value="6">Juin</option>
+                                <option value="7">Juillet</option>
+                                <option value="8">Août</option>
+                                <option value="9">Septembre</option>
+                                <option value="10">Octobre</option>
+                                <option value="11">Novembre</option>
+                                <option value="12">Décembre</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     `;
 }
+
 // NOUVELLE FONCTION : Sélectionner les N derniers jours
 function selectLastNDays(n) {
     const allDates = allClientsHourlyMatrix.dates || [];
@@ -7002,24 +6790,14 @@ function selectLastNDays(n) {
     // Prendre les N dernières dates
     const lastNDates = sortedDates.slice(-n);
 
-    // Mettre à jour les cases à cocher
-    document.querySelectorAll('.date-checkbox').forEach(cb => {
-        const isSelected = lastNDates.includes(cb.value);
-        cb.checked = isSelected;
+    // Appliquer directement le filtre sans utiliser les cases à cocher
+    window.filteredDates = lastNDates;
 
-        // Mettre à jour la classe du label
-        if (isSelected) {
-            cb.parentElement.classList.add('checked');
-        } else {
-            cb.parentElement.classList.remove('checked');
-        }
-    });
+    // Rafraîchir l'affichage
+    refreshAllTechniqueComponents();
 
-    // Mettre à jour le compteur
-    updateSelectedCount();
-
-    // Optionnel : appliquer automatiquement le filtre
-    // applyGlobalDateFilter();
+    // Mettre à jour l'indicateur
+    updateFilterIndicator();
 
     console.log(`✅ ${n} derniers jours sélectionnés: ${lastNDates.join(', ')}`);
 }
@@ -7115,262 +6893,6 @@ function applyGlobalDateFilter() {
     return true;
 }
 
-// Dans addAllClientsStyles() ou dans une nouvelle fonction
-function addDPDTStyles() {
-    if (document.querySelector('#dpdt-styles')) return;
-
-    const styles = document.createElement('style');
-    styles.id = 'dpdt-styles';
-    styles.textContent = `
-        /* Styles pour le tableau DP/DT */
-        .dpdt-table-container {
-            margin-top: 20px;
-            background: white;
-            border-radius: 8px;
-            border: 1px solid #e2e8f0;
-            overflow: hidden;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-        }
-        
-        .dpdt-table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 12px;
-        }
-        
-        .dpdt-table th {
-            background: #f8fafc;
-            padding: 12px 10px;
-            text-align: left;
-            font-weight: 600;
-            color: #475569;
-            border-bottom: 2px solid #e2e8f0;
-            position: sticky;
-            top: 0;
-        }
-        
-        .dpdt-table td {
-            padding: 10px;
-            border-bottom: 1px solid #e2e8f0;
-            vertical-align: top;
-        }
-        
-        .dpdt-dt-row {
-            background: linear-gradient(90deg, rgba(254, 226, 226, 0.1) 0%, rgba(254, 226, 226, 0.05) 100%);
-            border-left: 3px solid #ef4444;
-        }
-        
-        .dpdt-dp-row {
-            background: linear-gradient(90deg, rgba(254, 243, 199, 0.1) 0%, rgba(254, 243, 199, 0.05) 100%);
-            border-left: 3px solid #f59e0b;
-        }
-        
-        .dpdt-dt-row:hover {
-            background: linear-gradient(90deg, rgba(254, 226, 226, 0.2) 0%, rgba(254, 226, 226, 0.1) 100%);
-        }
-        
-        .dpdt-dp-row:hover {
-            background: linear-gradient(90deg, rgba(254, 243, 199, 0.2) 0%, rgba(254, 243, 199, 0.1) 100%);
-        }
-        
-        .dpdt-type-badge {
-            display: inline-block;
-            padding: 3px 10px;
-            border-radius: 12px;
-            font-size: 10px;
-            font-weight: bold;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-        
-        .dpdt-type-badge.dt {
-            background: #fee2e2;
-            color: #dc2626;
-            border: 1px solid #fecaca;
-        }
-        
-        .dpdt-type-badge.dp {
-            background: #fef3c7;
-            color: #d97706;
-            border: 1px solid #fde68a;
-        }
-        
-        .dpdt-hour-chip {
-            display: inline-block;
-            margin: 2px;
-            padding: 4px 8px;
-            background: #f1f5f9;
-            border-radius: 4px;
-            font-family: 'Courier New', monospace;
-            font-size: 11px;
-            color: #4a5568;
-            border: 1px solid #e2e8f0;
-        }
-        
-        .dpdt-hour-chip.dt {
-            background: #fee2e2;
-            border-color: #fecaca;
-            color: #991b1b;
-        }
-        
-        .dpdt-hour-chip.dp {
-            background: #fef3c7;
-            border-color: #fde68a;
-            color: #92400e;
-        }
-        
-        /* Statistiques DP/DT */
-        .dpdt-stats {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 10px;
-            padding: 15px;
-            background: #f8fafc;
-            border-top: 1px solid #e2e8f0;
-        }
-        
-        .dpdt-stat-card {
-            text-align: center;
-            padding: 15px;
-            border-radius: 8px;
-            background: white;
-            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-        }
-        
-        .dpdt-stat-card.dt {
-            border-top: 3px solid #ef4444;
-        }
-        
-        .dpdt-stat-card.dp {
-            border-top: 3px solid #f59e0b;
-        }
-        
-        .dpdt-stat-value {
-            display: block;
-            font-size: 24px;
-            font-weight: 800;
-            margin-bottom: 5px;
-        }
-        
-        .dpdt-stat-value.dt {
-            color: #dc2626;
-        }
-        
-        .dpdt-stat-value.dp {
-            color: #d97706;
-        }
-        
-        .dpdt-stat-label {
-            font-size: 11px;
-            color: #718096;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-        
-        /* Responsive */
-        @media (max-width: 768px) {
-            .dpdt-table {
-                font-size: 11px;
-            }
-            
-            .dpdt-table th,
-            .dpdt-table td {
-                padding: 8px 6px;
-            }
-            
-            .dpdt-stats {
-                grid-template-columns: 1fr;
-            }
-        }
-        /* MODIFICATION POUR LA GRILLE DE DATES */
-        .date-checkbox-container {
-            display: grid !important;
-            grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)) !important;
-            gap: 8px !important;
-            max-height: none !important;
-            overflow-y: visible !important;
-            height: auto !important;
-            padding: 10px 0 !important;
-        }
-        
-        /* Amélioration des labels pour meilleure visibilité */
-        .date-checkbox-label {
-            background: white;
-            border: 2px solid #e2e8f0;
-            border-radius: 8px;
-            padding: 10px 12px;
-            cursor: pointer;
-            transition: all 0.2s;
-            font-size: 13px;
-            font-weight: 500;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
-        }
-        
-        .date-checkbox-label:hover {
-            border-color: #3b82f6;
-            background: #f0f9ff;
-            transform: translateY(-2px);
-            box-shadow: 0 4px 8px rgba(59,130,246,0.1);
-        }
-        
-        .date-checkbox-label.checked {
-            background: #3b82f6;
-            border-color: #2563eb;
-            color: white;
-        }
-        
-        .date-checkbox-label.checked:hover {
-            background: #2563eb;
-        }
-        
-        .date-checkbox-label input[type="checkbox"] {
-            width: 18px;
-            height: 18px;
-            cursor: pointer;
-            accent-color: #3b82f6;
-        }
-        
-        .date-checkbox-label.checked input[type="checkbox"] {
-            accent-color: white;
-        }
-        
-        /* Compteur amélioré */
-        .date-counter {
-            background: #f8fafc;
-            border: 1px solid #e2e8f0;
-            border-radius: 8px;
-            padding: 12px;
-            margin-top: 15px;
-            font-size: 13px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        
-        /* Responsive pour mobile */
-        @media (max-width: 768px) {
-            .date-checkbox-container {
-                grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)) !important;
-            }
-            
-            .date-checkbox-label {
-                padding: 8px 10px;
-                font-size: 12px;
-            }
-        }
-        
-        @media (max-width: 576px) {
-            .date-checkbox-container {
-                grid-template-columns: repeat(2, 1fr) !important;
-            }
-        }
-    `;
-
-    document.head.appendChild(styles);
-}
 
 // ======================== AFFICHAGE COMPACT DES PÉRIODES DP/DT ========================
 function createCompactDPDTDisplay(dates, eventsByDate) {
@@ -7800,10 +7322,52 @@ function calculateFilteredTechnicalStats() {
 
 // Mise à jour de l'affichage des statistiques
 function updateStatsDisplay(stats) {
-    // Mettre à jour le tableau des statistiques
-    const statsTable = document.querySelector('.stats-summary-table');
-    if (statsTable) {
-        statsTable.innerHTML = `
+    // Créer ou récupérer la carte
+    let statsCard = document.getElementById('stats-technical-card');
+    const statsContainer = document.querySelector('.stats-summary-table')?.parentElement || document.querySelector('.all-clients-stats')?.parentElement;
+    
+    if (!statsContainer) return;
+    
+    // Supprimer l'ancienne carte si elle existe
+    if (statsCard) statsCard.remove();
+    
+    // Créer la nouvelle carte
+    statsCard = document.createElement('div');
+    statsCard.id = 'stats-technical-card';
+    statsCard.className = 'stats-card'; // Utilise la classe CSS
+    
+    // En-tête de la carte
+    const cardHeader = document.createElement('div');
+    cardHeader.className = 'card-header';
+    cardHeader.innerHTML = `📊 STATISTIQUES TECHNIQUES`;
+    statsCard.appendChild(cardHeader);
+    
+    // En-tête des stats
+    const statsHeader = document.createElement('div');
+    statsHeader.className = 'stats-header';
+    statsHeader.innerHTML = `
+        <div style="display: flex; align-items: center; gap: 10px;">
+            <span style="font-size: 22px;">📅</span>
+            <span style="font-size: 16px; font-weight: 600;">${stats.dates.length} jour${stats.dates.length !== 1 ? 's' : ''}</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 10px;">
+            <span style="font-size: 22px;">👤</span>
+            <span style="font-size: 16px; font-weight: 600;">${stats.clients.length} client${stats.clients.length !== 1 ? 's' : ''}</span>
+        </div>
+    `;
+    statsCard.appendChild(statsHeader);
+    
+    // Conteneur du tableau
+    const tableContainer = document.createElement('div');
+    tableContainer.className = 'table-container';
+    
+    const systemType = detectSystemTypeFromTensionValue(parseFloat(stats.averageTension) || 14);
+    const variationValue = systemType === '24V' ? 5 : 2.5;
+    const variationSeuil = systemType === '24V' ? 3 : 1.5;
+    const isVariationOutOfLimit = variationValue > variationSeuil;
+    
+    tableContainer.innerHTML = `
+        <table class="stats-table">
             <tbody>
                 <tr>
                     <td class="stats-label">⚡ Énergie Maximale</td>
@@ -7813,42 +7377,34 @@ function updateStatsDisplay(stats) {
                 <tr>
                     <td class="stats-label">📊 Tension Moyenne</td>
                     <td class="stats-value">${stats.averageTension} V</td>
-                    <td class="stats-date">Système ${detectSystemTypeFromTensionValue(parseFloat(stats.averageTension) || 14)}</td>
+                    <td class="stats-date"><span class="badge">Système ${systemType}</span></td>
                 </tr>
                 <tr>
-                    <td class="stats-label">⚡ Tension Minimale</td>
+                    <td class="stats-label">⬇️ Tension Minimale</td>
                     <td class="stats-value">${stats.minTensionValue} V</td>
                     <td class="stats-date">${stats.minTensionDate || '-'}</td>
                 </tr>
                 <tr>
-                    <td class="stats-label">⚡ Tension Maximale</td>
+                    <td class="stats-label">⬆️ Tension Maximale</td>
                     <td class="stats-value">${stats.maxTensionValue} V</td>
                     <td class="stats-date">${stats.maxTensionDate || '-'}</td>
                 </tr>
                 <tr>
                     <td class="stats-label">📏 Variation Max/Jour</td>
-                    <td class="stats-value" style="color: #d69e2e;">
-                        ${(detectSystemTypeFromTensionValue(parseFloat(stats.averageTension) || 14) === '24V' ? 5 : 2.5).toFixed(1)} V
+                    <td class="stats-value ${isVariationOutOfLimit ? 'alert-text' : ''}">
+                        ${variationValue.toFixed(1)} V ${isVariationOutOfLimit ? '⚠️' : ''}
                     </td>
-                    <td class="stats-date">
-                        Seuil alerte: ${detectSystemTypeFromTensionValue(parseFloat(stats.averageTension) || 14) === '24V' ? '3' : '1.5'} V/h
-                    </td>
+                    <td class="stats-date"><span class="badge">Seuil: ${variationSeuil} V/h</span></td>
                 </tr>
             </tbody>
-        `;
-    }
-
-    // Mettre à jour les en-têtes
-    const header = document.querySelector('.all-clients-stats');
-    if (header) {
-        const statItems = header.querySelectorAll('.stat-item');
-        if (statItems[0]) {
-            statItems[0].querySelector('.stat-text').textContent = `${stats.dates.length} jours`;
-        }
-        if (statItems[1]) {
-            statItems[1].querySelector('.stat-text').textContent = `${stats.clients.length} client${stats.clients.length !== 1 ? 's' : ''}`;
-        }
-    }
+        </table>
+    `;
+    
+    statsCard.appendChild(tableContainer);
+    
+    // Remplacer le contenu
+    statsContainer.innerHTML = '';
+    statsContainer.appendChild(statsCard);
 }
 // 3. Analyse de stabilité
 function refreshFilteredStabilityAnalysis() {
@@ -8595,10 +8151,6 @@ function displayAllClientsTab() {
                     <span class="stat-icon">👤</span>
                     <span class="stat-text">${allClientsHourlyMatrix.clients.length} client${allClientsHourlyMatrix.clients.length !== 1 ? 's' : ''}</span>
                 </div>
-                <div class="stat-item">
-                    <span class="stat-icon">💼</span>
-                    <span class="stat-text">Forfaits: ${sortedClients.map(id => `Client${id}-${allResultsByClient[id].forfait || 'N/A'}`).join(', ')}</span>
-                </div>
             </div>
             
             <!-- TABLEAU STATISTIQUES -->
@@ -8642,28 +8194,8 @@ function displayAllClientsTab() {
 
         <!-- ===== CARTE PRINCIPALE : Analyse général de la Tension ===== -->
         <div class="main-tension-card" style="background: white; border-radius: 24px; padding: 24px; margin: 30px 0; border: 2px solid #e2e8f0; box-shadow: 0 12px 30px rgba(0,0,0,0.1);">
-
-            <!-- EN-TÊTE DE LA CARTE PRINCIPALE -->
-            <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 25px; padding-bottom: 20px; border-bottom: 3px solid #3b82f6;">
-                <div style="width: 60px; height: 60px; background: linear-gradient(135deg, #3b82f6 0%, #1e3a8a 100%); border-radius: 18px; display: flex; align-items: center; justify-content: center; box-shadow: 0 10px 20px #3b82f680;">
-                    <span style="font-size: 32px; color: white;">⚡</span>
-                </div>
-                <div>
-                    <h3 style="margin: 0; font-size: 26px; font-weight: 800; color: #0f172a;">
-                        Analyse général de la Tension
-                        <span style="margin-left: 12px; font-size: 14px; background: #f1f5f9; color: #475569; padding: 6px 16px; border-radius: 40px; font-weight: 600;">
-                            ${systemType}
-                        </span>
-                    </h3>
-                    <div style="margin-top: 6px; font-size: 14px; color: #475569;">
-                        Analyse complète de la conformité, des atteintes nominales et de l'évolution temporelle
-                    </div>
-                </div>
-            </div>
-
-            <!-- CARTES EN COLONNE (les unes en dessous des autres) -->
             
-            <!-- CARTE 1 : Analyse globale de Tension -->
+            <!-- Analyse globale de Tension -->
             <div style="background: #f8fafc; border-radius: 20px; padding: 20px; margin-bottom: 25px; border: 1px solid #e2e8f0;">
                 <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 20px;">
                     <div style="width: 44px; height: 44px; background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%); border-radius: 12px; display: flex; align-items: center; justify-content: center;">
@@ -8671,122 +8203,120 @@ function displayAllClientsTab() {
                     </div>
                     <h4 style="margin: 0; font-size: 18px; font-weight: 700; color: #1e293b;">Analyse globale de Tension</h4>
                 </div>
+
+                <!-- CARTE 1 :  Conformité de la tension  -->
                 <div id="stability-analysis-container" style="min-height: 350px;"></div>
-            </div>
 
-            <!-- CARTE 2 : Tableau des Événements Combinés ENR + EC -->
-            ${combinedAnalysis && combinedAnalysis.allEvents.length > 0 ? `
-            <div style="background: #f8fafc; border-radius: 20px; padding: 20px; margin-bottom: 25px; border: 1px solid #e2e8f0;">
-                ${createDPDTOnlyTable(combinedAnalysis)}
-            </div>
-            ` : ''}
-
-            <!-- CARTE 3 : Évolution quotidienne des atteintes - Courbe de tendance -->
-            <div style="background: #f8fafc; border-radius: 20px; padding: 20px; margin-bottom: 25px; border: 1px solid #e2e8f0;">
-                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 20px;">
-                    <div style="width: 44px; height: 44px; background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); border-radius: 12px; display: flex; align-items: center; justify-content: center;">
-                        <span style="font-size: 22px; color: white;">📈</span>
-                    </div>
-                    <h4 style="margin: 0; font-size: 18px; font-weight: 700; color: #1e293b;">Évolution quotidienne des atteintes</h4>
-                </div>
-                <div id="nominal-tension-table-container"></div>
-            </div>
-
-            <!-- CARTE 4 : Tension journalière (Min/Max/Moyenne par Jour) -->
-            <div style="background: #f8fafc; border-radius: 20px; padding: 20px; margin-bottom: 25px; border: 1px solid #e2e8f0;">
-                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 15px;">
-                    <div style="width: 40px; height: 40px; background: linear-gradient(135deg, #a855f7 0%, #7e22ce 100%); border-radius: 10px; display: flex; align-items: center; justify-content: center;">
-                        <span style="font-size: 18px; color: white;">📊</span>
-                    </div>
-                    <h4 style="margin: 0; font-size: 16px; font-weight: 700; color: #1e293b;">Tension journalière (Système ${systemType})</h4>
-                </div>
-                <div class="system-info" style="font-size: 11px; color: #64748b; margin-bottom: 10px; display: flex; gap: 15px; flex-wrap: wrap; padding: 8px 0;">
-                    <span>Min: ${systemLimits.min}V</span>
-                    <span>Idéal: ${systemLimits.ideal.min}-${systemLimits.ideal.max}V</span>
-                    <span>Max: ${systemLimits.max}V</span>
-                </div>
+                <!-- CARTE 2 : Tension journalière (Min/Max/Moyenne par Jour) -->
                 <div class="chart-container all-clients-line-chart-container" style="height: 100%;">
+                    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 15px;">
+                        <div style="width: 40px; height: 40px; background: linear-gradient(135deg, #a855f7 0%, #7e22ce 100%); border-radius: 10px; display: flex; align-items: center; justify-content: center;">
+                            <span style="font-size: 18px; color: white;">📊</span>
+                        </div>
+                        <h4 style="margin: 0; font-size: 16px; font-weight: 700; color: #1e293b;">Tension journalière (Système ${systemType})</h4>
+                    </div>
                     <canvas id="allClientsTensionChart" style="width: 100% !important; height: 100% !important; display: block;"></canvas>
                 </div>
-            </div>
 
-            <!-- CARTE 5 : Évolution de la Tension (par date/heure) -->
-            <div style="background: #f8fafc; border-radius: 20px; padding: 20px; margin-bottom: 25px; border: 1px solid #e2e8f0;">
-                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 20px;">
-                    <div style="width: 44px; height: 44px; background: linear-gradient(135deg, #f97316 0%, #c2410c 100%); border-radius: 12px; display: flex; align-items: center; justify-content: center;">
-                        <span style="font-size: 22px; color: white;">⏱️</span>
-                    </div>
-                    <div style="display: flex; flex-direction: column; gap: 4px; flex: 1;">
-                        <h4 style="margin: 0; font-size: 18px; font-weight: 700; color: #1e293b;">Évolution de la Tension (par date/heure)</h4>
-                        <span style="font-size: 12px; color: #64748b;">
-                            Visualisation fine des variations de tension avec surbrillance de la plage idéale.
-                        </span>
-                    </div>
-                </div>
-
-                <!-- FILTRE PAR PLAGE DE DATES POUR LE GRAPHIQUE TENSION -->
-                <div style="margin-bottom: 18px; padding: 12px 16px; background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0;">
-                    <!-- Ligne 1: contrôles sur la même ligne -->
-                    <div style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap;">
-                        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-                            <span style="font-size: 13px; font-weight: 600; color: #334155;">📅 Plage de dates :</span>
-                            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-                                <label style="font-size: 12px; color: #64748b;">
-                                    Début
-                                    <select id="tension-start-date" onchange="onTensionStartDateChange()" style="margin-left: 4px; padding: 8px 12px; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 13px; font-weight: 500; background: #ffffff; cursor: pointer; min-width: 130px;">
-                                        ${allClientsHourlyMatrix.dates.map((date, index) => `
-                                            <option value="${date}" ${index === 0 ? 'selected' : ''}>${date}</option>
-                                        `).join('')}
-                                    </select>
-                                </label>
-                                <label style="font-size: 12px; color: #64748b;">
-                                    Fin
-                                    <select id="tension-end-date" style="margin-left: 4px; padding: 8px 12px; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 13px; font-weight: 500; background: #ffffff; cursor: pointer; min-width: 130px;">
-                                        ${allClientsHourlyMatrix.dates.map((date, index, arr) => `
-                                            <option value="${date}" ${index === arr.length - 1 ? 'selected' : ''}>${date}</option>
-                                        `).join('')}
-                                    </select>
-                                </label>
+                <!-- CARTE 3 : Évolution de la Tension (par date/heure) -->
+                <div style="margin-bottom: 18px; padding: 20px; background: #ffffff; border-radius: 16px; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                    <!-- Header -->
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
+                        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 20px;">
+                            <div style="width: 44px; height: 44px; background: linear-gradient(135deg, #f97316 0%, #c2410c 100%); border-radius: 12px; display: flex; align-items: center; justify-content: center;">
+                                <span style="font-size: 22px; color: white;">⏱️</span>
+                            </div>
+                            <div style="display: flex; flex-direction: column; gap: 4px; flex: 1;">
+                                <h4 style="margin: 0; font-size: 18px; font-weight: 700; color: #1e293b;">Évolution de la Tension (par date/heure)</h4>
                             </div>
                         </div>
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <div style="background: #ef4444; color: white; width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 20px;">
+                                📅
+                            </div>
+                            <div>
+                                <div style="font-weight: 600; color: #1f2937; font-size: 15px;">Filtre période (max 7 jours)</div>
+                                <div style="font-size: 13px; color: #64748b;">172 jours disponibles · 01/01/2010 — 16/03/2025</div>
+                            </div>
+                        </div>
+                        
+                        <div style="background: #fee2e2; color: #ef4444; padding: 6px 14px; border-radius: 9999px; font-size: 13px; font-weight: 500; display: flex; align-items: center; gap: 6px;">
+                            <span>⏳</span>
+                            7 jours max
+                        </div>
+                    </div>
 
-                        <div style="display: flex; gap: 10px; margin-left: auto;">
-                            <button onclick="applyTensionDateFilter()" style="padding: 9px 20px; background: #f97316; color: white; border: none; border-radius: 999px; font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 6px 12px rgba(249, 115, 22, 0.25);">
-                                <span>🔍</span> Appliquer le filtre
+                    <!-- Dates -->
+                    <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
+                        
+                        <!-- Date début -->
+                        <div style="flex: 1; min-width: 240px;">
+                            <label style="font-size: 13px; color: #64748b; font-weight: 500; display: block; margin-bottom: 6px;">
+                                📆 Date début
+                            </label>
+                            <select id="tension-start-date" onchange="onTensionStartDateChange()" style="margin-left: 4px; padding: 8px 12px; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 13px; font-weight: 500; background: #ffffff; cursor: pointer; min-width: 130px;">
+                                ${allClientsHourlyMatrix.dates.map((date, index) => `
+                                    <option value="${date}" ${index === 0 ? 'selected' : ''}>${date}</option>
+                                `).join('')}
+                            </select>
+                        </div>
+
+                        <!-- Date fin -->
+                        <div style="flex: 1; min-width: 240px;">
+                            <label style="font-size: 13px; color: #64748b; font-weight: 500; display: block; margin-bottom: 6px;">
+                                📆 Date fin
+                            </label>
+                            <select id="tension-end-date" style="margin-left: 4px; padding: 8px 12px; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 13px; font-weight: 500; background: #ffffff; cursor: pointer; min-width: 130px;">
+                                ${allClientsHourlyMatrix.dates.map((date, index, arr) => `
+                                    <option value="${date}" ${index === arr.length - 1 ? 'selected' : ''}>${date}</option>
+                                `).join('')}
+                            </select>
+                        </div>
+
+                        <!-- Boutons -->
+                        <div style="display: flex; gap: 12px; align-items: flex-end; padding-top: 6px;">
+                            <button onclick="applyTensionDateFilter()" 
+                                    style="background: #ef4444; color: white; border: none; padding: 12px 28px; border-radius: 12px; font-weight: 600; font-size: 14px; cursor: pointer; display: flex; align-items: center; gap: 8px; box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);">
+                                <span style="font-size: 18px;">✅</span>
+                                Appliquer
                             </button>
-                            <button onclick="resetTensionDateFilter()" style="padding: 9px 16px; background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; border-radius: 999px; font-size: 13px; font-weight: 600; cursor: pointer;">
+                            
+                            <button onclick="resetTensionDateFilter()" 
+                                    style="background: white; color: #64748b; border: 1px solid #cbd5e1; padding: 12px 20px; border-radius: 12px; font-weight: 600; font-size: 14px; cursor: pointer; display: flex; align-items: center; gap: 8px;">
+                                <span>⟳</span>
                                 Réinitialiser
                             </button>
                         </div>
                     </div>
 
-                    <!-- Ligne 2: info 7 jours uniquement -->
-                    <div style="margin-top: 8px; font-size: 11px; color: #64748b; display: flex; align-items: center; gap: 6px;">
-                        <span style="font-size: 12px;">ℹ️</span>
-                        <span>Période limitée à <strong style="color:#334155;">7 jours maximum</strong>. La date de fin s’ajuste automatiquement selon la date de début.</span>
+                    <!-- Période par défaut -->
+                    <div style="margin-top: 18px; margin-bottom: 18px; padding: 14px 18px; background: #f0f9ff; border-radius: 12px; border: 1px solid #bae6fd; display: flex; align-items: center; gap: 10px; margin">
+                        <span style="font-size: 18px;">📊</span>
+                        <div id="tension-current-range-badge" style="margin-top: 10px; font-size: 12px; color: #1e40af;">
+                            <span style="padding: 4px 10px; background: #dbeafe; border-radius: 999px; display: inline-flex; align-items: center; gap: 6px;">
+                                📊 Période affichée :
+                                <strong>
+                                    <span id="tension-range-start-label">${allClientsHourlyMatrix.dates[0]}</span>
+                                    &nbsp;→&nbsp;
+                                    <span id="tension-range-end-label">${allClientsHourlyMatrix.dates[allClientsHourlyMatrix.dates.length - 1]}</span>
+                                </strong>
+                            </span>
+                        </div>
                     </div>
-
-                    <div id="tension-current-range-badge" style="margin-top: 10px; font-size: 12px; color: #1e40af;">
-                        <span style="padding: 4px 10px; background: #dbeafe; border-radius: 999px; display: inline-flex; align-items: center; gap: 6px;">
-                            📊 Période affichée :
-                            <strong>
-                                <span id="tension-range-start-label">${allClientsHourlyMatrix.dates[0]}</span>
-                                &nbsp;→&nbsp;
-                                <span id="tension-range-end-label">${allClientsHourlyMatrix.dates[allClientsHourlyMatrix.dates.length - 1]}</span>
-                            </strong>
-                        </span>
-                    </div>
-                </div>
-
-                <div id="tension-evolution-container" style="background: transparent; padding: 0; border: none; box-shadow: none;">
                     <div class="chart-container" style="height: 350px; width: 100%; position: relative;">
-                        <canvas id="tensionEvolutionChart" style="width: 100% !important; height: 100% !important;"></canvas>
+                        <canvas id="tensionEvolutionChart" style="width: 100% !important; height: 420px !important;"></canvas>
                     </div>
-                    <div id="tension-evolution-stats"></div>
-                </div>
-            </div>
 
-            <!-- (supprimé) PIED DE CARTE : Résumé des indicateurs -->
+                </div>
+
+                <!-- CARTE 4 : Tableau des Événements Combinés ENR + EC -->
+                ${combinedAnalysis && combinedAnalysis.allEvents.length > 0 ? `
+                    ${createDPDTOnlyTable(combinedAnalysis)}
+                ` : ''}
+
+                <!-- CARTE 5 : Évolution quotidienne des atteintes - Courbe de tendance -->
+                <div id="nominal-tension-table-container" style="margin-bottom: 20px";></div>
+            </div>
         </div>
         <!-- ===== FIN CARTE PRINCIPALE TENSION ===== -->
 
@@ -9988,6 +9518,7 @@ function createTensionEvolutionChart(dates, tensionResults, systemType) {
 
     // Si aucune donnée, ne rien faire
     if (!effectiveTensionResults || effectiveTensionResults.length === 0) {
+        console.warn('⚠️ Aucune donnée de tension');
         return;
     }
 
@@ -10002,12 +9533,15 @@ function createTensionEvolutionChart(dates, tensionResults, systemType) {
     const filteredTensionResults = effectiveTensionResults.filter(item => datesToUse.includes(item.date));
 
     if (filteredTensionResults.length === 0) {
-        document.getElementById('tension-evolution-container').innerHTML = `
-            <div style="text-align: center; padding: 40px; background: #f8fafc; border-radius: 12px; border: 1px dashed #cbd5e1;">
-                <span style="font-size: 48px; display: block; margin-bottom: 15px; color: #94a3b8;">📊</span>
-                <span style="color: #64748b; font-size: 14px;">Aucune donnée de tension disponible pour la période sélectionnée</span>
-            </div>
-        `;
+        const container = document.getElementById('tension-evolution-container');
+        if (container) {
+            container.innerHTML = `
+                <div style="text-align: center; padding: 40px; background: #f8fafc; border-radius: 12px; border: 1px dashed #cbd5e1;">
+                    <span style="font-size: 48px; display: block; margin-bottom: 15px; color: #94a3b8;">📊</span>
+                    <span style="color: #64748b; font-size: 14px;">Aucune donnée de tension disponible pour la période sélectionnée</span>
+                </div>
+            `;
+        }
         return;
     }
 
@@ -10044,12 +9578,23 @@ function createTensionEvolutionChart(dates, tensionResults, systemType) {
         return dateA - dateB;
     });
 
-    // Générer une palette de couleurs distinctes pour chaque date
-    const colorPalette = generateColorPalette(sortedDates.length);
+    // === Palette de couleurs vives (style 2ème fonction) ===
+    const colorPalette = [
+        '#3B82F6',   // Bleu vif
+        '#EF4444',   // Rouge vif
+        '#10B981',   // Vert émeraude
+        '#F59E0B',   // Orange vif
+        '#8B5CF6',   // Violet
+        '#EC4899',   // Rose fuchsia
+        '#06B6D4',   // Cyan
+        '#F97316',   // Orange foncé vif
+        '#14B8A6',   // Turquoise
+        '#A855F7'    // Violet clair
+    ];
 
-    // Créer les labels (tous les points dans l'ordre chronologique)
+    // Préparer tous les points dans l'ordre chronologique
     const allDataPoints = [];
-    const datasetMap = {}; // Pour stocker les index par date
+    const datasetMap = {};
 
     sortedDates.forEach((date, index) => {
         const dayData = groupedByDate[date];
@@ -10081,7 +9626,7 @@ function createTensionEvolutionChart(dates, tensionResults, systemType) {
     // Créer les labels (affichage Date + Heure)
     const labels = allDataPoints.map(p => p.label);
 
-    // Préparer les datasets - un dataset par date
+    // Préparer les datasets - un dataset par date (avec couleurs vives)
     const datasets = [];
 
     for (let i = 0; i < sortedDates.length; i++) {
@@ -10096,30 +9641,32 @@ function createTensionEvolutionChart(dates, tensionResults, systemType) {
             }
         });
 
+        const color = colorPalette[i % colorPalette.length];
+
         datasets.push({
             label: date,
             data: data,
-            borderColor: colorPalette[i],
-            backgroundColor: colorPalette[i] + '20',
-            borderWidth: 3,
-            tension: 0.35,
-            pointRadius: 4,
-            pointBackgroundColor: colorPalette[i],
+            borderColor: color,
+            backgroundColor: color + '30',        // fond plus visible (style 2)
+            borderWidth: 4,                       // lignes plus épaisses (style 2)
+            tension: 0.2,                         // courbe plus dynamique (style 2)
+            pointRadius: 5,                       // points plus gros (style 2)
+            pointBackgroundColor: color,
             pointBorderColor: '#ffffff',
-            pointBorderWidth: 1.5,
-            pointHoverRadius: 6,
-            pointHoverBackgroundColor: colorPalette[i],
+            pointBorderWidth: 2,
+            pointHoverRadius: 7,
+            pointHoverBackgroundColor: color,
             pointHoverBorderColor: '#ffffff',
-            pointHoverBorderWidth: 2,
+            pointHoverBorderWidth: 2.5,
             spanGaps: false,
             fill: false
         });
     }
 
-    // Déterminer les limites selon le système
+    // Déterminer les limites selon le système (fonctionnalité 1)
     const systemLimits = getSystemLimits(effectiveSystemType);
 
-    // Calculer les statistiques globales
+    // Calculer les statistiques globales (fonctionnalité 1)
     const values = filteredTensionResults.map(item => parseFloat(item.tension || item.valeur || 0));
     const min = Math.min(...values).toFixed(2);
     const max = Math.max(...values).toFixed(2);
@@ -10127,6 +9674,10 @@ function createTensionEvolutionChart(dates, tensionResults, systemType) {
 
     const daysWithData = Object.keys(groupedByDate).length;
     const totalMeasurements = values.length;
+
+    // Déterminer les limites Y selon le système (style 2 avec adaptation)
+    const yMin = effectiveSystemType === '24V' ? 20 : 10.5;
+    const yMax = effectiveSystemType === '24V' ? 32 : 14.5;
 
     // Créer le graphique
     const ctx = chartCanvas.getContext('2d');
@@ -10138,7 +9689,7 @@ function createTensionEvolutionChart(dates, tensionResults, systemType) {
         },
         options: {
             responsive: true,
-            maintainAspectRatio: false,
+            maintainAspectRatio: false,   // permet de contrôler la hauteur via le CSS du conteneur
             interaction: {
                 mode: 'nearest',
                 axis: 'x',
@@ -10149,21 +9700,17 @@ function createTensionEvolutionChart(dates, tensionResults, systemType) {
                     display: true,
                     position: 'top',
                     labels: {
-                        font: { size: 10 },
+                        font: { size: 11 },
                         color: '#334155',
-                        padding: 8,
+                        padding: 10,
                         usePointStyle: true,
-                        boxWidth: 8,
-                        filter: function (item, chart) {
-                            // Ne pas afficher les datasets vides dans la légende
-                            return item.hidden !== true;
-                        }
+                        boxWidth: 10
                     },
                     title: {
                         display: true,
                         text: '📅 Une couleur par date',
                         color: '#64748b',
-                        font: { size: 11, weight: 'normal' }
+                        font: { size: 12 }
                     }
                 },
                 tooltip: {
@@ -10177,9 +9724,7 @@ function createTensionEvolutionChart(dates, tensionResults, systemType) {
                             return context[0].label;
                         },
                         label: function (context) {
-                            const datasetLabel = context.dataset.label;
-                            const value = context.parsed.y;
-                            return `${datasetLabel} → ${value.toFixed(2)}V`;
+                            return `${context.dataset.label} → ${context.parsed.y.toFixed(2)}V`;
                         }
                     }
                 }
@@ -10187,61 +9732,55 @@ function createTensionEvolutionChart(dates, tensionResults, systemType) {
             scales: {
                 y: {
                     beginAtZero: false,
+                    min: yMin,
+                    max: yMax,
                     title: {
                         display: true,
-                        text: 'Tension (V)',
-                        font: { size: 12, weight: 'bold' },
-                        color: '#334155',
-                        padding: 10
+                        text: 'Tension (Volts)',
+                        font: { size: 13, weight: 'bold' },
+                        color: '#334155'
                     },
                     ticks: {
-                        font: { size: 11 },
+                        font: { size: 12 },
                         color: '#64748b',
-                        callback: function (value) {
-                            return value.toFixed(1) + 'V';
-                        }
+                        callback: value => value.toFixed(1) + 'V'
                     },
                     grid: {
-                        color: 'rgba(148, 163, 184, 0.1)'
+                        color: 'rgba(148, 163, 184, 0.15)'
                     }
                 },
                 x: {
                     title: {
                         display: true,
                         text: 'Date et Heure',
-                        font: { size: 12, weight: 'bold' },
-                        color: '#334155',
-                        padding: 10
+                        font: { size: 13, weight: 'bold' },
+                        color: '#334155'
                     },
                     ticks: {
-                        font: { size: 9 },
+                        font: { size: 10 },
                         color: '#64748b',
                         maxRotation: 45,
                         minRotation: 30,
                         callback: function (val, index) {
-                            // Afficher seulement 1 tick sur 6 pour éviter la surcharge
-                            if (index % 6 === 0) {
-                                return this.getLabelForValue(val);
-                            }
+                            if (index % 6 === 0) return this.getLabelForValue(val);
                             return '';
                         }
                     },
-                    grid: {
-                        display: false
-                    }
+                    grid: { display: false }
                 }
             },
             elements: {
                 line: {
-                    tension: 0.35
+                    tension: 0.2
                 }
             }
-        },
-        plugins: []
+        }
     });
 
-    // Mettre à jour les statistiques
+    // Mettre à jour les statistiques (fonctionnalité 1 conservée)
     updateTensionEvolutionStats(filteredTensionResults, effectiveSystemType);
+    
+    console.log('✅ Graphique d\'évolution de la tension créé avec les styles et couleurs améliorés');
 }
 
 // Fonction utilitaire pour convertir l'heure en minutes
@@ -11410,465 +10949,7 @@ function showError(message) {
 }
 
 // Ajouter des styles CSS pour la nouvelle interface
-function addAllClientsStyles() {
-    if (!document.querySelector('#all-clients-styles')) {
-        const style = document.createElement('style');
-        style.id = 'all-clients-styles';
-        style.textContent = `
-            /* STYLE POUR FILTRE EN HAUT */
-            .global-filter-container {
-                margin-bottom: 25px;
-                background: white;
-                border-radius: 12px;
-                padding: 20px;
-                box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-                border: 1px solid #e2e8f0;
-                transition: all 0.3s ease;
-            }
-            
-            /* Animation pour indiquer le filtrage */
-            .global-filter-container.filter-active {
-                border: 2px solid #3b82f6;
-                box-shadow: 0 4px 20px rgba(59, 130, 246, 0.2);
-                background: linear-gradient(135deg, #f0f9ff 0%, #ffffff 100%);
-            }
-            
-            .global-filter-container .filter-header {
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                margin-bottom: 15px;
-                flex-wrap: wrap;
-                gap: 15px;
-            }
-            
-            .global-filter-container .filter-title {
-                display: flex;
-                align-items: center;
-                gap: 12px;
-                font-weight: 700;
-                color: #2c3e50;
-                font-size: 18px;
-            }
-            
-            .global-filter-container .filter-title-icon {
-                font-size: 24px;
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                -webkit-background-clip: text;
-                -webkit-text-fill-color: transparent;
-                background-clip: text;
-            }
-            
-            .global-filter-container .filter-actions {
-                display: flex;
-                gap: 10px;
-                align-items: center;
-            }
-            
-            /* Boutons spécifiques pour le filtre */
-            .filter-btn {
-                padding: 10px 20px;
-                border: none;
-                border-radius: 8px;
-                font-weight: 600;
-                font-size: 13px;
-                cursor: pointer;
-                transition: all 0.2s;
-                display: flex;
-                align-items: center;
-                gap: 8px;
-                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            }
-            
-            .filter-btn:hover {
-                transform: translateY(-2px);
-                box-shadow: 0 4px 8px rgba(0,0,0,0.15);
-            }
-            
-            .filter-btn:active {
-                transform: translateY(0);
-            }
-            
-            .filter-btn-primary {
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                color: white;
-            }
-            
-            .filter-btn-secondary {
-                background: #f1f5f9;
-                color: #64748b;
-                border: 1px solid #cbd5e1;
-            }
-            
-            .filter-btn-danger {
-                background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
-                color: white;
-            }
-            
-            /* Groupes de filtres */
-            .filter-group {
-                background: #f8fafc;
-                border-radius: 10px;
-                padding: 18px;
-                border: 1px solid #e2e8f0;
-                margin-bottom: 20px;
-                transition: all 0.3s ease;
-            }
-            
-            .filter-group:hover {
-                border-color: #cbd5e1;
-                box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-            }
-            
-            .filter-group-title {
-                font-weight: 600;
-                color: #475569;
-                margin-bottom: 14px;
-                font-size: 14px;
-                display: flex;
-                align-items: center;
-                gap: 10px;
-                text-transform: uppercase;
-                letter-spacing: 0.5px;
-            }
-            
-            /* Sections de dates */
-            .date-selection-section {
-                max-height: 180px;
-                overflow-y: auto;
-                background: white;
-                border-radius: 8px;
-                padding: 16px;
-                border: 1px solid #e2e8f0;
-                margin-bottom: 15px;
-            }
-            
-            .date-selection-actions {
-                display: flex;
-                gap: 10px;
-                margin-bottom: 15px;
-                padding-bottom: 15px;
-                border-bottom: 1px solid #e2e8f0;
-            }
-            
-            .date-select-btn {
-                padding: 8px 16px;
-                border: none;
-                border-radius: 6px;
-                font-size: 12px;
-                font-weight: 600;
-                cursor: pointer;
-                transition: all 0.2s;
-                flex: 1;
-                text-align: center;
-            }
-            
-            .date-select-btn:hover {
-                opacity: 0.9;
-                transform: translateY(-1px);
-            }
-            
-            .date-select-btn-primary {
-                background: #dbeafe;
-                color: #1e40af;
-            }
-            
-            .date-select-btn-secondary {
-                background: #f1f5f9;
-                color: #64748b;
-            }
-            
-            /* Cases à cocher */
-            .date-checkbox-container {
-                display: grid;
-                grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
-                gap: 10px;
-            }
-            
-            .date-checkbox-label {
-                display: flex;
-                align-items: center;
-                gap: 8px;
-                padding: 10px 12px;
-                background: white;
-                border-radius: 6px;
-                border: 2px solid #e2e8f0;
-                cursor: pointer;
-                transition: all 0.2s;
-                font-size: 13px;
-            }
-            
-            .date-checkbox-label:hover {
-                border-color: #cbd5e1;
-                background: #f8fafc;
-                transform: translateY(-1px);
-            }
-            
-            .date-checkbox-label.checked {
-                border-color: #3b82f6;
-                background: #dbeafe;
-                font-weight: 600;
-                color: #1e40af;
-            }
-            
-            .date-checkbox-label input[type="checkbox"] {
-                cursor: pointer;
-                accent-color: #3b82f6;
-                width: 16px;
-                height: 16px;
-            }
-            
-            /* Indicateur de filtrage */
-            .filter-indicator {
-                display: flex;
-                align-items: center;
-                gap: 12px;
-                padding: 16px;
-                background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
-                border-radius: 10px;
-                border: 2px solid #bae6fd;
-                margin-top: 20px;
-                transition: all 0.3s ease;
-            }
-            
-            .filter-indicator.filtered {
-                background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);
-                border-color: #86efac;
-            }
-            
-            .filter-indicator.warning {
-                background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
-                border-color: #fcd34d;
-            }
-            
-            .filter-indicator-icon {
-                font-size: 24px;
-            }
-            
-            .filter-indicator-info {
-                flex: 1;
-            }
-            
-            .filter-indicator-title {
-                font-weight: 700;
-                color: #0369a1;
-                font-size: 14px;
-                margin-bottom: 4px;
-            }
-            
-            .filter-indicator-description {
-                font-size: 12px;
-                color: #0c4a6e;
-            }
-            
-            /* Responsive */
-            @media (max-width: 768px) {
-                .global-filter-container {
-                    padding: 15px;
-                }
-                
-                .filter-group {
-                    padding: 15px;
-                }
-                
-                .filter-header {
-                    flex-direction: column;
-                    align-items: flex-start !important;
-                }
-                
-                .filter-actions {
-                    width: 100%;
-                    justify-content: space-between;
-                }
-                
-                .date-checkbox-container {
-                    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
-                }
-                
-                .date-selection-section {
-                    max-height: 150px;
-                }
-            }
-            
-            @media (max-width: 576px) {
-                .date-checkbox-container {
-                    grid-template-columns: 1fr;
-                }
-                
-                .filter-btn {
-                    padding: 10px 15px;
-                    font-size: 12px;
-                }
-                
-                .filter-indicator {
-                    flex-direction: column;
-                    text-align: center;
-                    gap: 8px;
-                }
-            }
-            /* NOUVEAUX STYLES POUR LES BOUTONS DE SÉLECTION RAPIDE */
-            .quick-select-btn {
-                padding: 8px 16px;
-                background: #e2e8f0;
-                border: 1px solid #cbd5e1;
-                border-radius: 6px;
-                font-size: 12px;
-                font-weight: 600;
-                color: #334155;
-                cursor: pointer;
-                transition: all 0.2s;
-            }
-            
-            .quick-select-btn:hover {
-                background: #cbd5e1;
-                transform: translateY(-1px);
-                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            }
-            
-            .quick-select-btn:active {
-                transform: translateY(0);
-            }
-            
-            /* Style pour les différents types de boutons rapides */
-            .quick-select-btn[data-days="3"]:hover {
-                background: #94a3b8;
-                color: white;
-            }
-            
-            .quick-select-btn[data-days="7"]:hover {
-                background: #64748b;
-                color: white;
-            }
-            
-            .quick-select-btn[data-days="15"]:hover {
-                background: #475569;
-                color: white;
-            }
-            
-            .quick-select-btn[data-days="30"]:hover {
-                background: #1e293b;
-                color: white;
-            }
-            
-            /* Animation pour les boutons */
-            @keyframes pulse {
-                0% { transform: scale(1); }
-                50% { transform: scale(1.05); }
-                100% { transform: scale(1); }
-            }
-            
-            .quick-select-btn:active {
-                animation: pulse 0.2s ease;
-            }
-            
-            /* Responsive pour les petits écrans */
-            @media (max-width: 768px) {
-                .quick-select-btn {
-                    padding: 6px 12px;
-                    font-size: 11px;
-                }
-            }
-            
-            @media (max-width: 576px) {
-                .quick-select-btn {
-                    flex: 1;
-                    text-align: center;
-                }
-            }
-        `;
-        document.head.appendChild(style);
-    }
 
-    const responsiveHeaderStyles = `
-        /* Styles pour l'en-tête responsive */
-        .header-content {
-            display: flex !important;
-            justify-content: space-between !important;
-            align-items: center !important;
-            width: 100% !important;
-        }
-        
-        #folder-title {
-            display: flex !important;
-            align-items: center !important;
-            justify-content: space-between !important;
-            width: 100% !important;
-            flex-wrap: wrap !important;
-            gap: 15px !important;
-        }
-        
-        .nr-text {
-            font-size: 24px !important;
-            font-weight: 700 !important;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
-        
-        .analyze-v2-button {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
-            color: white !important;
-            padding: 8px 20px !important;
-            border-radius: 30px !important;
-            font-size: 16px !important;
-            font-weight: 600 !important;
-            cursor: pointer !important;
-            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4) !important;
-            transition: all 0.3s ease !important;
-            white-space: nowrap !important;
-        }
-        
-        .analyze-v2-button:hover {
-            transform: translateY(-2px) !important;
-            box-shadow: 0 6px 16px rgba(102, 126, 234, 0.5) !important;
-        }
-        
-        #back-btn-header {
-            background: #f1f5f9 !important;
-            border: 1px solid #cbd5e1 !important;
-            color: #475569 !important;
-            padding: 8px 20px !important;
-            border-radius: 30px !important;
-            font-size: 14px !important;
-            font-weight: 600 !important;
-            cursor: pointer !important;
-            transition: all 0.3s ease !important;
-            white-space: nowrap !important;
-            display: flex !important;
-            align-items: center !important;
-            gap: 8px !important;
-        }
-        
-        #back-btn-header:hover {
-            background: #e2e8f0 !important;
-            border-color: #94a3b8 !important;
-            transform: translateY(-2px) !important;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1) !important;
-        }
-        
-        @media (max-width: 768px) {
-            #folder-title {
-                flex-direction: column !important;
-                align-items: flex-start !important;
-            }
-            
-            .nr-text {
-                font-size: 20px !important;
-            }
-            
-            .analyze-v2-button {
-                font-size: 14px !important;
-                padding: 6px 16px !important;
-            }
-            
-            #back-btn-header {
-                font-size: 12px !important;
-                padding: 6px 16px !important;
-            }
-        }
-    `;
-}
 
 // NOUVELLE FONCTION : Afficher l'analyse ENR avec les 3 types
 async function displayENRAnalysis() {
@@ -11999,13 +11080,6 @@ async function displayENRAnalysis() {
         enrAnalysisHTML += '</div>';
         contentElement.innerHTML = enrAnalysisHTML;
 
-        // Ajouter les styles
-        addSimpleENRStyles();
-        addMultiFileStyles();
-        addECSimpleStyles();
-        addCombinedTableStyles(); // NOUVEAU : Ajouter les styles pour le tableau combiné
-        addDPDTStyles();
-
     } catch (error) {
         console.error('❌ Erreur lors de l\'analyse ENR:', error);
         contentElement.innerHTML = `
@@ -12018,293 +11092,8 @@ async function displayENRAnalysis() {
         hideLoader();
     }
 }
-// ======================== STYLES CSS EC SIMPLE ========================
-function addECSimpleStyles() {
-    if (document.querySelector('#ec-simple-styles')) return;
 
-    const styles = document.createElement('style');
-    styles.id = 'ec-simple-styles';
-    styles.textContent = `
-        .ec-table-container {
-            margin-bottom: 30px;
-            background: white;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            overflow: hidden;
-        }
-        
-        .ec-table-container h4 {
-            margin: 0;
-            padding: 15px;
-            background: #4299e1;
-            color: white;
-            font-size: 16px;
-        }
-        
-        .simple-ec-table {
-            width: 100%;
-            border-collapse: collapse;
-            font-family: 'Courier New', monospace;
-            font-size: 13px;
-        }
-        
-        .simple-ec-table th {
-            background: #f1f5f9;
-            padding: 12px 10px;
-            text-align: left;
-            font-weight: 600;
-            border-bottom: 2px solid #e2e8f0;
-            color: #475569;
-        }
-        
-        .simple-ec-table td {
-            padding: 10px;
-            border-bottom: 1px solid #e2e8f0;
-            vertical-align: middle;
-        }
-        
-        .simple-ec-table tr:hover {
-            background: #f7fafc;
-        }
-        
-        /* Couleurs pour les différentes types de lignes EC */
-        .ec-credit-nul {
-            background: #fef3c7 !important;
-        }
-        
-        .ec-credit-nul:hover {
-            background: #fde68a !important;
-        }
-        
-        .ec-energie-epuisee {
-            background: #fee2e2 !important;
-        }
-        
-        .ec-energie-epuisee:hover {
-            background: #fecaca !important;
-        }
-        
-        .ec-surcharge {
-            background: #e0e7ff !important;
-        }
-        
-        .ec-surcharge:hover {
-            background: #c7d2fe !important;
-        }
-        
-        .ec-puissance-depassee {
-            background: #dbeafe !important;
-        }
-        
-        .ec-puissance-depassee:hover {
-            background: #bfdbfe !important;
-        }
-        
-        .ec-normal {
-            background: #d1fae5 !important;
-        }
-        
-        .ec-normal:hover {
-            background: #a7f3d0 !important;
-        }
-        
-        /* Style pour le code */
-        .simple-ec-table code {
-            background: #f1f5f9;
-            padding: 2px 6px;
-            border-radius: 4px;
-            font-family: 'Courier New', monospace;
-            color: #334155;
-            font-size: 12px;
-        }
-        
-        .ec-file-error {
-            background: #fee2e2;
-            border: 1px solid #ef4444;
-            border-radius: 6px;
-            padding: 15px;
-            margin-bottom: 20px;
-        }
-        
-        .ec-file-error h4 {
-            margin: 0 0 10px 0;
-            color: #dc2626;
-        }
-        
-        /* Table summary */
-        .table-summary {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-            gap: 10px;
-            padding: 15px;
-            background: #f8fafc;
-            border-top: 1px solid #e2e8f0;
-        }
-        
-        .summary-item {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-size: 13px;
-        }
-        
-        .summary-label {
-            font-weight: 600;
-            color: #475569;
-        }
-        
-        .summary-value {
-            color: #1e293b;
-            font-weight: bold;
-        }
-        
-        /* Responsive */
-        @media (max-width: 1200px) {
-            .simple-ec-table {
-                font-size: 12px;
-            }
-            
-            .simple-ec-table th,
-            .simple-ec-table td {
-                padding: 8px 6px;
-            }
-        }
-        
-        @media (max-width: 768px) {
-            .table-summary {
-                grid-template-columns: 1fr;
-            }
-            
-            .simple-ec-table {
-                font-size: 11px;
-            }
-        }
-    `;
 
-    document.head.appendChild(styles);
-}
-// Fonction pour ajouter les styles CSS multi-fichiers
-function addMultiFileStyles() {
-    if (document.querySelector('#multi-file-styles')) return;
-
-    const styles = document.createElement('style');
-    styles.id = 'multi-file-styles';
-    styles.textContent = `
-        .enr-analysis-multi-container {
-            padding: 20px;
-            background: #f8f9fa;
-            border-radius: 8px;
-        }
-        
-        .file-type-section {
-            margin-bottom: 30px;
-            background: white;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            overflow: hidden;
-        }
-        
-        .file-type-section h4 {
-            margin: 0;
-            padding: 15px;
-            background: #2c3e50;
-            color: white;
-            font-size: 16px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        
-        .raw-file-container {
-            margin: 15px;
-            border: 1px solid #e2e8f0;
-            border-radius: 6px;
-            overflow: hidden;
-        }
-        
-        .raw-file-header {
-            padding: 12px 15px;
-            background: #f7fafc;
-            border-bottom: 1px solid #e2e8f0;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 10px;
-        }
-        
-        .raw-file-header h5 {
-            margin: 0;
-            font-size: 15px;
-            color: #2d3748;
-        }
-        
-        .file-info {
-            display: flex;
-            gap: 10px;
-            align-items: center;
-            font-size: 12px;
-        }
-        
-        .client-info {
-            color: #4a5568;
-            background: #edf2f7;
-            padding: 4px 8px;
-            border-radius: 4px;
-        }
-        
-        .file-type-badge {
-            color: white;
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-weight: 600;
-            font-size: 11px;
-        }
-        
-        .ec-file .file-type-badge {
-            background: #4299e1; /* Bleu pour EC */
-        }
-        
-        .recharge-file .file-type-badge {
-            background: #38a169; /* Vert pour RECHARGE */
-        }
-        
-        .file-size {
-            color: #718096;
-        }
-        
-        .raw-file-content {
-            padding: 15px;
-            background: #1a202c;
-            color: #e2e8f0;
-            font-family: 'Courier New', monospace;
-            font-size: 13px;
-            max-height: 400px;
-            overflow-y: auto;
-        }
-        
-        .raw-file-content pre {
-            margin: 0;
-            white-space: pre-wrap;
-            word-wrap: break-word;
-        }
-        
-        /* Différenciation visuelle entre les sections */
-        .file-type-section:first-child {
-            border-left: 4px solid #e53e3e; /* Rouge pour ENR */
-        }
-        
-        .file-type-section:nth-child(2) {
-            border-left: 4px solid #4299e1; /* Bleu pour EC */
-        }
-        
-        .file-type-section:nth-child(3) {
-            border-left: 4px solid #38a169; /* Vert pour RECHARGE */
-        }
-    `;
-
-    document.head.appendChild(styles);
-}
 // Fonction pour créer un tableau HTML simple
 function createSimpleENRTable(data, filename) {
     if (!data || !data.length) {
@@ -14276,126 +13065,6 @@ function displayFraudeTab(subTab) {
 }
 
 
-// Ajoutez cette fonction pour inclure les styles dynamiques
-function addDynamicKitStyles() {
-    if (document.querySelector('#dynamic-kit-styles')) return;
-
-    const styles = document.createElement('style');
-    styles.id = 'dynamic-kit-styles';
-    styles.textContent = `
-        /* Styles pour l'info-bulle des kits */
-        .kit-threshold-info {
-            position: absolute;
-            background: white;
-            border: 2px solid #e2e8f0;
-            border-radius: 8px;
-            padding: 12px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-            z-index: 1000;
-            max-width: 300px;
-            font-size: 12px;
-        }
-        
-        .kit-threshold-info h4 {
-            margin: 0 0 8px 0;
-            color: #2d3748;
-            font-size: 13px;
-            border-bottom: 1px solid #e2e8f0;
-            padding-bottom: 6px;
-        }
-        
-        .kit-list {
-            list-style: none;
-            margin: 0;
-            padding: 0;
-        }
-        
-        .kit-item {
-            display: flex;
-            align-items: center;
-            padding: 4px 0;
-            border-bottom: 1px solid #f7fafc;
-        }
-        
-        .kit-color {
-            width: 12px;
-            height: 12px;
-            border-radius: 3px;
-            margin-right: 8px;
-            border: 1px solid rgba(0,0,0,0.1);
-        }
-        
-        /* Légende améliorée */
-        .kit-legend {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-            margin-top: 10px;
-            padding: 10px;
-            background: #f8fafc;
-            border-radius: 6px;
-            border: 1px solid #e2e8f0;
-        }
-        
-        .kit-legend-item {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            font-size: 11px;
-            color: #4a5568;
-        }
-        
-        .kit-legend-color {
-            width: 12px;
-            height: 12px;
-            border-radius: 2px;
-        }
-        
-        /* Message d'info sur le dimensionnement */
-        .dimensioning-info {
-            background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
-            border-left: 4px solid #0ea5e9;
-            padding: 15px;
-            border-radius: 8px;
-            margin-top: 15px;
-        }
-        
-        .dimensioning-info h5 {
-            margin: 0 0 8px 0;
-            color: #0369a1;
-            font-size: 14px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-        
-        .kit-status {
-            display: inline-block;
-            padding: 3px 8px;
-            border-radius: 12px;
-            font-size: 10px;
-            font-weight: bold;
-            margin-left: 8px;
-        }
-        
-        .kit-status.adequate {
-            background: #dcfce7;
-            color: #166534;
-        }
-        
-        .kit-status.inadequate {
-            background: #fee2e2;
-            color: #991b1b;
-        }
-        
-        .kit-status.warning {
-            background: #fef3c7;
-            color: #92400e;
-        }
-    `;
-
-    document.head.appendChild(styles);
-}
 // === FONCTION POUR CRÉER LE GRAPHIQUE TENSION (MIN/MAX/MOYENNE PAR JOUR) ===
 function createAllClientsTensionChart(dates, tensionByDay, systemType, systemLimits) {
     const chartCanvas = document.getElementById('allClientsTensionChart');
@@ -14410,15 +13079,27 @@ function createAllClientsTensionChart(dates, tensionByDay, systemType, systemLim
     const labels = dates;
     const minData = dates.map(date => tensionByDay[date] ? tensionByDay[date].min : null);
     const maxData = dates.map(date => tensionByDay[date] ? tensionByDay[date].max : null);
-
-    // --- NOUVEAU : Calcul des données pour la tension moyenne ---
+    
+    // Calcul de la tension moyenne
     const avgData = dates.map(date => {
         if (tensionByDay[date] && tensionByDay[date].min !== null && tensionByDay[date].max !== null) {
-            // Moyenne simple du min et du max du jour. Vous pouvez changer cette logique si vous avez une vraie moyenne journalière.
             return ((tensionByDay[date].min + tensionByDay[date].max) / 2).toFixed(2);
         }
         return null;
     });
+
+    // Calculer le nombre de dépassements (valeurs hors limites)
+    let exceedCount = 0;
+    dates.forEach(date => {
+        const dayData = tensionByDay[date];
+        if (dayData) {
+            if (dayData.min < systemLimits.min) exceedCount++;
+            if (dayData.max > systemLimits.max) exceedCount++;
+        }
+    });
+
+    // Mettre à jour le texte des statistiques dans le DOM
+    updateTensionStatsDisplay(systemType, systemLimits, exceedCount, dates.length);
 
     // Créer le graphique
     const ctx = chartCanvas.getContext('2d');
@@ -14428,13 +13109,14 @@ function createAllClientsTensionChart(dates, tensionByDay, systemType, systemLim
             labels: labels,
             datasets: [
                 {
-                    label: 'Tension Maximale (V)',
+                    label: 'Tension Maximale',
                     data: maxData,
-                    borderColor: '#f97316', // Orange plus vif
+                    borderColor: '#f97316',
                     backgroundColor: 'transparent',
                     borderWidth: 2.5,
+                    borderDash: [],
                     fill: false,
-                    tension: 0.4,
+                    tension: 0.3,
                     pointRadius: 3,
                     pointBackgroundColor: maxData.map(value => {
                         if (value === null) return '#f97316';
@@ -14445,13 +13127,29 @@ function createAllClientsTensionChart(dates, tensionByDay, systemType, systemLim
                     pointHoverRadius: 5
                 },
                 {
-                    label: 'Tension Minimale (V)',
-                    data: minData,
-                    borderColor: '#3b82f6', // Bleu plus vif
+                    label: 'Tension Moyenne',
+                    data: avgData,
+                    borderColor: '#22c55e',
                     backgroundColor: 'transparent',
                     borderWidth: 2.5,
+                    borderDash: [8, 5],
                     fill: false,
-                    tension: 0.4,
+                    tension: 0.3,
+                    pointRadius: 0,
+                    pointHoverRadius: 4,
+                    pointHoverBackgroundColor: '#22c55e',
+                    pointHoverBorderColor: '#fff',
+                    pointHoverBorderWidth: 2,
+                },
+                {
+                    label: 'Tension Minimale',
+                    data: minData,
+                    borderColor: '#3b82f6',
+                    backgroundColor: 'transparent',
+                    borderWidth: 2.5,
+                    borderDash: [],
+                    fill: false,
+                    tension: 0.3,
                     pointRadius: 3,
                     pointBackgroundColor: minData.map(value => {
                         if (value === null) return '#3b82f6';
@@ -14460,60 +13158,40 @@ function createAllClientsTensionChart(dates, tensionByDay, systemType, systemLim
                     pointBorderColor: '#fff',
                     pointBorderWidth: 1.5,
                     pointHoverRadius: 5
-                },
-                // --- NOUVEAU : Dataset pour la tension moyenne ---
-                {
-                    label: 'Tension Moyenne (V)',
-                    data: avgData,
-                    borderColor: '#22c55e', // Vert vif pour la moyenne
-                    backgroundColor: 'rgba(34, 197, 94, 0.05)', // Fond très léger
-                    borderWidth: 3, // Ligne légèrement plus épaisse
-                    borderDash: [8, 5], // Ligne en pointillés pour la différencier
-                    fill: false,
-                    tension: 0.4,
-                    pointRadius: 0, // Pas de points individuels pour une ligne plus propre
-                    pointHoverRadius: 4, // Un point apparaît au survol
-                    pointHoverBackgroundColor: '#22c55e',
-                    pointHoverBorderColor: '#fff',
-                    pointHoverBorderWidth: 2,
                 }
             ]
         },
         options: {
             responsive: true,
             maintainAspectRatio: true,
-            // --- AMÉLIORATION : Réduction des marges internes ---
             layout: {
                 padding: {
-                    top: 5,
-                    bottom: 5,
-                    left: 5,
-                    right: 5
+                    top: 10,
+                    bottom: 10,
+                    left: 10,
+                    right: 10
                 }
             },
             interaction: {
                 mode: 'index',
                 intersect: false
             },
-            animation: {
-                duration: 500, // Animation plus rapide
-                easing: 'easeInOutQuart'
-            },
             plugins: {
                 legend: {
                     display: true,
                     position: 'top',
-                    align: 'center', // Centrer la légende
+                    align: 'center',
                     labels: {
-                        font: {
-                            size: 11, // Police légèrement plus petite
-                            weight: '500'
-                        },
+                        font: { size: 11, weight: '500' },
                         color: '#334155',
-                        padding: 10, // Moins d'espace autour des labels
+                        padding: 12,
                         usePointStyle: true,
-                        boxWidth: 8,
-                        boxHeight: 8
+                        boxWidth: 10,
+                        boxHeight: 10,
+                        filter: function(legendItem) {
+                            // Afficher toutes les légendes
+                            return true;
+                        }
                     }
                 },
                 tooltip: {
@@ -14524,10 +13202,20 @@ function createAllClientsTensionChart(dates, tensionByDay, systemType, systemLim
                     cornerRadius: 6,
                     displayColors: true,
                     callbacks: {
-                        label: function (context) {
+                        label: function(context) {
                             const value = context.parsed.y;
                             if (value === null) return `${context.dataset.label}: Pas de données`;
-                            return `${context.dataset.label}: ${value.toFixed(2)} V`;
+                            let label = `${context.dataset.label}: ${value.toFixed(2)} V`;
+                            
+                            // Ajouter un indicateur si hors limites
+                            if (context.dataset.label === 'Tension Maximale' && value > systemLimits.max) {
+                                label += ' ⚠️ Hors limite max';
+                            }
+                            if (context.dataset.label === 'Tension Minimale' && value < systemLimits.min) {
+                                label += ' ⚠️ Hors limite min';
+                            }
+                            
+                            return label;
                         }
                     }
                 }
@@ -14535,48 +13223,55 @@ function createAllClientsTensionChart(dates, tensionByDay, systemType, systemLim
             scales: {
                 y: {
                     beginAtZero: false,
-                    // --- AMÉLIORATION : Réduction de l'espace du titre Y ---
                     title: {
                         display: true,
                         text: 'Tension (V)',
                         font: { size: 11, weight: '500' },
                         color: '#475569',
-                        padding: { top: 0, bottom: 5 } // Réduction du padding
+                        padding: { top: 0, bottom: 5 }
                     },
                     ticks: {
                         font: { size: 10 },
                         color: '#64748b',
-                        callback: function (value) {
+                        callback: function(value) {
                             return value.toFixed(1) + ' V';
                         },
-                        padding: 5, // Réduction du padding
-                        stepSize: 2, // Suggestion : Force un pas plus grand pour moins de ticks
+                        padding: 5,
+                        stepSize: 2,
                         autoSkip: true
                     },
                     grid: {
                         color: 'rgba(148, 163, 184, 0.1)',
                         lineWidth: 0.8
                     },
-                    // --- AMÉLIORATION : Suggérer une plage pour éviter trop d'espace vide ---
-                    suggestedMin: systemLimits.min - 1,
-                    suggestedMax: systemLimits.max + 1
+                    suggestedMin: Math.min(systemLimits.min - 1, Math.min(...minData.filter(v => v !== null)) - 1),
+                    suggestedMax: Math.max(systemLimits.max + 1, Math.max(...maxData.filter(v => v !== null)) + 1)
                 },
                 x: {
-                    // --- AMÉLIORATION : Réduction de l'espace du titre X ---
                     title: {
                         display: true,
-                        text: 'Dates',
+                        text: 'Date',
                         font: { size: 11, weight: '500' },
                         color: '#475569',
-                        padding: { top: 5, bottom: 0 } // Réduction du padding
+                        padding: { top: 5, bottom: 0 }
                     },
                     ticks: {
                         font: { size: 10 },
                         color: '#64748b',
-                        maxRotation: 30,
-                        minRotation: 20,
+                        maxRotation: 45,
+                        minRotation: 30,
                         autoSkip: true,
-                        maxTicksLimit: 10 // Limite le nombre de dates affichées
+                        maxTicksLimit: 8,
+                        callback: function(val, index) {
+                            const date = labels[index];
+                            if (!date) return '';
+                            // Format plus lisible pour les dates
+                            const parts = date.split('/');
+                            if (parts.length === 3) {
+                                return `${parts[0]}/${parts[1]}`;
+                            }
+                            return date;
+                        }
                     },
                     grid: {
                         display: false
@@ -14590,53 +13285,94 @@ function createAllClientsTensionChart(dates, tensionByDay, systemType, systemLim
                 afterDatasetsDraw(chart) {
                     const ctx = chart.ctx;
                     const yScale = chart.scales.y;
-
+                    
+                    // Zone de tension idéale (optionnel - commenté par défaut)
+                    // const idealMinPixel = yScale.getPixelForValue(systemLimits.ideal.min);
+                    // const idealMaxPixel = yScale.getPixelForValue(systemLimits.ideal.max);
+                    // ctx.fillStyle = 'rgba(34, 197, 94, 0.05)';
+                    // ctx.fillRect(chart.chartArea.left, idealMaxPixel,
+                    //     chart.chartArea.right - chart.chartArea.left,
+                    //     idealMinPixel - idealMaxPixel);
+                    
                     // Ligne min acceptable
                     const minPixel = yScale.getPixelForValue(systemLimits.min);
                     ctx.save();
-                    ctx.strokeStyle = '#f97316';
+                    ctx.strokeStyle = '#ef4444';
                     ctx.lineWidth = 1.5;
-                    ctx.setLineDash([4, 4]);
+                    ctx.setLineDash([6, 6]);
                     ctx.beginPath();
                     ctx.moveTo(chart.chartArea.left, minPixel);
                     ctx.lineTo(chart.chartArea.right, minPixel);
                     ctx.stroke();
-
+                    
                     // Ligne max acceptable
                     const maxPixel = yScale.getPixelForValue(systemLimits.max);
-                    ctx.strokeStyle = '#f97316';
+                    ctx.strokeStyle = '#ef4444';
                     ctx.lineWidth = 1.5;
-                    ctx.setLineDash([4, 4]);
+                    ctx.setLineDash([6, 6]);
                     ctx.beginPath();
                     ctx.moveTo(chart.chartArea.left, maxPixel);
                     ctx.lineTo(chart.chartArea.right, maxPixel);
                     ctx.stroke();
-
-                    // Plage idéale (optionnel, peut être enlevé si trop chargé)
-                    // const idealMinPixel = yScale.getPixelForValue(systemLimits.ideal.min);
-                    // const idealMaxPixel = yScale.getPixelForValue(systemLimits.ideal.max);
-                    // ctx.fillStyle = 'rgba(56, 161, 105, 0.05)';
-                    // ctx.fillRect(chart.chartArea.left, idealMaxPixel,
-                    //     chart.chartArea.right - chart.chartArea.left,
-                    //     idealMinPixel - idealMaxPixel);
-
+                    
+                    // Labels des seuils
+                    ctx.font = '10px sans-serif';
+                    ctx.fillStyle = '#ef4444';
                     ctx.setLineDash([]);
+                    ctx.fillText(`Min: ${systemLimits.min}V`, chart.chartArea.left + 5, minPixel - 3);
+                    ctx.fillText(`Max: ${systemLimits.max}V`, chart.chartArea.left + 5, maxPixel - 3);
+                    
                     ctx.restore();
                 }
             }
-        ],
-        // Garder l'interaction au clic si nécessaire
-        onClick: (event, elements, chart) => {
-            if (elements.length > 0) {
-                const element = elements[0];
-                const dateIndex = element.index;
-                const selectedDate = allClientsHourlyMatrix.dates[dateIndex];
-                if (selectedDate && typeof openTensionHourlyModal === 'function') {
-                    openTensionHourlyModal(selectedDate);
-                }
-            }
-        }
+        ]
     });
+}
+
+// Fonction auxiliaire pour mettre à jour l'affichage des statistiques
+function updateTensionStatsDisplay(systemType, systemLimits, exceedCount, totalDays) {
+    // Chercher ou créer le conteneur des statistiques
+    let statsContainer = document.getElementById('tension-stats-container');
+    
+    if (!statsContainer) {
+        // Créer le conteneur s'il n'existe pas
+        const chartContainer = document.querySelector('#allClientsTensionChart')?.parentElement;
+        if (chartContainer) {
+            statsContainer = document.createElement('div');
+            statsContainer.id = 'tension-stats-container';
+            statsContainer.style.cssText = `
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-top: 15px;
+                padding: 12px 20px;
+                background: #f8fafc;
+                border-radius: 12px;
+                font-size: 13px;
+                flex-wrap: wrap;
+                gap: 15px;
+            `;
+            chartContainer.parentElement.insertBefore(statsContainer, chartContainer.nextSibling);
+        }
+    }
+    
+    if (statsContainer) {
+        statsContainer.innerHTML = `
+            <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+                <div style="background: white; padding: 6px 14px; border-radius: 20px; border: 1px solid #e2e8f0;">
+                    <span style="font-weight: 600;">Système ${systemType}</span>
+                </div>
+                <div style="background: white; padding: 6px 14px; border-radius: 20px; border: 1px solid #e2e8f0;">
+                    <span>Plage: ${systemLimits.min}V - ${systemLimits.max}V</span>
+                </div>
+                <div style="background: ${exceedCount > 0 ? '#fee2e2' : '#f0fdf4'}; padding: 6px 14px; border-radius: 20px;">
+                    <span style="color: ${exceedCount > 0 ? '#dc2626' : '#16a34a'}; font-weight: 600;">
+                        ${exceedCount} dépassement${exceedCount !== 1 ? 's' : ''}
+                    </span>
+                </div>
+            </div>
+        `;
+    }
 }
 
 // ============ FONCTIONS POUR LE MODAL HORAIRE ============
@@ -14893,824 +13629,8 @@ function createHourlyTensionChart(selectedDate) {
         ]
     });
 }
-// Fonction pour ajouter les styles CSS
-function addSimpleENRStyles() {
-    if (document.querySelector('#simple-enr-styles')) return;
 
-    const styles = document.createElement('style');
-    styles.id = 'simple-enr-styles';
-    styles.textContent = `
-        .enr-analysis-simple-container {
-            padding: 20px;
-            background: #f8f9fa;
-            border-radius: 8px;
-        }
-        
-        .enr-table-container {
-            margin-bottom: 30px;
-            background: white;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            overflow: hidden;
-        }
-        
-        .enr-table-container h4 {
-            margin: 0;
-            padding: 15px;
-            background: #2c3e50;
-            color: white;
-            font-size: 16px;
-        }
-        
-        .table-wrapper {
-            overflow-x: auto;
-        }
-        
-        .simple-enr-table {
-            width: 100%;
-            border-collapse: collapse;
-            font-family: 'Courier New', monospace;
-            font-size: 14px;
-        }
-        
-        .simple-enr-table th {
-            background: #f1f5f9;
-            padding: 12px 15px;
-            text-align: left;
-            font-weight: 600;
-            border-bottom: 2px solid #e2e8f0;
-            color: #475569;
-        }
-        
-        .simple-enr-table td {
-            padding: 10px 15px;
-            border-bottom: 1px solid #e2e8f0;
-        }
-        
-        .simple-enr-table tr:hover {
-            background: #f7fafc;
-        }
-        
-        .simple-enr-table .row-number {
-            color: #64748b;
-            font-size: 12px;
-            text-align: center;
-        }
-        
-        .simple-enr-table code {
-            background: #f1f5f9;
-            padding: 2px 6px;
-            border-radius: 4px;
-            font-family: 'Courier New', monospace;
-            color: #334155;
-        }
-        
-        /* Couleurs pour les différentes types de lignes */
-        .enr-dt {
-            background: #fee2e2 !important;
-        }
-        
-        .enr-dt:hover {
-            background: #fecaca !important;
-        }
-        
-        .enr-dp {
-            background: #fef3c7 !important;
-        }
-        
-        .enr-dp:hover {
-            background: #fde68a !important;
-        }
-        
-        .enr-normal {
-            background: #d1fae5 !important;
-        }
-        
-        .enr-normal:hover {
-            background: #a7f3d0 !important;
-        }
-        
-        .table-summary {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 10px;
-            padding: 15px;
-            background: #f8fafc;
-            border-top: 1px solid #e2e8f0;
-        }
-        
-        .summary-item {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-        
-        .summary-label {
-            font-weight: 600;
-            color: #475569;
-        }
-        
-        .summary-value {
-            color: #1e293b;
-        }
-        
-        .enr-file-error {
-            background: #fee2e2;
-            border: 1px solid #ef4444;
-            border-radius: 6px;
-            padding: 15px;
-            margin-bottom: 20px;
-        }
-        
-        .enr-file-error h4 {
-            margin: 0 0 10px 0;
-            color: #dc2626;
-        }
-        
-        .error-details {
-            font-size: 12px;
-            color: #7f1d1d;
-            background: #fecaca;
-            padding: 10px;
-            border-radius: 4px;
-            overflow-x: auto;
-            margin-top: 10px;
-        }
-    `;
 
-    document.head.appendChild(styles);
-}
-
-//=========================ANALYSES PICAGES=============================
-
-// ======================== STYLES POUR LE TABLEAU COMBINÉ ========================
-function addCombinedTableStyles() {
-    if (document.querySelector('#combined-table-styles')) return;
-
-    const styles = document.createElement('style');
-    styles.id = 'combined-table-styles';
-    styles.textContent = `
-        .combined-events-table-container {
-            margin: 20px 0;
-            background: white;
-            border-radius: 12px;
-            overflow: hidden;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-        }
-        
-        .combined-events-table-container h4 {
-            margin: 0;
-            padding: 20px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            font-size: 18px;
-            text-align: center;
-            border-bottom: 3px solid #4c51bf;
-        }
-        
-        .table-wrapper {
-            overflow-x: auto;
-            padding: 15px;
-            max-height: 600px;
-            overflow-y: auto;
-        }
-        
-        .combined-events-table {
-            width: 100%;
-            border-collapse: separate;
-            border-spacing: 0;
-            font-size: 12px;
-            min-width: 900px;
-        }
-        
-        .combined-events-table th {
-            padding: 12px 10px;
-            text-align: center;
-            font-weight: 600;
-            border: 1px solid #e2e8f0;
-            white-space: nowrap;
-            position: sticky;
-            top: 0;
-            background: white;
-            z-index: 20;
-        }
-        
-        .combined-events-table .date-header {
-            background: #f8f9fa;
-            z-index: 30;
-            left: 0;
-            min-width: 90px;
-            border-right: 2px solid #cbd5e0;
-        }
-        
-        .combined-events-table .event-type-header {
-            border-bottom: 2px solid #4a5568;
-        }
-        
-        .event-type-title {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-            padding: 5px 0;
-        }
-        
-        .event-type-icon {
-            font-size: 16px;
-        }
-        
-        .event-type-name {
-            font-size: 11px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-        
-        .combined-events-table .sub-header {
-            background: #f8f9fa;
-            font-size: 10px;
-            color: #718096;
-            font-weight: 500;
-            border-top: none;
-        }
-        
-        .combined-events-table td {
-            padding: 10px 8px;
-            border: 1px solid #e2e8f0;
-            text-align: center;
-            vertical-align: middle;
-            position: relative;
-        }
-        
-        .combined-events-table .date-cell {
-            background: #f8f9fa;
-            font-weight: bold;
-            position: sticky;
-            left: 0;
-            z-index: 10;
-            min-width: 90px;
-            border-right: 2px solid #cbd5e0;
-            box-shadow: 2px 0 5px rgba(0,0,0,0.05);
-        }
-        
-        .combined-events-table .time-cell {
-            font-family: 'Courier New', monospace;
-            font-size: 11px;
-            font-weight: 600;
-        }
-        
-        .combined-events-table .duration-cell {
-            font-family: 'Courier New', monospace;
-            font-size: 11px;
-            font-weight: 700;
-        }
-        
-        .combined-events-table .empty-cell {
-            color: #cbd5e0;
-            font-style: italic;
-        }
-        
-        .period-count {
-            font-size: 9px;
-            color: #718096;
-            background: rgba(255,255,255,0.7);
-            padding: 1px 4px;
-            border-radius: 3px;
-            margin-left: 4px;
-            cursor: pointer;
-            position: relative;
-            display: inline-block;
-        }
-        
-        .period-count:hover .period-tooltip {
-            display: block;
-        }
-        
-        .period-tooltip {
-            display: none;
-            position: absolute;
-            bottom: 100%;
-            left: 50%;
-            transform: translateX(-50%);
-            background: #2d3748;
-            color: white;
-            padding: 8px 12px;
-            border-radius: 6px;
-            font-size: 10px;
-            white-space: nowrap;
-            z-index: 100;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-            min-width: 200px;
-            max-width: 300px;
-            text-align: left;
-            line-height: 1.4;
-            margin-bottom: 5px;
-        }
-        
-        .period-tooltip::after {
-            content: '';
-            position: absolute;
-            top: 100%;
-            left: 50%;
-            transform: translateX(-50%);
-            border-width: 5px;
-            border-style: solid;
-            border-color: #2d3748 transparent transparent transparent;
-        }
-        
-        /* Légende */
-        .color-legend {
-            padding: 15px 20px;
-            background: #f8f9fa;
-            border-top: 2px solid #e2e8f0;
-        }
-        
-        .color-legend h5 {
-            margin: 0 0 12px 0;
-            color: #2c3e50;
-            font-size: 14px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-        
-        .color-legend h5::before {
-            content: '🎨';
-            font-size: 16px;
-        }
-        
-        .legend-items {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-            gap: 10px;
-        }
-        
-        .legend-item {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            padding: 8px 12px;
-            background: white;
-            border-radius: 6px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-            transition: all 0.2s;
-        }
-        
-        .legend-item:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
-        }
-        
-        .legend-color {
-            width: 16px;
-            height: 16px;
-            border-radius: 3px;
-            border: 2px solid rgba(255,255,255,0.8);
-            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
-        }
-        
-        .legend-icon {
-            font-size: 16px;
-            width: 24px;
-            text-align: center;
-        }
-        
-        .legend-text {
-            font-size: 12px;
-            font-weight: 600;
-            color: #2c3e50;
-            flex: 1;
-        }
-        
-        /* Statistiques */
-        .combined-stats {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-            gap: 15px;
-            padding: 20px;
-            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
-            border-top: 2px solid #cbd5e0;
-        }
-        
-        .stats-card {
-            background: white;
-            padding: 15px;
-            border-radius: 8px;
-            text-align: center;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.08);
-            transition: all 0.3s;
-            position: relative;
-            overflow: hidden;
-        }
-        
-        .stats-card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 3px;
-        }
-        
-        .stats-card:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 8px 16px rgba(0,0,0,0.12);
-        }
-        
-        .stats-icon {
-            font-size: 28px;
-            display: block;
-            margin-bottom: 8px;
-            opacity: 0.9;
-        }
-        
-        .stats-value {
-            display: block;
-            font-size: 26px;
-            font-weight: 800;
-            color: #2c3e50;
-            margin-bottom: 4px;
-            text-shadow: 0 1px 2px rgba(0,0,0,0.1);
-        }
-        
-        .stats-label {
-            font-size: 11px;
-            color: #718096;
-            text-transform: uppercase;
-            letter-spacing: 0.8px;
-            font-weight: 600;
-        }
-        
-        /* Responsive */
-        @media (max-width: 1400px) {
-            .table-wrapper {
-                max-height: 500px;
-            }
-        }
-        
-        @media (max-width: 1200px) {
-            .combined-events-table {
-                font-size: 11px;
-            }
-            
-            .combined-events-table th,
-            .combined-events-table td {
-                padding: 8px 6px;
-            }
-            
-            .event-type-name {
-                font-size: 10px;
-            }
-        }
-        
-        @media (max-width: 992px) {
-            .legend-items {
-                grid-template-columns: repeat(3, 1fr);
-            }
-            
-            .combined-stats {
-                grid-template-columns: repeat(2, 1fr);
-            }
-        }
-        
-        @media (max-width: 768px) {
-            .legend-items {
-                grid-template-columns: repeat(2, 1fr);
-            }
-            
-            .event-type-title {
-                flex-direction: column;
-                gap: 2px;
-            }
-            
-            .table-wrapper {
-                padding: 10px;
-                max-height: 400px;
-            }
-        }
-        
-        @media (max-width: 576px) {
-            .legend-items {
-                grid-template-columns: 1fr;
-            }
-            
-            .combined-stats {
-                grid-template-columns: 1fr;
-            }
-        }
-        
-        /* Animation pour les cellules */
-        @keyframes fadeInRow {
-            from { 
-                opacity: 0; 
-                transform: translateY(10px); 
-            }
-            to { 
-                opacity: 1; 
-                transform: translateY(0); 
-            }
-        }
-        
-        .combined-events-table tbody tr {
-            animation: fadeInRow 0.4s ease-out;
-        }
-        
-        .combined-events-table tbody tr:nth-child(even) {
-            background-color: #fafbfc;
-        }
-        
-        .combined-events-table tbody tr:hover td:not(.date-cell) {
-            background: #f0f9ff !important;
-            box-shadow: inset 0 0 0 1px rgba(66, 153, 225, 0.2);
-        }
-        
-        .combined-events-table tbody tr:hover .date-cell {
-            background: #edf2f7 !important;
-            box-shadow: inset 0 0 0 1px rgba(203, 213, 224, 0.5);
-        }
-        
-        /* Style spécifique pour ÉNERGIE ÉPUISÉE */
-        td[style*="#FF8B94"] {
-            border-left: 2px solid #FF8B94 !important;
-            border-right: 2px solid #FF8B94 !important;
-        }
-        
-        /* Effet de surbrillance pour les cellules avec données */
-        .time-value, .duration-value {
-            position: relative;
-            z-index: 1;
-        }
-        
-        .time-value::after, .duration-value::after {
-            content: '';
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: calc(100% + 10px);
-            height: calc(100% + 6px);
-            background: rgba(255, 255, 255, 0.2);
-            border-radius: 4px;
-            z-index: -1;
-            opacity: 0;
-            transition: opacity 0.2s;
-        }
-        
-        .time-cell:hover .time-value::after,
-        .duration-cell:hover .duration-value::after {
-            opacity: 1;
-        }
-    `;
-
-    document.head.appendChild(styles);
-}
-// Dans addAllClientsStyles() ou dans une nouvelle fonction
-function addNewColumnStyles() {
-    if (document.querySelector('#new-column-styles')) return;
-
-    const styles = document.createElement('style');
-    styles.id = 'new-column-styles';
-    styles.textContent = `
-        .energy-sum-header, .intensity-header {
-            background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
-            color: white !important;
-            font-weight: 700;
-        }
-        
-        .row-energy-sum {
-            background: #eff6ff;
-            font-weight: 600;
-            text-align: center;
-            border-left: 2px solid #93c5fd;
-            border-right: 2px solid #93c5fd;
-        }
-        
-        .row-intensity {
-            background: #f0fdf4;
-            font-weight: 600;
-            text-align: center;
-        }
-        
-        .row-intensity[style*="color: #ef4444"] {
-            background: #fee2e2;
-            animation: pulse 2s infinite;
-        }
-        
-        .row-intensity[style*="color: #f59e0b"] {
-            background: #fff3cd;
-        }
-        
-        .row-intensity[style*="color: #10b981"] {
-            background: #d1fae5;
-        }
-        
-        @keyframes pulse {
-            0% { opacity: 1; }
-            50% { opacity: 0.7; }
-            100% { opacity: 1; }
-        }
-        
-        /* Tooltip pour expliquer le calcul */
-        .intensity-header {
-            position: relative;
-            cursor: help;
-        }
-        
-        .intensity-header:hover::after {
-            content: "Intensité = (∑ Énergie) / Tension";
-            position: absolute;
-            bottom: 100%;
-            left: 50%;
-            transform: translateX(-50%);
-            background: #1e293b;
-            color: white;
-            padding: 8px 12px;
-            border-radius: 6px;
-            font-size: 11px;
-            white-space: nowrap;
-            z-index: 100;
-            margin-bottom: 5px;
-        }
-    `;
-
-    document.head.appendChild(styles);
-}
-// Ajoutez cette fonction si elle n'existe pas déjà
-function addEventMatrixStyles() {
-    if (document.querySelector('#event-matrix-styles')) return;
-
-    const styles = document.createElement('style');
-    styles.id = 'event-matrix-styles';
-    styles.textContent = `
-        /* Styles pour le tableau matriciel des événements */
-        .events-matrix-table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 13px;
-            min-width: 1000px;
-            background: white;
-            border-radius: 12px;
-            overflow: hidden;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-        }
-
-        .events-matrix-table th {
-            padding: 16px 12px;
-            font-weight: 700;
-            text-align: center;
-            border: 1px solid #e2e8f0;
-            white-space: nowrap;
-        }
-
-        .events-matrix-table td {
-            padding: 14px 10px;
-            border: 1px solid #e2e8f0;
-            text-align: center;
-            vertical-align: middle;
-            transition: background-color 0.2s;
-        }
-
-        /* Style pour la colonne Date */
-        .events-matrix-table .date-cell {
-            background: #f8fafc;
-            font-weight: 700;
-            color: #1e293b;
-            font-size: 14px;
-            border-right: 2px solid #cbd5e1;
-            box-shadow: 2px 0 5px rgba(0,0,0,0.02);
-        }
-
-        /* Style pour les cellules de temps (début/fin) */
-        .events-matrix-table .time-cell {
-            font-family: 'Courier New', monospace;
-            font-weight: 600;
-            font-size: 13px;
-            background: white;
-        }
-
-        /* Style pour les cellules de durée */
-        .events-matrix-table .duration-cell {
-            font-family: 'Courier New', monospace;
-            font-weight: 700;
-            font-size: 13px;
-            background: white;
-        }
-
-        /* Style pour les cellules vides */
-        .events-matrix-table .empty-cell {
-            color: #cbd5e1;
-            background: #fafafa;
-            font-style: italic;
-        }
-
-        /* Surbrillance au survol */
-        .events-matrix-table tbody tr:hover td {
-            background: #f8fafc !important;
-        }
-
-        .events-matrix-table tbody tr:hover .date-cell {
-            background: #e6f0fa !important;
-        }
-
-        /* Style pour les en-têtes principaux */
-        .events-matrix-table thead tr:first-child th {
-            border-bottom: 3px solid currentColor;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            font-size: 12px;
-        }
-
-        /* Style pour les sous-en-têtes */
-        .events-matrix-table thead tr:last-child th {
-            background: #f8fafc;
-            color: #475569;
-            font-weight: 600;
-            font-size: 12px;
-            padding: 12px 8px;
-            border-top: none;
-        }
-
-        /* Lignes alternées pour meilleure lisibilité */
-        .events-matrix-table tbody tr:nth-child(even) {
-            background-color: #fafbfc;
-        }
-
-        /* Animation d'apparition */
-        @keyframes fadeInRow {
-            from { 
-                opacity: 0; 
-                transform: translateY(5px); 
-            }
-            to { 
-                opacity: 1; 
-                transform: translateY(0); 
-            }
-        }
-
-        .events-matrix-table tbody tr {
-            animation: fadeInRow 0.3s ease-out;
-        }
-
-        /* Badge pour plusieurs périodes (optionnel) */
-        .period-badge {
-            display: inline-block;
-            background: #f1f5f9;
-            color: #475569;
-            font-size: 10px;
-            padding: 2px 8px;
-            border-radius: 12px;
-            margin-left: 6px;
-            font-weight: 600;
-        }
-
-        /* Style pour les en-têtes colorés */
-        .events-matrix-table th[style*="background: #e0f2fe"] {
-            border-bottom-color: #38bdf8 !important;
-        }
-
-        .events-matrix-table th[style*="background: #fee2e2"] {
-            border-bottom-color: #ef4444 !important;
-        }
-
-        .events-matrix-table th[style*="background: #fef9c3"] {
-            border-bottom-color: #eab308 !important;
-        }
-
-        .events-matrix-table th[style*="background: #fae8ff"] {
-            border-bottom-color: #c084fc !important;
-        }
-
-        /* Responsive */
-        @media (max-width: 1200px) {
-            .events-matrix-table {
-                font-size: 12px;
-            }
-            
-            .events-matrix-table th,
-            .events-matrix-table td {
-                padding: 10px 6px;
-            }
-            
-            .events-matrix-table .time-cell,
-            .events-matrix-table .duration-cell {
-                font-size: 12px;
-            }
-        }
-
-        @media (max-width: 768px) {
-            .table-wrapper {
-                overflow-x: auto;
-                -webkit-overflow-scrolling: touch;
-            }
-            
-            .events-matrix-table {
-                min-width: 900px;
-            }
-        }
-    `;
-
-    document.head.appendChild(styles);
-}
 // ======================== FONCTIONS POUR LE FILTRAGE PAR DATE ========================
 
 // Variable pour stocker la date actuellement sélectionnée
@@ -16865,8 +14785,7 @@ document.addEventListener('change', function (e) {
         // updateHourlyChartForSelectedDate();
     }
 });
-// Appelez cette fonction au chargement
-document.addEventListener('DOMContentLoaded', addEventMatrixStyles);
+
 // Fermer le modal quand on clique en dehors
 document.addEventListener('click', (event) => {
     const modal = document.getElementById('tensionHourlyModal');
@@ -16876,459 +14795,7 @@ document.addEventListener('click', (event) => {
         closeTensionModal();
     }
 });
-function addCommercialStyles() {
-    if (document.querySelector('#commercial-styles')) return;
 
-    const style = document.createElement('style');
-    style.id = 'commercial-styles';
-    style.textContent = `
-        /* --- En-tête Client --- */
-        .commercial-header {
-            background: linear-gradient(135deg, #4299e1 0%, #3182ce 100%);
-            color: white;
-            padding: 20px 25px;
-            border-radius: 12px;
-            margin-bottom: 25px;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 15px;
-        }
-        .header-left {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-        .client-icon {
-            font-size: 28px;
-        }
-        .client-id {
-            font-size: 22px;
-            font-weight: 700;
-        }
-        .header-badges {
-            display: flex;
-            gap: 10px;
-        }
-        .badge {
-            padding: 6px 18px;
-            border-radius: 40px;
-            font-size: 14px;
-            font-weight: 600;
-            background: rgba(255, 255, 255, 0.2);
-            color: white;
-        }
-        .badge-active {
-            background: #22c55e;
-        }
-        .badge-inactive {
-            background: #94a3b8;
-        }
-        .badge-forfait {
-            background: #f1f5f9;
-            color: #1e293b;
-        }
-
-        /* --- Cartes Génériques --- */
-        .card {
-            background: white;
-            border-radius: 16px;
-            border: 1px solid #e2e8f0;
-            margin-bottom: 25px;
-            overflow: hidden;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-        }
-        .card-header {
-            padding: 18px 22px;
-            background: #f8fafc;
-            border-bottom: 1px solid #e2e8f0;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        .card-icon {
-            font-size: 20px;
-        }
-        .card-title {
-            font-weight: 700;
-            color: #1e293b;
-            font-size: 16px;
-        }
-        .card-subtitle {
-            margin-left: auto;
-            font-size: 12px;
-            color: #64748b;
-        }
-        .card-subheader {
-            padding: 12px 22px;
-            background: #ffffff;
-            border-bottom: 1px solid #e2e8f0;
-            font-size: 13px;
-            color: #475569;
-            display: flex;
-            justify-content: space-between;
-            flex-wrap: wrap;
-            gap: 10px;
-        }
-        .card-content {
-            padding: 22px;
-        }
-
-        /* Carte spécifique au forfait actuel */
-        .consumption-analysis-card.current-forfait {
-            border: 2px solid #22c55e;
-            box-shadow: 0 8px 20px rgba(34, 197, 94, 0.15);
-            position: relative;
-        }
-        .badge-actuel {
-            position: absolute;
-            top: 15px;
-            right: 22px;
-            background: #22c55e;
-            color: white;
-            padding: 4px 16px;
-            border-radius: 30px;
-            font-size: 12px;
-            font-weight: 700;
-            letter-spacing: 0.5px;
-        }
-
-        /* --- Tableau Historique --- */
-        .forfait-history-table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 13px;
-            margin-bottom: 20px;
-        }
-        .forfait-history-table th {
-            background: #f8fafc;
-            padding: 12px 10px;
-            text-align: left;
-            font-weight: 600;
-            color: #334155;
-            border-bottom: 2px solid #e2e8f0;
-        }
-        .forfait-history-table td {
-            padding: 10px;
-            border-bottom: 1px solid #e2e8f0;
-        }
-        .forfait-history-table .current-forfait-row {
-            background: #f0fdf4;
-            font-weight: 500;
-        }
-
-        /* --- Barres de progression --- */
-        .progress-bars {
-            margin-top: 15px;
-            padding-top: 15px;
-            border-top: 1px solid #e2e8f0;
-        }
-        .progress-bar-container {
-            display: flex;
-            height: 12px;
-            background: #edf2f7;
-            border-radius: 20px;
-            overflow: hidden;
-            margin: 8px 0;
-        }
-        .progress-bar-container.large {
-            height: 20px;
-        }
-        .progress-bar-segment {
-            height: 100%;
-            transition: width 0.3s ease;
-        }
-        .progress-legend {
-            display: flex;
-            gap: 20px;
-            font-size: 11px;
-            color: #475569;
-            flex-wrap: wrap;
-        }
-        .progress-legend span {
-            display: flex;
-            align-items: center;
-            gap: 5px;
-        }
-        .progress-legend span span {
-            display: inline-block;
-            width: 12px;
-            height: 12px;
-            border-radius: 3px;
-        }
-
-        /* --- Grille de statistiques --- */
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 15px;
-            margin-bottom: 25px;
-        }
-        .stat-card {
-            border-radius: 12px;
-            padding: 16px;
-            color: white;
-        }
-        .stat-card .stat-icon {
-            font-size: 18px;
-            margin-bottom: 10px;
-            opacity: 0.9;
-        }
-        .stat-card .stat-label {
-            font-size: 11px;
-            opacity: 0.9;
-            margin-bottom: 4px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-        .stat-card .stat-value {
-            font-size: 28px;
-            font-weight: 700;
-            line-height: 1.2;
-        }
-        .stat-card .stat-sub {
-            font-size: 10px;
-            opacity: 0.8;
-            margin-top: 4px;
-        }
-        .gradient-purple { background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); }
-        .gradient-blue { background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); }
-        .gradient-gray { background: linear-gradient(135deg, #94a3b8 0%, #64748b 100%); }
-        .gradient-green { background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); }
-
-        /* --- Section Répartition --- */
-        .repartition-section {
-            margin-top: 20px;
-            padding: 20px;
-            background: #f8fafc;
-            border-radius: 12px;
-            border: 1px solid #e2e8f0;
-        }
-        .repartition-title {
-            font-weight: 600;
-            color: #1e293b;
-            font-size: 14px;
-            margin-bottom: 15px;
-        }
-        .repartition-legend {
-            display: flex;
-            gap: 25px;
-            margin-top: 12px;
-            font-size: 12px;
-            color: #334155;
-        }
-        .repartition-legend div {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-        .repartition-legend div span {
-            display: inline-block;
-            width: 14px;
-            height: 14px;
-            border-radius: 3px;
-        }
-        .repartition-details {
-            display: flex;
-            justify-content: space-between;
-            margin-top: 10px;
-            font-size: 13px;
-            color: #475569;
-        }
-
-        /* --- Section Énergie Épuisée --- */
-        .energy-depleted-section {
-            margin-top: 20px;
-            padding: 16px 20px;
-            background: #fee2e2;
-            border-radius: 10px;
-            border-left: 4px solid #ef4444;
-        }
-        .depleted-title {
-            font-weight: 600;
-            color: #991b1b;
-            font-size: 14px;
-            margin-bottom: 5px;
-        }
-        .depleted-value {
-            font-size: 24px;
-            font-weight: 700;
-            color: #b91c1c;
-        }
-
-        /* --- Responsive --- */
-        @media (max-width: 1024px) {
-            .stats-grid {
-                grid-template-columns: repeat(2, 1fr);
-            }
-        }
-        @media (max-width: 768px) {
-            .stats-grid {
-                grid-template-columns: 1fr;
-            }
-            .commercial-header {
-                flex-direction: column;
-                align-items: flex-start;
-            }
-            .header-badges {
-                width: 100%;
-                justify-content: flex-start;
-            }
-            .card-subheader {
-                flex-direction: column;
-            }
-            .badge-actuel {
-                position: static;
-                display: inline-block;
-                margin-left: 10px;
-            }
-        }
-    `;
-    document.head.appendChild(style);
-}
-
-// ======================== STYLES CSS POUR LA VERSION SIMPLIFIÉE ========================
-function addSimplifiedCommercialStyles() {
-    if (document.querySelector('#simplified-commercial-styles')) return;
-
-    const styles = document.createElement('style');
-    styles.id = 'simplified-commercial-styles';
-    styles.textContent = `
-        /* Style pour l'en-tête client simplifié */
-        .commercial-simple-header {
-            background: linear-gradient(135deg, #4299e1 0%, #3182ce 100%);
-            color: white;
-            padding: 15px 20px;
-            border-radius: 12px;
-            margin-bottom: 20px;
-            display: flex;
-            align-items: center;
-            gap: 15px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-        }
-        
-        /* Améliorations pour le tableau existant */
-        .daily-summary-table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 13px;
-            background: white;
-            border-radius: 8px;
-            overflow: hidden;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-        }
-        
-        .daily-summary-table th {
-            background: #f8fafc;
-            padding: 14px 12px;
-            text-align: left;
-            font-weight: 600;
-            color: #334155;
-            border-bottom: 2px solid #e2e8f0;
-            font-size: 13px;
-        }
-        
-        .daily-summary-table td {
-            padding: 12px;
-            border-bottom: 1px solid #e2e8f0;
-        }
-        
-        .daily-summary-table tbody tr:hover {
-            background: #f8fafc;
-        }
-        
-        .row-index {
-            color: #64748b;
-            font-size: 12px;
-            font-weight: 500;
-            width: 50px;
-        }
-        
-        .row-date {
-            font-weight: 600;
-            color: #0f172a;
-        }
-        
-        .row-energy, .row-hour, .row-credit, .row-tension {
-            font-family: 'Courier New', monospace;
-        }
-        
-        .table-footer {
-            padding: 15px 20px;
-            background: #f8fafc;
-            border-top: 1px solid #e2e8f0;
-        }
-        
-        .pagination {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-            flex-wrap: wrap;
-        }
-        
-        .pagination-btn {
-            padding: 8px 16px;
-            border: 1px solid #cbd5e1;
-            background: white;
-            border-radius: 6px;
-            font-size: 12px;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        
-        .pagination-btn:hover:not(:disabled) {
-            background: #f1f5f9;
-            border-color: #94a3b8;
-        }
-        
-        .pagination-btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-        
-        .page-info {
-            font-size: 13px;
-            color: #334155;
-            padding: 0 15px;
-        }
-        
-        .items-info {
-            color: #64748b;
-            font-size: 12px;
-            margin-left: 5px;
-        }
-        
-        .table-info {
-            text-align: center;
-            font-size: 12px;
-            color: #64748b;
-            margin-top: 10px;
-            padding-top: 10px;
-            border-top: 1px dashed #e2e8f0;
-        }
-        
-        /* Responsive */
-        @media (max-width: 768px) {
-            .daily-summary-table {
-                font-size: 12px;
-            }
-            
-            .daily-summary-table th,
-            .daily-summary-table td {
-                padding: 8px 6px;
-            }
-            
-            .pagination {
-                flex-direction: column;
-            }
-        }
-    `;
-
-    document.head.appendChild(styles);
-}
 // ======================== STYLES À AJOUTER ========================
 // Ajoutez cette fonction et appelez-la dans votre code
 function addCommercialStyles() {
@@ -17644,104 +15111,10 @@ function addCommercialStyles() {
     document.head.appendChild(style);
 }
 // ======================== STYLES CSS À AJOUTER ========================
-// Ajoutez cette fonction et appelez-la au chargement
-function addFilterStyles() {
-    if (document.querySelector('#filter-styles')) return;
 
-    const styles = document.createElement('style');
-    styles.id = 'filter-styles';
-    styles.textContent = `
-        /* Style pour les groupes de filtres */
-        .filter-group {
-            background: #f8fafc;
-            border-radius: 8px;
-            padding: 12px 15px;
-            border: 1px solid #e2e8f0;
-            transition: all 0.2s;
-        }
-        
-        .filter-group:hover {
-            border-color: #cbd5e1;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-        }
-        
-        .filter-group-title {
-            font-weight: 600;
-            color: #475569;
-            margin-bottom: 8px;
-            font-size: 12px;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-        
-        /* Style pour les inputs */
-        .filter-date-input, .filter-select {
-            border: 2px solid #e2e8f0;
-            border-radius: 6px;
-            padding: 8px 10px;
-            font-size: 12px;
-            background: white;
-            transition: all 0.2s;
-        }
-        
-        .filter-date-input:focus, .filter-select:focus {
-            border-color: #3b82f6;
-            outline: none;
-            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-        }
-        
-        /* Style pour les boutons rapides */
-        .quick-select-btn {
-            background: white;
-            border: 1px solid #cbd5e1;
-            border-radius: 20px;
-            padding: 4px 12px;
-            font-size: 11px;
-            cursor: pointer;
-            color: #475569;
-            transition: all 0.2s;
-        }
-        
-        .quick-select-btn:hover {
-            background: #3b82f6;
-            color: white;
-            border-color: #3b82f6;
-        }
-        
-        /* Style pour les labels de dates */
-        .date-checkbox-label {
-            transition: all 0.2s;
-        }
-        
-        .date-checkbox-label:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        
-        .date-checkbox-label.checked {
-            background: #dbeafe !important;
-            border-color: #3b82f6 !important;
-        }
-        
-        /* Responsive */
-        @media (max-width: 1200px) {
-            .filter-group {
-                flex: 1 1 100% !important;
-                min-width: 100% !important;
-            }
-        }
-    `;
-
-    document.head.appendChild(styles);
-}
 // Ajouter les styles au chargement
-document.addEventListener('DOMContentLoaded', addSimplifiedCommercialStyles);
 document.addEventListener('DOMContentLoaded', addCommercialStyles);
-document.addEventListener('DOMContentLoaded', addAllClientsStyles);
-document.addEventListener('DOMContentLoaded', addFilterStyles);
 // Appeler la fonction au chargement
-document.addEventListener('DOMContentLoaded', addNewColumnStyles);
 // Effet de réduction de l'en-tête au scroll
 window.addEventListener('scroll', function () {
     const header = document.querySelector('.header');

@@ -4,6 +4,275 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Traitement V2 - Analyse Technique & Commerciale</title>
+    <style>
+        /* Styles supplémentaires si nécessaire */
+        /* ===== CONTAINER FILTRE ===== */
+        .filter-container {
+        background: white;
+        border-radius: 14px;
+        padding: 20px;
+        box-shadow: 0 6px 18px rgba(0,0,0,0.08);
+        margin-bottom: 24px;
+        }
+
+        /* ===== HEADER ===== */
+        .filter-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 18px;
+        }
+
+        .filter-title {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 18px;
+        font-weight: 700;
+        color: #1e293b;
+        }
+
+        /* ===== BOUTONS ===== */
+        .btn {
+        padding: 8px 16px;
+        border-radius: 999px;
+        font-weight: 600;
+        cursor: pointer;
+        border: none;
+        transition: all 0.3s ease;
+        }
+
+        .btn-reset {
+        background: white;
+        border: 1px solid #cbd5e1;
+        }
+
+        .btn-apply {
+        background: linear-gradient(90deg, #10b981, #059669);
+        color: white;
+        }
+
+        /* ===== BARRE PERIODE (STYLE EXACT QUE TU VEUX) ===== */
+        .selected-period {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+
+        padding: 14px 18px;
+        border-radius: 12px;
+
+        background: linear-gradient(90deg, #3b82f6, #1e3a5f);
+        color: white;
+        font-weight: 600;
+
+        margin-bottom: 20px;
+        }
+
+        .selected-period-left {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        }
+
+        .selected-period-close {
+        background: rgba(255,255,255,0.2);
+        border-radius: 999px;
+        padding: 4px 10px;
+        cursor: pointer;
+        }
+
+        /* ===== BLOCS ===== */
+        .filter-block {
+        flex: 1;
+        min-width: 250px;
+        background: #f8fafc;
+        padding: 16px;
+        border-radius: 12px;
+        border: 1px solid #e2e8f0;
+        }
+
+        .filter-block-title {
+        font-weight: 600;
+        margin-bottom: 12px;
+        color: #1e293b;
+        }
+
+        /* ===== GRID BOUTONS ===== */
+        .filter-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+        }
+
+        .filter-btn {
+        padding: 9px;
+        border-radius: 8px;
+        border: 1px solid #e2e8f0;
+        background: white;
+        cursor: pointer;
+        transition: 0.2s;
+        }
+
+        .filter-btn:hover {
+        background: #f1f5f9;
+        }
+
+        /* bouton actif */
+        .filter-btn.primary {
+        background: linear-gradient(90deg, #5f6fd6, #7c3aed);
+        color: white;
+        border: none;
+        }
+
+        /* ===== INPUT & SELECT ===== */
+        input[type="date"],
+        select {
+        width: 100%;
+        padding: 10px 12px;
+
+        border-radius: 10px;
+        border: 1px solid #cbd5e1;
+
+        background: #ffffff;
+        color: #1e293b;
+
+        font-size: 14px;
+        font-weight: 500;
+
+        outline: none;
+        transition: all 0.25s ease;
+        }
+
+        /* ===== HOVER ===== */
+        input[type="date"]:hover,
+        select:hover {
+        border-color: #94a3b8;
+        }
+
+        /* ===== FOCUS (IMPORTANT UX) ===== */
+        input[type="date"]:focus,
+        select:focus {
+        border-color: #6366f1;
+        box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+        }
+
+        /* ===== STYLE SELECT (flèche custom simple) ===== */
+        select {
+        appearance: none;
+        background-image: url("data:image/svg+xml;utf8,<svg fill='%2364748b' height='20' viewBox='0 0 20 20' width='20' xmlns='http://www.w3.org/2000/svg'><path d='M5 7l5 5 5-5z'/></svg>");
+        background-repeat: no-repeat;
+        background-position: right 10px center;
+        background-size: 16px;
+        padding-right: 35px;
+        }
+
+        /* ===== CONTAINER INPUTS ===== */
+        .filter-input-group {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        }
+
+        .filter-label {
+        font-size: 12px;
+        color: #64748b;
+        font-weight: 500;
+        }
+        /* ===== GRID ===== */
+        .dpdt-stats-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 16px;
+        }
+
+        /* ===== CARD ===== */
+        .dpdt-stat-card {
+        background: #f8fafc;
+        border-radius: 14px;
+        padding: 18px;
+        position: relative;
+        overflow: hidden;
+        }
+
+        /* ===== BORDURE GAUCHE COLORÉE ===== */
+        .dpdt-stat-card::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 0;
+        height: 100%;
+        width: 5px;
+        border-radius: 14px 0 0 14px;
+        }
+
+        /* ===== HEADER ===== */
+        .dpdt-stat-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 10px;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.5px;
+        color: #64748b;
+        }
+
+        /* ===== VALEUR ===== */
+        .dpdt-stat-value {
+        font-size: 34px;
+        font-weight: 800;
+        margin-bottom: 6px;
+        }
+
+        /* ===== TEXTE ===== */
+        .dpdt-stat-sub {
+        font-size: 12px;
+        color: #64748b;
+        }
+        /* CONFORMITÉ */
+        .card-green {
+        background: #ecfdf5;
+        }
+        .card-green::before {
+        background: #22c55e;
+        }
+        .card-green .dpdt-stat-value {
+        color: #16a34a;
+        }
+
+        /* CONFORMES */
+        .card-blue {
+        background: #eff6ff;
+        }
+        .card-blue::before {
+        background: #3b82f6;
+        }
+        .card-blue .dpdt-stat-value {
+        color: #2563eb;
+        }
+
+        /* NON CONFORMES */
+        .card-red {
+        background: #fef2f2;
+        }
+        .card-red::before {
+        background: #ef4444;
+        }
+        .card-red .dpdt-stat-value {
+        color: #dc2626;
+        }
+
+        /* VARIATION */
+        .card-orange {
+        background: #fffbeb;
+        }
+        .card-orange::before {
+        background: #f59e0b;
+        }
+        .card-orange .dpdt-stat-value {
+        color: #d97706;
+        }
+    </style>
     <link rel="stylesheet" href="tableau-horaire.css">
 <body>
     <div class="container">

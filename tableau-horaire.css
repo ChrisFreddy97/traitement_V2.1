@@ -178,6 +178,7 @@ body {
     font-weight: 600;
     transition: all 0.3s ease;
     color: white;
+    transition: all 0.25s ease;
 }
 
 .main-tab:hover {
@@ -393,7 +394,6 @@ body {
     display: flex;
     flex-wrap: wrap;
     gap: 15px;
-    justify-content: center;
 }
 
 .stat-item {
@@ -3429,4 +3429,71 @@ body {
     border-radius: 30px;
     font-size: 12px;
     font-weight: 500;
+}
+/* ===== CONTAINER ===== */
+.main-tabs-container {
+  display: flex;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #f3f4f6;
+  margin-bottom: 20px;
+}
+
+/* ===== ONGLET ===== */
+.main-tab {
+  flex: 1;
+  padding: 14px 24px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  background: #e5e7eb;
+  color: #374151;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.3s ease;
+}
+
+/* ===== ONGLET ACTIF (GRADIENT) ===== */
+.main-tab.active {
+  background: linear-gradient(90deg, #5f6fd6, #7c3aed);
+  color: white;
+}
+
+/* ===== HOVER ===== */
+.main-tab:hover {
+  opacity: 0.9;
+}
+
+/* ===== SOUS ONGLETS ===== */
+.sub-tabs-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.sub-tab {
+  background: #f1f5f9;
+  color: #475569;
+  border: none;
+  padding: 8px 18px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+/* actif */
+.sub-tab.active {
+  background: linear-gradient(90deg, #5f6fd6, #7c3aed);
+  color: white;
+}
+
+/* hover */
+.sub-tab:hover {
+  transform: translateY(-1px);
 }
