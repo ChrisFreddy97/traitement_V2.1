@@ -17,7 +17,7 @@
 
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            background: linear-gradient(135deg, #88aae1 0%, #88aae1 100%);
             min-height: 100vh;
         }
 
@@ -28,7 +28,7 @@
         }
 
         .analyze-header {
-            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+            background: linear-gradient(135deg, #0e1a81 0%, #490783 100%);
             border-radius: 16px;
             padding: 20px 30px;
             margin-bottom: 25px;
@@ -118,7 +118,7 @@
 
         .tab.active {
             color: white;
-            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+            background: linear-gradient(135deg, #0e1a81 0%, #490783 100%);
             box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);
         }
 
@@ -155,7 +155,7 @@
 
         /* Bouton toggle tables */
         .toggle-tables-btn {
-            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%) !important;
+            background: linear-gradient(135deg, #0e1a81 0%, #490783 100%) !important;
             color: white !important;
             border: none !important;
             padding: 12px 24px !important;
@@ -229,7 +229,7 @@
                 <button id="go-back-btn" class="btn-secondary" style="margin-top: 20px;">← Retour à l'upload</button>
             `;
             document.getElementById('go-back-btn')?.addEventListener('click', () => {
-                window.location.href = 'uploadFile.html';
+                window.location.href = 'arduino.html';
             });
         } else {
             try {
@@ -241,21 +241,15 @@
                 document.getElementById('analysis-content').innerHTML = `
                     <!-- Section INFO -->
                     <div class="info-section" id="infoSection">
-                        <h3>🔍 Informations extraites</h3>
-                        <div class="nanoreseau-value" id="nanoreseauValue">-</div>
-                        
                         <!-- ONGLETS PRINCIPAUX -->
                         <div class="tabs">
                             <div class="tab active" data-tab="Technique">Technique</div>
                             <div class="tab" data-tab="Commercial">Commercial</div>
-                            <div class="tab" data-tab="Evenement">Événements</div>
                         </div>
                         
                         <!-- CONTENEURS DES DASHBOARDS -->
                         <div id="technicalDashboard"></div>
-                        <div id="commercialDashboard"></div>
-                        <div id="eventDashboard"></div>
-                        
+                        <div id="commercialDashboard"></div>                    
                         <div class="type-legend" id="typeLegend"></div>
                     </div>
 
@@ -299,14 +293,14 @@
                     <button id="go-back-btn" class="btn-secondary" style="margin-top: 20px;">← Retour à l'upload</button>
                 `;
                 document.getElementById('go-back-btn')?.addEventListener('click', () => {
-                    window.location.href = 'uploadFile.html';
+                    window.location.href = 'arduino.html';
                 });
             }
         }
         
         // Bouton retour
         document.getElementById('back-btn')?.addEventListener('click', () => {
-            window.location.href = 'uploadFile.html';
+            window.location.href = 'arduino.html';
         });
     </script>
 </body>

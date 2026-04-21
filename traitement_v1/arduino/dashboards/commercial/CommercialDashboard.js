@@ -521,14 +521,15 @@ function renderAllBoards() {
 function renderConsumptionBoard() {
     const container = document.getElementById('consumptionBoard');
     if (!container) return;
+    
     if (!activeClientId) {
-        container.innerHTML = '<p class="no-data">❌ Aucun client sélectionné</p>';
+        container.innerHTML = '<div class="error-message show">❌ Aucun client sélectionné</div>';
         return;
     }
     
     const client = clientsList.find(c => c.id === activeClientId);
     if (!client) {
-        container.innerHTML = '<p class="no-data">❌ Client non trouvé</p>';
+        container.innerHTML = '<div class="error-message show">❌ Client non trouvé</div>';
         return;
     }
     
@@ -540,35 +541,56 @@ function renderConsumptionBoard() {
     const forfaitHistory = buildForfaitHistory(client);
     const forfaitStats = computeForfaitStats(client, forfaitHistory);
     
-    let html = `<h3 class="card-title">📋 HISTORIQUE FORFAITS & CONSOMMATION - Client ${client.id}</h3><div class="client-card">`;
+    // Calcul du nombre total de jours pour l'affichage
+    const totalDays = forfaitStats.reduce((sum, stat) => sum + stat.totalDays, 0);
+    
+    // EN-TÊTE À LA RENDERINFOCARD (exactement le même style)
+    let html = `
+        <div style="background: white; border-radius: 16px; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08); overflow: hidden; border: 1px solid #e2e8f0; margin-bottom: 20px;">
+            <!-- En-tête style carte (copié de renderInfoCard) -->
+            <div style="background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); color: white; padding: 12px 20px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <span style="font-size: 18px;">📋</span>
+                    <span style="font-weight: 600;">HISTORIQUE FORFAITS & CONSOMMATION</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                    <span style="background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 20px; font-size: 11px;">👤 Client ${client.id}</span>
+                    <span style="background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 20px; font-size: 11px;">📊 ${totalDays} jours</span>
+                </div>
+            </div>
+    `;
     
     if (forfaitStats.length > 0) {
+        // Contenu principal (tableau + détails)
+        html += `<div style="padding: 20px;">`;
+        
+        // Tableau des forfaits
         html += `
-            <div style="overflow-x: auto; margin-bottom: 25px;">
-                <table style="width: 100%; border-collapse: collapse; font-size: 13px; min-width: 1100px;">
-                    <thead style="background: ${STYLES.colors.grayBg}; border-bottom: 2px solid ${STYLES.colors.border};">
+            <div class="table-wrapper" style="margin-bottom: 25px;">
+                <table class="table-details">
+                    <thead>
                         <tr>
-                            <th style="padding: ${STYLES.spacing.md} 10px; text-align: center;">Forfait</th>
-                            <th style="padding: ${STYLES.spacing.md} 10px; text-align: center;">Changement</th>
-                            <th style="padding: ${STYLES.spacing.md} 10px; text-align: center;">Jours totaux</th>
-                            <th style="padding: ${STYLES.spacing.md} 10px; text-align: center;">Jours avec conso</th>
-                            <th style="padding: ${STYLES.spacing.md} 10px; text-align: center;">Jours sans conso</th>
-                            <th style="padding: ${STYLES.spacing.md} 10px; text-align: center;">Énergie max</th>
-                            <th style="padding: ${STYLES.spacing.md} 10px; text-align: center;">Énergie moy</th>
+                            <th>Forfait</th>
+                            <th>Changement</th>
+                            <th>Jours totaux</th>
+                            <th>Jours avec conso</th>
+                            <th>Jours sans conso</th>
+                            <th>Énergie max</th>
+                            <th>Énergie moy</th>
                         </tr>
                     </thead>
                     <tbody>
                         ${forfaitStats.map((stat, idx) => {
-                            const bgColor = idx % 2 === 0 ? '#ffffff' : '#fafbfc';
+                            const badgeClass = stat.isCurrent ? 'badge-excellent' : 'badge-extreme';
                             return `
-                                <tr style="border-bottom: 1px solid ${STYLES.colors.border}; background: ${bgColor};">
-                                    <td style="padding: ${STYLES.spacing.md} 10px; text-align: center;">${renderBadge(stat.forfait, stat.isCurrent ? STYLES.colors.success : STYLES.colors.primary, stat.isCurrent)}</td>
-                                    <td style="padding: ${STYLES.spacing.md} 10px; text-align: center; white-space: nowrap;">${stat.changeText}</td>
-                                    <td style="padding: ${STYLES.spacing.md} 10px; text-align: center; font-weight: 600;">${stat.totalDays}</td>
-                                    <td style="padding: ${STYLES.spacing.md} 10px; text-align: center; font-weight: 600; color: ${STYLES.colors.success};">${stat.daysWithConso}</td>
-                                    <td style="padding: ${STYLES.spacing.md} 10px; text-align: center; font-weight: 600; color: ${STYLES.colors.gray};">${stat.daysWithoutConso}</td>
-                                    <td style="padding: ${STYLES.spacing.md} 10px; text-align: center;">${stat.maxEnergy} Wh</td>
-                                    <td style="padding: ${STYLES.spacing.md} 10px; text-align: center;">${stat.avgEnergy} Wh</td>
+                                <tr>
+                                    <td class="text-center"><span class="badge ${badgeClass}">${stat.forfait}</span></td>
+                                    <td class="text-center" style="white-space: nowrap;">${stat.changeText}</td>
+                                    <td class="text-center" style="font-weight: 600;">${stat.totalDays}</td>
+                                    <td class="text-center" style="font-weight: 600; color: var(--success);">${stat.daysWithConso}</td>
+                                    <td class="text-center" style="font-weight: 600; color: var(--gray-600);">${stat.daysWithoutConso}</td>
+                                    <td class="text-center">${stat.maxEnergy} Wh</td>
+                                    <td class="text-center">${stat.avgEnergy} Wh</td>
                                 </tr>
                             `;
                         }).join('')}
@@ -577,37 +599,51 @@ function renderConsumptionBoard() {
             </div>
         `;
         
-        forfaitStats.forEach(stat => {
+        // Détails par forfait
+        forfaitStats.forEach((stat, index) => {
             const startDate = formatDateToFrench(stat.startDate);
             const endDate = stat.endDate ? formatDateToFrench(stat.endDate) : 'Présent';
+            const badgeClass = stat.isCurrent ? 'badge-excellent' : 'badge-extreme';
+            const cardBg = index % 2 === 0 ? '#ffffff' : '#fafbfc';
+            const borderColor = stat.isCurrent ? 'var(--success)' : 'var(--primary)';
             
             html += `
-                <div style="margin-bottom: 20px; padding: ${STYLES.spacing.lg}; background: ${STYLES.colors.grayBg}; border-radius: ${STYLES.borderRadius.xl}; border: 1px solid ${STYLES.colors.border};">
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
-                        <div>
-                            ${renderBadge(stat.forfait, stat.isCurrent ? STYLES.colors.success : STYLES.colors.primary, false)}
-                            <span style="font-size: 12px; color: ${STYLES.colors.gray};">${startDate} → ${endDate}</span>
+                <div class="stat-box" style="margin-bottom: 20px; background: ${cardBg}; border-left: 4px solid ${borderColor};">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px;">
+                        <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                            <span class="badge ${badgeClass}">${stat.forfait}</span>
+                            <span class="tag small">📅 ${startDate} → ${endDate}</span>
                         </div>
-                        <span style="font-size: 12px;">${stat.daysWithConso} jours avec conso</span>
+                        <span class="tag">📊 ${stat.daysWithConso} jours avec conso</span>
                     </div>
-                    ${renderProgressBar(
-                        [stat.percentBelow85, stat.percentInTolerance, stat.percentAbove115],
-                        [`≤85% : ${stat.daysBelow85} jours`, `85-115% : ${stat.daysInTolerance} jours`, `>115% : ${stat.daysAbove115} jours`],
-                        [STYLES.colors.success, STYLES.colors.warning, STYLES.colors.danger]
-                    )}
-                    <div class="progress-legend" style="display: flex; flex-wrap: wrap; gap: 20px; justify-content: center;">
-                        <div class="legend-item" style="display: flex; align-items: center; gap: 5px;">
-                            <span class="legend-dot success" style="width: 12px; height: 12px; background: ${STYLES.colors.success}; border-radius: 3px;"></span>
-                            <span style="font-size: 12px;">≤${stat.seuil85.toFixed(0)}Wh: ${stat.daysBelow85}j (${stat.percentBelow85}%)</span>
+                    
+                    <div class="unified-progress-bar">
+                        ${stat.percentBelow85 > 0 ? `<div class="progress-segment success" style="width: ${stat.percentBelow85}%;"></div>` : ''}
+                        ${stat.percentInTolerance > 0 ? `<div class="progress-segment warning" style="width: ${stat.percentInTolerance}%;"></div>` : ''}
+                        ${stat.percentAbove115 > 0 ? `<div class="progress-segment danger" style="width: ${stat.percentAbove115}%;"></div>` : ''}
+                    </div>
+                    
+                    <div class="progress-legend">
+                        <div class="legend-item">
+                            <span class="legend-dot success"></span>
+                            <span class="legend-label">≤${stat.seuil85.toFixed(0)}Wh :</span>
+                            <span class="legend-value">${stat.daysBelow85}j (${stat.percentBelow85}%)</span>
                         </div>
-                        <div class="legend-item" style="display: flex; align-items: center; gap: 5px;">
-                            <span class="legend-dot warning" style="width: 12px; height: 12px; background: ${STYLES.colors.warning}; border-radius: 3px;"></span>
-                            <span style="font-size: 12px;">${stat.seuil85.toFixed(0)}-${stat.seuil115.toFixed(0)}Wh: ${stat.daysInTolerance}j (${stat.percentInTolerance}%)</span>
+                        <div class="legend-item">
+                            <span class="legend-dot warning"></span>
+                            <span class="legend-label">${stat.seuil85.toFixed(0)}-${stat.seuil115.toFixed(0)}Wh :</span>
+                            <span class="legend-value">${stat.daysInTolerance}j (${stat.percentInTolerance}%)</span>
                         </div>
-                        <div class="legend-item" style="display: flex; align-items: center; gap: 5px;">
-                            <span class="legend-dot danger" style="width: 12px; height: 12px; background: ${STYLES.colors.danger}; border-radius: 3px;"></span>
-                            <span style="font-size: 12px;">>${stat.seuil115.toFixed(0)}Wh: ${stat.daysAbove115}j (${stat.percentAbove115}%)</span>
+                        <div class="legend-item">
+                            <span class="legend-dot danger"></span>
+                            <span class="legend-label">>${stat.seuil115.toFixed(0)}Wh :</span>
+                            <span class="legend-value">${stat.daysAbove115}j (${stat.percentAbove115}%)</span>
                         </div>
+                    </div>
+                    
+                    <div class="progress-footer">
+                        <span class="total-days">📅 Total : ${stat.totalDays} jours</span>
+                        <span class="detail-counts">⚡ Moyenne : ${stat.avgEnergy} Wh | Max : ${stat.maxEnergy} Wh</span>
                     </div>
                 </div>
             `;
@@ -615,16 +651,20 @@ function renderConsumptionBoard() {
         
         if (forfaitStats[0]?.suspendECount > 0) {
             html += `
-                <div class="info-note" style="margin-top: ${STYLES.spacing.lg}; padding: ${STYLES.spacing.sm}; background: #fee2e2; border-radius: ${STYLES.borderRadius.md}; font-size: 12px;">
-                    ⚠️ ${forfaitStats[0].suspendECount} jour(s) avec SuspendE détecté(s) (comptés dans la zone rouge)
+                <div class="message-container" style="background: #fee2e2; border-left: 4px solid var(--danger);">
+                    <div class="client-message danger" style="background: transparent;">
+                        ⚠️ ${forfaitStats[0].suspendECount} jour(s) avec SuspendE détecté(s) (comptés dans la zone rouge)
+                    </div>
                 </div>
             `;
         }
+        
+        html += `</div>`; // fermeture padding
     } else {
-        html += '<p class="no-data">Aucune donnée de consommation disponible</p>';
+        html += '<div class="info-section show" style="margin: 20px;">📭 Aucune donnée de consommation disponible</div>';
     }
     
-    html += `</div>`;
+    html += `</div>`; // fermeture de la carte principale
     container.innerHTML = html;
 }
 
@@ -635,14 +675,15 @@ function renderConsumptionBoard() {
 function renderEventsBoard() {
     const container = document.getElementById('commercialEventsBoard');
     if (!container) return;
+    
     if (!activeClientId) {
-        container.innerHTML = '<p class="no-data">❌ Aucun client sélectionné</p>';
+        container.innerHTML = '<div class="error-message show">❌ Aucun client sélectionné</div>';
         return;
     }
     
     const client = clientsList.find(c => c.id === activeClientId);
     if (!client) {
-        container.innerHTML = '<p class="no-data">❌ Client non trouvé</p>';
+        container.innerHTML = '<div class="error-message show">❌ Client non trouvé</div>';
         return;
     }
     
@@ -713,29 +754,64 @@ function renderEventsClient(client) {
     const daysWithSuspendP = new Set(eventsByDay.filter(d => d.SuspendP > 0).map(d => d.date));
     const daysWithSuspendE = new Set(eventsByDay.filter(d => d.SuspendE > 0).map(d => d.date));
     
+    const totalEvents = events.length + zeroCreditDates.length;
+    const hasAnyEvent = daysWithCreditNul.size > 0 || daysWithSuspendP.size > 0 || daysWithSuspendE.size > 0;
+    
+    // ✅ CONDITION : si aucun événement (toutes les valeurs à 0)
+    if (!hasAnyEvent || totalEvents === 0) {
+        return `
+            <div style="background: white; border-radius: 16px; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08); overflow: hidden; border: 1px solid #e2e8f0; margin-bottom: 20px;">
+                <div style="background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); color: white; padding: 12px 20px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <span style="font-size: 18px;">⚠️</span>
+                        <span style="font-weight: 600;">ÉVÉNEMENTS - Client ${client.id}</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                        <span style="background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 20px; font-size: 11px;">📊 0 signalements</span>
+                    </div>
+                </div>
+                <div style="text-align: center; padding: 60px 20px; color: #64748b;">
+                    <span style="font-size: 48px; display: block; margin-bottom: 16px;">✅</span>
+                    <h3 style="margin: 0 0 8px 0; color: #1e293b;">Aucun événement</h3>
+                    <p style="margin: 0; font-size: 14px;">Aucun événement enregistré pour ce client</p>
+                </div>
+            </div>
+        `;
+    }
+    
+    // Sinon, afficher le dashboard complet avec l'en-tête style renderInfoCard
     const percentCreditNul = ((daysWithCreditNul.size / totalDays) * 100).toFixed(1);
     const percentSuspendP = ((daysWithSuspendP.size / totalDays) * 100).toFixed(1);
     const percentSuspendE = ((daysWithSuspendE.size / totalDays) * 100).toFixed(1);
     
     let html = `
-        <div class="client-card">
-            <div class="client-header">
-                <span class="client-icon">⚠️</span>
-                <span class="client-id">Événements - Client ${client.id}</span>
-                <span class="client-badge">${events.length + zeroCreditDates.length} signalements</span>
+        <div style="background: white; border-radius: 16px; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08); overflow: hidden; border: 1px solid #e2e8f0; margin-bottom: 20px;">
+            <!-- En-tête style renderInfoCard -->
+            <div style="background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); color: white; padding: 12px 20px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <span style="font-size: 18px;">⚠️</span>
+                    <span style="font-weight: 600;">ÉVÉNEMENTS - Client ${client.id}</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                    <span style="background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 20px; font-size: 11px;">📊 ${totalEvents} signalements</span>
+                    <span style="background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 20px; font-size: 11px;">📅 ${totalDays} jours</span>
+                </div>
             </div>
             
-            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: ${STYLES.spacing.sm}; margin-bottom: 20px;">
-                ${renderStatCard('💰', 'CRÉDIT NUL', daysWithCreditNul.size, percentCreditNul, STYLES.gradients.creditNul)}
-                ${renderStatCard('📈', 'PUISSANCE', daysWithSuspendP.size, percentSuspendP, STYLES.gradients.puissance)}
-                ${renderStatCard('🔋', 'ÉNERGIE', daysWithSuspendE.size, percentSuspendE, STYLES.gradients.energie)}
-            </div>
-            
-            <div style="background: ${STYLES.colors.grayBg}; border-radius: ${STYLES.borderRadius.md}; padding: ${STYLES.spacing.sm} ${STYLES.spacing.lg}; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; font-size: 12px; border: 1px solid ${STYLES.colors.border};">
-                <span>📅 ${totalDays} jours analysés</span>
-                <span>📊 ${eventsByDay.length} jours avec événements</span>
-                <span>⚡ ${events.length + zeroCreditDates.length} signalements</span>
-            </div>
+            <div style="padding: 20px;">
+                <!-- 3 stats cards -->
+                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 20px;">
+                    ${renderStatCard('💰', 'CRÉDIT NUL', daysWithCreditNul.size, percentCreditNul, 'linear-gradient(135deg, #f59e0b, #d97706)')}
+                    ${renderStatCard('📈', 'PUISSANCE', daysWithSuspendP.size, percentSuspendP, 'linear-gradient(135deg, #3b82f6, #2563eb)')}
+                    ${renderStatCard('🔋', 'ÉNERGIE', daysWithSuspendE.size, percentSuspendE, 'linear-gradient(135deg, #06b6d4, #0891b2)')}
+                </div>
+                
+                <!-- Résumé rapide -->
+                <div style="background: #f8fafc; border-radius: 12px; padding: 12px 20px; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; font-size: 12px; border: 1px solid #e2e8f0;">
+                    <span>📅 ${totalDays} jours analysés</span>
+                    <span>📊 ${eventsByDay.length} jours avec événements</span>
+                    <span>⚡ ${totalEvents} signalements</span>
+                </div>
     `;
     
     if (eventsByDay.length > 0) {
@@ -743,42 +819,42 @@ function renderEventsClient(client) {
         const tableId = `events-table-${client.id}`;
         
         html += `
-            <button id="${toggleId}" style="width: 100%; padding: ${STYLES.spacing.md}; background: #f1f5f9; border: 1px solid ${STYLES.colors.borderDark}; border-radius: ${STYLES.borderRadius.md}; color: ${STYLES.colors.text}; font-size: 14px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: ${STYLES.spacing.lg};">
+            <button id="${toggleId}" style="width: 100%; padding: 12px; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 12px; color: #1e293b; font-size: 14px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 20px;">
                 <span style="font-size: 16px;">🔽</span> Afficher le tableau détaillé
             </button>
             
-            <div id="${tableId}" style="display: none; border: 2px solid ${STYLES.colors.border}; border-radius: ${STYLES.borderRadius.xl}; overflow: hidden; margin-bottom: ${STYLES.spacing.lg}; max-height: 350px; overflow-y: auto; overflow-x: auto;">
+            <div id="${tableId}" style="display: none; border: 2px solid #e2e8f0; border-radius: 16px; overflow: hidden; margin-bottom: 20px; max-height: 350px; overflow-y: auto; overflow-x: auto;">
                 <table style="width: 100%; border-collapse: collapse; font-size: 12px; min-width: 900px;">
                     <thead style="position: sticky; top: 0; z-index: 10;">
                         <tr>
-                            <th rowspan="2" style="padding: ${STYLES.spacing.lg} ${STYLES.spacing.sm}; text-align: left; border-right: 2px solid ${STYLES.colors.borderDark}; background: #f1f5f9; font-size: 14px; position: sticky; left: 0; z-index: 11;">📅 DATE</th>
-                            <th colspan="3" style="padding: ${STYLES.spacing.md} ${STYLES.spacing.sm}; text-align: center; background: ${STYLES.colors.blue}; color: white; border-right: 2px solid ${STYLES.colors.blueDark};">📈 PUISSANCE DÉPASSÉE</th>
-                            <th colspan="1" style="padding: ${STYLES.spacing.md} ${STYLES.spacing.sm}; text-align: center; background: ${STYLES.colors.warning}; color: white; border-right: 2px solid #d97706;">💰 CRÉDIT NUL</th>
-                            <th colspan="3" style="padding: ${STYLES.spacing.md} ${STYLES.spacing.sm}; text-align: center; background: ${STYLES.colors.info}; color: white;">🔋 ÉNERGIE ÉPUISÉE</th>
+                            <th rowspan="2" style="padding: 16px 8px; text-align: left; border-right: 2px solid #cbd5e1; background: #f1f5f9; font-size: 14px; position: sticky; left: 0; z-index: 11;">📅 DATE</th>
+                            <th colspan="3" style="padding: 12px 8px; text-align: center; background: #3b82f6; color: white; border-right: 2px solid #2563eb;">📈 PUISSANCE DÉPASSÉE</th>
+                            <th colspan="1" style="padding: 12px 8px; text-align: center; background: #f59e0b; color: white; border-right: 2px solid #d97706;">💰 CRÉDIT NUL</th>
+                            <th colspan="3" style="padding: 12px 8px; text-align: center; background: #06b6d4; color: white;">🔋 ÉNERGIE ÉPUISÉE</th>
                         </tr>
                         <tr style="background: #f1f5f9;">
-                            <th style="padding: ${STYLES.spacing.sm} 8px; text-align: center;">Début</th>
-                            <th style="padding: ${STYLES.spacing.sm} 8px; text-align: center;">Fin</th>
-                            <th style="padding: ${STYLES.spacing.sm} 8px; text-align: center; border-right: 2px solid ${STYLES.colors.borderDark};">Durée</th>
-                            <th style="padding: ${STYLES.spacing.sm} 8px; text-align: center; border-right: 2px solid ${STYLES.colors.borderDark};">Signalement</th>
-                            <th style="padding: ${STYLES.spacing.sm} 8px; text-align: center;">Début</th>
-                            <th style="padding: ${STYLES.spacing.sm} 8px; text-align: center;">Fin</th>
-                            <th style="padding: ${STYLES.spacing.sm} 8px; text-align: center;">Durée</th>
+                            <th style="padding: 8px 8px; text-align: center;">Début</th>
+                            <th style="padding: 8px 8px; text-align: center;">Fin</th>
+                            <th style="padding: 8px 8px; text-align: center; border-right: 2px solid #cbd5e1;">Durée</th>
+                            <th style="padding: 8px 8px; text-align: center; border-right: 2px solid #cbd5e1;">Signalement</th>
+                            <th style="padding: 8px 8px; text-align: center;">Début</th>
+                            <th style="padding: 8px 8px; text-align: center;">Fin</th>
+                            <th style="padding: 8px 8px; text-align: center;">Durée</th>
                         </tr>
                     </thead>
                     <tbody>
                         ${eventsByDay.sort((a, b) => b.dateObj - a.dateObj).map((day, idx) => {
                             const bgColor = idx % 2 === 0 ? '#ffffff' : '#fafbfc';
                             return `
-                                <tr style="border-bottom: 1px solid ${STYLES.colors.border}; background: ${bgColor};">
-                                    <td style="padding: ${STYLES.spacing.md} ${STYLES.spacing.sm}; font-weight: 600; border-right: 2px solid ${STYLES.colors.border}; position: sticky; left: 0; background: ${bgColor};">${formatDateToFrench(day.date)}</td>
-                                    <td style="padding: ${STYLES.spacing.sm} 8px; text-align: center; ${day.SuspendP > 0 ? `background: ${STYLES.colors.blue}10; font-weight: 600; color: ${STYLES.colors.blueDark};` : `color: ${STYLES.colors.grayLight};`}">${day.SuspendP_start || '-'}</td>
-                                    <td style="padding: ${STYLES.spacing.sm} 8px; text-align: center; ${day.SuspendP > 0 ? `background: ${STYLES.colors.blue}10; font-weight: 600; color: ${STYLES.colors.blueDark};` : `color: ${STYLES.colors.grayLight};`}">${day.SuspendP_end || '-'}</td>
-                                    <td style="padding: ${STYLES.spacing.sm} 8px; text-align: center; border-right: 2px solid ${STYLES.colors.border}; ${day.SuspendP > 0 ? `background: ${STYLES.colors.blue}20; font-weight: 700; color: ${STYLES.colors.blueDark};` : `color: ${STYLES.colors.grayLight};`}">${day.SuspendP_duration || '-'}</td>
-                                    <td style="padding: ${STYLES.spacing.sm} 8px; text-align: center; border-right: 2px solid ${STYLES.colors.border}; ${day.CreditNul > 0 ? `background: ${STYLES.colors.warning}; color: white; font-weight: 700;` : `background: #f1f5f9; color: ${STYLES.colors.grayLight};`}">${day.CreditNul > 0 ? '⚠️ CRÉDIT NUL' : '✓ Normal'}</td>
-                                    <td style="padding: ${STYLES.spacing.sm} 8px; text-align: center; ${day.SuspendE > 0 ? `background: ${STYLES.colors.info}10; font-weight: 600; color: ${STYLES.colors.infoDark};` : `color: ${STYLES.colors.grayLight};`}">${day.SuspendE_start || '-'}</td>
-                                    <td style="padding: ${STYLES.spacing.sm} 8px; text-align: center; ${day.SuspendE > 0 ? `background: ${STYLES.colors.info}10; font-weight: 600; color: ${STYLES.colors.infoDark};` : `color: ${STYLES.colors.grayLight};`}">${day.SuspendE_end || '-'}</td>
-                                    <td style="padding: ${STYLES.spacing.sm} 8px; text-align: center; ${day.SuspendE > 0 ? `background: ${STYLES.colors.info}20; font-weight: 700; color: ${STYLES.colors.infoDark};` : `color: ${STYLES.colors.grayLight};`}">${day.SuspendE_duration || '-'}</td>
+                                <tr style="border-bottom: 1px solid #e2e8f0; background: ${bgColor};">
+                                    <td style="padding: 12px 8px; font-weight: 600; border-right: 2px solid #e2e8f0; position: sticky; left: 0; background: ${bgColor};">${formatDateToFrench(day.date)}</td>
+                                    <td style="padding: 8px 8px; text-align: center; ${day.SuspendP > 0 ? `background: #3b82f610; font-weight: 600; color: #2563eb;` : `color: #94a3b8;`}">${day.SuspendP_start || '-'}</td>
+                                    <td style="padding: 8px 8px; text-align: center; ${day.SuspendP > 0 ? `background: #3b82f610; font-weight: 600; color: #2563eb;` : `color: #94a3b8;`}">${day.SuspendP_end || '-'}</td>
+                                    <td style="padding: 8px 8px; text-align: center; border-right: 2px solid #e2e8f0; ${day.SuspendP > 0 ? `background: #3b82f620; font-weight: 700; color: #2563eb;` : `color: #94a3b8;`}">${day.SuspendP_duration || '-'}</td>
+                                    <td style="padding: 8px 8px; text-align: center; border-right: 2px solid #e2e8f0; ${day.CreditNul > 0 ? `background: #f59e0b; color: white; font-weight: 700;` : `background: #f1f5f9; color: #94a3b8;`}">${day.CreditNul > 0 ? '⚠️ CRÉDIT NUL' : '✓ Normal'}</td>
+                                    <td style="padding: 8px 8px; text-align: center; ${day.SuspendE > 0 ? `background: #06b6d410; font-weight: 600; color: #0891b2;` : `color: #94a3b8;`}">${day.SuspendE_start || '-'}</td>
+                                    <td style="padding: 8px 8px; text-align: center; ${day.SuspendE > 0 ? `background: #06b6d410; font-weight: 600; color: #0891b2;` : `color: #94a3b8;`}">${day.SuspendE_end || '-'}</td>
+                                    <td style="padding: 8px 8px; text-align: center; ${day.SuspendE > 0 ? `background: #06b6d420; font-weight: 700; color: #0891b2;` : `color: #94a3b8;`}">${day.SuspendE_duration || '-'}</td>
                                 </tr>
                             `;
                         }).join('')}
@@ -786,44 +862,21 @@ function renderEventsClient(client) {
                 </table>
             </div>
             
-            <div style="margin-top: ${STYLES.spacing.lg}; padding: ${STYLES.spacing.md} ${STYLES.spacing.xl}; background: ${STYLES.colors.grayBg}; border-radius: ${STYLES.borderRadius.md}; border: 1px solid ${STYLES.colors.border}; display: flex; align-items: center; gap: 20px; flex-wrap: wrap; font-size: 12px;">
-                <span><span style="color:${STYLES.colors.blue};">⬤</span> Puissance dépassée (SuspendP)</span>
-                <span><span style="color:${STYLES.colors.warning};">⬤</span> Crédit nul</span>
-                <span><span style="color:${STYLES.colors.info};">⬤</span> Énergie épuisée (SuspendE)</span>
-            </div>
-        `;
-    } else {
-        html += `
-            <div style="text-align: center; padding: 40px; color: ${STYLES.colors.grayLight}; background: ${STYLES.colors.grayBg}; border-radius: ${STYLES.borderRadius.xl};">
-                <span style="font-size: 48px; display: block; margin-bottom: ${STYLES.spacing.lg};">✅</span>
-                <h3 style="margin: 0 0 10px 0; color: ${STYLES.colors.textDark};">Aucun événement</h3>
-                <p style="margin: 0; font-size: 14px;">Aucun événement pour ce client</p>
+            <div style="margin-top: 20px; padding: 12px 24px; background: #f8fafc; border-radius: 12px; border: 1px solid #e2e8f0; display: flex; align-items: center; gap: 20px; flex-wrap: wrap; font-size: 12px;">
+                <span><span style="color: #3b82f6;">⬤</span> Puissance dépassée (SuspendP)</span>
+                <span><span style="color: #f59e0b;">⬤</span> Crédit nul</span>
+                <span><span style="color: #06b6d4;">⬤</span> Énergie épuisée (SuspendE)</span>
             </div>
         `;
     }
     
-    html += `</div>`;
-    
-    setTimeout(() => {
-        const toggleBtn = document.getElementById(`toggle-events-${client.id}`);
-        const table = document.getElementById(`events-table-${client.id}`);
-        if (toggleBtn && table) {
-            toggleBtn.onclick = () => {
-                const isHidden = table.style.display === 'none';
-                table.style.display = isHidden ? 'block' : 'none';
-                toggleBtn.innerHTML = isHidden 
-                    ? '<span style="font-size:16px;">🔼</span> Masquer le tableau'
-                    : '<span style="font-size:16px;">🔽</span> Afficher le tableau détaillé';
-            };
-        }
-    }, 100);
-    
+    html += `</div></div>`; // fermeture padding + carte
     return html;
 }
 
 function renderStatCard(icon, label, value, percent, gradient) {
     return `
-        <div style="background: ${gradient}; border-radius: ${STYLES.borderRadius.lg}; padding: ${STYLES.spacing.md}; color: white;">
+        <div style="background: ${gradient}; border-radius: 12px; padding: 12px; color: white;">
             <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
                 <span style="font-size: 20px;">${icon}</span>
                 <span style="font-size: 12px; font-weight: 600; opacity: 0.9;">${label}</span>
