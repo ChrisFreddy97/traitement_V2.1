@@ -138,33 +138,7 @@ export function renderTechnicalDashboard() {
 }
 
 // ===========================================
-// FONCTIONS UTILITAIRES
-// ===========================================
-
-function createDetailButton(targetId, label = "Voir détails") {
-    const buttonId = `btn-${targetId}-${Date.now()}`;
-    
-    setTimeout(() => {
-        const btn = document.getElementById(buttonId);
-        const target = document.getElementById(targetId);
-        if (btn && target) {
-            btn.addEventListener('click', () => {
-                if (target.style.display === 'none' || target.style.display === '') {
-                    target.style.display = 'block';
-                    btn.textContent = 'Masquer détails';
-                } else {
-                    target.style.display = 'none';
-                    btn.textContent = label;
-                }
-            });
-        }
-    }, 100);
-    
-    return `<button id="${buttonId}" class="detail-btn">${label}</button>`;
-}
-
-// ===========================================
-// FILTRE - VERSION MODERNE (avec conservation des noms)
+// FILTRE - STYLE MODERNE
 // ===========================================
 
 export function renderFilterPanel() {
@@ -175,102 +149,89 @@ export function renderFilterPanel() {
         return `<option value="${date}" ${currentFilter.startDate && new Date(currentFilter.startDate).toDateString() === new Date(date).toDateString() ? 'selected' : ''}>${formatted}</option>`;
     }).join('');
     
-    const hasActiveFiltre = hasActiveFilter(currentFilter);
-    const firstDate = getFirstAvailableDate();
-    const lastDate = getLastAvailableDate();
     const years = getAvailableYears();
-    const yearOptions = years.map(year => `<option value="${year}" ${currentFilter.year === year ? 'selected' : ''}>${year}</option>`).join('');
-    const monthNames = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
-    const monthOptions = monthNames.map((month, i) => `<option value="${i + 1}" ${currentFilter.month === i + 1 ? 'selected' : ''}>${month}</option>`).join('');
-    
-    const startDateValue = currentFilter.startDate ? formatDateForInput(currentFilter.startDate) : '';
-    const endDateValue = currentFilter.endDate ? formatDateForInput(currentFilter.endDate) : '';
     
     return `
         <div style="background: white; border-radius: 16px; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08); overflow: hidden; border: 1px solid #e2e8f0; margin-bottom: 20px;">
+            <!-- En-tête avec toggle -->
             <div style="background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); color: white; padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; cursor: pointer;" onclick="window.toggleFilterPanelModern()">
                 <div style="display: flex; align-items: center; gap: 10px;">
                     <span style="font-size: 18px;">🎯</span>
-                    <span style="font-weight: 600;">FILTRER LES DONNÉES</span>
+                    <span style="font-weight: 600;">Filtrer les données</span>
                 </div>
                 <div style="display: flex; align-items: center; gap: 12px;">
-                    <span id="filterActiveBadge" style="background: rgba(34,197,94,0.3); color: #4ade80; padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 500; display: ${hasActiveFiltre ? 'inline-block' : 'none'};">✓ Filtre actif</span>
-                    <span id="filterToggleIcon" style="font-size: 1.2rem; transition: transform 0.2s;">▼</span>
+                    <span id="filterActiveBadge" style="display: ${hasActiveFilter(currentFilter) ? 'inline-flex' : 'none'}; background: #ef4444; color: white; padding: 2px 8px; border-radius: 20px; font-size: 10px;">Filtre actif</span>
+                    <span id="filterToggleIcon" style="font-size: 1rem; transition: transform 0.2s;">▼</span>
                 </div>
             </div>
             
-            <div id="filterContentModern" style="display: none;">
-                <div id="filterSummary" style="padding: 12px 20px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; font-size: 13px; color: #475569; display: flex; align-items: center; gap: 8px;">
-                    <span style="font-size: 14px;">📅</span> ${getFilterSummaryText(currentFilter)}
+            <!-- Contenu du filtre -->
+            <div id="filterContentModern" style="display: block; padding: 20px;">
+                <!-- Résumé du filtre actif -->
+                <div id="filterSummary" style="background: #f8fafc; padding: 10px 15px; border-radius: 10px; margin-bottom: 20px; font-size: 13px; color: #475569; border-left: 4px solid #f59e0b;">
+                    ${getFilterSummaryText(currentFilter)}
                 </div>
-                
-                <div style="padding: 20px; display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
+
+                <!-- Grille des filtres -->
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px;">
+                    
                     <!-- Section Période rapide -->
-                    <div style="background: #f8fafc; border-radius: 12px; padding: 16px; border: 1px solid #e2e8f0;">
-                        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 15px;">
-                            <span style="font-size: 18px;">⚡</span>
-                            <span style="font-weight: 700; color: #1e293b; font-size: 13px;">Période rapide</span>
+                    <div style="background: #f8fafc; border-radius: 12px; padding: 15px; border: 1px solid #e2e8f0;">
+                        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+                            <span style="font-size: 16px;">⚡</span>
+                            <span style="font-weight: 600; font-size: 13px; color: #1e293b;">Période rapide</span>
                         </div>
-                        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;">
-                            <button class="filter-chip-modern ${currentFilter.period === '7days' ? 'active' : ''}" data-period="7days" onclick="window.applyFilterPeriod('7days')">7 jours</button>
-                            <button class="filter-chip-modern ${currentFilter.period === '15days' ? 'active' : ''}" data-period="15days" onclick="window.applyFilterPeriod('15days')">15 jours</button>
-                            <button class="filter-chip-modern ${currentFilter.period === '30days' ? 'active' : ''}" data-period="30days" onclick="window.applyFilterPeriod('30days')">30 jours</button>
-                            <button class="filter-chip-modern ${currentFilter.period === '2months' ? 'active' : ''}" data-period="2months" onclick="window.applyFilterPeriod('2months')">2 mois</button>
-                            <button class="filter-chip-modern ${currentFilter.period === '3months' ? 'active' : ''}" data-period="3months" onclick="window.applyFilterPeriod('3months')">3 mois</button>
-                            <button class="filter-chip-modern ${currentFilter.period === '6months' ? 'active' : ''}" data-period="6months" onclick="window.applyFilterPeriod('6months')">6 mois</button>
-                            <button class="filter-chip-modern ${currentFilter.period === '1year' ? 'active' : ''}" data-period="1year" onclick="window.applyFilterPeriod('1year')">1 an</button>
-                            <button class="filter-chip-modern ${currentFilter.period === 'all' ? 'active' : ''}" data-period="all" onclick="window.applyFilterPeriod('all')">Toutes</button>
+                        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;">
+                            <button class="filter-chip" data-period="7days" onclick="window.applyFilterPeriod('7days')" style="padding: 8px; border: 1px solid #e2e8f0; border-radius: 8px; background: ${currentFilter.period === '7days' ? '#f59e0b' : 'white'}; color: ${currentFilter.period === '7days' ? 'white' : '#1e293b'}; font-size: 11px; cursor: pointer; transition: all 0.2s;">7j</button>
+                            <button class="filter-chip" data-period="15days" onclick="window.applyFilterPeriod('15days')" style="padding: 8px; border: 1px solid #e2e8f0; border-radius: 8px; background: ${currentFilter.period === '15days' ? '#f59e0b' : 'white'}; color: ${currentFilter.period === '15days' ? 'white' : '#1e293b'}; font-size: 11px; cursor: pointer;">15j</button>
+                            <button class="filter-chip" data-period="30days" onclick="window.applyFilterPeriod('30days')" style="padding: 8px; border: 1px solid #e2e8f0; border-radius: 8px; background: ${currentFilter.period === '30days' ? '#f59e0b' : 'white'}; color: ${currentFilter.period === '30days' ? 'white' : '#1e293b'}; font-size: 11px; cursor: pointer;">30j</button>
+                            <button class="filter-chip" data-period="2months" onclick="window.applyFilterPeriod('2months')" style="padding: 8px; border: 1px solid #e2e8f0; border-radius: 8px; background: ${currentFilter.period === '2months' ? '#f59e0b' : 'white'}; color: ${currentFilter.period === '2months' ? 'white' : '#1e293b'}; font-size: 11px; cursor: pointer;">2m</button>
+                            <button class="filter-chip" data-period="3months" onclick="window.applyFilterPeriod('3months')" style="padding: 8px; border: 1px solid #e2e8f0; border-radius: 8px; background: ${currentFilter.period === '3months' ? '#f59e0b' : 'white'}; color: ${currentFilter.period === '3months' ? 'white' : '#1e293b'}; font-size: 11px; cursor: pointer;">3m</button>
+                            <button class="filter-chip" data-period="6months" onclick="window.applyFilterPeriod('6months')" style="padding: 8px; border: 1px solid #e2e8f0; border-radius: 8px; background: ${currentFilter.period === '6months' ? '#f59e0b' : 'white'}; color: ${currentFilter.period === '6months' ? 'white' : '#1e293b'}; font-size: 11px; cursor: pointer;">6m</button>
+                            <button class="filter-chip" data-period="1year" onclick="window.applyFilterPeriod('1year')" style="padding: 8px; border: 1px solid #e2e8f0; border-radius: 8px; background: ${currentFilter.period === '1year' ? '#f59e0b' : 'white'}; color: ${currentFilter.period === '1year' ? 'white' : '#1e293b'}; font-size: 11px; cursor: pointer;">1a</button>
+                            <button class="filter-chip" data-period="all" onclick="window.applyFilterPeriod('all')" style="padding: 8px; border: 1px solid #e2e8f0; border-radius: 8px; background: ${currentFilter.period === 'all' ? '#f59e0b' : 'white'}; color: ${currentFilter.period === 'all' ? 'white' : '#1e293b'}; font-size: 11px; cursor: pointer;">Tout</button>
                         </div>
                     </div>
                     
                     <!-- Section Mois spécifique -->
-                    <div style="background: #f8fafc; border-radius: 12px; padding: 16px; border: 1px solid #e2e8f0;">
-                        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 15px;">
-                            <span style="font-size: 18px;">📅</span>
-                            <span style="font-weight: 700; color: #1e293b; font-size: 13px;">Mois spécifique</span>
+                    <div style="background: #f8fafc; border-radius: 12px; padding: 15px; border: 1px solid #e2e8f0;">
+                        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+                            <span style="font-size: 16px;">📅</span>
+                            <span style="font-weight: 600; font-size: 13px; color: #1e293b;">Mois spécifique</span>
                         </div>
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
-                            <div>
-                                <label style="display: block; font-size: 11px; color: #64748b; margin-bottom: 4px;">Année</label>
-                                <select id="filterYearSelect" style="width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 13px; background: white;">
-                                    <option value="">Toutes</option>
-                                    ${yearOptions}
-                                </select>
-                            </div>
-                            <div>
-                                <label style="display: block; font-size: 11px; color: #64748b; margin-bottom: 4px;">Mois</label>
-                                <select id="filterMonthSelect" style="width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 13px; background: white;">
-                                    <option value="">Tous</option>
-                                    ${monthOptions}
-                                </select>
-                            </div>
+                        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                            <select id="filterMonthSelect" style="flex: 1; padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 12px; background: white;">
+                                <option value="">Mois</option>
+                                ${['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'].map((m, i) => `<option value="${i+1}" ${currentFilter.month === i+1 ? 'selected' : ''}>${m}</option>`).join('')}
+                            </select>
+                            <select id="filterYearSelect" style="flex: 1; padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 12px; background: white;">
+                                <option value="">Année</option>
+                                ${years.map(y => `<option value="${y}" ${currentFilter.year === y ? 'selected' : ''}>${y}</option>`).join('')}
+                            </select>
+                            <button class="filter-btn-primary" onclick="window.applyFilterMonthYear()" style="padding: 8px 16px; background: #f59e0b; border: none; border-radius: 8px; color: white; font-size: 12px; cursor: pointer;">▶ Appliquer</button>
                         </div>
-                        <button id="applyMonthYearBtn" style="width: 100%; padding: 10px; background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; border: none; border-radius: 8px; font-weight: 600; font-size: 13px; cursor: pointer;">✓ Appliquer</button>
                     </div>
                     
                     <!-- Section Dates personnalisées -->
-                    <div style="background: #f8fafc; border-radius: 12px; padding: 16px; border: 1px solid #e2e8f0;">
-                        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 15px;">
-                            <span style="font-size: 18px;">📆</span>
-                            <span style="font-weight: 700; color: #1e293b; font-size: 13px;">Dates personnalisées</span>
+                    <div style="background: #f8fafc; border-radius: 12px; padding: 15px; border: 1px solid #e2e8f0;">
+                        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+                            <span style="font-size: 16px;">📆</span>
+                            <span style="font-weight: 600; font-size: 13px; color: #1e293b;">Dates personnalisées</span>
                         </div>
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
-                            <div>
-                                <label style="display: block; font-size: 11px; color: #64748b; margin-bottom: 4px;">Date de début</label>
-                                <input type="date" id="filterStartDateInput" style="width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 13px;" min="${firstDate || ''}" max="${lastDate || ''}" value="${startDateValue}">
-                            </div>
-                            <div>
-                                <label style="display: block; font-size: 11px; color: #64748b; margin-bottom: 4px;">Date de fin</label>
-                                <input type="date" id="filterEndDateInput" style="width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 13px;" min="${firstDate || ''}" max="${lastDate || ''}" value="${endDateValue}">
-                            </div>
+                        <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+                            <select id="filterStartDateSelect" style="flex: 1; padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 12px; background: white;">
+                                <option value="">Du</option>
+                                ${dateOptions}
+                            </select>
+                            <span style="color: #64748b;">→</span>
+                            <select id="filterEndDateSelect" style="flex: 1; padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 12px; background: white;">
+                                <option value="">Au</option>
+                                ${dateOptions}
+                            </select>
                         </div>
-                        <div style="display: flex; gap: 12px;">
-                            <button id="applyCustomDatesBtn" style="flex: 2; padding: 10px; background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: white; border: none; border-radius: 8px; font-weight: 600; font-size: 13px; cursor: pointer;">✓ Appliquer</button>
-                            <button id="resetFiltersBtn" style="flex: 1; padding: 10px; background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; border-radius: 8px; font-weight: 600; font-size: 13px; cursor: pointer;">⟳ Réinitialiser</button>
-                        </div>
-                        <div style="margin-top: 12px; padding: 8px 12px; background: #e2e8f0; border-radius: 8px; font-size: 11px; color: #475569; display: flex; justify-content: space-between;">
-                            <span>📅 ${firstDate ? formatDisplayDate(firstDate) : '—'} → ${lastDate ? formatDisplayDate(lastDate) : '—'}</span>
-                            <span>📊 Données disponibles</span>
+                        <div style="display: flex; gap: 10px; margin-top: 12px;">
+                            <button class="filter-btn-primary" onclick="window.applyFilterCustomDates()" style="flex: 1; padding: 8px; background: #f59e0b; border: none; border-radius: 8px; color: white; font-size: 12px; cursor: pointer;">✓ Appliquer</button>
+                            <button class="filter-btn-secondary" onclick="window.clearFilter()" style="flex: 1; padding: 8px; background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 8px; color: #475569; font-size: 12px; cursor: pointer;">⟳ Réinitialiser</button>
                         </div>
                     </div>
                 </div>
@@ -279,67 +240,73 @@ export function renderFilterPanel() {
     `;
 }
 
-// Fonction globale pour toggler le panneau
+// Fonction globale pour toggler le panneau de filtre
 window.toggleFilterPanelModern = function() {
     const content = document.getElementById('filterContentModern');
     const toggleIcon = document.getElementById('filterToggleIcon');
     if (content && toggleIcon) {
         if (content.style.display === 'none') {
             content.style.display = 'block';
-            toggleIcon.style.transform = 'rotate(180deg)';
+            toggleIcon.style.transform = 'rotate(0deg)';
+            toggleIcon.textContent = '▼';
         } else {
             content.style.display = 'none';
-            toggleIcon.style.transform = 'rotate(0deg)';
+            toggleIcon.style.transform = 'rotate(-90deg)';
+            toggleIcon.textContent = '▶';
         }
     }
 };
 
-// Attacher les événements après le rendu (en utilisant les IDs originaux)
-document.addEventListener('DOMContentLoaded', function() {
-    setTimeout(() => {
-        const applyMonthYearBtn = document.getElementById('applyMonthYearBtn');
-        if (applyMonthYearBtn) {
-            applyMonthYearBtn.addEventListener('click', window.applyFilterMonthYear);
-        }
-        
-        const applyCustomBtn = document.getElementById('applyCustomDatesBtn');
-        if (applyCustomBtn) {
-            applyCustomBtn.addEventListener('click', window.applyFilterCustomDates);
-        }
-        
-        const resetBtn = document.getElementById('resetFiltersBtn');
-        if (resetBtn) {
-            resetBtn.addEventListener('click', window.clearFilter);
-        }
-    }, 200);
-});
+// Remplacer l'ancienne fonction toggleFilterPanel
+window.toggleFilterPanel = window.toggleFilterPanelModern;
 
-// Ajouter les styles CSS
-const filterStyles = document.createElement('style');
-filterStyles.textContent = `
-    .filter-chip-modern {
-        padding: 10px;
-        border: 1px solid #cbd5e1;
-        border-radius: 8px;
-        background: white;
-        color: #475569;
-        cursor: pointer;
-        font-size: 12px;
-        font-weight: 500;
-        transition: all 0.2s;
-    }
-    .filter-chip-modern:hover {
-        transform: translateY(-1px);
-        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        border-color: #f59e0b;
-    }
-    .filter-chip-modern.active {
-        background: #f59e0b;
-        border-color: #f59e0b;
-        color: white;
-    }
-`;
-document.head.appendChild(filterStyles);
+// Mettre à jour refreshFilterUI pour le nouveau style
+const originalRefreshFilterUI = window.refreshFilterUI;
+
+window.refreshFilterUI = function() {
+    if (originalRefreshFilterUI) originalRefreshFilterUI();
+    
+    setTimeout(() => {
+        const filter = getCurrentFilter();
+        
+        // Mettre à jour le badge
+        const badge = document.getElementById('filterActiveBadge');
+        if (badge) {
+            badge.style.display = hasActiveFilter(filter) ? 'inline-flex' : 'none';
+        }
+        
+        // Mettre à jour le résumé
+        const summary = document.getElementById('filterSummary');
+        if (summary) {
+            summary.innerHTML = getFilterSummaryText(filter);
+        }
+        
+        // Mettre à jour les styles des boutons période
+        document.querySelectorAll('.filter-chip[data-period]').forEach(btn => {
+            const period = btn.getAttribute('data-period');
+            if (filter.period === period) {
+                btn.style.background = '#f59e0b';
+                btn.style.color = 'white';
+                btn.style.borderColor = '#f59e0b';
+            } else {
+                btn.style.background = 'white';
+                btn.style.color = '#1e293b';
+                btn.style.borderColor = '#e2e8f0';
+            }
+        });
+        
+        // Mettre à jour les selects
+        const monthSelect = document.getElementById('filterMonthSelect');
+        const yearSelect = document.getElementById('filterYearSelect');
+        const startSelect = document.getElementById('filterStartDateSelect');
+        const endSelect = document.getElementById('filterEndDateSelect');
+        
+        if (monthSelect) monthSelect.value = filter.month || '';
+        if (yearSelect) yearSelect.value = filter.year || '';
+        if (startSelect && filter.startDate) startSelect.value = new Date(filter.startDate).toISOString().split('T')[0];
+        if (endSelect && filter.endDate) endSelect.value = new Date(filter.endDate).toISOString().split('T')[0];
+    }, 50);
+};
 
 // ===========================================
 // FILTRE
@@ -474,117 +441,8 @@ function formatDateForInput(date) {
     const d = new Date(date);
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
-/*
-export function renderFilterPanel() {
-    const currentFilter = getCurrentFilter();
-    const availableDates = getAvailableDates();
-    const dateOptions = availableDates.map(date => {
-        const formatted = new Date(date).toLocaleDateString('fr-FR');
-        return `<option value="${date}" ${currentFilter.startDate && new Date(currentFilter.startDate).toDateString() === new Date(date).toDateString() ? 'selected' : ''}>${formatted}</option>`;
-    }).join('');
-    
-    return `
-        <div class="filter-panel">
-            <div class="filter-header" onclick="window.toggleFilterPanel()">
-                <div class="filter-header-left">
-                    <span class="filter-icon">🎯</span>
-                    <span class="filter-title">Filtrer les données</span>
-                </div>
-                <div class="filter-header-right">
-                    <span class="filter-badge" id="filterActiveBadge" style="display: ${hasActiveFilter(currentFilter) ? 'inline-flex' : 'none'};">Filtre actif</span>
-                    <span class="filter-toggle">▼</span>
-                </div>
-            </div>
-            
-            <div class="filter-content" id="filterContent">
-                <!-- Résumé du filtre actif -->
-                <div class="filter-summary" id="filterSummary">
-                    ${getFilterSummaryText(currentFilter)}
-                </div>
 
-                <!-- Section Période rapide -->
-                <div class="filter-section">
-                    <div class="filter-section-header">
-                        <span class="filter-section-icon">⚡</span>
-                        <span class="filter-section-title">Période rapide</span>
-                    </div>
-                    <div class="filter-options-grid">
-                        <button class="filter-chip ${currentFilter.period === '7days' ? 'active' : ''}" data-period="7days" onclick="window.applyFilterPeriod('7days')">7 jours</button>
-                        <button class="filter-chip ${currentFilter.period === '15days' ? 'active' : ''}" data-period="15days" onclick="window.applyFilterPeriod('15days')">15 jours</button>
-                        <button class="filter-chip ${currentFilter.period === '30days' ? 'active' : ''}" data-period="30days" onclick="window.applyFilterPeriod('30days')">30 jours</button>
-                        <button class="filter-chip ${currentFilter.period === '2months' ? 'active' : ''}" data-period="2months" onclick="window.applyFilterPeriod('2months')">2 mois</button>
-                        <button class="filter-chip ${currentFilter.period === '3months' ? 'active' : ''}" data-period="3months" onclick="window.applyFilterPeriod('3months')">3 mois</button>
-                        <button class="filter-chip ${currentFilter.period === '6months' ? 'active' : ''}" data-period="6months" onclick="window.applyFilterPeriod('6months')">6 mois</button>
-                        <button class="filter-chip ${currentFilter.period === '1year' ? 'active' : ''}" data-period="1year" onclick="window.applyFilterPeriod('1year')">1 an</button>
-                        <button class="filter-chip ${currentFilter.period === 'all' ? 'active' : ''}" data-period="all" onclick="window.applyFilterPeriod('all')">Toutes</button>
-                    </div>
-                </div>
-                
-                <!-- Section Mois spécifique -->
-                <div class="filter-section">
-                    <div class="filter-section-header">
-                        <span class="filter-section-icon">📅</span>
-                        <span class="filter-section-title">Mois spécifique</span>
-                    </div>
-                    <div class="filter-controls-group">
-                        <select class="filter-select" id="filterMonthSelect">
-                            <option value="">Sélectionner un mois</option>
-                            ${Array.from({length: 12}, (_, i) => {
-                                const monthNum = i + 1;
-                                const monthName = new Date(2000, i, 1).toLocaleDateString('fr-FR', { month: 'long' });
-                                return `<option value="${monthNum}" ${currentFilter.month === monthNum ? 'selected' : ''}>${monthName}</option>`;
-                            }).join('')}
-                        </select>
-                        <select class="filter-select" id="filterYearSelect">
-                            <option value="">Sélectionner une année</option>
-                            ${getAvailableYears().map(year => `<option value="${year}" ${currentFilter.year === year ? 'selected' : ''}>${year}</option>`).join('')}
-                        </select>
-                        <button class="filter-btn-primary" onclick="window.applyFilterMonthYear()">
-                            <span>▶</span> Appliquer
-                        </button>
-                    </div>
-                </div>
-                
-                <!-- Section Dates personnalisées -->
-                <div class="filter-section">
-                    <div class="filter-section-header">
-                        <span class="filter-section-icon">📆</span>
-                        <span class="filter-section-title">Dates personnalisées</span>
-                    </div>
-                    <div class="filter-controls-group">
-                        <div class="filter-date-range">
-                            <div class="filter-date-box">
-                                <span class="date-label">Du</span>
-                                <select class="filter-date-select" id="filterStartDateSelect">
-                                    <option value="">Choisir une date</option>
-                                    ${dateOptions}
-                                </select>
-                            </div>
-                            <span class="date-separator">→</span>
-                            <div class="filter-date-box">
-                                <span class="date-label">Au</span>
-                                <select class="filter-date-select" id="filterEndDateSelect">
-                                    <option value="">Choisir une date</option>
-                                    ${dateOptions}
-                                </select>
-                            </div>
-                        </div>
-                        <div class="filter-actions">
-                            <button class="filter-btn-primary" onclick="window.applyFilterCustomDates()">
-                                <span>✓</span> Appliquer
-                            </button>
-                            <button class="filter-btn-secondary" onclick="window.clearFilter()">
-                                <span>⟳</span> Réinitialiser
-                            </button>
-                        </div>
-                    </div>
-                </div>
-                
-            </div>
-        </div>
-    `;
-}
-*/
+
 // ===========================================
 // FONCTIONS GLOBALES DU FILTRE
 // ===========================================
@@ -594,7 +452,6 @@ window.applyFilterPeriod = function(period) {
         module.applyFilter({ period, startDate: null, endDate: null, month: null, year: null });
     });
 };
-/*
 window.applyFilterMonthYear = function() {
     const month = document.getElementById('filterMonthSelect')?.value;
     const year = document.getElementById('filterYearSelect')?.value;
@@ -613,27 +470,12 @@ window.applyFilterCustomDates = function() {
         module.applyFilter({ period: null, startDate: start ? new Date(start) : null, endDate: end ? new Date(end) : null, month: null, year: null });
     });
 };
-*/
+
 window.clearFilter = function() {
     import('../../arduinoMain.js').then(module => {
         module.applyFilter({ period: 'all', startDate: null, endDate: null, month: null, year: null });
     });
 };
-/*
-window.toggleFilterPanel = function() {
-    const content = document.getElementById('filterContent');
-    const toggle = document.querySelector('.filter-toggle');
-    if (content && toggle) {
-        if (content.style.display === 'none') {
-            content.style.display = 'block';
-            toggle.textContent = '▼';
-        } else {
-            content.style.display = 'none';
-            toggle.textContent = '▶';
-        }
-    }
-};
-*/
 
 export function refreshFilterUI() {
     setTimeout(() => {

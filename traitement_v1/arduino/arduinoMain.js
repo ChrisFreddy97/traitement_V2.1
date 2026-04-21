@@ -1069,29 +1069,38 @@ async function handleFileSelect() {
 }
 
 // ===========================================
-// ÉVÉNEMENTS D'IMPORT
+// ÉVÉNEMENTS D'IMPORT (Conditionnels)
 // ===========================================
 
-fileInput.addEventListener('change', handleFileSelect);
+// Vérifier si les éléments existent dans le DOM
+if (fileInput) {
+    fileInput.addEventListener('change', handleFileSelect);
+} else {
+    console.log("ℹ️ fileInput non trouvé (page d'analyse probablement)");
+}
 
-uploadSection.addEventListener('dragover', (e) => {
-    e.preventDefault();
-    uploadSection.classList.add('dragover');
-});
+if (uploadSection) {
+    uploadSection.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        uploadSection.classList.add('dragover');
+    });
 
-uploadSection.addEventListener('dragleave', () => {
-    uploadSection.classList.remove('dragover');
-});
+    uploadSection.addEventListener('dragleave', () => {
+        uploadSection.classList.remove('dragover');
+    });
 
-uploadSection.addEventListener('drop', (e) => {
-    e.preventDefault();
-    uploadSection.classList.remove('dragover');
-    const files = e.dataTransfer.files;
-    if (files.length > 0) {
-        fileInput.files = files;
-        handleFileSelect();
-    }
-});
+    uploadSection.addEventListener('drop', (e) => {
+        e.preventDefault();
+        uploadSection.classList.remove('dragover');
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+            fileInput.files = files;
+            handleFileSelect();
+        }
+    });
+} else {
+    console.log("ℹ️ uploadSection non trouvé (page d'analyse probablement)");
+}
 
 // ===========================================
 // FONCTION POUR RÉINITIALISER LE FILTRE
@@ -1365,3 +1374,48 @@ function filterTablesByDate(tables, filter) {
     
     console.log(`📱 Plateforme détectée: ${document.body.className}`);
 })();
+
+// ===========================================
+// FONCTION POUR ANALYSER UN CONTENU TEXTE (pour analyzeFile.html)
+// ===========================================
+
+export async function analyzeFromContent(content, nrValue = null) {
+    try {
+        showLoader();
+        simulateProgress();
+
+        const nanoreseauMatch = content.match(/<#NANORESEAU:(\d+)>/);
+        if (!nanoreseauMatch && !nrValue) {
+            throw new Error('Numéro NANORESEAU non trouvé');
+        }
+        
+        const nrNumber = nrValue || nanoreseauMatch[1];
+        if (nanoreseauValue) nanoreseauValue.textContent = nrNumber;
+
+        const rawTables = parseRawTables(content);
+        database.rawTables = JSON.parse(JSON.stringify(rawTables));
+        
+        const tablesToUse = filterTablesByDate(rawTables, currentFilter);
+        buildDatabase(tablesToUse);
+        
+        buildEventMap();
+        analyzeTechnicalData();
+        analyzeEnergyData();
+        analyzeCommercialData();
+        linkEnergyToCommercial();
+        
+        renderByTab();
+        
+        document.getElementById('infoSection')?.classList.add('show');
+        hideError();
+        
+        console.log("✅ Analyse terminée avec succès");
+        return { success: true, nr: nrNumber };
+        
+    } catch (err) {
+        showError('Erreur lors de l\'analyse: ' + err.message);
+        console.error(err);
+        hideLoader();
+        throw err;
+    }
+}

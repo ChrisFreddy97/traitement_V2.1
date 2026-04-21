@@ -872,7 +872,7 @@ input[type="file"] {
 
 /* ----- BASE HTML ----- */
 html {
-    font-size: 18px;
+    font-size: 16px;
     scroll-behavior: smooth;
 }
 
@@ -880,7 +880,7 @@ html {
 /* Ces classes sont à appliquer sur le body ou un conteneur parent */
 .web, 
 .electron { 
-    font-size: 14px; 
+    font-size: 12px; 
 }
 
 .tablet { 
@@ -1347,4 +1347,3 @@ html {
 .hidden-details.show {
     display: block;
 }
-
