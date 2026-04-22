@@ -2090,23 +2090,25 @@ function renderMonthlyCreditAnalysis(credits, zeroCreditDates) {
         monthData.sumCredit += value;
     });
     
-    // 3. Calculer les stats par mois et trier par date décroissante
+    // 3. Calculer les stats par mois et trier par date croissante (comme code 1)
     const sortedMonths = Array.from(monthlyData.values())
         .map(month => {
             const avgCredit = month.sumCredit / month.totalDays;
             const percentZeroDays = (month.zeroDays / month.totalDays) * 100;
             const availabilityRate = 100 - percentZeroDays;
+            const positiveCreditDays = month.totalDays - month.zeroDays;
             
             return {
                 ...month,
                 avgCredit: avgCredit,
                 percentZeroDays: percentZeroDays,
-                availabilityRate: availabilityRate
+                availabilityRate: availabilityRate,
+                positiveCreditDays: positiveCreditDays
             };
         })
         .sort((a, b) => {
-            if (a.year !== b.year) return b.year - a.year;
-            return b.month - a.month;
+            if (a.year !== b.year) return a.year - b.year;  // Tri croissant (code 1)
+            return a.month - b.month;  // Tri croissant
         });
     
     if (sortedMonths.length === 0) {
@@ -2119,52 +2121,51 @@ function renderMonthlyCreditAnalysis(credits, zeroCreditDates) {
         `;
     }
     
-    // 4. Fonction pour obtenir l'icône et la couleur selon le taux de disponibilité
-    function getAvailabilityStatus(rate, zeroPercent) {
-        if (zeroPercent === 0) {
-            return { icon: '✅', color: '#22c55e', bgOpacity: '20', label: 'Parfait' };
-        } else if (rate >= 95) {
-            return { icon: '🟢', color: '#22c55e', bgOpacity: '20', label: 'Excellent' };
-        } else if (rate >= 80) {
-            return { icon: '⚠️', color: '#f59e0b', bgOpacity: '20', label: 'Attention' };
-        } else {
-            return { icon: '🔴', color: '#ef4444', bgOpacity: '20', label: 'Critique' };
-        }
+    // 4. Couleurs par mois (comme code 1)
+    const monthColors = {
+        0: '#22c55e', 1: '#eab308', 2: '#a855f7', 3: '#f97316',
+        4: '#06b6d4', 5: '#ec4899', 6: '#84cc16', 7: '#f59e0b',
+        8: '#8b5cf6', 9: '#ef4444', 10: '#10b981', 11: '#6366f1'
+    };
+    
+    // 5. Déterminer la couleur du taux de disponibilité (comme code 1)
+    function getCreditColor(rate) {
+        if (rate < 70) return '#dc2626';      // Rouge
+        if (rate < 90) return '#f59e0b';      // Orange
+        return '#16a34a';                      // Vert
     }
     
-    // 5. Générer le HTML du tableau
+    // 6. Générer le HTML du tableau
     const monthNames = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
     
     const rowsHTML = sortedMonths.map(month => {
         const monthName = monthNames[month.month - 1];
-        const percentZeroDays = month.percentZeroDays.toFixed(1);
+        const totalDays = month.totalDays;
         const availabilityRate = month.availabilityRate.toFixed(1);
-        const status = getAvailabilityStatus(month.availabilityRate, month.zeroDays);
+        const percentZeroDays = month.percentZeroDays.toFixed(1);
+        const creditColor = getCreditColor(parseFloat(availabilityRate));
         
         return `
-            <tr style="border-bottom: 1px solid ${STYLES.colors.border};">
-                <td style="padding: ${STYLES.spacing.md} ${STYLES.spacing.sm}; font-weight: 600;">
-                    ${monthName} ${month.year}
+            <tr style="border-bottom: 1px solid #e2e8f0;">
+                <td style="padding: 12px 10px; font-weight: 600;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <div style="width: 12px; height: 12px; background: ${monthColors[month.month - 1]}; border-radius: 2px;"></div>
+                        <span>${monthName} ${month.year}</span>
+                    </div>
                 </td>
-                <td style="padding: ${STYLES.spacing.md} ${STYLES.spacing.sm}; text-align: center;">
-                    ${month.totalDays}
-                    <span style="font-size: 10px; color: ${STYLES.colors.gray};"> (100%)</span>
+                <td style="padding: 12px 8px; text-align: center;"><strong>${totalDays}</strong></td>
+                <td style="padding: 12px 8px; text-align: center;">
+                    <span style="color: ${month.zeroDays > 0 ? '#dc2626' : '#16a34a'}; font-weight: 700;">${month.zeroDays}</span>
+                    <div style="font-size: 10px; color: #64748b;">(${percentZeroDays}%)</div>
                 </td>
-                <td style="padding: ${STYLES.spacing.md} ${STYLES.spacing.sm}; text-align: center;">
-                    ${month.zeroDays}
-                    <span style="font-size: 10px; color: ${STYLES.colors.gray};"> (${percentZeroDays}%)</span>
+                <td style="padding: 12px 8px; text-align: center;">
+                    <span style="color: ${creditColor}; font-weight: 600;">${availabilityRate}%</span>
+                    <div style="margin-top: 3px; width: 60px; height: 4px; background: #e2e8f0; border-radius: 2px; overflow: hidden; margin: 3px auto 0;">
+                        <div style="width: ${availabilityRate}%; height: 100%; background: ${creditColor}; border-radius: 2px;"></div>
+                    </div>
                 </td>
-                <td style="padding: ${STYLES.spacing.md} ${STYLES.spacing.sm}; text-align: center;">
-                    <span style="display: inline-flex; align-items: center; gap: 6px; background: ${status.color}${status.bgOpacity}; color: ${status.color}; font-weight: 600; padding: 4px 10px; border-radius: 20px; font-size: 12px;">
-                        ${status.icon} ${availabilityRate}%
-                    </span>
-                </td>
-                <td style="padding: ${STYLES.spacing.md} ${STYLES.spacing.sm}; text-align: center; font-weight: 600; color: ${STYLES.colors.primary};">
-                    ${month.maxCredit}
-                </td>
-                <td style="padding: ${STYLES.spacing.md} ${STYLES.spacing.sm}; text-align: center;">
-                    ${month.avgCredit.toFixed(1)}
-                </td>
+                <td style="padding: 12px 8px; text-align: center; color: #16a34a; font-weight: 600;">${month.maxCredit} j</td>
+                <td style="padding: 12px 8px; text-align: center; font-weight: 500;">${month.avgCredit.toFixed(1)} j</td>
             </tr>
         `;
     }).join('');
@@ -2172,15 +2173,15 @@ function renderMonthlyCreditAnalysis(credits, zeroCreditDates) {
     // Calcul des totaux généraux
     const totalDays = sortedMonths.reduce((sum, m) => sum + m.totalDays, 0);
     const totalZeroDays = sortedMonths.reduce((sum, m) => sum + m.zeroDays, 0);
-    const totalAvailabilityRate = totalDays > 0 ? ((totalDays - totalZeroDays) / totalDays * 100).toFixed(1) : 0;
+    const overallAvailabilityRate = totalDays > 0 ? ((totalDays - totalZeroDays) / totalDays * 100).toFixed(1) : 0;
     const totalZeroPercent = totalDays > 0 ? (totalZeroDays / totalDays * 100).toFixed(1) : 0;
     const overallMaxCredit = Math.max(...sortedMonths.map(m => m.maxCredit), 0);
     const overallAvgCredit = sortedMonths.reduce((sum, m) => sum + (m.avgCredit * m.totalDays), 0) / totalDays;
-    const totalStatus = getAvailabilityStatus(parseFloat(totalAvailabilityRate), totalZeroDays);
+    const overallCreditColor = getCreditColor(parseFloat(overallAvailabilityRate));
     
     return `
-        <div style="background: white; border-radius: ${STYLES.borderRadius.md}; margin-bottom: ${STYLES.spacing.md}; overflow: hidden; border: 1px solid ${STYLES.colors.border};">
-            <div style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: white; padding: ${STYLES.spacing.sm} ${STYLES.spacing.lg};">
+        <div style="background: white; border-radius: 12px; margin-bottom: 20px; overflow: hidden; border: 1px solid #e2e8f0;">
+            <div style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: white; padding: 12px 20px;">
                 <div style="display: flex; align-items: center; gap: 8px;">
                     <span style="font-size: 16px;">📅</span>
                     <span style="font-weight: 600; font-size: 14px;">Analyse mensuelle du crédit</span>
@@ -2189,40 +2190,44 @@ function renderMonthlyCreditAnalysis(credits, zeroCreditDates) {
             
             <div style="overflow-x: auto;">
                 <table style="width: 100%; border-collapse: collapse; font-size: 13px; min-width: 700px;">
-                    <thead style="background: ${STYLES.colors.grayBg}; border-bottom: 2px solid ${STYLES.colors.border};">
+                    <thead style="background: #f8fafc; border-bottom: 2px solid #e2e8f0;">
                         <tr>
-                            <th style="padding: ${STYLES.spacing.md} ${STYLES.spacing.sm}; text-align: left;">Mois</th>
-                            <th style="padding: ${STYLES.spacing.md} ${STYLES.spacing.sm}; text-align: center;">Jours analysés</th>
-                            <th style="padding: ${STYLES.spacing.md} ${STYLES.spacing.sm}; text-align: center;">Jours sans crédit</th>
-                            <th style="padding: ${STYLES.spacing.md} ${STYLES.spacing.sm}; text-align: center;">Taux de disponibilité</th>
-                            <th style="padding: ${STYLES.spacing.md} ${STYLES.spacing.sm}; text-align: center;">Crédit max</th>
-                            <th style="padding: ${STYLES.spacing.md} ${STYLES.spacing.sm}; text-align: center;">Crédit moyen</th>
+                            <th style="padding: 12px 10px; text-align: left;">Mois</th>
+                            <th style="padding: 12px 8px; text-align: center;">Jours analysés</th>
+                            <th style="padding: 12px 8px; text-align: center;">Jours sans crédit</th>
+                            <th style="padding: 12px 8px; text-align: center;">Taux de disponibilité</th>
+                            <th style="padding: 12px 8px; text-align: center;">Crédit maximum</th>
+                            <th style="padding: 12px 8px; text-align: center;">Crédit moyen</th>
                         </tr>
                     </thead>
                     <tbody>
                         ${rowsHTML}
                     </tbody>
-                    <tfoot style="background: ${STYLES.colors.grayBg}; border-top: 2px solid ${STYLES.colors.border}; font-weight: 600;">
+                    <tfoot style="background: #f8fafc; border-top: 2px solid #e2e8f0; font-weight: 600;">
                         <tr>
-                            <td style="padding: ${STYLES.spacing.md} ${STYLES.spacing.sm}; text-align: left;">📊 TOTAL</td>
-                            <td style="padding: ${STYLES.spacing.md} ${STYLES.spacing.sm}; text-align: center;">${totalDays}</td>
-                            <td style="padding: ${STYLES.spacing.md} ${STYLES.spacing.sm}; text-align: center;">${totalZeroDays} <span style="font-size: 10px; color: ${STYLES.colors.gray};"> (${totalZeroPercent}%)</span></td>
-                            <td style="padding: ${STYLES.spacing.md} ${STYLES.spacing.sm}; text-align: center;">
-                                <span style="display: inline-flex; align-items: center; gap: 6px; background: ${totalStatus.color}${totalStatus.bgOpacity}; color: ${totalStatus.color}; font-weight: 600; padding: 4px 10px; border-radius: 20px; font-size: 12px;">
-                                    ${totalStatus.icon} ${totalAvailabilityRate}%
-                                </span>
+                            <td style="padding: 12px 10px; text-align: left;">📊 TOTAL</td>
+                            <td style="padding: 12px 8px; text-align: center;">${totalDays}</td>
+                            <td style="padding: 12px 8px; text-align: center;">
+                                <span style="color: ${totalZeroDays > 0 ? '#dc2626' : '#16a34a'};">${totalZeroDays}</span>
+                                <div style="font-size: 10px; color: #64748b;">(${totalZeroPercent}%)</div>
                             </td>
-                            <td style="padding: ${STYLES.spacing.md} ${STYLES.spacing.sm}; text-align: center; color: ${STYLES.colors.primary};">${overallMaxCredit}</td>
-                            <td style="padding: ${STYLES.spacing.md} ${STYLES.spacing.sm}; text-align: center;">${overallAvgCredit.toFixed(1)}</td>
+                            <td style="padding: 12px 8px; text-align: center;">
+                                <span style="color: ${overallCreditColor}; font-weight: 600;">${overallAvailabilityRate}%</span>
+                                <div style="margin-top: 3px; width: 60px; height: 4px; background: #e2e8f0; border-radius: 2px; overflow: hidden; margin: 3px auto 0;">
+                                    <div style="width: ${overallAvailabilityRate}%; height: 100%; background: ${overallCreditColor}; border-radius: 2px;"></div>
+                                </div>
+                            </td>
+                            <td style="padding: 12px 8px; text-align: center; color: #16a34a;">${overallMaxCredit} j</td>
+                            <td style="padding: 12px 8px; text-align: center;">${overallAvgCredit.toFixed(1)} j</td>
                         </tr>
                     </tfoot>
                 </table>
             </div>
             
-            <div style="padding: ${STYLES.spacing.sm} ${STYLES.spacing.lg}; background: ${STYLES.colors.grayBg}; font-size: 11px; color: ${STYLES.colors.gray}; border-top: 1px solid ${STYLES.colors.border}; display: flex; flex-wrap: wrap; gap: 20px; justify-content: center;">
-                <span><span style="color: #22c55e;">✅</span> 0% sans crédit</span>
-                <span><span style="color: #f59e0b;">⚠️</span> 1-20% sans crédit</span>
-                <span><span style="color: #ef4444;">🔴</span> >20% sans crédit</span>
+            <div style="padding: 10px 20px; background: #f8fafc; font-size: 11px; color: #64748b; border-top: 1px solid #e2e8f0; display: flex; flex-wrap: wrap; gap: 20px; justify-content: center;">
+                <span><span style="color: #22c55e;">✅</span> ≥90% disponible</span>
+                <span><span style="color: #f59e0b;">⚠️</span> 70-89% disponible</span>
+                <span><span style="color: #dc2626;">🔴</span> <70% disponible</span>
             </div>
         </div>
     `;

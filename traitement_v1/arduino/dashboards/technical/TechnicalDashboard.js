@@ -1005,7 +1005,7 @@ window.toggleNormsContent = function(contentId, headerElement) {
         }
     }
 };
-
+/*
 // ===========================================
 // II-4) LOAD SHEDDING BOARD
 // ===========================================
@@ -1191,6 +1191,303 @@ function renderLoadSheddingBoard() {
             </div>
         </div>
     `;
+}
+*/
+// ===========================================
+// II-4) LOAD SHEDDING BOARD - 
+// ===========================================
+
+function renderLoadSheddingBoard() {
+    const container = document.getElementById('loadSheddingBoard');
+    if (!container) return;
+    
+    // ✅ RÉCUPÉRATION ROBUSTE DES DONNÉES
+    const loadSheddingData = database.technicalData?.loadShedding || { partiel: 0, total: 0, jours: [], parDate: {} };
+    const totalJours = database.technicalData?.daysCount || 0;
+    
+    // ✅ Calcul du nombre total de jours de diagnostic (comme code 1)
+    let totalDiagnosticDays = totalJours;
+    if (totalDiagnosticDays === 0) {
+        // Fallback : compter les jours depuis les données d'énergie et tension
+        const uniqueDays = new Set();
+        if (database.energyData?.data) {
+            database.energyData.data.forEach(row => {
+                if (row.timestamp) {
+                    const date = row.timestamp.split(' ')[0];
+                    uniqueDays.add(date);
+                }
+            });
+        }
+        if (database.tensionData?.data) {
+            database.tensionData.data.forEach(row => {
+                if (row.timestamp) {
+                    const date = row.timestamp.split(' ')[0];
+                    uniqueDays.add(date);
+                }
+            });
+        }
+        totalDiagnosticDays = uniqueDays.size || 1;
+    }
+    
+    const joursAvecDelestage = loadSheddingData.jours?.length || 0;
+    const totalPartiel = loadSheddingData.partiel || 0;
+    const totalTotal = loadSheddingData.total || 0;
+    const totalEvenements = totalPartiel + totalTotal;
+    
+    // ✅ SI AUCUN ÉVÉNEMENT
+    if (totalEvenements === 0 && joursAvecDelestage === 0) {
+        container.innerHTML = `
+            <div style="background: white; border-radius: 16px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08); overflow: hidden; border: 1px solid #e2e8f0; margin-top: 25px;">
+                <div style="background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%); color: white; padding: 15px 25px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 15px;">
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <span style="font-size: 24px;">🔌</span>
+                        <span style="font-weight: 700;">Événements de Délestage - Analyse détaillée</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 15px;">
+                        <span style="background: rgba(255,255,255,0.15); padding: 6px 16px; border-radius: 30px; font-size: 12px; font-weight: 600;">
+                            📅 ${totalDiagnosticDays} jour(s) de diagnostic
+                        </span>
+                    </div>
+                </div>
+                <div style="padding: 60px; text-align: center; color: #64748b; background: #f8fafc;">
+                    <span style="font-size: 64px; display: block; margin-bottom: 20px;">✅</span>
+                    <h3 style="margin: 0 0 10px 0; color: #1e293b; font-size: 20px;">Aucun événement de délestage</h3>
+                    <p style="margin: 0; color: #64748b; font-size: 14px;">Aucun délestage (partiel ou total) n'a été enregistré sur ${totalDiagnosticDays} jour(s) de diagnostic.</p>
+                </div>
+            </div>
+        `;
+        return;
+    }
+    
+    // ✅ CALCUL DES POURCENTAGES
+    const percentPartiel = totalDiagnosticDays > 0 ? ((joursAvecDelestage / totalDiagnosticDays) * 100).toFixed(1) : 0;
+    const percentTotal = totalDiagnosticDays > 0 ? ((joursAvecDelestage / totalDiagnosticDays) * 100).toFixed(1) : 0;
+    
+    // ✅ PRÉPARATION DES DONNÉES POUR LE TABLEAU
+    const joursTries = [...(loadSheddingData.jours || [])].sort((a, b) => new Date(b) - new Date(a));
+    
+    const groupHeures = (heures) => {
+        if (!heures || heures.length === 0) return '—';
+        const compteur = {};
+        heures.forEach(h => {
+            const hourStr = h.includes('h') ? h : `${h}h00`;
+            compteur[hourStr] = (compteur[hourStr] || 0) + 1;
+        });
+        return Object.entries(compteur)
+            .map(([heure, count]) => count > 1 ? `${heure} (x${count})` : heure)
+            .join(' · ');
+    };
+    
+    // ✅ GÉNÉRATION DES LIGNES DU TABLEAU
+    const generateDetailsRows = () => {
+        if (!joursTries.length) return '<tr><td colspan="5" style="text-align: center; padding: 40px;">Aucune donnée disponible</td></tr>';
+        
+        return joursTries.map(date => {
+            const jourData = loadSheddingData.parDate?.[date] || { partiel: 0, total: 0, evenements: [] };
+            const partielJour = jourData.partiel || 0;
+            const totalJour = jourData.total || 0;
+            const totalEvJour = partielJour + totalJour;
+            
+            const heures = (jourData.evenements || []).map(e => {
+                if (e.time) return e.time;
+                if (e.heure) return `${e.heure}h00`;
+                return '—';
+            });
+            
+            const heuresTexte = groupHeures(heures);
+            
+            return `
+                <tr style="border-bottom: 1px solid #e2e8f0;">
+                    <td style="padding: 12px 10px; font-weight: 600;">${date}</td>
+                    <td style="padding: 12px 10px; text-align: center; color: #ea580c; font-weight: 600;">${partielJour}</td>
+                    <td style="padding: 12px 10px; text-align: center; color: #991b1b; font-weight: 600;">${totalJour}</td>
+                    <td style="padding: 12px 10px; text-align: center;">${totalEvJour}</td>
+                    <td style="padding: 12px 10px; font-size: 11px; color: #475569;">${heuresTexte}</td>
+                </tr>
+            `;
+        }).join('');
+    };
+    
+    // ✅ HTML COMPLET STYLE CODE 1
+    container.innerHTML = `
+        <div style="background: white; border-radius: 16px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08); overflow: hidden; border: 1px solid #e2e8f0; margin-top: 25px;">
+            <!-- En-tête style code 1 -->
+            <div style="background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%); color: white; padding: 15px 25px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 15px;">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <span style="font-size: 24px;">🔌</span>
+                    <span style="font-weight: 700;">Événements de Délestage - Analyse détaillée</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 15px;">
+                    <span style="background: rgba(255,255,255,0.15); padding: 6px 16px; border-radius: 30px; font-size: 12px; font-weight: 600;">
+                        📅 ${totalDiagnosticDays} jour(s) de diagnostic
+                    </span>
+                    <span style="background: #ea580c80; padding: 6px 16px; border-radius: 30px; font-size: 12px; font-weight: 600;">
+                        🔌 Partiel: ${totalPartiel}
+                    </span>
+                    <span style="background: #991b1b80; padding: 6px 16px; border-radius: 30px; font-size: 12px; font-weight: 600;">
+                        🔋 Total: ${totalTotal}
+                    </span>
+                </div>
+            </div>
+            
+            <!-- Cartes de pourcentages -->
+            <div style="padding: 20px 25px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px;">
+                <!-- Délestage Partiel -->
+                <div style="background: white; padding: 15px; border-radius: 12px; border-left: 5px solid #ea580c; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                        <span style="font-size: 13px; color: #ea580c; font-weight: 700;">🔌 DÉLESTAGE PARTIEL</span>
+                        <span style="background: #ea580c20; color: #ea580c; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 700;">${totalPartiel} fois</span>
+                    </div>
+                    <div style="margin-bottom: 12px;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                            <span style="font-size: 12px; color: #64748b;">Jours concernés</span>
+                            <span style="font-weight: 700; color: #1e293b;">${joursAvecDelestage} / ${totalDiagnosticDays}</span>
+                        </div>
+                        <div style="width: 100%; height: 10px; background: #e2e8f0; border-radius: 6px; overflow: hidden;">
+                            <div style="width: ${percentPartiel}%; height: 100%; background: #ea580c; border-radius: 6px;"></div>
+                        </div>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                        <span style="font-size: 24px; font-weight: 800; color: #ea580c;">${percentPartiel}%</span>
+                        <span style="font-size: 11px; color: #64748b;">des jours de diagnostic</span>
+                    </div>
+                </div>
+                
+                <!-- Délestage Total -->
+                <div style="background: white; padding: 15px; border-radius: 12px; border-left: 5px solid #991b1b; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                        <span style="font-size: 13px; color: #991b1b; font-weight: 700;">🔋 DÉLESTAGE TOTAL</span>
+                        <span style="background: #991b1b20; color: #991b1b; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 700;">${totalTotal} fois</span>
+                    </div>
+                    <div style="margin-bottom: 12px;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                            <span style="font-size: 12px; color: #64748b;">Jours concernés</span>
+                            <span style="font-weight: 700; color: #1e293b;">${joursAvecDelestage} / ${totalDiagnosticDays}</span>
+                        </div>
+                        <div style="width: 100%; height: 10px; background: #e2e8f0; border-radius: 6px; overflow: hidden;">
+                            <div style="width: ${percentTotal}%; height: 100%; background: #991b1b; border-radius: 6px;"></div>
+                        </div>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                        <span style="font-size: 24px; font-weight: 800; color: #991b1b;">${percentTotal}%</span>
+                        <span style="font-size: 11px; color: #64748b;">des jours de diagnostic</span>
+                    </div>
+                </div>
+                
+                <!-- Synthèse -->
+                <div style="background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); padding: 15px; border-radius: 12px; color: white;">
+                    <div style="font-size: 13px; font-weight: 700; margin-bottom: 15px; opacity: 0.9;">📊 SYNTHÈSE</div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                        <div>
+                            <div style="font-size: 11px; opacity: 0.8;">Jours diagnostic</div>
+                            <div style="font-size: 28px; font-weight: 800;">${totalDiagnosticDays}</div>
+                        </div>
+                        <div>
+                            <div style="font-size: 11px; opacity: 0.8;">Jours avec dél.</div>
+                            <div style="font-size: 28px; font-weight: 800;">${joursAvecDelestage}</div>
+                        </div>
+                        <div>
+                            <div style="font-size: 11px; opacity: 0.8;">Taux d'occurrence</div>
+                            <div style="font-size: 20px; font-weight: 700;">${totalDiagnosticDays > 0 ? ((joursAvecDelestage / totalDiagnosticDays) * 100).toFixed(1) : 0}%</div>
+                        </div>
+                        <div>
+                            <div style="font-size: 11px; opacity: 0.8;">Dernier</div>
+                            <div style="font-size: 14px; font-weight: 600;">${joursTries[0] || '-'}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Légende -->
+            <div style="padding: 12px 25px; background: #f1f5f9; border-bottom: 1px solid #e2e8f0; display: flex; align-items: center; gap: 25px; flex-wrap: wrap; font-size: 12px;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <div style="width: 14px; height: 14px; background: #ea580c; border-radius: 4px;"></div>
+                    <span style="color: #9a3412; font-weight: 600;">🔌 Délestage Partiel</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <div style="width: 14px; height: 14px; background: #991b1b; border-radius: 4px;"></div>
+                    <span style="color: #7f1d1d; font-weight: 600;">🔋 Délestage Total</span>
+                </div>
+                <div style="margin-left: auto; background: white; padding: 4px 12px; border-radius: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                    <span style="color: #475569;">⏱️ Durée = heure de fin - heure de début</span>
+                </div>
+            </div>
+            
+            <!-- Bouton toggle -->
+            <div style="padding: 20px 25px 0 25px;">
+                <button id="toggle-loadshedding-table" style="width: 100%; padding: 12px; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 8px; color: #334155; font-size: 14px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                    <span style="font-size: 16px;">🔽</span>
+                    <span>Afficher le tableau détaillé</span>
+                </button>
+            </div>
+            
+            <!-- Tableau détaillé (caché par défaut) -->
+            <div id="loadshedding-details-table" style="display: none; padding: 20px 25px;">
+                <div style="max-height: 350px; overflow-y: auto; overflow-x: auto; border-radius: 12px; border: 1px solid #e2e8f0;">
+                    <table style="width: 100%; border-collapse: collapse; font-size: 12px; min-width: 800px;">
+                        <thead style="position: sticky; top: 0; background: #334155; z-index: 10;">
+                            <tr style="color: white;">
+                                <th style="padding: 14px 10px; text-align: left;">📅 DATE</th>
+                                <th style="padding: 14px 10px; text-align: center;">🔌 PARTIEL</th>
+                                <th style="padding: 14px 10px; text-align: center;">🔋 TOTAL</th>
+                                <th style="padding: 14px 10px; text-align: center;">📊 FRÉQUENCE</th>
+                                <th style="padding: 14px 10px; text-align: left;">⏰ HEURES</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${generateDetailsRows()}
+                        </tbody>
+                        <tfoot style="background: #1e293b; color: white; font-weight: 700;">
+                            <tr>
+                                <td style="padding: 14px 10px; text-align: left;">TOTAL GÉNÉRAL</td>
+                                <td style="padding: 14px 10px; text-align: center;">
+                                    <span style="background: #ea580c; padding: 6px 16px; border-radius: 30px; font-size: 12px;">${totalPartiel} événement(s)</span>
+                                </td>
+                                <td style="padding: 14px 10px; text-align: center;">
+                                    <span style="background: #991b1b; padding: 6px 16px; border-radius: 30px; font-size: 12px;">${totalTotal} événement(s)</span>
+                                </td>
+                                <td style="padding: 14px 10px; text-align: center;">${totalEvenements} total</td>
+                                <td style="padding: 14px 10px;">-</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+            
+            <!-- Footer -->
+            <div style="padding: 15px 25px; background: #f8fafc; border-top: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: #475569; flex-wrap: wrap; gap: 15px;">
+                <div style="display: flex; align-items: center; gap: 20px;">
+                    <span>📊 <strong>${joursAvecDelestage}</strong> jour(s) avec délestages</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 20px;">
+                    <span>🔌 Partiel: <strong style="color: #ea580c;">${totalPartiel}</strong> fois</span>
+                    <span>🔋 Total: <strong style="color: #991b1b;">${totalTotal}</strong> fois</span>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // ✅ ATTACHER L'ÉVÉNEMENT TOGGLE APRÈS L'INJECTION
+    setTimeout(() => {
+        const toggleBtn = document.getElementById('toggle-loadshedding-table');
+        const tableDiv = document.getElementById('loadshedding-details-table');
+        
+        if (toggleBtn && tableDiv) {
+            // Éviter les doublons d'écouteurs
+            const newBtn = toggleBtn.cloneNode(true);
+            toggleBtn.parentNode.replaceChild(newBtn, toggleBtn);
+            
+            newBtn.addEventListener('click', () => {
+                if (tableDiv.style.display === 'none' || tableDiv.style.display === '') {
+                    tableDiv.style.display = 'block';
+                    newBtn.innerHTML = '<span style="font-size: 16px;">🔼</span><span>Masquer le tableau</span>';
+                } else {
+                    tableDiv.style.display = 'none';
+                    newBtn.innerHTML = '<span style="font-size: 16px;">🔽</span><span>Afficher le tableau détaillé</span>';
+                }
+            });
+        }
+    }, 50);
 }
 
 // ===========================================
@@ -1693,7 +1990,7 @@ function renderDailyChart() {
     chartManager.destroy('dailyTensionChart');
     requestAnimationFrame(() => createDailyTensionChart(data));
 }
-
+/*
 // ✅ Fonction avec SEUILS COLORÉS EN ROUGE (comme dans le sample)
 function createDailyTensionChart(data) {
     const ctx = document.getElementById('dailyTensionChart')?.getContext('2d');
@@ -1802,6 +2099,137 @@ function createDailyTensionChart(data) {
                 },
                 scales: { 
                     y: { 
+                        grid: { color: '#e9ecef' },
+                        title: { display: true, text: 'Tension (Volts)', font: { size: 11, weight: 'bold' } },
+                        ticks: { font: { size: 10 } }
+                    }, 
+                    x: { 
+                        grid: { display: false },
+                        ticks: { maxRotation: 45, minRotation: 45, font: { size: 9 } },
+                        title: { display: true, text: 'Date', font: { size: 11, weight: 'bold' } }
+                    } 
+                }
+            }
+        });
+    });
+}
+*/
+// ✅ Fonction avec SEUILS COLORÉS EN ROUGE et Y MIN = 10V
+function createDailyTensionChart(data) {
+    const ctx = document.getElementById('dailyTensionChart')?.getContext('2d');
+    if (!ctx) return;
+    const norms = VOLTAGE_NORMS[database.technicalData?.normSystem || '12V'];
+    
+    // Calculer la valeur max pour l'échelle Y (garder un peu de marge)
+    const allValues = [...data.mins, ...data.maxs, ...data.avgs].filter(v => v !== null && !isNaN(v));
+    const maxValue = Math.max(...allValues, norms.max + 2);
+    const yMax = Math.ceil(maxValue * 1.05);
+    
+    requestAnimationFrame(() => {
+        chartManager.create('dailyTensionChart', {
+            type: 'line',
+            data: {
+                labels: data.dates,
+                datasets: [
+                    { 
+                        label: 'Tension minimale', 
+                        data: data.mins, 
+                        borderColor: '#3b82f6',
+                        borderWidth: 2, 
+                        pointRadius: 4, 
+                        pointBackgroundColor: '#3b82f6',
+                        pointBorderColor: 'white',
+                        pointBorderWidth: 1.5,
+                        tension: 0.2,
+                        fill: false
+                    },
+                    { 
+                        label: 'Tension maximale', 
+                        data: data.maxs, 
+                        borderColor: '#f97316',
+                        borderWidth: 2, 
+                        pointRadius: 4, 
+                        pointBackgroundColor: '#f97316',
+                        pointBorderColor: 'white',
+                        pointBorderWidth: 1.5,
+                        tension: 0.2,
+                        fill: false
+                    },
+                    { 
+                        label: 'Tension moyenne', 
+                        data: data.avgs, 
+                        borderColor: '#22c55e',
+                        borderWidth: 2.5, 
+                        pointRadius: 5, 
+                        pointBackgroundColor: '#22c55e',
+                        pointBorderColor: 'white',
+                        pointBorderWidth: 2,
+                        tension: 0.2,
+                        fill: false
+                    },
+                    { 
+                        label: 'Seuil minimal', 
+                        data: Array(data.dates.length).fill(norms.min), 
+                        borderColor: '#ef4444',
+                        borderWidth: 2, 
+                        borderDash: [8, 6], 
+                        pointRadius: 0,
+                        fill: false,
+                        tension: 0
+                    },
+                    { 
+                        label: 'Seuil maximal', 
+                        data: Array(data.dates.length).fill(norms.max), 
+                        borderColor: '#ef4444',
+                        borderWidth: 2, 
+                        borderDash: [8, 6], 
+                        pointRadius: 0,
+                        fill: false,
+                        tension: 0
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
+                plugins: {
+                    legend: { 
+                        position: 'top', 
+                        labels: { 
+                            font: { size: 11, weight: '600' },
+                            usePointStyle: true,
+                            pointStyle: 'circle',
+                            padding: 15
+                        } 
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                        titleFont: { size: 12, weight: 'bold' },
+                        bodyFont: { size: 11 },
+                        padding: 10,
+                        cornerRadius: 8,
+                        callbacks: {
+                            label: function(context) {
+                                let label = context.dataset.label || '';
+                                let value = context.parsed.y.toFixed(2);
+                                let isExceeding = false;
+                                
+                                if (label === 'Tension minimale' && parseFloat(value) < norms.min) isExceeding = true;
+                                if (label === 'Tension maximale' && parseFloat(value) > norms.max) isExceeding = true;
+                                if (label === 'Tension moyenne' && (parseFloat(value) < norms.min || parseFloat(value) > norms.max)) isExceeding = true;
+                                
+                                if (label === 'Seuil minimal' || label === 'Seuil maximal') return null;
+                                
+                                return `${isExceeding ? '⚠️' : '✅'} ${label}: ${value} V`;
+                            }
+                        }
+                    }
+                },
+                scales: { 
+                    y: { 
+                        min: 10,  // 🔥 BLOQUÉ À 10V (décision du boss)
+                        max: yMax,
                         grid: { color: '#e9ecef' },
                         title: { display: true, text: 'Tension (Volts)', font: { size: 11, weight: 'bold' } },
                         ticks: { font: { size: 10 } }
@@ -3602,7 +4030,7 @@ export function renderDailyEnergyCycle() {
     updateAverageChart();
     attachCycleEvents();
 }
-
+/*
 function renderCycleUI(container) {
     const dates = currentManager.getCurrentDates();
     const averageStats = currentManager.getAverageStats();
@@ -3750,6 +4178,178 @@ function renderCycleUI(container) {
         </div>
     `;
 }
+*/
+function renderCycleUI(container) {
+    const dates = currentManager.getCurrentDates();
+    const averageStats = currentManager.getAverageStats();
+    const dayNightAverages = currentManager.getDayNightAverages();
+    
+    // Nombre de points réels
+    let actualDataPoints = 0;
+    for (let i = currentManager.startIndex; i <= currentManager.endIndex; i++) {
+        actualDataPoints += currentManager.allHoursData[i]?.hours.filter(h => h.value > 0).length || 0;
+    }
+    
+    const totalEnergy = averageStats.avg * 24 * dates.count;
+    const dayTotalEnergy = dayNightAverages.day * 12 * dates.count;
+    const nightTotalEnergy = dayNightAverages.night * 12 * dates.count;
+    const dayPercent = totalEnergy > 0 ? (dayTotalEnergy / totalEnergy * 100) : 0;
+    const nightPercent = totalEnergy > 0 ? (nightTotalEnergy / totalEnergy * 100) : 0;
+    
+    // 🔥 RECHERCHE DE LA DATE EXACTE DU MAXIMUM HORAIRE
+    let maxHourValue = 0;
+    let maxHourDate = '';
+    let maxHourTime = '';
+    for (let i = currentManager.startIndex; i <= currentManager.endIndex; i++) {
+        const date = currentManager.allDates[i];
+        const hours = currentManager.allHoursData[i]?.hours || [];
+        hours.forEach(hour => {
+            if (hour.value > maxHourValue) {
+                maxHourValue = hour.value;
+                maxHourDate = date;
+                maxHourTime = hour.label;
+            }
+        });
+    }
+    const maxHourDateFormatted = maxHourDate ? formatFrenchDate(maxHourDate) : '-';
+    const maxHourInfo = `${maxHourDateFormatted} ${maxHourTime}`;
+    
+    // 🔥 PÉRIODE EXACTE POUR L'ÉNERGIE TOTALE
+    const startDateFormatted = formatFrenchDate(dates.start);
+    const endDateFormatted = formatFrenchDate(dates.end);
+    const totalEnergyPeriod = `${startDateFormatted} → ${endDateFormatted}`;
+    
+    const chartContentId = `cycle-chart-content-${Date.now()}`;
+    const maxValue = averageStats.max || 0;
+    
+    container.innerHTML = `
+        <div style="background: white; border-radius: 16px; box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08); overflow: hidden; border: 1px solid #e2e8f0; margin-bottom: 20px;">
+            <!-- En-tête -->
+            <div style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; padding: 15px 25px; font-size: 16px; font-weight: 700; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <span style="font-size: 20px;">⚡</span>
+                    <span>CYCLE DE CONSOMMATION</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 15px;">
+                    <span style="font-size: 12px; background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 20px;">
+                        ${dates.count} JOUR${dates.count > 1 ? 'S' : ''}
+                    </span>
+                    <span style="font-size: 12px; background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 20px;">
+                        Max: ${maxValue.toFixed(1)} Wh/h
+                    </span>
+                </div>
+            </div>
+            
+            <!-- Badge période -->
+            <div style="background: #f8fafc; padding: 10px 20px; border-bottom: 1px solid #e2e8f0; display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
+                <div style="background: #f59e0b; color: white; padding: 6px 15px; border-radius: 30px; font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 8px;">
+                    <span style="font-size: 16px;">📅</span>
+                    <span>${dates.start} → ${dates.end}</span>
+                    <span style="font-size: 12px; background: rgba(255,255,255,0.2); padding: 2px 8px; border-radius: 20px;">
+                        ${dates.count}j · ${actualDataPoints} points
+                    </span>
+                </div>
+            </div>
+            
+            <!-- 🔥 6 DASHBOARDS SUR UNE SEULE LIGNE -->
+            <div style="padding: 20px 24px 0 24px;">
+                <div style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; margin-bottom: 20px;">
+                    <!-- 1. Moyenne horaire -->
+                    <div style="background: linear-gradient(135deg, #fef3c7, #fffbeb); border-radius: 12px; padding: 12px; text-align: center; border-left: 4px solid #f59e0b;">
+                        <div style="font-size: 10px; color: #d97706; font-weight: 600;">MOYENNE HORAIRE</div>
+                        <div style="font-size: 20px; font-weight: 800; color: #f59e0b;">${averageStats.avg.toFixed(1)} <span style="font-size: 10px;">Wh/h</span></div>
+                    </div>
+                    
+                    <!-- 2. Maximum horaire AVEC DATE -->
+                    <div style="background: linear-gradient(135deg, #fee2e2, #fef2f2); border-radius: 12px; padding: 12px; text-align: center; border-left: 4px solid #ef4444;">
+                        <div style="font-size: 10px; color: #dc2626; font-weight: 600;">MAXIMUM HORAIRE</div>
+                        <div style="font-size: 20px; font-weight: 800; color: #ef4444;">${averageStats.max.toFixed(1)} <span style="font-size: 10px;">Wh/h</span></div>
+                        <div style="font-size: 9px; color: #64748b; margin-top: 4px;">📅 ${maxHourInfo}</div>
+                    </div>
+                    
+                    <!-- 3. Énergie totale AVEC PÉRIODE -->
+                    <div style="background: linear-gradient(135deg, #dbeafe, #eff6ff); border-radius: 12px; padding: 12px; text-align: center; border-left: 4px solid #3b82f6;">
+                        <div style="font-size: 10px; color: #2563eb; font-weight: 600;">ÉNERGIE TOTALE</div>
+                        <div style="font-size: 20px; font-weight: 800; color: #3b82f6;">${totalEnergy.toFixed(0)} <span style="font-size: 10px;">Wh</span></div>
+                        <div style="font-size: 9px; color: #64748b; margin-top: 4px;">📅 ${totalEnergyPeriod}</div>
+                    </div>
+                    
+                    <!-- 4. Points réels -->
+                    <div style="background: linear-gradient(135deg, #dcfce7, #f0fdf4); border-radius: 12px; padding: 12px; text-align: center; border-left: 4px solid #22c55e;">
+                        <div style="font-size: 10px; color: #16a34a; font-weight: 600;">POINTS RÉELS</div>
+                        <div style="font-size: 20px; font-weight: 800; color: #22c55e;">${actualDataPoints}</div>
+                    </div>
+                    
+                    <!-- 5. Jour -->
+                    <div style="background: linear-gradient(135deg, #fff7ed, #fffbeb); border-radius: 12px; padding: 12px; text-align: center; border-left: 4px solid #f59e0b;">
+                        <div style="font-size: 10px; color: #d97706; font-weight: 600;">☀️ JOUR (6h-18h)</div>
+                        <div style="font-size: 20px; font-weight: 800; color: #f59e0b;">${dayPercent.toFixed(0)}%</div>
+                        <div style="margin-top: 6px; background: #e2e8f0; border-radius: 20px; height: 6px; overflow: hidden;">
+                            <div style="width: ${dayPercent}%; background: linear-gradient(90deg, #f59e0b, #f97316); height: 100%; border-radius: 20px;"></div>
+                        </div>
+                        <div style="font-size: 10px; color: #64748b; margin-top: 4px;">${dayNightAverages.day.toFixed(1)} Wh/h</div>
+                    </div>
+                    
+                    <!-- 6. Nuit -->
+                    <div style="background: linear-gradient(135deg, #eff6ff, #f0f9ff); border-radius: 12px; padding: 12px; text-align: center; border-left: 4px solid #3b82f6;">
+                        <div style="font-size: 10px; color: #2563eb; font-weight: 600;">🌙 NUIT (18h-6h)</div>
+                        <div style="font-size: 20px; font-weight: 800; color: #3b82f6;">${nightPercent.toFixed(0)}%</div>
+                        <div style="margin-top: 6px; background: #e2e8f0; border-radius: 20px; height: 6px; overflow: hidden;">
+                            <div style="width: ${nightPercent}%; background: linear-gradient(90deg, #3b82f6, #60a5fa); height: 100%; border-radius: 20px;"></div>
+                        </div>
+                        <div style="font-size: 10px; color: #64748b; margin-top: 4px;">${dayNightAverages.night.toFixed(1)} Wh/h</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Filtres -->
+            <div style="padding: 0 24px 20px 24px;">
+                <div style="display: flex; gap: 16px; align-items: flex-end; flex-wrap: wrap;">
+                    <div style="flex: 1; min-width: 180px;">
+                        <label style="display: block; font-size: 11px; font-weight: 600; color: #475569; margin-bottom: 6px;">📅 DATE DE DÉBUT</label>
+                        <select id="cycleStartSelect" style="width: 100%; padding: 10px 14px; border: 2px solid #e2e8f0; border-radius: 10px; background: white; font-size: 13px; cursor: pointer;">
+                            ${currentManager.allDates.map((d,i)=>`<option value="${i}" ${i===currentManager.startIndex?'selected':''}>${d}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div style="flex: 1; min-width: 180px;">
+                        <label style="display: block; font-size: 11px; font-weight: 600; color: #475569; margin-bottom: 6px;">📅 DATE DE FIN</label>
+                        <select id="cycleEndSelect" style="width: 100%; padding: 10px 14px; border: 2px solid #e2e8f0; border-radius: 10px; background: white; font-size: 13px; cursor: pointer;">
+                            ${currentManager.allDates.map((d,i)=>`<option value="${i}" ${i===currentManager.endIndex?'selected':''}>${d}</option>`).join('')}
+                        </select>
+                    </div>
+                    <button id="cycleApplyBtn" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; border: none; padding: 10px 28px; border-radius: 10px; font-weight: 600; cursor: pointer; transition: all 0.2s; box-shadow: 0 2px 8px rgba(245,158,11,0.3);">
+                        APPLIQUER
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Section CONSOMMATION CUMULÉE (toggle) -->
+            <div style="padding: 0 24px 0 24px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; cursor: pointer;" onclick="toggleCycleChart('${chartContentId}', this)">
+                    <h4 style="margin: 0; font-size: 14px; font-weight: 700; color: #1e293b; display: flex; align-items: center; gap: 8px;">
+                        <span>📈</span>
+                        CONSOMMATION CUMULÉE
+                    </h4>
+                    <span class="cycle-chart-toggle" style="font-size: 1rem; transition: transform 0.2s; color: #f59e0b;">▶</span>
+                </div>
+                <div id="${chartContentId}" style="display: none;">
+                    <div style="height: 350px; position: relative;">
+                        <canvas id="dailyEnergyCycleChart"></canvas>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Section MOYENNES HORAIRES -->
+            <div style="padding: 20px 24px 24px 24px;">
+                <h4 style="margin: 0 0 16px 0; font-size: 14px; font-weight: 700; color: #1e293b;">📊 MOYENNES HORAIRES</h4>
+                <div style="height: 300px; position: relative;">
+                    <canvas id="hourlyAverageChart"></canvas>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
 /*
 function renderCycleUI(container) {
     const dates = currentManager.getCurrentDates();
