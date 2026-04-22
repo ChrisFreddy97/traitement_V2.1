@@ -16,6 +16,7 @@ export function renderEventDashboard() {
         return;
     }
     
+
     // Grouper les événements par date
     const events = Array.from(eventMap.values());
     const eventsByDate = {};

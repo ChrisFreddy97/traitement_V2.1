@@ -29,7 +29,7 @@
             border-radius: 16px;
             padding: 20px 30px;
             margin-bottom: 25px;
-            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+            box-shadow: 0 8px 25px rgba(81, 22, 22, 0.15);
         }
 
         .header-content {
@@ -517,8 +517,8 @@
                     <td><strong style="color: #f59e0b;">${escapeHtml(file.nr)}</strong></td>
                     <td>${new Date(file.date).toLocaleDateString('fr-FR')}</td>
                     <td>
-                        <button class="action-btn view" onclick="viewFile('${file.id}')" title="Analyser">📊</button>
-                        <button class="action-btn delete" onclick="deleteFile('${file.id}')" title="Supprimer">🗑️</button>
+                        <button class="action-btn view" onclick="viewFile('${file.id}')" title="Analyser">📊Analyser</button>
+                        <button class="action-btn delete" onclick="deleteFile('${file.id}')" title="Supprimer">🗑️Supprimer</button>
                     </td>
                 </tr>
             `).join('');
