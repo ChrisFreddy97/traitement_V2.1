@@ -515,6 +515,252 @@ function renderAllBoards() {
 }
 
 // ===========================================
+// RENDU CONSOMMATION BOARD - STYLE IDENTIQUE AU CODE 1
+// ===========================================
+
+function renderConsumptionBoard() {
+    const container = document.getElementById('consumptionBoard');
+    if (!container) return;
+    
+    if (!activeClientId) {
+        container.innerHTML = '<div class="error-message show">❌ Aucun client sélectionné</div>';
+        return;
+    }
+    
+    const client = clientsList.find(c => c.id === activeClientId);
+    if (!client) {
+        container.innerHTML = '<div class="error-message show">❌ Client non trouvé</div>';
+        return;
+    }
+    
+    if (isGhostClient(client)) {
+        container.innerHTML = renderGhostCard('📋 HISTORIQUE FORFAITS & CONSOMMATION', client.id, 'Aucune donnée de consommation ou forfait disponible.');
+        return;
+    }
+    
+    const forfaitHistory = buildForfaitHistory(client);
+    const forfaitStats = computeForfaitStats(client, forfaitHistory);
+    
+    // Déterminer si le client est actif
+    let isActive = false;
+    const consoJournaliere = client.consommation?.journaliere ?? [];
+    for (let i = 0; i < Math.min(50, consoJournaliere.length); i++) {
+        if (consoJournaliere[i].valeur > 0) {
+            isActive = true;
+            break;
+        }
+    }
+    
+    // Récupérer le forfait actuel
+    const currentForfait = forfaitStats.find(s => s.isCurrent)?.forfait || 'ECO';
+    const forfaitLimits = FORFAIT_LIMITS[currentForfait] || { max: 50 };
+    const forfaitMax = forfaitLimits.max || 50;
+    
+    // Calcul du nombre total de jours pour l'affichage
+    const totalDays = forfaitStats.reduce((sum, stat) => sum + stat.totalDays, 0);
+    
+    let html = `
+        <div style="background: white; border-radius: 16px; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08); overflow: hidden; border: 1px solid #e2e8f0; margin-bottom: 20px;">
+            <!-- En-tête client style code 1 -->
+            <div style="background: linear-gradient(135deg, #4299e1 0%, #3182ce 100%); color: white; padding: 20px 25px; display: flex; align-items: center; gap: 20px;">
+                <div style="width: 60px; height: 60px; background: white; border-radius: 30px; display: flex; align-items: center; justify-content: center;">
+                    <span style="font-size: 30px;">👤</span>
+                </div>
+                <div style="flex: 1;">
+                    <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
+                        <h2 style="margin: 0; font-size: 24px; font-weight: 700;">Client ${client.id}</h2>
+                        <span style="background: ${isActive ? '#22c55e' : '#94a3b8'}; padding: 4px 15px; border-radius: 30px; font-size: 14px; font-weight: 600;">
+                            ${isActive ? 'Actif' : 'Inactif'}
+                        </span>
+                        <span style="background: rgba(255,255,255,0.2); padding: 4px 15px; border-radius: 30px; font-size: 14px;">
+                            ${currentForfait} · ${forfaitMax}Wh
+                        </span>
+                    </div>
+                </div>
+            </div>
+    `;
+    
+    if (forfaitStats.length > 0) {
+        html += `<div style="padding: 20px;">`;
+        
+        // En-tête du tableau avec le même style que code 1
+        html += `
+            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 15px;">
+                <div style="width: 40px; height: 40px; background: linear-gradient(135deg, #9f7aea 0%, #805ad5 100%); border-radius: 10px; display: flex; align-items: center; justify-content: center;">
+                    <span style="font-size: 20px; color: white;">📋</span>
+                </div>
+                <div>
+                    <h3 style="margin: 0; font-size: 16px; font-weight: 700; color: #1e293b;">Historique des forfaits et consommation</h3>
+                    <p style="margin: 2px 0 0 0; font-size: 12px; color: #64748b;">${forfaitStats.length} forfait(s) · Analyse détaillée par période</p>
+                </div>
+            </div>
+            
+            <div style="overflow-x: auto; border-radius: 8px; border: 1px solid #e2e8f0; margin-bottom: 20px;">
+                <table style="width: 100%; border-collapse: collapse; font-size: 13px; min-width: 1200px;">
+                    <thead style="background: #f8fafc; border-bottom: 2px solid #e2e8f0;">
+                        <tr>
+                            <th style="padding: 12px 15px; text-align: left; color: #475569; font-weight: 600;">Période</th>
+                            <th style="padding: 12px 15px; text-align: center; color: #475569; font-weight: 600;">Forfait</th>
+                            <th style="padding: 12px 15px; text-align: center; color: #475569; font-weight: 600;">Changement</th>
+                            <th style="padding: 12px 15px; text-align: center; color: #475569; font-weight: 600; background: #f1f5f9;">📅 Jours totaux</th>
+                            <th style="padding: 12px 15px; text-align: center; color: #475569; font-weight: 600; background: #f1f5f9;">✅ Jours avec conso</th>
+                            <th style="padding: 12px 15px; text-align: center; color: #475569; font-weight: 600; background: #f1f5f9;">⭕ Jours sans conso</th>
+                            <th style="padding: 12px 15px; text-align: center; color: #475569; font-weight: 600; background: #ede9fe;">⚡ Énergie max</th>
+                            <th style="padding: 12px 15px; text-align: center; color: #475569; font-weight: 600; background: #ede9fe;">📊 Énergie moy</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${forfaitStats.map((stat, index) => {
+                            const bgColor = index % 2 === 0 ? '#ffffff' : '#fafbfc';
+                            const startDateStr = formatDateToFrench(stat.startDate);
+                            const endDateStr = stat.endDate ? formatDateToFrench(stat.endDate) : 'Présent';
+                            
+                            let changeText = '';
+                            if (index === 0) {
+                                changeText = '<span style="color: #64748b;">Premier forfait</span>';
+                            } else {
+                                changeText = `
+                                    <span style="background: #f97315; color: white; padding: 4px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; margin-right: 5px;">
+                                        ${forfaitStats[index-1].forfait}
+                                    </span>
+                                    →
+                                    <span style="background: #22c55e; color: white; padding: 4px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; margin-left: 5px;">
+                                        ${stat.forfait}
+                                    </span>
+                                `;
+                            }
+                            
+                            return `
+                                <tr style="border-bottom: 1px solid #e2e8f0; background: ${bgColor};">
+                                    <td style="padding: 12px 15px; white-space: nowrap;">
+                                        <strong>${startDateStr}</strong> → <strong>${endDateStr}</strong>
+                                        ${stat.isCurrent ? '<span style="background: #22c55e; color: white; padding: 2px 8px; border-radius: 12px; font-size: 10px; margin-left: 8px;">ACTUEL</span>' : ''}
+                                    </td>
+                                    <td style="padding: 12px 15px; text-align: center;">
+                                        <span style="background: ${stat.isCurrent ? '#22c55e20' : '#9f7aea20'}; color: ${stat.isCurrent ? '#22c55e' : '#9f7aea'}; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600;">
+                                            ${stat.forfait}
+                                        </span>
+                                    </td>
+                                    <td style="padding: 12px 15px; text-align: center; white-space: nowrap;">
+                                        ${changeText}
+                                    </td>
+                                    <td style="padding: 12px 15px; text-align: center; font-weight: 600; background: #f8fafc;">
+                                        ${stat.totalDays}
+                                    </td>
+                                    <td style="padding: 12px 15px; text-align: center; font-weight: 600; color: #22c55e; background: #f8fafc;">
+                                        ${stat.daysWithConso}
+                                        ${stat.totalDays > 0 ? `<span style="font-size: 11px; color: #64748b; margin-left: 4px;">(${Math.round(stat.daysWithConso/stat.totalDays*100)}%)</span>` : ''}
+                                    </td>
+                                    <td style="padding: 12px 15px; text-align: center; font-weight: 600; color: #64748b; background: #f8fafc;">
+                                        ${stat.daysWithoutConso}
+                                        ${stat.totalDays > 0 ? `<span style="font-size: 11px; color: #64748b; margin-left: 4px;">(${Math.round(stat.daysWithoutConso/stat.totalDays*100)}%)</span>` : ''}
+                                    </td>
+                                    <td style="padding: 12px 15px; text-align: center; font-weight: 600; color: #7c3aed; background: #f5f3ff;">
+                                        <div>${stat.maxEnergy} Wh</div>
+                                        <div style="font-size: 10px; color: #6b21a5;">${stat.maxEnergyDate || '-'}</div>
+                                    </td>
+                                    <td style="padding: 12px 15px; text-align: center; font-weight: 600; color: #7c3aed; background: #f5f3ff;">
+                                        ${stat.avgEnergy} Wh
+                                    </td>
+                                </tr>
+                            `;
+                        }).join('')}
+                    </tbody>
+                </table>
+            </div>
+        `;
+        
+        // Barres de progression pour chaque forfait (style code 1)
+        html += `
+            <div style="margin-top: 15px;">
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 15px;">
+                    <span style="font-size: 18px;">📊</span>
+                    <span style="font-weight: 600; color: #1e293b;">Répartition par rapport au forfait (seuils 85% et 115%)</span>
+                </div>
+        `;
+        
+        forfaitStats.forEach((stat) => {
+            const startDateStr = formatDateToFrench(stat.startDate);
+            const endDateStr = stat.endDate ? formatDateToFrench(stat.endDate) : 'Présent';
+            
+            html += `
+                <div style="margin-bottom: 20px; padding: 15px; background: #f8fafc; border-radius: 12px; border: 1px solid #e2e8f0;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <span style="font-weight: 600; color: ${stat.isCurrent ? '#22c55e' : '#9f7aea'};">${stat.forfait}</span>
+                            <span style="font-size: 11px; color: #64748b;">${startDateStr} → ${endDateStr}</span>
+                        </div>
+                        <span style="font-size: 12px; background: white; padding: 4px 12px; border-radius: 20px; border: 1px solid #e2e8f0;">
+                            ${stat.daysWithConso} jours avec conso
+                        </span>
+                    </div>
+                    
+                    <!-- Barre de progression style code 1 (hauteur 40px, pourcentages affichés) -->
+                    <div style="background: #f1f5f9; border-radius: 30px; height: 40px; overflow: hidden; display: flex; box-shadow: inset 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 10px;">
+                        <div style="width: ${stat.percentBelow85}%; height: 100%; background: #22c55e; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600; color: white;">
+                            ${stat.percentBelow85 > 5 ? stat.percentBelow85 + '%' : ''}
+                        </div>
+                        <div style="width: ${stat.percentInTolerance}%; height: 100%; background: #f59e0b; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600; color: white;">
+                            ${stat.percentInTolerance > 5 ? stat.percentInTolerance + '%' : ''}
+                        </div>
+                        <div style="width: ${stat.percentAbove115}%; height: 100%; background: #ef4444; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600; color: white;">
+                            ${stat.percentAbove115 > 5 ? stat.percentAbove115 + '%' : ''}
+                        </div>
+                    </div>
+                    
+                    <!-- Légende sous la barre (style code 1) -->
+                    <div style="display: flex; flex-wrap: wrap; gap: 15px; justify-content: space-between; font-size: 11px;">
+                        <div style="display: flex; align-items: center; gap: 5px;">
+                            <div style="width: 12px; height: 12px; background: #22c55e; border-radius: 3px;"></div>
+                            <span><strong>${stat.daysBelow85} jours</strong> ≤${stat.seuil85.toFixed(0)}Wh · ${stat.percentBelow85}%</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 5px;">
+                            <div style="width: 12px; height: 12px; background: #f59e0b; border-radius: 3px;"></div>
+                            <span><strong>${stat.daysInTolerance} jours</strong> ${stat.seuil85.toFixed(0)}-${stat.seuil115.toFixed(0)}Wh · ${stat.percentInTolerance}%</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 5px;">
+                            <div style="width: 12px; height: 12px; background: #ef4444; border-radius: 3px;"></div>
+                            <span><strong>${stat.daysAbove115} jours</strong> >${stat.seuil115.toFixed(0)}Wh · ${stat.percentAbove115}%</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+        
+        // Légende finale (bloc gris avec 📌) - style code 1
+        html += `
+            <div style="margin-top: 15px; padding: 15px; background: #f1f5f9; border-radius: 8px; font-size: 12px; display: flex; flex-direction: column; gap: 10px;">
+                <div style="display: flex; align-items: center; gap: 10px; color: #475569;">
+                    <span style="font-size: 14px;">📌</span>
+                    <span><strong>Légende des seuils de consommation :</strong></span>
+                </div>
+                <div style="display: flex; flex-wrap: wrap; gap: 20px; justify-content: space-around;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <div style="width: 16px; height: 16px; background: #22c55e; border-radius: 4px;"></div>
+                        <span><strong>Normal</strong> (0-85% du forfait)</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <div style="width: 16px; height: 16px; background: #f59e0b; border-radius: 4px;"></div>
+                        <span><strong>Tolérance</strong> (85-115% du forfait)</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <div style="width: 16px; height: 16px; background: #ef4444; border-radius: 4px;"></div>
+                        <span><strong>Hors tolérance</strong> (>115% du forfait)</span>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        html += `</div>`; // fermeture padding
+    } else {
+        html += '<div class="info-section show" style="margin: 20px;">📭 Aucune donnée de consommation disponible</div>';
+    }
+    
+    html += `</div>`; // fermeture de la carte principale
+    container.innerHTML = html;
+}
+/*
+// ===========================================
 // RENDU CONSOMMATION BOARD
 // ===========================================
 
@@ -649,15 +895,6 @@ function renderConsumptionBoard() {
             `;
         });
         
-        if (forfaitStats[0]?.suspendECount > 0) {
-            html += `
-                <div class="message-container" style="background: #fee2e2; border-left: 4px solid var(--danger);">
-                    <div class="client-message danger" style="background: transparent;">
-                        ⚠️ ${forfaitStats[0].suspendECount} jour(s) avec SuspendE détecté(s) (comptés dans la zone rouge)
-                    </div>
-                </div>
-            `;
-        }
         
         html += `</div>`; // fermeture padding
     } else {
@@ -667,11 +904,308 @@ function renderConsumptionBoard() {
     html += `</div>`; // fermeture de la carte principale
     container.innerHTML = html;
 }
-
+*/
 // ===========================================
 // RENDU EVENTS BOARD
 // ===========================================
 
+// ===========================================
+// RENDU EVENTS BOARD - STYLE IDENTIQUE AU CODE 1
+// ===========================================
+
+function renderEventsBoard() {
+    const container = document.getElementById('commercialEventsBoard');
+    if (!container) return;
+    
+    if (!activeClientId) {
+        container.innerHTML = '<div class="error-message show">❌ Aucun client sélectionné</div>';
+        return;
+    }
+    
+    const client = clientsList.find(c => c.id === activeClientId);
+    if (!client) {
+        container.innerHTML = '<div class="error-message show">❌ Client non trouvé</div>';
+        return;
+    }
+    
+    if (isGhostClient(client)) {
+        container.innerHTML = renderGhostCard('⚠️ ÉVÉNEMENTS', client.id, 'Aucun événement enregistré pour ce client.');
+        return;
+    }
+    
+    container.innerHTML = renderEventsClient(client);
+    
+    // ✅ Attacher les événements après l'injection du HTML
+    setTimeout(() => {
+        const toggleId = `toggle-events-${client.id}`;
+        const tableId = `events-table-${client.id}`;
+        const toggleBtn = document.getElementById(toggleId);
+        const table = document.getElementById(tableId);
+        
+        if (toggleBtn && table) {
+            // Supprimer les anciens listeners pour éviter les doublons
+            const newBtn = toggleBtn.cloneNode(true);
+            toggleBtn.parentNode.replaceChild(newBtn, toggleBtn);
+            
+            newBtn.addEventListener('click', () => {
+                if (table.style.display === 'none' || table.style.display === '') {
+                    table.style.display = 'block';
+                    newBtn.innerHTML = '<span style="font-size:16px;">🔼</span><span>Masquer le tableau</span>';
+                } else {
+                    table.style.display = 'none';
+                    newBtn.innerHTML = '<span style="font-size:16px;">🔽</span><span>Afficher le tableau détaillé</span>';
+                }
+            });
+        }
+    }, 50);
+}
+
+function renderEventsClient(client) {
+    const events = client.events ?? [];
+    const zeroCreditDates = client.zeroCreditDates ?? [];
+    const totalDays = client.consommation?.journaliere?.length ?? client.credits?.length ?? zeroCreditDates.length ?? 1;
+    
+    const eventsMap = new Map();
+    
+    events.forEach(event => {
+        if (!event.date) return;
+        const dateStr = event.date.split('T')[0];
+        const hour = event.date.includes('T') ? event.date.split('T')[1]?.substring(0,5) : '';
+        
+        if (!eventsMap.has(dateStr)) {
+            eventsMap.set(dateStr, {
+                date: dateStr,
+                dateObj: new Date(event.date),
+                SuspendE: 0, SuspendE_start: '', SuspendE_end: '', SuspendE_duration: '',
+                SuspendP: 0, SuspendP_start: '', SuspendP_end: '', SuspendP_duration: '',
+                CreditNul: 0
+            });
+        }
+        
+        const dayData = eventsMap.get(dateStr);
+        
+        if (event.type === 'SuspendE') {
+            dayData.SuspendE++;
+            if (!dayData.SuspendE_start) dayData.SuspendE_start = hour;
+            dayData.SuspendE_end = hour;
+            dayData.SuspendE_duration = dayData.SuspendE > 1 ? `${dayData.SuspendE} évts` : '-';
+        }
+        
+        if (event.type === 'SuspendP') {
+            dayData.SuspendP++;
+            if (!dayData.SuspendP_start) dayData.SuspendP_start = hour;
+            dayData.SuspendP_end = hour;
+            dayData.SuspendP_duration = dayData.SuspendP > 1 ? `${dayData.SuspendP} évts` : '-';
+        }
+    });
+    
+    zeroCreditDates.forEach(date => {
+        const dateStr = date.split('T')[0];
+        if (!eventsMap.has(dateStr)) {
+            eventsMap.set(dateStr, {
+                date: dateStr, dateObj: new Date(date),
+                SuspendE: 0, SuspendE_start: '', SuspendE_end: '', SuspendE_duration: '',
+                SuspendP: 0, SuspendP_start: '', SuspendP_end: '', SuspendP_duration: '',
+                CreditNul: 1
+            });
+        } else {
+            eventsMap.get(dateStr).CreditNul = 1;
+        }
+    });
+    
+    const eventsByDay = Array.from(eventsMap.values());
+    
+    const daysWithCreditNul = new Set(eventsByDay.filter(d => d.CreditNul > 0).map(d => d.date));
+    const daysWithSuspendP = new Set(eventsByDay.filter(d => d.SuspendP > 0).map(d => d.date));
+    const daysWithSuspendE = new Set(eventsByDay.filter(d => d.SuspendE > 0).map(d => d.date));
+    
+    const totalEvents = events.length + zeroCreditDates.length;
+    const hasAnyEvent = daysWithCreditNul.size > 0 || daysWithSuspendP.size > 0 || daysWithSuspendE.size > 0;
+    
+    // Format du numéro client avec zéro devant (comme code 1)
+    const clientNumberFormatted = client.id.toString().padStart(2, '0');
+    
+    // ✅ CONDITION : si aucun événement
+    if (!hasAnyEvent || totalEvents === 0) {
+        return `
+            <div style="background: white; border-radius: 16px; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08); overflow: hidden; border: 1px solid #e2e8f0; margin-bottom: 20px;">
+                <div style="background: linear-gradient(135deg, #f97316 0%, #ea580c 100%); color: white; padding: 15px 25px; font-size: 18px; font-weight: 700; display: flex; align-items: center; gap: 12px;">
+                    <span style="font-size: 24px;">⚠️</span>
+                    <span>Événements - Client ${clientNumberFormatted}</span>
+                </div>
+                <div style="text-align: center; padding: 60px 20px; color: #64748b;">
+                    <span style="font-size: 48px; display: block; margin-bottom: 15px;">✅</span>
+                    <h3 style="margin: 0 0 10px 0; color: #1e293b;">Aucun événement</h3>
+                    <p style="margin: 0; font-size: 14px;">Aucun événement pour ce client</p>
+                    <p style="margin-top: 10px; font-size: 12px; color: #64748b;">Sur ${totalDays} jour(s) de diagnostic</p>
+                </div>
+            </div>
+        `;
+    }
+    
+    // Calcul des pourcentages
+    const percentCreditNul = ((daysWithCreditNul.size / totalDays) * 100).toFixed(1);
+    const percentSuspendP = ((daysWithSuspendP.size / totalDays) * 100).toFixed(1);
+    const percentSuspendE = ((daysWithSuspendE.size / totalDays) * 100).toFixed(1);
+    
+    let html = `
+        <div style="background: white; border-radius: 16px; box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08); overflow: hidden; border: 2px solid #e2e8f0; margin-bottom: 25px;">
+            <!-- En-tête style code 1 (dégradé orange) -->
+            <div style="background: linear-gradient(135deg, #f97316 0%, #ea580c 100%); color: white; padding: 15px 25px; font-size: 18px; font-weight: 700; display: flex; align-items: center; gap: 12px;">
+                <span style="font-size: 24px;">⚠️</span>
+                <span>Événements - Client ${clientNumberFormatted}</span>
+            </div>
+            
+            <div style="padding: 20px;">
+                <!-- 3 stats cards -->
+                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 20px;">
+                    <div style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); border-radius: 10px; padding: 12px; color: white;">
+                        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                            <span style="font-size: 20px;">💰</span>
+                            <span style="font-size: 12px; font-weight: 600; opacity: 0.9;">CRÉDIT NUL</span>
+                        </div>
+                        <div style="font-size: 28px; font-weight: 800; margin-bottom: 4px;">${daysWithCreditNul.size}</div>
+                        <div style="font-size: 11px; opacity: 0.9;">jour(s) concerné(s)</div>
+                        <div style="margin-top: 8px; background: rgba(255,255,255,0.2); height: 4px; border-radius: 2px; overflow: hidden;">
+                            <div style="width: ${percentCreditNul}%; height: 100%; background: white; border-radius: 2px;"></div>
+                        </div>
+                        <div style="margin-top: 5px; font-size: 11px; font-weight: 600;">${percentCreditNul}%</div>
+                    </div>
+                    
+                    <div style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); border-radius: 10px; padding: 12px; color: white;">
+                        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                            <span style="font-size: 20px;">📈</span>
+                            <span style="font-size: 12px; font-weight: 600; opacity: 0.9;">PUISSANCE</span>
+                        </div>
+                        <div style="font-size: 28px; font-weight: 800; margin-bottom: 4px;">${daysWithSuspendP.size}</div>
+                        <div style="font-size: 11px; opacity: 0.9;">jour(s) concerné(s)</div>
+                        <div style="margin-top: 8px; background: rgba(255,255,255,0.2); height: 4px; border-radius: 2px; overflow: hidden;">
+                            <div style="width: ${percentSuspendP}%; height: 100%; background: white; border-radius: 2px;"></div>
+                        </div>
+                        <div style="margin-top: 5px; font-size: 11px; font-weight: 600;">${percentSuspendP}%</div>
+                    </div>
+                    
+                    <div style="background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%); border-radius: 10px; padding: 12px; color: white;">
+                        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                            <span style="font-size: 20px;">🔋</span>
+                            <span style="font-size: 12px; font-weight: 600; opacity: 0.9;">ÉNERGIE</span>
+                        </div>
+                        <div style="font-size: 28px; font-weight: 800; margin-bottom: 4px;">${daysWithSuspendE.size}</div>
+                        <div style="font-size: 11px; opacity: 0.9;">jour(s) concerné(s)</div>
+                        <div style="margin-top: 8px; background: rgba(255,255,255,0.2); height: 4px; border-radius: 2px; overflow: hidden;">
+                            <div style="width: ${percentSuspendE}%; height: 100%; background: white; border-radius: 2px;"></div>
+                        </div>
+                        <div style="margin-top: 5px; font-size: 11px; font-weight: 600;">${percentSuspendE}%</div>
+                    </div>
+                </div>
+                
+                <!-- Informations période compactes -->
+                <div style="background: #f8fafc; border-radius: 8px; padding: 10px 15px; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; font-size: 12px; border: 1px solid #e2e8f0;">
+                    <span>📅 ${totalDays} jours analysés</span>
+                    <span>📊 ${eventsByDay.length} jours avec événements</span>
+                    <span>⚡ ${totalEvents} signalements</span>
+                </div>
+    `;
+    
+    if (eventsByDay.length > 0) {
+        const toggleId = `toggle-events-${client.id}`;
+        const tableId = `events-table-${client.id}`;
+        
+        html += `
+            <button id="${toggleId}" style="width: 100%; padding: 12px; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 8px; color: #334155; font-size: 14px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 15px;">
+                <span style="font-size: 16px;">🔽</span>
+                <span>Afficher le tableau détaillé</span>
+            </button>
+            
+            <div id="${tableId}" style="display: none; border: 2px solid #e2e8f0; border-radius: 12px; overflow: hidden; margin-bottom: 15px; max-height: 350px; overflow-y: auto; overflow-x: auto;">
+                <table style="width: 100%; border-collapse: collapse; font-size: 12px; min-width: 900px;">
+                    <thead style="position: sticky; top: 0; z-index: 10;">
+                        <tr>
+                            <th rowspan="2" style="padding: 15px 10px; text-align: left; border-right: 2px solid #cbd5e1; background: #f1f5f9; font-size: 14px; position: sticky; left: 0; z-index: 11;">📅 DATE</th>
+                            <th colspan="3" style="padding: 12px 10px; text-align: center; background: #3b82f6; color: white; border-right: 2px solid #2563eb;">📈 PUISSANCE DÉPASSÉE</th>
+                            <th colspan="1" style="padding: 12px 10px; text-align: center; background: #f59e0b; color: white; border-right: 2px solid #d97706;">💰 CRÉDIT NUL</th>
+                            <th colspan="3" style="padding: 12px 10px; text-align: center; background: #0ea5e9; color: white;">🔋 ÉNERGIE ÉPUISÉE</th>
+                        </tr>
+                        <tr style="background: #f1f5f9;">
+                            <th style="padding: 10px 8px; text-align: center; border-bottom: 1px solid #cbd5e1;">Début</th>
+                            <th style="padding: 10px 8px; text-align: center; border-bottom: 1px solid #cbd5e1;">Fin</th>
+                            <th style="padding: 10px 8px; text-align: center; border-bottom: 1px solid #cbd5e1; border-right: 2px solid #cbd5e1;">Durée</th>
+                            <th style="padding: 10px 8px; text-align: center; border-bottom: 1px solid #cbd5e1; border-right: 2px solid #cbd5e1;">Signalement</th>
+                            <th style="padding: 10px 8px; text-align: center; border-bottom: 1px solid #cbd5e1;">Début</th>
+                            <th style="padding: 10px 8px; text-align: center; border-bottom: 1px solid #cbd5e1;">Fin</th>
+                            <th style="padding: 10px 8px; text-align: center; border-bottom: 1px solid #cbd5e1;">Durée</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${eventsByDay.sort((a, b) => b.dateObj - a.dateObj).map((day, idx) => {
+                            const bgColor = idx % 2 === 0 ? '#ffffff' : '#fafbfc';
+                            return `
+                                <tr style="border-bottom: 1px solid #e2e8f0; background: ${bgColor};">
+                                    <td style="padding: 12px 10px; font-weight: 600; border-right: 2px solid #e2e8f0; position: sticky; left: 0; background: ${bgColor};">
+                                        ${formatDateToFrench(day.date)}
+                                    </td>
+                                    <td style="padding: 10px 8px; text-align: center; ${day.SuspendP > 0 ? 'background: #3b82f610; font-weight: 600; color: #2563eb;' : 'color: #94a3b8;'}">
+                                        ${day.SuspendP_start || '-'}
+                                    </td>
+                                    <td style="padding: 10px 8px; text-align: center; ${day.SuspendP > 0 ? 'background: #3b82f610; font-weight: 600; color: #2563eb;' : 'color: #94a3b8;'}">
+                                        ${day.SuspendP_end || '-'}
+                                    </td>
+                                    <td style="padding: 10px 8px; text-align: center; border-right: 2px solid #e2e8f0; ${day.SuspendP > 0 ? 'background: #3b82f620; font-weight: 700; color: #2563eb;' : 'color: #94a3b8;'}">
+                                        ${day.SuspendP_duration || '-'}
+                                    </td>
+                                    <td style="padding: 10px 8px; text-align: center; border-right: 2px solid #e2e8f0; ${day.CreditNul > 0 ? 'background: #f59e0b; color: white; font-weight: 700;' : 'background: #f1f5f9; color: #94a3b8;'}">
+                                        ${day.CreditNul > 0 ? '⚠️ CRÉDIT NUL' : '✓ Normal'}
+                                    </td>
+                                    <td style="padding: 10px 8px; text-align: center; ${day.SuspendE > 0 ? 'background: #0ea5e910; font-weight: 600; color: #0284c7;' : 'color: #94a3b8;'}">
+                                        ${day.SuspendE_start || '-'}
+                                    </td>
+                                    <td style="padding: 10px 8px; text-align: center; ${day.SuspendE > 0 ? 'background: #0ea5e910; font-weight: 600; color: #0284c7;' : 'color: #94a3b8;'}">
+                                        ${day.SuspendE_end || '-'}
+                                    </td>
+                                    <td style="padding: 10px 8px; text-align: center; ${day.SuspendE > 0 ? 'background: #0ea5e920; font-weight: 700; color: #0284c7;' : 'color: #94a3b8;'}">
+                                        ${day.SuspendE_duration || '-'}
+                                    </td>
+                                </tr>
+                            `;
+                        }).join('')}
+                    </tbody>
+                </table>
+            </div>
+            
+            <div style="margin-top: 15px; padding: 12px 20px; background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0; display: flex; align-items: center; gap: 20px; flex-wrap: wrap; font-size: 12px;">
+                <span><span style="color: #3b82f6;">⬤</span> Puissance dépassée</span>
+                <span><span style="color: #f59e0b;">⬤</span> Crédit nul</span>
+                <span><span style="color: #0ea5e9;">⬤</span> Énergie épuisée</span>
+            </div>
+        `;
+        
+        // Script pour le toggle (inline car pas de setTimeout nécessaire)
+        html += `
+            <script>
+                (function() {
+                    const btn = document.getElementById('${toggleId}');
+                    const table = document.getElementById('${tableId}');
+                    if (btn && table) {
+                        btn.addEventListener('click', function() {
+                            if (table.style.display === 'none') {
+                                table.style.display = 'block';
+                                btn.innerHTML = '<span style="font-size:16px;">🔼</span><span>Masquer le tableau</span>';
+                            } else {
+                                table.style.display = 'none';
+                                btn.innerHTML = '<span style="font-size:16px;">🔽</span><span>Afficher le tableau détaillé</span>';
+                            }
+                        });
+                    }
+                })();
+            </script>
+        `;
+    }
+    
+    html += `</div></div>`;
+    return html;
+}
+
+/*
 function renderEventsBoard() {
     const container = document.getElementById('commercialEventsBoard');
     if (!container) return;
@@ -873,7 +1407,7 @@ function renderEventsClient(client) {
     html += `</div></div>`; // fermeture padding + carte
     return html;
 }
-
+*/
 function renderStatCard(icon, label, value, percent, gradient) {
     return `
         <div style="background: ${gradient}; border-radius: 12px; padding: 12px; color: white;">
@@ -890,6 +1424,7 @@ function renderStatCard(icon, label, value, percent, gradient) {
         </div>
     `;
 }
+
 
 // ===========================================
 // RENDU CREDIT BOARD
@@ -921,6 +1456,8 @@ function renderCreditBoard() {
     
     const streaksData = processCreditStreaks(credits, zeroCreditDates);
     const rechargeData = processRechargeData(recharges);
+
+
     
     let html = `
         <div class="client-card" style="padding: 0; overflow: hidden;">
@@ -931,12 +1468,6 @@ function renderCreditBoard() {
             <div style="padding: ${STYLES.spacing.lg};">
 
     `;
-
-    html += renderCreditEvolutionChart(credits, client.id);
-    html += renderMonthlyCreditAnalysis(credits, zeroCreditDates);
-    const summaryHTML = renderCreditSummaryDashboard(credits, zeroCreditDates);
-    
-    
     if (rechargeData.hasData) {
         html += renderRechargeHabits(rechargeData);
     }
@@ -951,7 +1482,7 @@ function renderCreditBoard() {
         
         <div id="${detailsId}" style="display: none; margin-top: ${STYLES.spacing.lg};">
     `;
-    
+
     if (rechargeData.hasData) {
         html += renderRechargeTable(rechargeData);
     }
@@ -965,6 +1496,11 @@ function renderCreditBoard() {
         </div>
     </div>`;
     
+
+    html += renderCreditEvolutionChart(credits, client.id);
+    html += renderMonthlyCreditAnalysis(credits, zeroCreditDates);
+    const summaryHTML = renderCreditSummaryDashboard(credits, zeroCreditDates);
+
     container.innerHTML = html;
     // Créer le graphique après le rendu
     requestAnimationFrame(() => {
@@ -984,6 +1520,8 @@ function renderCreditBoard() {
             };
         }
     }, 100);
+
+    
 }
 
 function renderStreaksCard(streaksData) {
@@ -1288,16 +1826,16 @@ function initCreditChart() {
     const monthColors = {
         1: '#8b5cf6',  // Janvier - Violet
         2: '#FF0000',  // Février - Violet clair
-        3: '#008000',  // Mars - Lavande
+        3: '#54ff54',  // Mars - Lavande
         4: '#0000FF',  // Avril - Rose violet
         5: '#f472b6',  // Mai - Rose
         6: '#fb7185',  // Juin - Rose saumon
         7: '#FF8C00',  // Juillet - Orange
         8: '#FF00FF',  // Août - Jaune orange
         9: '#00CED1',  // Septembre - Jaune
-        10: '#8B4513', // Octobre - Vert lime
-        11: '#808080', // Novembre - Vert
-        12: '#FFD700'  // Décembre - Cyan
+        10: '#cc5907', // Octobre - Vert lime
+        11: '#0f6f01', // Novembre - Vert
+        12: '#ffd900'  // Décembre - Cyan
     };
     
     function getMonthColor(month) {
