@@ -19,7 +19,7 @@ let selectAllFilesBtn, deselectAllFilesBtn, selectLastThreeBtn;
 let nrExtractionInfo, detectedNrEl, useDetectedNrBtn;
 let nrConfirmationModal, confirmNrYesBtn, confirmNrNoBtn, confirmationNrNumberEl;
 
-const ALLOWED_DATA_DIRS = ['ENERGIE', 'EVENT', 'INT', 'RECHARGE', 'SOLDE', 'TENS'];
+const ALLOWED_DATA_DIRS = ['ENERGIE', 'EVENT', 'FONC', 'INT', 'RECHARGE', 'SOLDE', 'TENS'];
 
 // Gestion confirmation NR (une seule confirmation par valeur)
 let nrConfirmedValue = null; // ex: "NR1234"
@@ -386,7 +386,7 @@ async function addFileDatesToStructure(structure, basePath) {
 }
 
 function parseDataFilename(filename) {
-  const m = String(filename).match(/^(ENERGIE|EVENT|INT|RECHARGE|SOLDE|TENS)\s*(\d+)\.txt$/i);
+  const m = String(filename).match(/^(ENERGIE|EVENT|FONC|INT|RECHARGE|SOLDE|TENS)\s*(\d+)\.txt$/i);
   if (!m) return null;
   return { type: m[1].toUpperCase(), num: Number(m[2]) };
 }

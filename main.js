@@ -156,7 +156,7 @@ ipcMain.handle('upload-folder-structure', async (event, folderPath) => {
     let totalSize = 0;
 
     // Dossiers autorisés (on ignore les autres + on ignore les .txt à la racine)
-    const ALLOWED_DATA_DIRS = new Set(['ENERGIE', 'EVENT', 'INT', 'RECHARGE', 'SOLDE', 'TENS']);
+    const ALLOWED_DATA_DIRS = new Set(['ENERGIE', 'EVENT', 'FONC', 'INT', 'RECHARGE', 'SOLDE', 'TENS']);
     
     function scanDirectory(dirPath, maxDepth = 100, currentDepth = 0) {
       if (currentDepth > maxDepth) {
