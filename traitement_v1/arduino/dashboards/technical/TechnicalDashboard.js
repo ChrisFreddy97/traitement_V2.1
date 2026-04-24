@@ -1694,11 +1694,16 @@ function renderDailyChart() {
     requestAnimationFrame(() => createDailyTensionChart(data));
 }
 
-// ✅ Fonction avec SEUILS COLORÉS EN ROUGE (comme dans le sample)
 function createDailyTensionChart(data) {
     const ctx = document.getElementById('dailyTensionChart')?.getContext('2d');
     if (!ctx) return;
     const norms = VOLTAGE_NORMS[database.technicalData?.normSystem || '12V'];
+    
+    // Calculer la valeur max pour l'échelle Y (garder un peu de marge)
+    const allValues = [...data.mins, ...data.maxs, ...data.avgs].filter(v => v !== null && !isNaN(v));
+    const maxValue = Math.max(...allValues, norms.max + 2);
+    const yMax = Math.ceil(maxValue * 1.05);
+    
     requestAnimationFrame(() => {
         chartManager.create('dailyTensionChart', {
             type: 'line',
@@ -1708,7 +1713,7 @@ function createDailyTensionChart(data) {
                     { 
                         label: 'Tension minimale', 
                         data: data.mins, 
-                        borderColor: '#3b82f6',  // Bleu
+                        borderColor: '#3b82f6',
                         borderWidth: 2, 
                         pointRadius: 4, 
                         pointBackgroundColor: '#3b82f6',
@@ -1720,7 +1725,7 @@ function createDailyTensionChart(data) {
                     { 
                         label: 'Tension maximale', 
                         data: data.maxs, 
-                        borderColor: '#f97316',  // Orange
+                        borderColor: '#f97316',
                         borderWidth: 2, 
                         pointRadius: 4, 
                         pointBackgroundColor: '#f97316',
@@ -1732,7 +1737,7 @@ function createDailyTensionChart(data) {
                     { 
                         label: 'Tension moyenne', 
                         data: data.avgs, 
-                        borderColor: '#22c55e',  // Vert
+                        borderColor: '#22c55e',
                         borderWidth: 2.5, 
                         pointRadius: 5, 
                         pointBackgroundColor: '#22c55e',
@@ -1744,7 +1749,7 @@ function createDailyTensionChart(data) {
                     { 
                         label: 'Seuil minimal', 
                         data: Array(data.dates.length).fill(norms.min), 
-                        borderColor: '#ef4444',  // 🔴 ROUGE
+                        borderColor: '#ef4444',
                         borderWidth: 2, 
                         borderDash: [8, 6], 
                         pointRadius: 0,
@@ -1754,7 +1759,7 @@ function createDailyTensionChart(data) {
                     { 
                         label: 'Seuil maximal', 
                         data: Array(data.dates.length).fill(norms.max), 
-                        borderColor: '#ef4444',  // 🔴 ROUGE
+                        borderColor: '#ef4444',
                         borderWidth: 2, 
                         borderDash: [8, 6], 
                         pointRadius: 0,
@@ -1802,6 +1807,8 @@ function createDailyTensionChart(data) {
                 },
                 scales: { 
                     y: { 
+                        min: 10,  // 🔥 BLOQUÉ À 10V (décision du boss)
+                        max: yMax,
                         grid: { color: '#e9ecef' },
                         title: { display: true, text: 'Tension (Volts)', font: { size: 11, weight: 'bold' } },
                         ticks: { font: { size: 10 } }
