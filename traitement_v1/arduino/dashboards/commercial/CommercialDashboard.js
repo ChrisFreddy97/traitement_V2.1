@@ -438,15 +438,11 @@ export function renderCommercialDashboard() {
         <div class="section-title"><h2>💰 ANALYSE DE CONSOMMATION</h2></div>
         <div id="consumptionBoard" class="card"></div>
         
-        <div class="section-title"><h2>💳 ANALYSE CRÉDIT ET RECHARGE</h2></div>
         <div id="commercialEventsBoard" class="card"></div>
         
-        <div class="section-title"><h2>📊 SOLDE ET RECHARGE</h2></div>
+        <div class="section-title"><h2>💳 ANALYSE CRÉDIT ET RECHARGE</h2></div>
         <div id="creditBoard" class="card"></div>
         
-        <button class="toggle-tables-btn" onclick="window.toggleTablesContainer?.()">
-            📋 Afficher les tableaux détaillés
-        </button>
     `;
     
     renderGlobalClientTabs();

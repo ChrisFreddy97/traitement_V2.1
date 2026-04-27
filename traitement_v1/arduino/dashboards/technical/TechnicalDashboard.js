@@ -1223,7 +1223,7 @@ function renderHighVoltageBoard() {
         extreme: ((stats.extreme / totalJours) * 100).toFixed(1)
     };
 
-    // Récupérer les données horaires pour trouver l'heure du pic
+    // 🔥 Récupérer TOUTES les heures de dépassement (tension ≥ seuil)
     const table = database.tables?.find(t => t.type === 'T');
     const hourlyData = {};
     
@@ -1232,15 +1232,27 @@ function renderHighVoltageBoard() {
             const cells = row.split(';');
             const timestamp = cells[1];
             const tension = parseFloat(cells[4]);
-            if (timestamp && !isNaN(tension)) {
+            if (timestamp && !isNaN(tension) && tension >= seuil) {
                 const date = timestamp.split(' ')[0];
                 const hour = timestamp.split(' ')[1]?.substring(0, 5);
-                if (!hourlyData[date]) hourlyData[date] = { maxTension: 0, hourAtMax: '—' };
+                if (!hourlyData[date]) {
+                    hourlyData[date] = { hours: [], maxTension: 0, hourAtMax: '—' };
+                }
+                // Ajouter l'heure si pas déjà présente
+                if (!hourlyData[date].hours.includes(hour)) {
+                    hourlyData[date].hours.push(hour);
+                }
+                // Garder aussi l'heure du pic pour le tri si besoin
                 if (tension > hourlyData[date].maxTension) {
                     hourlyData[date].maxTension = tension;
                     hourlyData[date].hourAtMax = hour;
                 }
             }
+        });
+        
+        // Trier les heures pour chaque jour
+        Object.keys(hourlyData).forEach(date => {
+            hourlyData[date].hours.sort();
         });
     }
 
@@ -1262,10 +1274,11 @@ function renderHighVoltageBoard() {
         return 'CRITIQUE';
     };
 
-    // Générer le tableau de détails
+    // 🔥 Générer le tableau avec TOUTES les heures de dépassement
     const generateDetailsRows = () => {
         return hvData.map(d => {
-            const heurePic = hourlyData[d.date]?.hourAtMax || '—';
+            const dayHours = hourlyData[d.date]?.hours || [];
+            const heuresTexte = dayHours.length > 0 ? dayHours.join(' · ') : '—';
             const countColor = getCountColor(d.count);
             const countLabel = getCountLabel(d.count);
             
@@ -1291,7 +1304,9 @@ function renderHighVoltageBoard() {
                             <span style="font-size: 9px; color: ${textColor}80;">${countLabel}</span>
                         </div>
                     </td>
-                    <td style="padding: 10px 8px; text-align: center; font-family: monospace; color: ${textColor};">${heurePic}</td>
+                    <td style="padding: 10px 8px; text-align: center; font-family: monospace; font-size: 11px; color: ${textColor};">
+                        ${heuresTexte}
+                    </td>
                 </tr>
             `;
         }).join('');
@@ -1429,12 +1444,12 @@ function renderHighVoltageBoard() {
             <!-- Tableau des détails (caché par défaut) -->
             <div id="${detailsId}" style="display: none;">
                 <div style="max-height: 400px; overflow-y: auto; overflow-x: auto; scrollbar-width: thin;">
-                    <table style="width: 100%; border-collapse: collapse; font-size: 12px; min-width: 500px;">
+                    <table style="width: 100%; border-collapse: collapse; font-size: 12px; min-width: 600px;">
                         <thead style="position: sticky; top: 0; z-index: 10; background: white;">
                             <tr style="background: #f1f5f9; border-bottom: 2px solid #cbd5e1;">
                                 <th style="padding: 10px 8px; text-align: left; font-weight: 600; color: #334155;">📅 Date</th>
                                 <th style="padding: 10px 8px; text-align: center; font-weight: 600; color: #334155;">⚡ Atteintes</th>
-                                <th style="padding: 10px 8px; text-align: center; font-weight: 600; color: #334155;">⏰ Heure du pic</th>
+                                <th style="padding: 10px 8px; text-align: center; font-weight: 600; color: #334155;">⏰ Heures de dépassement</th>
                             </tr>
                         </thead>
                         <tbody>
