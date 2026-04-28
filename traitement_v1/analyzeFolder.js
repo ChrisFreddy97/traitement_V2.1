@@ -8381,7 +8381,7 @@ function createMainTabs() {
     mainTabsContainer.className = 'main-tabs-container';
     mainTabsContainer.style.cssText = `background: white; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1); overflow: hidden;`;
     
-    // Onglets principaux (TECHNIQUE, COMMERCIALE et FRAUDE)
+    // Onglets principaux (TECHNIQUE, COMMERCIALE)
     const mainTabsHeader = document.createElement('div');
     mainTabsHeader.className = 'main-tabs-header';
     mainTabsHeader.style.cssText = `display: flex; background: #f8f9fa; border-bottom: 2px solid #e9ecef; padding: 0;`;
@@ -8402,17 +8402,8 @@ function createMainTabs() {
     commercialeTab.innerHTML = '💰 COMMERCIALE';
     commercialeTab.addEventListener('click', () => showMainTab('commerciale'));
     
-    // ✅ NOUVEL ONGLET FRAUDE
-    const fraudeTab = document.createElement('button');
-    fraudeTab.id = 'main-tab-fraude';
-    fraudeTab.className = 'main-tab-btn';
-    fraudeTab.style.cssText = `flex: 1; padding: 18px 25px; background: #e9ecef; color: #6c757d; border: none; font-size: 16px; font-weight: 600; cursor: pointer; transition: all 0.3s ease; display: flex; align-items: center; justify-content: center; gap: 10px;`;
-    fraudeTab.innerHTML = '🔍 FRAUDE';
-    fraudeTab.addEventListener('click', () => showMainTab('fraude'));
-    
     mainTabsHeader.appendChild(techniqueTab);
     mainTabsHeader.appendChild(commercialeTab);
-    mainTabsHeader.appendChild(fraudeTab);
     mainTabsContainer.appendChild(mainTabsHeader);
     
     // Contenu des onglets
@@ -8432,15 +8423,8 @@ function createMainTabs() {
     commercialeContent.className = 'main-tab-content';
     commercialeContent.style.cssText = `padding: 0; display: none;`;
     
-    // ✅ NOUVEAU CONTENU FRAUDE
-    const fraudeContent = document.createElement('div');
-    fraudeContent.id = 'main-tab-content-fraude';
-    fraudeContent.className = 'main-tab-content';
-    fraudeContent.style.cssText = `padding: 0; display: none;`;
-    
     mainTabsContent.appendChild(techniqueContent);
     mainTabsContent.appendChild(commercialeContent);
-    mainTabsContent.appendChild(fraudeContent);
     mainTabsContainer.appendChild(mainTabsContent);
     
     // Supprimer l'ancien conteneur d'onglets s'il existe
@@ -8483,8 +8467,14 @@ function showMainTab(tabName) {
                     showClientTab(activeClients[0]);
                 }
             }, 100);
-        } else if (tabName === 'fraude') {
-            displayFraudeAnalysis();
+        } else if (tabName === 'commerciale') {
+            createClientSubTabs();
+            setTimeout(() => {
+                const activeClients = detectActiveClients();
+                if (activeClients.length > 0) {
+                    showClientTab(activeClients[0]);
+                }
+            }, 100);
         }
     }
 }
@@ -8493,7 +8483,6 @@ function getTabGradient(tabName) {
     switch(tabName) {
         case 'technique': return 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
         case 'commerciale': return 'linear-gradient(135deg, #48bb78 0%, #38a169 100%)';
-        case 'fraude': return 'linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)';
         default: return '#e9ecef';
     }
 }
@@ -12039,17 +12028,6 @@ function createVoltageThresholdTable() {
     `;
 
     dashboard.innerHTML = `
-        <div style="background: white; border-radius: 8px; padding: 12px; border-left: 4px solid #22c55e; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
-            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
-                <span style="font-size: 18px;">⭐</span>
-                <span style="font-size: 12px; font-weight: 600; color: #166534;">EXCELLENTE</span>
-            </div>
-            <div style="font-size: 24px; font-weight: 800; color: #22c55e; margin-bottom: 5px;">${excellent}</div>
-            <div style="font-size: 11px; color: #64748b;">${totalJours > 0 ? ((excellent/totalJours*100).toFixed(1)) : 0}% des jours</div>
-            <div style="margin-top: 8px; width: 100%; height: 4px; background: #e2e8f0; border-radius: 2px; overflow: hidden;">
-                <div style="width: ${totalJours > 0 ? (excellent/totalJours*100) : 0}%; height: 100%; background: #22c55e;"></div>
-            </div>
-        </div>
         <div style="background: white; border-radius: 8px; padding: 12px; border-left: 4px solid #8b5cf6; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
             <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
                 <span style="font-size: 18px;">🔴</span>
@@ -12059,6 +12037,17 @@ function createVoltageThresholdTable() {
             <div style="font-size: 11px; color: #64748b;">${totalJours > 0 ? ((exces/totalJours*100).toFixed(1)) : 0}% des jours</div>
             <div style="margin-top: 8px; width: 100%; height: 4px; background: #e2e8f0; border-radius: 2px; overflow: hidden;">
                 <div style="width: ${totalJours > 0 ? (exces/totalJours*100) : 0}%; height: 100%; background: #8b5cf6;"></div>
+            </div>
+        </div>
+        <div style="background: white; border-radius: 8px; padding: 12px; border-left: 4px solid #22c55e; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                <span style="font-size: 18px;">⭐</span>
+                <span style="font-size: 12px; font-weight: 600; color: #166534;">EXCELLENTE</span>
+            </div>
+            <div style="font-size: 24px; font-weight: 800; color: #22c55e; margin-bottom: 5px;">${excellent}</div>
+            <div style="font-size: 11px; color: #64748b;">${totalJours > 0 ? ((excellent/totalJours*100).toFixed(1)) : 0}% des jours</div>
+            <div style="margin-top: 8px; width: 100%; height: 4px; background: #e2e8f0; border-radius: 2px; overflow: hidden;">
+                <div style="width: ${totalJours > 0 ? (excellent/totalJours*100) : 0}%; height: 100%; background: #22c55e;"></div>
             </div>
         </div>
         <div style="background: white; border-radius: 8px; padding: 12px; border-left: 4px solid #eab308; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
@@ -12935,15 +12924,6 @@ function createCombinedTables() {
         evenementGrid.appendChild(combinedEventContainer);
         evenementContent.appendChild(evenementGrid);
     }
-
-    // ========== ONGLET FRAUDE (inchangé) ==========
-    const fraudeContent = document.getElementById('main-tab-content-fraude');
-    if (fraudeContent) {
-        fraudeContent.innerHTML = '';
-        const fraudeGrid = document.createElement('div');
-        fraudeGrid.style.cssText = `display: flex; flex-direction: column; gap: 30px; padding: 20px;`;
-        fraudeContent.appendChild(fraudeGrid);
-    }
 }
 // ==================== ANALYSE DES CHUTES DE TENSION (24h/24) ====================
 function analyzeTensionDrops() {
@@ -13070,324 +13050,6 @@ function getPeriodOfDay(hour) {
     return '🌙 Nuit';
 }
 
-// Version améliorée de getTimeDifferenceMinutes qui gère les changements de jour
-function getTimeDifferenceMinutes(time1, time2, date1, date2) {
-    const [h1, m1] = time1.split(':').map(Number);
-    const [h2, m2] = time2.split(':').map(Number);
-    
-    let minutes1 = h1 * 60 + m1;
-    let minutes2 = h2 * 60 + m2;
-    
-    // Si les dates sont différentes, ajouter 24h
-    if (date1 !== date2) {
-        minutes2 += 24 * 60;
-    }
-    
-    return minutes2 - minutes1;
-}
-// ==================== AFFICHAGE DANS L'ONGLET FRAUDE ====================
-
-function displayFraudeAnalysis() {
-    const fraudeContent = document.getElementById('main-tab-content-fraude');
-    if (!fraudeContent) return;
-    
-    fraudeContent.innerHTML = '';
-    
-    // Créer le conteneur principal
-    const fraudeContainer = document.createElement('div');
-    fraudeContainer.style.cssText = `
-        padding: 20px;
-        display: flex;
-        flex-direction: column;
-        gap: 20px;
-    `;
-    
-    // Titre
-    const title = document.createElement('h2');
-    title.style.cssText = `
-        margin: 0 0 10px 0;
-        color: #1e293b;
-        font-size: 20px;
-        display: flex;
-        align-items: center;
-        gap: 10px;
-    `;
-    title.innerHTML = `🔍 Analyse des Chutes de Tension (24h/24) - ${escapeHtml(currentFolder.name)}`;
-    fraudeContainer.appendChild(title);
-    
-    // Lancer l'analyse
-    const analysis = analyzeTensionDrops();
-    
-    // Détecter le système de tension pour afficher les seuils
-    const systemType = detectSystemType(combinedTensionData);
-    const limits = getSystemLimits(systemType);
-    
-    // Carte de synthèse
-    const summaryCard = document.createElement('div');
-    summaryCard.style.cssText = `
-        background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
-        border-radius: 12px;
-        padding: 20px;
-        color: white;
-        display: grid;
-        grid-template-columns: repeat(4, 1fr);
-        gap: 15px;
-    `;
-    
-    summaryCard.innerHTML = `
-        <div>
-            <div style="font-size: 12px; opacity: 0.8;">Chutes détectées</div>
-            <div style="font-size: 32px; font-weight: 700;">${analysis.summary.totalDrops}</div>
-        </div>
-        <div>
-            <div style="font-size: 12px; opacity: 0.8;">Chutes critiques</div>
-            <div style="font-size: 32px; font-weight: 700; color: #ef4444;">${analysis.summary.totalCritical}</div>
-        </div>
-        <div>
-            <div style="font-size: 12px; opacity: 0.8;">Pire chute</div>
-            <div style="font-size: 20px; font-weight: 700;">${analysis.summary.worstDrop ? analysis.summary.worstDrop.drop + ' V' : '0 V'}</div>
-        </div>
-        <div>
-            <div style="font-size: 12px; opacity: 0.8;">Jour le plus actif</div>
-            <div style="font-size: 16px; font-weight: 700;">${analysis.summary.worstDay ? new Date(analysis.summary.worstDay).toLocaleDateString('fr-FR') : 'Aucun'}</div>
-        </div>
-    `;
-    
-    fraudeContainer.appendChild(summaryCard);
-    
-    // Informations sur le système
-    const systemCard = document.createElement('div');
-    systemCard.style.cssText = `
-        background: white;
-        border-radius: 12px;
-        padding: 15px 20px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-        display: flex;
-        align-items: center;
-        gap: 20px;
-        flex-wrap: wrap;
-        border: 1px solid #e2e8f0;
-    `;
-    
-    systemCard.innerHTML = `
-        <div style="display: flex; align-items: center; gap: 10px;">
-            <span style="font-size: 20px;">⚡</span>
-            <div>
-                <div style="font-size: 12px; color: #64748b;">Système détecté</div>
-                <div style="font-weight: 700; color: #1e293b;">${systemType}</div>
-            </div>
-        </div>
-        <div style="display: flex; align-items: center; gap: 10px;">
-            <span style="font-size: 20px;">📊</span>
-            <div>
-                <div style="font-size: 12px; color: #64748b;">Tension normale</div>
-                <div style="font-weight: 700; color: #1e293b;">${limits.normal} V</div>
-            </div>
-        </div>
-        <div style="display: flex; align-items: center; gap: 10px;">
-            <span style="font-size: 20px;">⚠️</span>
-            <div>
-                <div style="font-size: 12px; color: #64748b;">Seuil critique (-30%)</div>
-                <div style="font-weight: 700; color: #ef4444;">${(limits.normal * 0.3).toFixed(1)} V</div>
-            </div>
-        </div>
-        <div style="display: flex; align-items: center; gap: 10px; margin-left: auto;">
-            <span style="font-size: 20px;">📅</span>
-            <div>
-                <div style="font-size: 12px; color: #64748b;">Période analysée</div>
-                <div style="font-weight: 700; color: #1e293b;">24h/24</div>
-            </div>
-        </div>
-    `;
-    
-    fraudeContainer.appendChild(systemCard);
-    
-    // Graphique de répartition horaire (simple)
-    const chartCard = document.createElement('div');
-    chartCard.style.cssText = `
-        background: white;
-        border-radius: 12px;
-        padding: 20px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-        border: 1px solid #e2e8f0;
-    `;
-    
-    chartCard.innerHTML = `<h3 style="margin: 0 0 15px 0; font-size: 16px;">📊 Répartition des chutes par heure</h3>`;
-    
-    const chartBars = document.createElement('div');
-    chartBars.style.cssText = `display: flex; align-items: flex-end; gap: 2px; height: 150px;`;
-    
-    const maxValue = Math.max(...analysis.summary.dropsByHour, 1);
-    
-    for (let hour = 0; hour < 24; hour++) {
-        const count = analysis.summary.dropsByHour[hour];
-        const height = count > 0 ? (count / maxValue) * 100 : 0;
-        const period = getPeriodOfDay(hour);
-        
-        let barColor = '#3b82f6';
-        if (period.includes('Nuit')) barColor = '#1e293b';
-        if (period.includes('Soir')) barColor = '#f97316';
-        if (period.includes('Matin')) barColor = '#22c55e';
-        
-        chartBars.innerHTML += `
-            <div style="flex: 1; display: flex; flex-direction: column; align-items: center;">
-                <div style="width: 100%; background: ${barColor}20; border-radius: 4px 4px 0 0; height: ${height}%; min-height: ${count > 0 ? '4px' : '0'}; position: relative;">
-                    ${count > 0 ? `<div style="position: absolute; top: -20px; left: 50%; transform: translateX(-50%); font-size: 10px; background: ${barColor}; color: white; padding: 2px 4px; border-radius: 4px;">${count}</div>` : ''}
-                </div>
-                <div style="font-size: 9px; margin-top: 5px; color: #64748b;">${hour}h</div>
-            </div>
-        `;
-    }
-    
-    chartCard.appendChild(chartBars);
-    
-    // Légende des périodes
-    const legend = document.createElement('div');
-    legend.style.cssText = `
-        display: flex;
-        justify-content: center;
-        gap: 20px;
-        margin-top: 15px;
-        padding-top: 15px;
-        border-top: 1px solid #e2e8f0;
-        font-size: 11px;
-    `;
-    legend.innerHTML = `
-        <div style="display: flex; align-items: center; gap: 5px;"><div style="width: 12px; height: 12px; background: #22c55e; border-radius: 3px;"></div>Matin (5h-12h)</div>
-        <div style="display: flex; align-items: center; gap: 5px;"><div style="width: 12px; height: 12px; background: #3b82f6; border-radius: 3px;"></div>Après-midi (12h-18h)</div>
-        <div style="display: flex; align-items: center; gap: 5px;"><div style="width: 12px; height: 12px; background: #f97316; border-radius: 3px;"></div>Soir (18h-22h)</div>
-        <div style="display: flex; align-items: center; gap: 5px;"><div style="width: 12px; height: 12px; background: #1e293b; border-radius: 3px;"></div>Nuit (22h-5h)</div>
-    `;
-    chartCard.appendChild(legend);
-    
-    fraudeContainer.appendChild(chartCard);
-    
-    // Tableau des chutes
-    if (analysis.drops.length > 0) {
-        const dropsCard = document.createElement('div');
-        dropsCard.style.cssText = `
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-            overflow: hidden;
-        `;
-        
-        const dropsHeader = document.createElement('div');
-        dropsHeader.style.cssText = `
-            background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
-            color: white;
-            padding: 15px 20px;
-            font-size: 16px;
-            font-weight: 600;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        `;
-        dropsHeader.innerHTML = `
-            <span>📉 Détail des chutes de tension</span>
-            <span style="background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 20px; font-size: 12px;">
-                ${analysis.drops.length} chute(s)
-            </span>
-        `;
-        dropsCard.appendChild(dropsHeader);
-        
-        const dropsContent = document.createElement('div');
-        dropsContent.style.cssText = `padding: 20px; max-height: 500px; overflow-y: auto;`;
-        
-        let dropsHTML = `
-            <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
-                <thead style="position: sticky; top: 0; background: #f1f5f9;">
-                    <tr>
-                        <th style="padding: 10px; text-align: left;">Date</th>
-                        <th style="padding: 10px; text-align: center;">Période</th>
-                        <th style="padding: 10px; text-align: center;">Chute (V)</th>
-                        <th style="padding: 10px; text-align: center;">Tension</th>
-                        <th style="padding: 10px; text-align: center;">Durée</th>
-                        <th style="padding: 10px; text-align: center;">Horaire</th>
-                        <th style="padding: 10px; text-align: center;">Statut</th>
-                    </tr>
-                </thead>
-                <tbody>
-        `;
-        
-        analysis.drops.forEach((drop, index) => {
-            const isCritical = drop.isCritical;
-            const rowColor = isCritical ? '#fef2f2' : (index % 2 === 0 ? '#ffffff' : '#fafbfc');
-            const statusText = isCritical ? 'CRITIQUE' : 'Significatif';
-            const statusColor = isCritical ? '#ef4444' : '#3b82f6';
-            
-            dropsHTML += `
-                <tr style="border-bottom: 1px solid #e2e8f0; background: ${rowColor};">
-                    <td style="padding: 10px;">${new Date(drop.date).toLocaleDateString('fr-FR')}</td>
-                    <td style="padding: 10px; text-align: center;">${drop.period}</td>
-                    <td style="padding: 10px; text-align: center; font-weight: 700; color: ${statusColor};">${drop.drop} V</td>
-                    <td style="padding: 10px; text-align: center;">${drop.fromValue} → ${drop.toValue} V</td>
-                    <td style="padding: 10px; text-align: center;">${drop.duration} min</td>
-                    <td style="padding: 10px; text-align center;">${drop.fromTime} → ${drop.time}</td>
-                    <td style="padding: 10px; text-align: center;">
-                        <span style="background: ${statusColor}20; color: ${statusColor}; padding: 4px 8px; border-radius: 12px; font-weight: 600;">
-                            ${statusText}
-                        </span>
-                    </td>
-                </tr>
-            `;
-        });
-        
-        dropsHTML += `</tbody></table>`;
-        dropsContent.innerHTML = dropsHTML;
-        dropsCard.appendChild(dropsContent);
-        
-        // Ajouter une légende
-        const legend2 = document.createElement('div');
-        legend2.style.cssText = `
-            padding: 10px 20px;
-            background: #f8fafc;
-            border-top: 1px solid #e2e8f0;
-            display: flex;
-            align-items: center;
-            gap: 20px;
-            font-size: 11px;
-            flex-wrap: wrap;
-        `;
-        legend2.innerHTML = `
-            <div style="display: flex; align-items: center; gap: 5px;">
-                <div style="width: 12px; height: 12px; background: #3b82f6; border-radius: 3px;"></div>
-                <span>Chute significative (>1.5V en <2h)</span>
-            </div>
-            <div style="display: flex; align-items: center; gap: 5px;">
-                <div style="width: 12px; height: 12px; background: #ef4444; border-radius: 3px;"></div>
-                <span>Chute critique (>${(limits.normal * 0.3).toFixed(1)}V)</span>
-            </div>
-            <div style="margin-left: auto; background: #e2e8f0; padding: 4px 8px; border-radius: 4px;">
-                ${combinedTensionData.length} relevés analysés
-            </div>
-        `;
-        dropsCard.appendChild(legend2);
-        
-        fraudeContainer.appendChild(dropsCard);
-    } else {
-        const noDataCard = document.createElement('div');
-        noDataCard.style.cssText = `
-            background: white;
-            border-radius: 12px;
-            padding: 40px;
-            text-align: center;
-            color: #64748b;
-            border: 1px solid #e2e8f0;
-        `;
-        noDataCard.innerHTML = `
-            <span style="font-size: 48px; display: block; margin-bottom: 20px;">📊</span>
-            <h3 style="margin: 0 0 10px 0; color: #1e293b;">Aucune chute de tension détectée</h3>
-            <p style="margin: 0;">Aucune chute significative (>1.5V) n'a été enregistrée sur l'ensemble des relevés.</p>
-            <p style="margin-top: 10px; font-size: 11px;">${combinedTensionData.length} relevés analysés</p>
-        `;
-        fraudeContainer.appendChild(noDataCard);
-    }
-    
-    fraudeContent.appendChild(fraudeContainer);
-}
-////////////////////////////////////////////////////////////////////////////
-// AJOUTER LES STYLES CSS
 function addCommercialStyles() {
     if (document.querySelector('#commercial-styles')) return;
     
