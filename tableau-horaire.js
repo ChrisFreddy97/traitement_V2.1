@@ -2566,7 +2566,7 @@ function displayClientEventsTab(clientId) {
                 <div style="background: linear-gradient(135deg, #f97316 0%, #ea580c 100%); color: white; padding: 12px 16px;">
                     <div style="display: flex; align-items: center; gap: 10px;">
                         <span style="font-size: 18px;">📊</span>
-                        <h4 style="margin: 0; font-size: 14px; font-weight: 600;">Événements Client ${parseInt(clientId).toString().padStart(2, '0')}</h4>
+                        <h4 style="margin: 0; font-size: 14px; font-weight: 600;">Événements - Client ${parseInt(clientId).toString().padStart(2, '0')}</h4>
                     </div>
                 </div>
                 <div style="padding: 30px; text-align: center; background: #f8fafc;">
@@ -2577,13 +2577,6 @@ function displayClientEventsTab(clientId) {
             </div>
         `;
     }
-
-    // Trier les événements par date/heure
-    clientEvents.sort((a, b) => {
-        const dateA = new Date(a.Date.split('/').reverse().join('-') + 'T' + (a.Heure || '00:00'));
-        const dateB = new Date(b.Date.split('/').reverse().join('-') + 'T' + (b.Heure || '00:00'));
-        return dateA - dateB;
-    });
 
     // Grouper les événements par date
     const eventsByDate = {};
@@ -2597,88 +2590,123 @@ function displayClientEventsTab(clientId) {
     // Calculer le nombre de JOURS avec événements
     const daysWithEvents = Object.keys(eventsByDate).length;
 
-    // Statistiques par type d'événement (pour le tableau de bord - en JOURS)
-    const eventStatsByDays = {
-        'SURCHARGE': { days: new Set(), color: '#FF6B6B', icon: '⚡' },
-        'CRÉDIT NUL': { days: new Set(), color: '#FFD93D', icon: '💰' },
-        'PUISSANCE DÉPASSÉE': { days: new Set(), color: '#6BCEF5', icon: '📈' },
-        'ÉNERGIE ÉPUISÉE': { days: new Set(), color: '#FF8B94', icon: '🔋' },
-    };
+    // Statistiques par type d'événement (en JOURS)
+    const daysWithSurcharge = new Set();
+    const daysWithCreditNul = new Set();
+    const daysWithSuspendP = new Set();  // Puissance dépassée
+    const daysWithSuspendE = new Set();  // Énergie épuisée
+    const daysWithDP = new Set();        // Délestage partiel
+    const daysWithDT = new Set();        // Délestage total
 
     clientEvents.forEach(event => {
         const type = event['Analyse État'] || event.type || 'NORMAL';
-        if (eventStatsByDays[type]) {
-            eventStatsByDays[type].days.add(event.Date);
+        const date = event.Date;
+
+        if (type === 'SURCHARGE') {
+            daysWithSurcharge.add(date);
+        } else if (type === 'CRÉDIT NUL') {
+            daysWithCreditNul.add(date);
+        } else if (type === 'PUISSANCE DÉPASSÉE') {
+            daysWithSuspendP.add(date);
+        } else if (type === 'ÉNERGIE ÉPUISÉE') {
+            daysWithSuspendE.add(date);
         }
     });
 
-    // Fonction pour grouper les événements en périodes
-    function groupEventsIntoPeriods(events) {
-        if (events.length === 0) return [];
+    const totalDaysWithEvents = daysWithEvents;
+    const percentSurcharge = totalDaysWithEvents > 0 ? Math.round((daysWithSurcharge.size / totalDaysWithEvents) * 100) : 0;
+    const percentCreditNul = totalDaysWithEvents > 0 ? Math.round((daysWithCreditNul.size / totalDaysWithEvents) * 100) : 0;
+    const percentSuspendP = totalDaysWithEvents > 0 ? Math.round((daysWithSuspendP.size / totalDaysWithEvents) * 100) : 0;
+    const percentSuspendE = totalDaysWithEvents > 0 ? Math.round((daysWithSuspendE.size / totalDaysWithEvents) * 100) : 0;
 
-        const periods = [];
-        let currentPeriod = {
-            debut: events[0].Heure || '00:00',
-            fin: events[0].Heure || '00:00',
-            events: [events[0]]
-        };
+    // Trier les événements par date/heure
+    clientEvents.sort((a, b) => {
+        const dateA = new Date(a.Date.split('/').reverse().join('-') + 'T' + (a.Heure || '00:00'));
+        const dateB = new Date(b.Date.split('/').reverse().join('-') + 'T' + (b.Heure || '00:00'));
+        return dateA - dateB;
+    });
 
-        for (let i = 1; i < events.length; i++) {
-            const currentEvent = events[i];
-            const lastEventTime = convertTimeToMinutes(currentPeriod.fin);
-            const currentEventTime = convertTimeToMinutes(currentEvent.Heure || '00:00');
-
-            // Si l'écart est <= 30 minutes, on continue la période
-            if (currentEventTime - lastEventTime <= 30) {
-                currentPeriod.fin = currentEvent.Heure || '00:00';
-                currentPeriod.events.push(currentEvent);
-            } else {
-                // Nouvelle période
-                periods.push(currentPeriod);
-                currentPeriod = {
-                    debut: currentEvent.Heure || '00:00',
-                    fin: currentEvent.Heure || '00:00',
-                    events: [currentEvent]
-                };
-            }
-        }
-
-        periods.push(currentPeriod);
-        return periods;
-    }
-
-    // Fonction utilitaire pour convertir l'heure en minutes
-    function convertTimeToMinutes(timeStr) {
-        if (!timeStr) return 0;
-        const [hours, minutes] = timeStr.split(':').map(Number);
-        return (hours || 0) * 60 + (minutes || 0);
-    }
-
-    // Fonction pour formater la durée
-    function formatDuration(minutes) {
-        if (minutes < 60) {
-            return `${minutes}mn`;
-        } else {
-            const hours = Math.floor(minutes / 60);
-            const mins = minutes % 60;
-            return mins > 0 ? `${hours}h${mins.toString().padStart(2, '0')}mn` : `${hours}h`;
-        }
-    }
-
-    // Préparer les données pour le tableau
+    // Préparer les données pour le tableau simplifié
     const sortedDates = Object.keys(eventsByDate).sort((a, b) => {
         const dateA = new Date(a.split('/').reverse().join('-'));
         const dateB = new Date(b.split('/').reverse().join('-'));
         return dateB - dateA; // Plus récent en premier
     });
 
+    // Fonction pour grouper les heures par créneau de 15 minutes (version LISIBLE)
+    function groupHoursBy15MinCompact(hoursList) {
+        if (!hoursList || hoursList.length === 0) return [];
+        
+        // Supprimer les doublons
+        const uniqueHours = [...new Set(hoursList)];
+        
+        // Convertir les heures en minutes depuis minuit pour faciliter le tri
+        const timeToMinutes = (timeStr) => {
+            const [hours, minutes] = timeStr.split(':').map(Number);
+            return hours * 60 + minutes;
+        };
+        
+        // Trier les heures uniques
+        uniqueHours.sort((a, b) => timeToMinutes(a) - timeToMinutes(b));
+        
+        // Grouper par tranche de 15 minutes
+        const grouped = [];
+        let currentGroup = [];
+        let currentGroupStart = null;
+        
+        uniqueHours.forEach(hour => {
+            const minutes = timeToMinutes(hour);
+            if (currentGroupStart === null) {
+                currentGroupStart = minutes;
+                currentGroup.push(hour);
+            } else if (minutes - currentGroupStart <= 15) {
+                // Dans le même créneau de 15 minutes
+                currentGroup.push(hour);
+            } else {
+                // Fin du groupe actuel, créer le créneau
+                if (currentGroup.length > 0) {
+                    const startHour = currentGroup[0];
+                    const endHour = currentGroup[currentGroup.length - 1];
+                    if (currentGroup.length === 1) {
+                        grouped.push(startHour);
+                    } else {
+                        // Format clair : 07:11 → 07:24
+                        grouped.push(`${startHour} → ${endHour}`);
+                    }
+                }
+                // Commencer un nouveau groupe
+                currentGroupStart = minutes;
+                currentGroup = [hour];
+            }
+        });
+        
+        // Ajouter le dernier groupe
+        if (currentGroup.length > 0) {
+            const startHour = currentGroup[0];
+            const endHour = currentGroup[currentGroup.length - 1];
+            if (currentGroup.length === 1) {
+                grouped.push(startHour);
+            } else {
+                grouped.push(`${startHour} → ${endHour}`);
+            }
+        }
+        
+        return grouped;
+    }
+
     // Types d'événements dans l'ordre
-    const eventTypes = ['PUISSANCE DÉPASSÉE', 'SURCHARGE', 'CRÉDIT NUL', 'ÉNERGIE ÉPUISÉE'];
+    const eventTypes = ['SURCHARGE', 'CRÉDIT NUL', 'PUISSANCE DÉPASSÉE', 'ÉNERGIE ÉPUISÉE'];
     const typeColors = {
-        'PUISSANCE DÉPASSÉE': '#6BCEF5',
-        'SURCHARGE': '#FF6B6B',
-        'CRÉDIT NUL': '#FFD93D',
-        'ÉNERGIE ÉPUISÉE': '#FF8B94',
+        'SURCHARGE': '#ef4444',
+        'CRÉDIT NUL': '#f59e0b',
+        'PUISSANCE DÉPASSÉE': '#3b82f6',
+        'ÉNERGIE ÉPUISÉE': '#0ea5e9',
+    };
+    const typeBackgrounds = {
+        'SURCHARGE': '#fee2e2',
+        'CRÉDIT NUL': '#fef3c7',
+        'PUISSANCE DÉPASSÉE': '#dbeafe',
+        'ÉNERGIE ÉPUISÉE': '#e0f2fe',
     };
 
     // Créer les lignes du tableau
@@ -2686,142 +2714,190 @@ function displayClientEventsTab(clientId) {
 
     sortedDates.forEach(date => {
         const dayEvents = eventsByDate[date];
-
-        // Grouper les événements par type
-        const eventsByType = {};
+        
+        // Extraire les heures par type d'événement
+        const hoursByType = {};
+        eventTypes.forEach(type => {
+            hoursByType[type] = [];
+        });
+        
         dayEvents.forEach(event => {
             const type = event['Analyse État'] || event.type || 'NORMAL';
-            if (!eventsByType[type]) {
-                eventsByType[type] = [];
+            const heure = event.Heure || '00:00';
+            const formattedHour = heure.includes('h') ? heure.replace('h', ':') : heure;
+            if (hoursByType[type]) {
+                hoursByType[type].push(formattedHour);
             }
-            eventsByType[type].push(event);
         });
-
-        // Pour chaque type, créer des périodes
-        const typePeriods = {};
+        
+        // Grouper les heures par créneau de 15 minutes (version compacte)
         eventTypes.forEach(type => {
-            if (eventsByType[type]) {
-                // Trier par heure
-                const sortedTypeEvents = eventsByType[type].sort((a, b) => {
-                    return convertTimeToMinutes(a.Heure || '00:00') - convertTimeToMinutes(b.Heure || '00:00');
-                });
-                typePeriods[type] = groupEventsIntoPeriods(sortedTypeEvents);
+            hoursByType[type] = groupHoursBy15MinCompact(hoursByType[type]);
+        });
+        
+        // Créer la ligne du tableau - CHAQUE TYPE SUR UNE SEULE LIGNE
+        tableRows += `<tr style="border-bottom: 1px solid #e2e8f0;">`;
+        tableRows += `<td style="padding: 14px 12px; font-weight: 700; color: #1e293b; background: #fafbfc; border-right: 1px solid #e2e8f0; vertical-align: top;">${date}</td>`;
+        
+        eventTypes.forEach(type => {
+            const hours = hoursByType[type];
+            const bgColor = typeBackgrounds[type];
+            const color = typeColors[type];
+            
+            if (hours.length > 0) {
+                // Afficher tous les créneaux sur UNE SEULE LIGNE avec flex-wrap
+                tableRows += `
+                    <td style="padding: 12px; background: ${bgColor}; vertical-align: top;">
+                        <div style="display: flex; flex-wrap: wrap; gap: 6px; align-items: center;">
+                            ${hours.map(hour => `
+                                <span style="display: inline-block; background: white; padding: 4px 8px; 
+                                           border-radius: 16px; font-size: 10px; font-weight: 600; color: ${color};
+                                           border: 1px solid ${color}40; box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+                                           font-family: monospace; white-space: nowrap; letter-spacing: 0.3px;">
+                                    ${hour}
+                                </span>
+                            `).join('')}
+                        </div>
+                    </td>
+                `;
             } else {
-                typePeriods[type] = [];
+                tableRows += `
+                    <td style="padding: 12px; text-align: center; color: #cbd5e1; background: #fafafa; font-size: 12px;">
+                        —
+                    </td>
+                `;
             }
         });
-
-        // Déterminer le nombre maximum de périodes pour cette date
-        const maxPeriods = Math.max(...eventTypes.map(type => typePeriods[type].length));
-
-        // Créer les lignes pour cette date
-        for (let i = 0; i < maxPeriods; i++) {
-            let rowHtml = `<tr>`;
-
-            // Colonne Date (seulement sur la première ligne)
-            if (i === 0) {
-                rowHtml += `<td rowspan="${maxPeriods}" style="padding: 12px; font-weight: 600; background: #f8fafc; border-right: 1px solid #e2e8f0; vertical-align: middle;">${date}</td>`;
-            }
-
-            // Pour chaque type d'événement
-            eventTypes.forEach(type => {
-                const periods = typePeriods[type];
-                const color = typeColors[type] || '#64748b';
-
-                if (i < periods.length) {
-                    const period = periods[i];
-                    const debutMinutes = convertTimeToMinutes(period.debut);
-                    const finMinutes = convertTimeToMinutes(period.fin);
-                    const dureeMinutes = finMinutes - debutMinutes;
-                    const duree = dureeMinutes < 60 ?
-                        `${dureeMinutes}mn` :
-                        `${Math.floor(dureeMinutes / 60)}h${(dureeMinutes % 60).toString().padStart(2, '0')}mn`;
-
-                    rowHtml += `
-                        <td style="padding: 8px; text-align: center; color: ${color}; font-weight: 600; background: ${color}08;">${period.debut}</td>
-                        <td style="padding: 8px; text-align: center; color: ${color}; font-weight: 600; background: ${color}08;">${period.fin}</td>
-                        <td style="padding: 8px; text-align: center; color: ${color}; font-weight: 700; background: ${color}12;">${duree}</td>
-                    `;
-                } else {
-                    rowHtml += `
-                        <td style="padding: 8px; text-align: center; color: #cbd5e1; background: #fafafa;">-</td>
-                        <td style="padding: 8px; text-align: center; color: #cbd5e1; background: #fafafa;">-</td>
-                        <td style="padding: 8px; text-align: center; color: #cbd5e1; background: #fafafa;">-</td>
-                    `;
-                }
-            });
-
-            rowHtml += `</tr>`;
-            tableRows += rowHtml;
-        }
+        
+        tableRows += `<tr>`;
     });
+
 
     // Générer un ID unique pour ce client
     const containerId = `client-events-${clientId}`;
     const tableId = `client-events-table-${clientId}`;
 
-    // Retourner le HTML avec un ID unique pour le script
+    // Retourner le HTML avec le tableau optimisé
     return `
-        <div id="${containerId}" style="background: white; border-radius: 12px; border: 1px solid #e2e8f0; margin: 20px 0; overflow: hidden;">
+        <div id="${containerId}" style="background: white; border-radius: 16px; border: 1px solid #e2e8f0; margin: 20px 0; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
             
-            <!-- En-tête avec bouton -->
-            <div style="background: linear-gradient(135deg, #f97316 0%, #ea580c 100%); color: white; padding: 12px 16px;">
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <div style="display: flex; align-items: center; gap: 10px;">
-                        <span style="font-size: 18px;">📊</span>
-                        <h3 style="margin: 0; font-size: 14px; font-weight: 600;">Événements - Client ${parseInt(clientId).toString().padStart(2, '0')}</h3>
+            <!-- En-tête -->
+            <div style="background: linear-gradient(135deg, #f97316 0%, #ea580c 100%); color: white; padding: 16px 20px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <div style="width: 40px; height: 40px; background: rgba(255,255,255,0.2); border-radius: 10px; display: flex; align-items: center; justify-content: center;">
+                            <span style="font-size: 20px;">📊</span>
+                        </div>
+                        <div>
+                            <h3 style="margin: 0; font-size: 16px; font-weight: 700;">Événements Client ${parseInt(clientId).toString().padStart(2, '0')}</h3>
+                            <p style="margin: 4px 0 0 0; font-size: 12px; opacity: 0.9;">${totalDaysWithEvents} jour(s) avec événement(s)</p>
+                        </div>
                     </div>
-                    <div style="display: flex; gap: 15px; align-items: center;">
-                        <span style="background: rgba(255,255,255,0.15); padding: 4px 12px; border-radius: 20px; font-size: 12px;">📅 ${daysWithEvents} jour(s)</span>
-                        <span style="background: rgba(255,255,255,0.15); padding: 4px 12px; border-radius: 20px; font-size: 12px;">📊 ${clientEvents.length} événement(s)</span>
-                        <button id="toggle-${tableId}" 
-                                data-table-id="${tableId}"
-                                style="background: rgba(255,255,255,0.25); border: 1px solid rgba(255,255,255,0.4); color: white; padding: 6px 14px; border-radius: 8px; cursor: pointer; font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 6px; transition: all 0.2s;">
-                            <span style="font-size: 12px;">🔽</span>
-                            <span>Afficher le tableau</span>
-                        </button>
+                    <div style="background: rgba(255,255,255,0.2); padding: 6px 16px; border-radius: 30px; font-size: 12px; font-weight: 600;">
+                        📋 ${clientEvents.length} événement(s) détecté(s)
                     </div>
                 </div>
             </div>
 
-            <!-- Mini tableau de bord : Nombre de JOURS avec événements (toujours visible) -->
-            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; padding: 15px; background: #f8fafc; border-bottom: 1px solid #e2e8f0;">
-                ${Object.entries(eventStatsByDays).map(([type, data]) => `
-                    <div style="text-align: center;">
-                        <div style="font-size: 20px; margin-bottom: 4px;">${data.icon}</div>
-                        <div style="font-size: 16px; font-weight: 700; color: ${data.color};">${data.days.size}</div>
-                        <div style="font-size: 9px; color: #64748b;">${type}</div>
+            <!-- TABLEAU DE BORD STYLISÉ -->
+            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; padding: 20px; background: #f8fafc; border-bottom: 1px solid #e2e8f0;">
+                
+                <!-- CARTE CRÉDIT NUL -->
+                <div style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); border-radius: 12px; padding: 14px; color: white; box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);">
+                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px;">
+                        <span style="font-size: 20px;">💰</span>
+                        <span style="font-size: 11px; font-weight: 600; opacity: 0.9; letter-spacing: 0.5px;">CRÉDIT NUL</span>
                     </div>
-                `).join('')}
+                    <div style="font-size: 28px; font-weight: 800; margin-bottom: 4px;">${daysWithCreditNul.size}</div>
+                    <div style="font-size: 10px; opacity: 0.9; margin-bottom: 10px;">jour(s)</div>
+                    <div style="background: rgba(255,255,255,0.25); border-radius: 6px; height: 4px; overflow: hidden;">
+                        <div style="width: ${percentCreditNul}%; height: 100%; background: white; border-radius: 6px;"></div>
+                    </div>
+                    <div style="margin-top: 6px; font-size: 12px; font-weight: 700;">${percentCreditNul}%</div>
+                </div>
+
+                <!-- CARTE PUISSANCE DÉPASSÉE -->
+                <div style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); border-radius: 12px; padding: 14px; color: white; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);">
+                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px;">
+                        <span style="font-size: 20px;">📈</span>
+                        <span style="font-size: 11px; font-weight: 600; opacity: 0.9; letter-spacing: 0.5px;">PUISSANCE DÉPASSÉE</span>
+                    </div>
+                    <div style="font-size: 28px; font-weight: 800; margin-bottom: 4px;">${daysWithSuspendP.size}</div>
+                    <div style="font-size: 10px; opacity: 0.9; margin-bottom: 10px;">jour(s)</div>
+                    <div style="background: rgba(255,255,255,0.25); border-radius: 6px; height: 4px; overflow: hidden;">
+                        <div style="width: ${percentSuspendP}%; height: 100%; background: white; border-radius: 6px;"></div>
+                    </div>
+                    <div style="margin-top: 6px; font-size: 12px; font-weight: 700;">${percentSuspendP}%</div>
+                </div>
+
+                <!-- CARTE SURCHARGE -->
+                <div style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); border-radius: 12px; padding: 14px; color: white; box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);">
+                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px;">
+                        <span style="font-size: 20px;">⚡</span>
+                        <span style="font-size: 11px; font-weight: 600; opacity: 0.9; letter-spacing: 0.5px;">SURCHARGE</span>
+                    </div>
+                    <div style="font-size: 28px; font-weight: 800; margin-bottom: 4px;">${daysWithSurcharge.size}</div>
+                    <div style="font-size: 10px; opacity: 0.9; margin-bottom: 10px;">jour(s)</div>
+                    <div style="background: rgba(255,255,255,0.25); border-radius: 6px; height: 4px; overflow: hidden;">
+                        <div style="width: ${percentSurcharge}%; height: 100%; background: white; border-radius: 6px;"></div>
+                    </div>
+                    <div style="margin-top: 6px; font-size: 12px; font-weight: 700;">${percentSurcharge}%</div>
+                </div>
+
+                <!-- CARTE ÉNERGIE ÉPUISÉE -->
+                <div style="background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%); border-radius: 12px; padding: 14px; color: white; box-shadow: 0 4px 12px rgba(14, 165, 233, 0.3);">
+                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px;">
+                        <span style="font-size: 20px;">🔋</span>
+                        <span style="font-size: 11px; font-weight: 600; opacity: 0.9; letter-spacing: 0.5px;">ÉNERGIE ÉPUISÉE</span>
+                    </div>
+                    <div style="font-size: 28px; font-weight: 800; margin-bottom: 4px;">${daysWithSuspendE.size}</div>
+                    <div style="font-size: 10px; opacity: 0.9; margin-bottom: 10px;">jour(s)</div>
+                    <div style="background: rgba(255,255,255,0.25); border-radius: 6px; height: 4px; overflow: hidden;">
+                        <div style="width: ${percentSuspendE}%; height: 100%; background: white; border-radius: 6px;"></div>
+                    </div>
+                    <div style="margin-top: 6px; font-size: 12px; font-weight: 700;">${percentSuspendE}%</div>
+                </div>
             </div>
 
-            <!-- Tableau (caché par défaut) -->
-            <div id="${tableId}" style="max-height: 350px; overflow-y: auto; overflow-x: auto; display: none;">
-                <table style="width: 100%; border-collapse: collapse; font-size: 12px; min-width: 1300px;">
-                    <thead style="position: sticky; top: 0; background: #f1f5f9; z-index: 10;">
-                        <tr>
-                            <th style="padding: 12px; text-align: left; background: #f1f5f9;">📅 Date</th>
-                            <th colspan="3" style="padding: 12px; text-align: center; background: #e0f2fe; color: #0369a1;">PUISSANCE DÉPASSÉE</th>
-                            <th colspan="3" style="padding: 12px; text-align: center; background: #fee2e2; color: #b91c1c;">SURCHARGE</th>
-                            <th colspan="3" style="padding: 12px; text-align: center; background: #fef9c3; color: #854d0e;">CRÉDIT NUL</th>
-                            <th colspan="3" style="padding: 12px; text-align: center; background: #fae8ff; color: #86198f;">ÉNERGIE ÉPUISÉE</th>
-                        </tr>
-                        <tr style="background: #f8fafc;">
-                            <th style="padding: 8px;"></th>
-                            <th style="padding: 8px;">Début</th><th style="padding: 8px;">Fin</th><th style="padding: 8px;">Durée</th>
-                            <th style="padding: 8px;">Début</th><th style="padding: 8px;">Fin</th><th style="padding: 8px;">Durée</th>
-                            <th style="padding: 8px;">Début</th><th style="padding: 8px;">Fin</th><th style="padding: 8px;">Durée</th>
-                            <th style="padding: 8px;">Début</th><th style="padding: 8px;">Fin</th><th style="padding: 8px;">Durée</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${tableRows}
-                    </tbody>
-                </table>
+            <button id="toggle-${tableId}" 
+                    data-table-id="${tableId}"
+                    style="width: 100%; padding: 10px 16px; background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); 
+                        color: white; border: none; font-size: 12px; font-weight: 600; cursor: pointer; 
+                        display: flex; align-items: center; justify-content: center; gap: 8px;
+                        transition: all 0.3s ease;">
+                <span style="font-size: 14px;">🔽</span>
+                <span>Afficher le tableau détaillé</span>
+            </button>
+
+            <!-- TABLEAU AVEC HAUTEUR FIXE ET SCROLL VERTICAL -->
+            <div id="${tableId}" style="overflow-x: auto; display: none;">
+                <div style="max-height: 400px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 8px;">
+                    <table style="width: 100%; border-collapse: collapse; font-size: 12px; min-width: 600px;">
+                        <thead style="position: sticky; top: 0; background: #f8fafc; z-index: 10;">
+                            <tr style="border-bottom: 2px solid #e2e8f0;">
+                                <th style="padding: 12px 12px; text-align: left; font-weight: 700; color: #334155; background: #f8fafc; min-width: 100px; position: sticky; top: 0; background: #f8fafc;">📅 DATE</th>
+                                <th style="padding: 12px 8px; text-align: center; font-weight: 700; color: #b91c1c; background: #fee2e2; font-size: 11px; position: sticky; top: 0; background: #fee2e2;">⚡ SURCHARGE</th>
+                                <th style="padding: 12px 8px; text-align: center; font-weight: 700; color: #92400e; background: #fef3c7; font-size: 11px; position: sticky; top: 0; background: #fef3c7;">💰 CRÉDIT NUL</th>
+                                <th style="padding: 12px 8px; text-align: center; font-weight: 700; color: #1e40af; background: #dbeafe; font-size: 11px; position: sticky; top: 0; background: #dbeafe;">📈 PUISSANCE DÉPASSÉE</th>
+                                <th style="padding: 12px 8px; text-align: center; font-weight: 700; color: #0369a1; background: #e0f2fe; font-size: 11px; position: sticky; top: 0; background: #e0f2fe;">🔋 ÉNERGIE ÉPUISÉE</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${tableRows}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <!-- Pied de carte -->
+            <div style="padding: 8px 16px; background: #f8fafc; border-top: 1px solid #e2e8f0; font-size: 10px; color: #64748b; display: flex; justify-content: space-between;">
+                <span>📊 Créneaux de 15 min (ex: 02:32-48 = de 02:32 à 02:48)</span>
+                <span>Client ${parseInt(clientId).toString().padStart(2, '0')}</span>
             </div>
         </div>
     `;
 }
+// Fonction pour initialiser tous les boutons de toggle des événements clients
 // Fonction pour initialiser tous les boutons de toggle des événements clients
 function initializeClientEventsToggles() {
     setTimeout(() => {
@@ -2829,7 +2905,7 @@ function initializeClientEventsToggles() {
         
         // Trouver tous les boutons de toggle
         document.querySelectorAll('[id^="toggle-client-events-table-"]').forEach(button => {
-            // Éviter de dupliquer les événements
+            // Supprimer l'ancien événement pour éviter les doublons
             button.removeEventListener('click', handleClientEventsToggle);
             button.addEventListener('click', handleClientEventsToggle);
         });
@@ -2842,22 +2918,18 @@ function handleClientEventsToggle(event) {
     const tableId = button.getAttribute('data-table-id');
     const table = document.getElementById(tableId);
     
-    console.log(`🔘 Bouton cliqué - tableId: ${tableId}, table trouvée: ${!!table}`);
-    
     if (table) {
         if (table.style.display === 'none') {
             table.style.display = 'block';
-            button.innerHTML = '<span style="font-size: 12px;">🔼</span><span>Masquer le tableau</span>';
-            button.style.background = 'rgba(255,255,255,0.35)';
+            button.innerHTML = '<span style="font-size: 16px;">🔼</span><span>Masquer le tableau détaillé</span>';
+            button.style.background = 'linear-gradient(135deg, #64748b 0%, #475569 100%)';
             console.log(`✅ Tableau ${tableId} affiché`);
         } else {
             table.style.display = 'none';
-            button.innerHTML = '<span style="font-size: 12px;">🔽</span><span>Afficher le tableau</span>';
-            button.style.background = 'rgba(255,255,255,0.25)';
+            button.innerHTML = '<span style="font-size: 16px;">🔽</span><span>Afficher le tableau détaillé</span>';
+            button.style.background = 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)';
             console.log(`✅ Tableau ${tableId} masqué`);
         }
-    } else {
-        console.error(`❌ Tableau avec ID ${tableId} non trouvé`);
     }
 }
 // Fonction principale d'affichage des données client
@@ -6020,10 +6092,13 @@ function createNominalTensionTableWithCanvas(tensionResults, systemType, allDate
         `;
     });
 
-    // Construction du HTML complet - SANS contour vert sur la carte principale
+    // IDs fixes pour le toggle
+    const tableId = 'nominal-tension-table';
+    const buttonId = 'toggle-nominal-table';
+
+    // Construction du HTML complet avec bouton toggle
     return `
-        <div style="background: white; 
-                    border-radius: 20px; padding: 24px; margin-top: 25px;
+        <div style="background: white; border-radius: 20px; padding: 24px; margin-top: 25px;
                     box-shadow: 0 12px 30px rgba(0,0,0,0.1);">
             
             <!-- En-tête -->
@@ -6073,7 +6148,7 @@ function createNominalTensionTableWithCanvas(tensionResults, systemType, allDate
                     </div>
                 </div>
 
-                <!-- Grille des pourcentages - 6 tableaux -->
+                <!-- Grille des pourcentages -->
                 <div style="padding: 15px 20px; background: #f8fafc; border-top: 1px solid #e2e8f0; display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px;">
                     <div style="background: white; border-radius: 8px; padding: 12px; border-left: 4px solid #8b5cf6; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
                         <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
@@ -6196,33 +6271,46 @@ function createNominalTensionTableWithCanvas(tensionResults, systemType, allDate
                 </div>
             </div>
             
-            <!-- TABLEAU DES DONNÉES - Fond blanc -->
-            <div style="background: white; border-radius: 16px; border: 1px solid #e2e8f0; overflow: hidden;
-                      box-shadow: 0 8px 20px rgba(0,0,0,0.05); margin-bottom: 20px;">
-                <div style="max-height: 400px; overflow-y: auto; overflow-x: auto;">
-                    <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
-                        <thead style="position: sticky; top: 0; background: #f8fafc; z-index: 10;">
-                            <tr>
-                                <th style="padding: 16px 12px; text-align: left; font-weight: 700; color: #1e293b; 
-                                         border-bottom: 2px solid #e2e8f0; background: #f8fafc; font-size: 13px;
-                                         white-space: nowrap;">
-                                    📅 Date
-                                </th>
-                                <th style="padding: 16px 12px; text-align: center; font-weight: 700; color: #1e293b; 
-                                         border-bottom: 2px solid #e2e8f0; background: #f8fafc; font-size: 13px;
-                                         white-space: nowrap;">
-                                    ⚡ Atteintes ≥${targetTension.toFixed(1)}V
-                                </th>
-                                <th style="padding: 16px 12px; text-align: left; font-weight: 700; color: #1e293b; 
-                                         border-bottom: 2px solid #e2e8f0; background: #f8fafc; font-size: 13px;">
-                                    🔍 Heures d'atteinte
-                                </th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${tableRows}
-                        </tbody>
-                    </table>
+            <!-- BOUTON POUR AFFICHER/MASQUER LE TABLEAU DÉTAILLÉ -->
+            <button id="${buttonId}" 
+                    onclick="toggleNominalTable()"
+                    style="width: 100%; padding: 12px 20px; background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); 
+                           color: white; border: none; border-radius: 12px; font-size: 14px; font-weight: 600; 
+                           cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px;
+                           transition: all 0.3s ease; margin-bottom: 20px;">
+                <span style="font-size: 18px;">🔽</span>
+                <span>Afficher le tableau détaillé</span>
+            </button>
+            
+            <!-- TABLEAU DES DONNÉES (CACHÉ PAR DÉFAUT) -->
+            <div id="${tableId}" style="display: none;">
+                <div style="background: white; border-radius: 16px; border: 1px solid #e2e8f0; overflow: hidden;
+                          box-shadow: 0 8px 20px rgba(0,0,0,0.05); margin-bottom: 20px;">
+                    <div style="max-height: 400px; overflow-y: auto; overflow-x: auto;">
+                        <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+                            <thead style="position: sticky; top: 0; background: #f8fafc; z-index: 10;">
+                                <tr>
+                                    <th style="padding: 16px 12px; text-align: left; font-weight: 700; color: #1e293b; 
+                                             border-bottom: 2px solid #e2e8f0; background: #f8fafc; font-size: 13px;
+                                             white-space: nowrap;">
+                                        📅 Date
+                                    </th>
+                                    <th style="padding: 16px 12px; text-align: center; font-weight: 700; color: #1e293b; 
+                                             border-bottom: 2px solid #e2e8f0; background: #f8fafc; font-size: 13px;
+                                             white-space: nowrap;">
+                                        ⚡ Atteintes ≥${targetTension.toFixed(1)}V
+                                    </th>
+                                    <th style="padding: 16px 12px; text-align: left; font-weight: 700; color: #1e293b; 
+                                             border-bottom: 2px solid #e2e8f0; background: #f8fafc; font-size: 13px;">
+                                        🔍 Heures d'atteinte
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${tableRows}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
             
@@ -6271,6 +6359,58 @@ function createNominalTensionTableWithCanvas(tensionResults, systemType, allDate
             </div>
         </div>
     `;
+}
+// Initialiser le toggle pour le tableau des atteintes nominales
+// Initialiser le toggle pour le tableau des atteintes nominales
+function initializeNominalTableToggle() {
+    const toggleBtn = document.getElementById('toggle-nominal-table');
+    const table = document.getElementById('nominal-tension-table');
+    
+    if (toggleBtn && table) {
+        console.log('🔧 Initialisation du toggle pour le tableau des atteintes nominales');
+        
+        // Supprimer l'ancien événement s'il existe
+        const newToggleBtn = toggleBtn.cloneNode(true);
+        toggleBtn.parentNode.replaceChild(newToggleBtn, toggleBtn);
+        
+        // Ajouter le nouvel événement
+        newToggleBtn.addEventListener('click', function() {
+            if (table.style.display === 'none') {
+                table.style.display = 'block';
+                newToggleBtn.innerHTML = '<span style="font-size: 18px;">🔼</span><span>Masquer le tableau détaillé</span>';
+                newToggleBtn.style.background = 'linear-gradient(135deg, #64748b 0%, #475569 100%)';
+                console.log('✅ Tableau nominal affiché');
+            } else {
+                table.style.display = 'none';
+                newToggleBtn.innerHTML = '<span style="font-size: 18px;">🔽</span><span>Afficher le tableau détaillé</span>';
+                newToggleBtn.style.background = 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)';
+                console.log('✅ Tableau nominal masqué');
+            }
+        });
+    } else {
+        console.log('⚠️ Bouton ou tableau nominal non trouvé');
+        if (!toggleBtn) console.log('❌ toggle-nominal-table non trouvé');
+        if (!table) console.log('❌ nominal-tension-table non trouvé');
+    }
+}
+
+// Gestionnaire d'événements pour les boutons du tableau nominal
+function handleNominalTableToggle(event) {
+    const button = event.currentTarget;
+    const tableId = button.getAttribute('data-table-id');
+    const table = document.getElementById(tableId);
+    
+    if (table) {
+        if (table.style.display === 'none') {
+            table.style.display = 'block';
+            button.innerHTML = '<span style="font-size: 18px;">🔼</span><span>Masquer le tableau détaillé</span>';
+            button.style.background = 'linear-gradient(135deg, #64748b 0%, #475569 100%)';
+        } else {
+            table.style.display = 'none';
+            button.innerHTML = '<span style="font-size: 18px;">🔽</span><span>Afficher le tableau détaillé</span>';
+            button.style.background = 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)';
+        }
+    }
 }
 // Fonction utilitaire
 function convertTimeToMinutes(timeStr) {
@@ -6570,8 +6710,13 @@ function createGlobalDateFilter() {
     const allDates = allClientsHourlyMatrix.dates || [];
     if (allDates.length === 0) return null;
 
-    const isFilterActive = window.filteredDates &&
-        window.filteredDates.length > 0 &&
+    // Variable pour stocker la sélection temporaire
+    if (!window.tempFilteredDates) {
+        window.tempFilteredDates = [...allDates];
+    }
+
+    const isFilterActive = window.filteredDates && 
+        window.filteredDates.length > 0 && 
         window.filteredDates.length < allDates.length;
 
     const sortedAllDates = [...allDates].sort((a, b) => {
@@ -6593,11 +6738,8 @@ function createGlobalDateFilter() {
 
     return `
         <div class="filter-container">
-
-            <!-- HEADER -->
             <div class="filter-header">
                 <div class="filter-title">📅 Filtres de Date</div>
-
                 <div style="display:flex; gap:10px;">
                     <button id="reset-all-filters-btn" class="btn btn-reset">
                         🔄 Réinitialiser
@@ -6608,12 +6750,10 @@ function createGlobalDateFilter() {
                 </div>
             </div>
 
-            <!-- BARRE BLEUE -->
             <div class="selected-period">
                 <div class="selected-period-left">
                     📅 <span>Période sélectionnée : ${dateRangeText}</span>
                 </div>
-
                 ${isFilterActive ? `
                 <div class="selected-period-close" onclick="resetAllFilters()">
                     ✕
@@ -6621,36 +6761,30 @@ function createGlobalDateFilter() {
             </div>
 
             <div style="display:flex; gap:16px; flex-wrap:wrap;">
-
                 <!-- PREDEFINED -->
                 <div class="filter-block">
                     <div class="filter-block-title">📅 Période Prédéfinie</div>
-
                     <div class="filter-grid">
-                        <button class="filter-btn" onclick="selectLastNDays(5)">5 jours</button>
-                        <button class="filter-btn" onclick="selectLastNDays(7)">7 jours</button>
-                        <button class="filter-btn" onclick="selectLastNDays(15)">15 jours</button>
-
-                        <button class="filter-btn" onclick="selectLastNDays(30)">30 jours</button>
-                        <button class="filter-btn" onclick="selectLastNDays(60)">2 mois</button>
-                        <button class="filter-btn" onclick="selectLastNDays(90)">3 mois</button>
-
-                        <button class="filter-btn" onclick="selectLastNDays(180)">6 mois</button>
-                        <button class="filter-btn" onclick="selectLastNDays(365)">1 an</button>
-                        <button class="filter-btn primary" onclick="selectAllDates()">Tout</button>
+                        <button class="filter-btn preset-btn" data-days="5">5 jours</button>
+                        <button class="filter-btn preset-btn" data-days="7">7 jours</button>
+                        <button class="filter-btn preset-btn" data-days="15">15 jours</button>
+                        <button class="filter-btn preset-btn" data-days="30">30 jours</button>
+                        <button class="filter-btn preset-btn" data-days="60">2 mois</button>
+                        <button class="filter-btn preset-btn" data-days="90">3 mois</button>
+                        <button class="filter-btn preset-btn" data-days="180">6 mois</button>
+                        <button class="filter-btn preset-btn" data-days="365">1 an</button>
+                        <button class="filter-btn preset-btn" data-days="all">Tout</button>
                     </div>
                 </div>
 
                 <!-- MANUEL -->
                 <div class="filter-block">
                     <div class="filter-block-title">📆 Sélection Manuelle</div>
-
                     <div style="display:flex; gap:10px;">
                         <div class="filter-input-group">
                             <label class="filter-label">Date début</label>
                             <input type="date" id="filter-start-date">
                         </div>
-
                         <div class="filter-input-group">
                             <label class="filter-label">Date fin</label>
                             <input type="date" id="filter-end-date">
@@ -6661,7 +6795,6 @@ function createGlobalDateFilter() {
                 <!-- MOIS/ANNEE -->
                 <div class="filter-block">
                     <div class="filter-block-title">🗓️ Filtre Mois/Année</div>
-
                     <div style="display:flex; gap:10px;">
                         <div class="filter-input-group">
                             <label class="filter-label">Année</label>
@@ -6672,7 +6805,6 @@ function createGlobalDateFilter() {
                                     .map(y => `<option value="${y}">${y}</option>`).join('')}
                             </select>
                         </div>
-
                         <div class="filter-input-group">
                             <label class="filter-label">Mois</label>
                             <select id="filter-month">
@@ -6740,23 +6872,80 @@ function updateSelectedCount() {
         }
     }
 }
+// Sélection temporaire des N derniers jours (sans appliquer)
+function selectTempLastNDays(n) {
+    const allDates = allClientsHourlyMatrix.dates || [];
+    if (allDates.length === 0) return;
 
-// ======================== RÉINITIALISATION COMPLÈTE DES FILTRES ========================
-function resetAllFilters() {
-    document.querySelectorAll('.date-checkbox').forEach(cb => {
-        cb.checked = true;
-        if (cb.parentElement) {
-            cb.parentElement.classList.add('checked');
+    const sortedDates = [...allDates].sort((a, b) => {
+        const dateA = new Date(a.split('/').reverse().join('-'));
+        const dateB = new Date(b.split('/').reverse().join('-'));
+        return dateA - dateB;
+    });
+
+    // Stocker temporairement les dates sélectionnées
+    if (n === 'all') {
+        window.tempFilteredDates = [...sortedDates];
+    } else {
+        window.tempFilteredDates = sortedDates.slice(-n);
+    }
+
+    // Mettre à jour l'affichage de la période sélectionnée
+    const selectedPeriodSpan = document.querySelector('.selected-period-left span');
+    if (selectedPeriodSpan && window.tempFilteredDates.length > 0) {
+        const startDate = window.tempFilteredDates[0];
+        const endDate = window.tempFilteredDates[window.tempFilteredDates.length - 1];
+        selectedPeriodSpan.textContent = `Période sélectionnée : ${startDate} → ${endDate} (${window.tempFilteredDates.length} jours)`;
+    }
+
+    // Mettre à jour le style des boutons
+    document.querySelectorAll('.preset-btn').forEach(btn => {
+        const days = btn.getAttribute('data-days');
+        const isSelected = (n === 'all' && days === 'all') || (n === parseInt(days));
+        if (isSelected) {
+            btn.classList.add('selected');
+        } else {
+            btn.classList.remove('selected');
         }
     });
 
+    console.log(`📅 Sélection temporaire: ${window.tempFilteredDates.length} jours`);
+}
+// ======================== RÉINITIALISATION COMPLÈTE DES FILTRES ========================
+function resetAllFilters() {
+    const allDates = allClientsHourlyMatrix.dates || [];
+    if (allDates.length === 0) return;
+
+    // Réinitialiser les sélections temporaires
+    window.tempFilteredDates = [...allDates];
+    
+    // Réinitialiser les champs de formulaire
     document.getElementById('filter-start-date').value = '';
     document.getElementById('filter-end-date').value = '';
     document.getElementById('filter-year').value = 'all';
     document.getElementById('filter-month').value = 'all';
-
-    window.filteredDates = allClientsHourlyMatrix.dates;
+    
+    // Réinitialiser le style des boutons prédéfinis
+    document.querySelectorAll('.preset-btn').forEach(btn => {
+        btn.classList.remove('selected');
+    });
+    
+    // Appliquer immédiatement la réinitialisation
+    window.filteredDates = [...allDates];
     refreshAllTechniqueComponents();
+    
+    // Mettre à jour l'affichage
+    const selectedPeriodSpan = document.querySelector('.selected-period-left span');
+    if (selectedPeriodSpan) {
+        const sortedDates = [...allDates].sort((a, b) => {
+            const dateA = new Date(a.split('/').reverse().join('-'));
+            const dateB = new Date(b.split('/').reverse().join('-'));
+            return dateA - dateB;
+        });
+        selectedPeriodSpan.textContent = `Période sélectionnée : ${sortedDates[0]} → ${sortedDates[sortedDates.length - 1]} (tous les jours)`;
+    }
+    
+    updateFilterIndicator();
     console.log('✅ Tous les filtres réinitialisés');
 }
 
@@ -6786,33 +6975,27 @@ function updateFilterIndicator() {
 }
 // ======================== FONCTION D'APPLICATION DU FILTRE ========================
 function applyGlobalDateFilter() {
-    const selectedCheckboxes = document.querySelectorAll('.date-checkbox:checked');
-    const selectedDates = Array.from(selectedCheckboxes).map(cb => cb.value);
-
-    if (selectedDates.length === 0) {
-        alert('Veuillez sélectionner au moins une date');
+    if (!window.tempFilteredDates || window.tempFilteredDates.length === 0) {
+        alert('Veuillez sélectionner une période');
         return false;
     }
 
-    window.filteredDates = selectedDates.sort((a, b) => {
-        const dateA = new Date(a.split('/').reverse().join('-'));
-        const dateB = new Date(b.split('/').reverse().join('-'));
-        return dateA - dateB;
-    });
-
+    // Appliquer le filtre
+    window.filteredDates = [...window.tempFilteredDates];
+    
+    // 🔴 FORCER le recalcul complet des stats
+    const filteredStats = calculateFilteredTechnicalStats();
+    updateStatsDisplay(filteredStats);
+    
+    // Rafraîchir tous les composants techniques
     refreshAllTechniqueComponents();
 
-    // AJOUTEZ CES LIGNES ICI
-    setTimeout(() => {
-        if (matrixTableVisible) {
-            const tableContainer = document.getElementById('matrix-table-container');
-            if (tableContainer) {
-                tableContainer.style.display = 'block';
-            }
-        }
-    }, 200);
+    // Mettre à jour l'indicateur
+    updateFilterIndicator();
 
-    console.log(`✅ Filtre appliqué: ${selectedDates.length} jour(s) sélectionné(s)`);
+    console.log(`✅ Filtre appliqué: ${window.filteredDates.length} jour(s) sélectionné(s)`);
+    console.log(`📊 Stats recalculées: Énergie max=${filteredStats.maxEnergyValue}Wh, Tension moy=${filteredStats.averageTension}V`);
+    
     return true;
 }
 
@@ -7137,9 +7320,19 @@ function showDayDetails(date) {
 // ======================== RAFRAÎCHISSEMENT COMPLET DE L'ONGLET TECHNIQUE ========================
 function refreshAllTechniqueComponents() {
     if (!window.filteredDates || window.filteredDates.length === 0) {
-        window.filteredDates = allClientsHourlyMatrix.dates;
+        window.filteredDates = [...(allClientsHourlyMatrix.dates || [])];
     }
+    
+    // Recalculer les statistiques avec les dates filtrées
+    const filteredStats = calculateFilteredTechnicalStats();
+    
+    // Mettre à jour l'affichage des statistiques
+    updateStatsDisplay(filteredStats);
+    
+    // Rafraîchir l'onglet TECHNIQUE complet
     displayAllClientsTab();
+    
+    console.log(`✅ Composants techniques mis à jour avec ${window.filteredDates.length} jours`);
 }
 // 1. Tableau matriciel
 function refreshFilteredMatrixTable() {
@@ -7161,6 +7354,7 @@ function refreshFilteredTechnicalStats() {
 }
 // Calcul des statistiques techniques filtrées
 function calculateFilteredTechnicalStats() {
+    // Utiliser les dates filtrées
     const dates = window.filteredDates || allClientsHourlyMatrix.dates;
     const sortedClients = Object.keys(allResultsByClient).sort((a, b) => {
         const numA = parseInt(a, 16) || 0;
@@ -7239,33 +7433,30 @@ function calculateFilteredTechnicalStats() {
         maxTensionValue: maxTensionValue > 0 ? maxTensionValue.toFixed(2) : 'N/A',
         maxTensionDate: maxTensionDate,
         minTensionValue: minTensionDisplay,
-        minTensionDate: minTensionDate
+        minTensionDate: minTensionDate,
+        daysWithEnergy: Object.values(energyDataByDay).filter(v => v > 0).length,
+        averageEnergy: Object.values(energyDataByDay).reduce((a, b) => a + b, 0) / dates.length
     };
 }
 
 // Mise à jour de l'affichage des statistiques
 function updateStatsDisplay(stats) {
-    // Créer ou récupérer la carte
     let statsCard = document.getElementById('stats-technical-card');
     const statsContainer = document.querySelector('.stats-summary-table')?.parentElement || document.querySelector('.all-clients-stats')?.parentElement;
     
     if (!statsContainer) return;
     
-    // Supprimer l'ancienne carte si elle existe
     if (statsCard) statsCard.remove();
     
-    // Créer la nouvelle carte
     statsCard = document.createElement('div');
     statsCard.id = 'stats-technical-card';
-    statsCard.className = 'stats-card'; // Utilise la classe CSS
+    statsCard.className = 'stats-card';
     
-    // En-tête de la carte
     const cardHeader = document.createElement('div');
     cardHeader.className = 'card-header';
-    cardHeader.innerHTML = `📊 STATISTIQUES TECHNIQUES`;
+    cardHeader.innerHTML = `📊 STATISTIQUES TECHNIQUES (${stats.dates.length} jours)`;
     statsCard.appendChild(cardHeader);
     
-    // En-tête des stats
     const statsHeader = document.createElement('div');
     statsHeader.className = 'stats-header';
     statsHeader.innerHTML = `
@@ -7280,14 +7471,10 @@ function updateStatsDisplay(stats) {
     `;
     statsCard.appendChild(statsHeader);
     
-    // Conteneur du tableau
     const tableContainer = document.createElement('div');
     tableContainer.className = 'table-container';
     
     const systemType = detectSystemTypeFromTensionValue(parseFloat(stats.averageTension) || 14);
-    const variationValue = systemType === '24V' ? 5 : 2.5;
-    const variationSeuil = systemType === '24V' ? 3 : 1.5;
-    const isVariationOutOfLimit = variationValue > variationSeuil;
     
     tableContainer.innerHTML = `
         <table class="stats-table">
@@ -7295,7 +7482,12 @@ function updateStatsDisplay(stats) {
                 <tr>
                     <td class="stats-label">⚡ Énergie Maximale</td>
                     <td class="stats-value">${stats.maxEnergyValue} Wh</td>
-                    <td class="stats-date">${stats.maxEnergyDate}</td>
+                    <td class="stats-date">${stats.maxEnergyDate || '-'}</td>
+                </tr>
+                <tr>
+                    <td class="stats-label">📊 Énergie Moyenne</td>
+                    <td class="stats-value">${Math.round(stats.averageEnergy)} Wh</td>
+                    <td class="stats-date">sur ${stats.daysWithEnergy} jour(s)</td>
                 </tr>
                 <tr>
                     <td class="stats-label">📊 Tension Moyenne</td>
@@ -7312,20 +7504,11 @@ function updateStatsDisplay(stats) {
                     <td class="stats-value">${stats.maxTensionValue} V</td>
                     <td class="stats-date">${stats.maxTensionDate || '-'}</td>
                 </tr>
-                <tr>
-                    <td class="stats-label">📏 Variation Max/Jour</td>
-                    <td class="stats-value ${isVariationOutOfLimit ? 'alert-text' : ''}">
-                        ${variationValue.toFixed(1)} V ${isVariationOutOfLimit ? '⚠️' : ''}
-                    </td>
-                    <td class="stats-date"><span class="badge">Seuil: ${variationSeuil} V/h</span></td>
-                </tr>
             </tbody>
         </table>
     `;
     
     statsCard.appendChild(tableContainer);
-    
-    // Remplacer le contenu
     statsContainer.innerHTML = '';
     statsContainer.appendChild(statsCard);
 }
@@ -7659,15 +7842,21 @@ function displayAllClientsTab() {
         return;
     }
 
-    // === CALCUL DE L'ÉNERGIE MAX PAR JOUR (somme des max de tous les clients) ===
-    const energyDataByDay = {};
+    // 🔴 IMPORTANT: Utiliser les dates filtrées pour TOUS les calculs
+    const datesToUse = window.filteredDates && window.filteredDates.length > 0 
+        ? window.filteredDates 
+        : (allClientsHourlyMatrix.dates || []);
+    
     const sortedClients = Object.keys(allResultsByClient).sort((a, b) => {
         const numA = parseInt(a, 16) || 0;
         const numB = parseInt(b, 16) || 0;
         return numA - numB;
     });
 
-    allClientsHourlyMatrix.dates.forEach(date => {
+    // === 1. CALCUL DE L'ÉNERGIE MAX PAR JOUR (UNIQUEMENT SUR LES DATES FILTRÉES) ===
+    const energyDataByDay = {};
+    
+    datesToUse.forEach(date => {
         let totalDayEnergy = 0;
         sortedClients.forEach(clientId => {
             const clientData = allResultsByClient[clientId];
@@ -7684,7 +7873,7 @@ function displayAllClientsTab() {
         energyDataByDay[date] = totalDayEnergy;
     });
 
-    // === CALCULS DES STATISTIQUES D'ÉNERGIE ===
+    // === 2. STATISTIQUES D'ÉNERGIE SUR LES DATES FILTRÉES ===
     let maxEnergyValue = 0;
     let maxEnergyDate = '';
     let totalEnergySum = 0;
@@ -7705,33 +7894,26 @@ function displayAllClientsTab() {
         ? Math.round(totalEnergySum / daysWithEnergy)
         : 0;
 
-    // Préparer les données paginées
-    const itemsPerPage = window.allClientsItemsPerPage || 50;
-    const currentPage = window.allClientsCurrentPage || 1;
-    const totalItems = allClientsHourlyMatrix.dates.length * allClientsHourlyMatrix.hours.length;
-    const totalPages = Math.ceil(totalItems / itemsPerPage);
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    const endIndex = Math.min(startIndex + itemsPerPage, totalItems);
-
-    // === CALCULS DES STATISTIQUES DE TENSION ===
+    // === 3. STATISTIQUES DE TENSION SUR LES DATES FILTRÉES ===
     let tensionValues = [];
     let maxTensionValue = 0;
     let maxTensionDate = '';
     let minTensionValue = Infinity;
     let minTensionDate = '';
 
-    allClientsHourlyMatrix.dates.forEach(date => {
+    datesToUse.forEach(date => {
         allClientsHourlyMatrix.hours.forEach(hour => {
             const key = `${date}_${hour}`;
             const rowData = allClientsHourlyMatrix.data[key];
             if (rowData && rowData.tension !== null && rowData.tension !== undefined) {
-                tensionValues.push(rowData.tension);
-                if (rowData.tension > maxTensionValue) {
-                    maxTensionValue = rowData.tension;
+                const tension = parseFloat(rowData.tension);
+                tensionValues.push(tension);
+                if (tension > maxTensionValue) {
+                    maxTensionValue = tension;
                     maxTensionDate = date;
                 }
-                if (rowData.tension < minTensionValue) {
-                    minTensionValue = rowData.tension;
+                if (tension < minTensionValue) {
+                    minTensionValue = tension;
                     minTensionDate = date;
                 }
             }
@@ -7742,17 +7924,19 @@ function displayAllClientsTab() {
         ? (tensionValues.reduce((a, b) => a + b, 0) / tensionValues.length).toFixed(2)
         : 'N/A';
     const minTensionDisplay = minTensionValue !== Infinity ? minTensionValue.toFixed(2) : 'N/A';
+    const maxTensionDisplay = maxTensionValue > 0 ? maxTensionValue.toFixed(2) : 'N/A';
 
-    // === CALCUL TENSION MIN/MAX PAR JOUR ===
+    // === 4. CALCUL TENSION MIN/MAX PAR JOUR (UNIQUEMENT SUR DATES FILTRÉES) ===
     const tensionByDay = {};
-    allClientsHourlyMatrix.dates.forEach(date => {
+    datesToUse.forEach(date => {
         tensionByDay[date] = { min: Infinity, max: -Infinity };
         allClientsHourlyMatrix.hours.forEach(hour => {
             const key = `${date}_${hour}`;
             const rowData = allClientsHourlyMatrix.data[key];
             if (rowData && rowData.tension !== null && rowData.tension !== undefined) {
-                tensionByDay[date].min = Math.min(tensionByDay[date].min, rowData.tension);
-                tensionByDay[date].max = Math.max(tensionByDay[date].max, rowData.tension);
+                const tension = parseFloat(rowData.tension);
+                tensionByDay[date].min = Math.min(tensionByDay[date].min, tension);
+                tensionByDay[date].max = Math.max(tensionByDay[date].max, tension);
             }
         });
         if (tensionByDay[date].min === Infinity) {
@@ -7760,13 +7944,14 @@ function displayAllClientsTab() {
         }
     });
 
-    // === DÉTECTION DU TYPE DE MONTAGE ===
-    const systemType = parseFloat(averageTension) > 20 ? '24V' : '12V';
+    // === 5. DÉTECTION DU TYPE DE MONTAGE ===
+    const avgTensionNum = parseFloat(averageTension) || 14;
+    const systemType = avgTensionNum > 20 ? '24V' : '12V';
     const systemLimits = systemType === '24V'
         ? { min: 22, max: 31, ideal: { min: 24, max: 29 }, normal: 28, maxVariation: 5, alertThreshold: 3 }
         : { min: 11, max: 15, ideal: { min: 12, max: 14.5 }, normal: 14, maxVariation: 2.5, alertThreshold: 1.5 };
 
-    // === ANALYSE DES ÉVÉNEMENTS DP/DT ===
+    // === 6. ANALYSE DES ÉVÉNEMENTS DP/DT AVEC FILTRAGE ===
     const dpdtEvents = analyzeDPDTEvents();
     let filteredDPDTEvents = dpdtEvents;
     if (window.filteredDates && window.filteredDates.length > 0) {
@@ -7785,37 +7970,21 @@ function displayAllClientsTab() {
         return dateA - dateB;
     });
 
-    // === ANALYSE DE STABILITÉ ===
+    // === 7. ANALYSE DE STABILITÉ AVEC FILTRAGE ===
     let stabilityData = null;
-    let alertData = null;
-    let stabilitySectionHTML = '';
     let filteredTensionResults = [];
-    let totalNominalHits = 0;
-    let daysWithNominal = 0;
-    let daysWithData = 0;
-
+    
     if (tensionResults && tensionResults.length > 0) {
-        filteredTensionResults = window.filteredDates ?
-            tensionResults.filter(item => window.filteredDates.includes(item.date)) :
-            tensionResults;
+        filteredTensionResults = window.filteredDates && window.filteredDates.length > 0
+            ? tensionResults.filter(item => window.filteredDates.includes(item.date))
+            : tensionResults;
 
         if (filteredTensionResults.length > 0) {
             stabilityData = analyzeTensionStability(filteredTensionResults);
-            alertData = calculateAlertDays(filteredTensionResults);
-
-            const targetTension = systemType === '24V' ? 28.0 : 14.0;
-            filteredTensionResults.forEach(item => {
-                const tension = parseFloat(item.tension || item.valeur || 0);
-                if (tension >= targetTension) totalNominalHits++;
-            });
-
-            const uniqueDates = [...new Set(filteredTensionResults.map(item => item.date))];
-            daysWithNominal = uniqueDates.length;
-            daysWithData = uniqueDates.length;
         }
     }
 
-    // === ANALYSE DES ÉVÉNEMENTS COMBINÉS ENR + EC ===
+    // === 8. ANALYSE DES ÉVÉNEMENTS COMBINÉS ENR + EC AVEC FILTRAGE ===
     let combinedAnalysis = null;
     const hasEnrFiles = window.enrFiles && window.enrFiles.length > 0;
     const hasEcFiles = window.ecFiles && window.ecFiles.length > 0;
@@ -7826,16 +7995,28 @@ function displayAllClientsTab() {
                 hasEnrFiles ? window.enrFiles : [],
                 hasEcFiles ? window.ecFiles : []
             );
-            console.log(`✅ Analyse combinée pour onglet TECHNIQUE: ${combinedAnalysis.allEvents.length} événements trouvés`);
+            // Filtrer les événements par date
+            if (combinedAnalysis && window.filteredDates && window.filteredDates.length > 0) {
+                combinedAnalysis.allEvents = combinedAnalysis.allEvents.filter(
+                    event => window.filteredDates.includes(event.date)
+                );
+                combinedAnalysis.dailyEvents = {};
+                combinedAnalysis.allEvents.forEach(event => {
+                    if (!combinedAnalysis.dailyEvents[event.date]) {
+                        combinedAnalysis.dailyEvents[event.date] = {};
+                    }
+                    if (!combinedAnalysis.dailyEvents[event.date][event.type]) {
+                        combinedAnalysis.dailyEvents[event.date][event.type] = { events: [], periods: [] };
+                    }
+                    combinedAnalysis.dailyEvents[event.date][event.type].events.push(event);
+                });
+            }
         } catch (error) {
             console.error('❌ Erreur analyse combinée:', error);
         }
     }
 
-    // === DÉTERMINER LES DATES À UTILISER ===
-    const datesToUse = window.filteredDates || allClientsHourlyMatrix.dates;
-
-    // === CALCUL DES DONNÉES FILTRÉES ===
+    // === 9. DONNÉES POUR LES GRAPHIQUES FILTRÉES ===
     const filteredEnergyData = {};
     datesToUse.forEach(date => {
         if (energyDataByDay[date] !== undefined) {
@@ -7850,217 +8031,49 @@ function displayAllClientsTab() {
         }
     });
 
-    // === CALCUL DES STATISTIQUES D'INTENSITÉ ===
-    function calculateIntensityStats() {
-        const intensityData = [];
-        const intensityByHour = {};
+    // === 10. STATISTIQUES D'INTENSITÉ SUR DATES FILTRÉES ===
+    const intensityStats = calculateIntensityStatsForDates(datesToUse);
+    const dailyIntensityStats = calculateDailyIntensityStatsForDates(datesToUse);
 
-        for (let h = 0; h < 24; h++) {
-            const hour = `${h.toString().padStart(2, '0')}:00`;
-            intensityByHour[hour] = {
-                values: [],
-                total: 0,
-                count: 0,
-                max: -Infinity,
-                min: Infinity
-            };
-        }
+    // === 11. AFFICHAGE DU NOMBRE DE JOURS ===
+    const totalDaysAvailable = allClientsHourlyMatrix.dates ? allClientsHourlyMatrix.dates.length : 0;
+    const isFilterActive = window.filteredDates && window.filteredDates.length < totalDaysAvailable;
+    const dayCountText = isFilterActive 
+        ? `${datesToUse.length}/${totalDaysAvailable} jours (filtré)`
+        : `${datesToUse.length} jour${datesToUse.length !== 1 ? 's' : ''}`;
 
-        const previousValues = {};
-        allClientsHourlyMatrix.clients.forEach(clientId => {
-            previousValues[clientId] = null;
-        });
+    // === 12. PRÉPARATION DE LA PAGINATION ===
+    const itemsPerPage = window.allClientsItemsPerPage || 50;
+    const currentPage = window.allClientsCurrentPage || 1;
+    const totalItems = datesToUse.length * allClientsHourlyMatrix.hours.length;
+    const totalPages = Math.ceil(totalItems / itemsPerPage);
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = Math.min(startIndex + itemsPerPage, totalItems);
 
-        let previousDate = null;
-        let maxIntensity = { value: 0, date: '', hour: '' };
-        let minIntensity = { value: Infinity, date: '', hour: '' };
-        let totalIntensity = 0;
-        let intensityCount = 0;
-
-        for (let i = 0; i < datesToUse.length; i++) {
-            const date = datesToUse[i];
-
-            if (previousDate !== null && date !== previousDate) {
-                allClientsHourlyMatrix.clients.forEach(clientId => {
-                    previousValues[clientId] = null;
-                });
-            }
-
-            for (let j = 0; j < allClientsHourlyMatrix.hours.length; j++) {
-                const hour = allClientsHourlyMatrix.hours[j];
-                const key = `${date}_${hour}`;
-                const rowData = allClientsHourlyMatrix.data[key] || {};
-
-                const tension = rowData.tension;
-                if (!tension || tension <= 0) continue;
-
-                let totalConsoHeure = 0;
-                let hasValidData = false;
-
-                allClientsHourlyMatrix.clients.forEach(clientId => {
-                    const energie = rowData[`client_${clientId}`];
-                    if (energie !== null && energie !== undefined) {
-                        const valeur = parseFloat(energie);
-                        const previous = previousValues[clientId];
-                        if (previous !== null && valeur >= previous) {
-                            totalConsoHeure += (valeur - previous);
-                            hasValidData = true;
-                        }
-                        previousValues[clientId] = valeur;
-                    }
-                });
-
-                if (hasValidData && totalConsoHeure > 0) {
-                    const intensity = totalConsoHeure / tension;
-
-                    if (intensity > maxIntensity.value) {
-                        maxIntensity = { value: intensity, date, hour };
-                    }
-                    if (intensity < minIntensity.value) {
-                        minIntensity = { value: intensity, date, hour };
-                    }
-
-                    totalIntensity += intensity;
-                    intensityCount++;
-
-                    if (intensityByHour[hour]) {
-                        intensityByHour[hour].values.push(intensity);
-                        intensityByHour[hour].total += intensity;
-                        intensityByHour[hour].count++;
-                        intensityByHour[hour].max = Math.max(intensityByHour[hour].max, intensity);
-                        intensityByHour[hour].min = Math.min(intensityByHour[hour].min, intensity);
-                    }
-
-                    intensityData.push({
-                        date,
-                        hour,
-                        intensity,
-                        label: `${date} ${hour}`
-                    });
-                }
-            }
-
-            previousDate = date;
-        }
-
-        Object.keys(intensityByHour).forEach(hour => {
-            if (intensityByHour[hour].count > 0) {
-                intensityByHour[hour].avg = intensityByHour[hour].total / intensityByHour[hour].count;
-            } else {
-                intensityByHour[hour].avg = 0;
-            }
-        });
-
-        const avgIntensity = intensityCount > 0 ? totalIntensity / intensityCount : 0;
-
-        return {
-            intensityData,
-            intensityByHour,
-            maxIntensity: maxIntensity.value > 0 ? maxIntensity : { value: 0, date: '-', hour: '-' },
-            minIntensity: minIntensity.value < Infinity ? minIntensity : { value: 0, date: '-', hour: '-' },
-            avgIntensity,
-            intensityCount,
-            datesAnalyzed: datesToUse.length
-        };
-    }
-
-    function calculateDailyIntensityStats() {
-        const dailyIntensity = {};
-        const previousValues = {};
-        allClientsHourlyMatrix.clients.forEach(clientId => {
-            previousValues[clientId] = null;
-        });
-
-        let previousDate = null;
-
-        for (let i = 0; i < datesToUse.length; i++) {
-            const date = datesToUse[i];
-
-            if (previousDate !== null && date !== previousDate) {
-                allClientsHourlyMatrix.clients.forEach(clientId => {
-                    previousValues[clientId] = null;
-                });
-            }
-
-            let dailyTotal = 0;
-            let dailyCount = 0;
-            let dailyMax = 0;
-            let dailyMin = Infinity;
-
-            for (let j = 0; j < allClientsHourlyMatrix.hours.length; j++) {
-                const hour = allClientsHourlyMatrix.hours[j];
-                const key = `${date}_${hour}`;
-                const rowData = allClientsHourlyMatrix.data[key] || {};
-
-                const tension = rowData.tension;
-                if (!tension || tension <= 0) continue;
-
-                let totalConsoHeure = 0;
-                let hasValidData = false;
-
-                allClientsHourlyMatrix.clients.forEach(clientId => {
-                    const energie = rowData[`client_${clientId}`];
-                    if (energie !== null && energie !== undefined) {
-                        const valeur = parseFloat(energie);
-                        const previous = previousValues[clientId];
-                        if (previous !== null && valeur >= previous) {
-                            totalConsoHeure += (valeur - previous);
-                            hasValidData = true;
-                        }
-                        previousValues[clientId] = valeur;
-                    }
-                });
-
-                if (hasValidData && totalConsoHeure > 0) {
-                    const intensity = totalConsoHeure / tension;
-                    dailyTotal += intensity;
-                    dailyCount++;
-                    dailyMax = Math.max(dailyMax, intensity);
-                    dailyMin = Math.min(dailyMin, intensity);
-                }
-            }
-
-            previousDate = date;
-
-            if (dailyCount > 0) {
-                dailyIntensity[date] = {
-                    avg: dailyTotal / dailyCount,
-                    max: dailyMax,
-                    min: dailyMin,
-                    count: dailyCount
-                };
-            }
-        }
-
-        return dailyIntensity;
-    }
-
-    const intensityStats = calculateIntensityStats();
-    const dailyIntensityStats = calculateDailyIntensityStats();
-
-    // === CONSTRUCTION DU HTML ===
+    // === 13. GÉNÉRATION DU HTML ===
     contentElement.innerHTML = `
         <!-- FILTRE GLOBAL DES DATES EN HAUT -->
         ${createGlobalDateFilter() || ''}
         
         <div class="all-clients-header">
             <h3>👥 DONNÉES TECHNIQUES DU NR</h3>
-            ${window.filteredDates && window.filteredDates.length < allClientsHourlyMatrix.dates.length ?
-            `<div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px; padding: 8px 12px; background: #dbeafe; border-radius: 6px; border-left: 4px solid #3b82f6;">
-                    <span style="font-size: 14px;">🔍</span>
-                    <span style="font-size: 12px; color: #1e40af; font-weight: 500;">
-                        Filtre actif: ${window.filteredDates.length} jour${window.filteredDates.length !== 1 ? 's' : ''} sélectionné${window.filteredDates.length !== 1 ? 's' : ''} sur ${allClientsHourlyMatrix.dates.length}
-                    </span>
-                </div>` : ''
-        }
+            ${isFilterActive ? `
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px; padding: 8px 12px; background: #dbeafe; border-radius: 6px; border-left: 4px solid #3b82f6;">
+                <span style="font-size: 14px;">🔍</span>
+                <span style="font-size: 12px; color: #1e40af; font-weight: 500;">
+                    Filtre actif: ${window.filteredDates.length} jour${window.filteredDates.length !== 1 ? 's' : ''} sélectionné${window.filteredDates.length !== 1 ? 's' : ''} sur ${totalDaysAvailable}
+                </span>
+            </div>` : ''
+            }
+            
             <div class="all-clients-stats">
                 <div class="stat-item">
                     <span class="stat-icon">📅</span>
-                    <span class="stat-text">${datesToUse.length} jour${datesToUse.length !== 1 ? 's' : ''}</span>
+                    <span class="stat-text">${dayCountText}</span>
                 </div>
                 <div class="stat-item">
                     <span class="stat-icon">👤</span>
-                    <span class="stat-text">${allClientsHourlyMatrix.clients.length} client${allClientsHourlyMatrix.clients.length !== 1 ? 's' : ''}</span>
+                    <span class="stat-text">${sortedClients.length} client${sortedClients.length !== 1 ? 's' : ''}</span>
                 </div>
             </div>
             
@@ -8070,7 +8083,7 @@ function displayAllClientsTab() {
                         <tr>
                             <td class="stats-label">⚡ Énergie Maximale</td>
                             <td class="stats-value">${maxEnergyValue} Wh</td>
-                            <td class="stats-date">${maxEnergyDate}</td>
+                            <td class="stats-date">${maxEnergyDate || '-'}</td>
                         </tr>
                         <tr>
                             <td class="stats-label">📊 Énergie Moyenne</td>
@@ -8083,19 +8096,14 @@ function displayAllClientsTab() {
                             <td class="stats-date">Système ${systemType}</td>
                         </tr>
                         <tr>
-                            <td class="stats-label">⚡ Tension Minimale</td>
+                            <td class="stats-label">⬇️ Tension Minimale</td>
                             <td class="stats-value">${minTensionDisplay} V</td>
                             <td class="stats-date">${minTensionDate || '-'}</td>
                         </tr>
                         <tr>
-                            <td class="stats-label">⚡ Tension Maximale</td>
-                            <td class="stats-value">${maxTensionValue > 0 ? maxTensionValue.toFixed(2) : 'N/A'} V</td>
+                            <td class="stats-label">⬆️ Tension Maximale</td>
+                            <td class="stats-value">${maxTensionDisplay} V</td>
                             <td class="stats-date">${maxTensionDate || '-'}</td>
-                        </tr>
-                        <tr>
-                            <td class="stats-label">📏 Variation Max/Jour</td>
-                            <td class="stats-value" style="color: #d69e2e;">${(systemType === '24V' ? 5 : 2.5).toFixed(1)} V</td>
-                            <td class="stats-date">Seuil alerte: ${systemType === '24V' ? '3' : '1.5'} V/h</td>
                         </tr>
                     </tbody>
                 </table>
@@ -8115,7 +8123,7 @@ function displayAllClientsTab() {
 
                 <div id="stability-analysis-container" style="min-height: 350px;"></div>
 
-                <div class="chart-container all-clients-line-chart-container" style="height: 100%;">
+                <div class="chart-container all-clients-line-chart-container" style="height: 400px;">
                     <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 15px;">
                         <div style="width: 40px; height: 40px; background: linear-gradient(135deg, #a855f7 0%, #7e22ce 100%); border-radius: 10px; display: flex; align-items: center; justify-content: center;">
                             <span style="font-size: 18px; color: white;">📊</span>
@@ -8125,91 +8133,48 @@ function displayAllClientsTab() {
                     <canvas id="allClientsTensionChart" style="width: 100% !important; height: 100% !important; display: block;"></canvas>
                 </div>
 
-                <div style="margin-bottom: 18px; padding: 20px; background: #ffffff; border-radius: 16px; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                <div style="margin-bottom: 18px; padding: 20px; background: #ffffff; border-radius: 16px; border: 1px solid #e2e8f0;">
                     <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
-                        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 20px;">
+                        <div style="display: flex; align-items: center; gap: 10px;">
                             <div style="width: 44px; height: 44px; background: linear-gradient(135deg, #f97316 0%, #c2410c 100%); border-radius: 12px; display: flex; align-items: center; justify-content: center;">
                                 <span style="font-size: 22px; color: white;">⏱️</span>
                             </div>
-                            <div style="display: flex; flex-direction: column; gap: 4px; flex: 1;">
-                                <h4 style="margin: 0; font-size: 18px; font-weight: 700; color: #1e293b;">Évolution de la Tension (par date/heure)</h4>
-                            </div>
+                            <h4 style="margin: 0; font-size: 18px; font-weight: 700; color: #1e293b;">Évolution de la Tension (par date/heure)</h4>
                         </div>
-                        <div style="display: flex; align-items: center; gap: 12px;">
-                            <div style="background: #ef4444; color: white; width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 20px;">
-                                📅
-                            </div>
-                            <div>
-                                <div style="font-weight: 600; color: #1f2937; font-size: 15px;">Filtre période (max 7 jours)</div>
-                                <div style="font-size: 13px; color: #64748b;">${allClientsHourlyMatrix.dates.length} jours disponibles</div>
-                            </div>
-                        </div>
-                        
-                        <div style="background: #fee2e2; color: #ef4444; padding: 6px 14px; border-radius: 9999px; font-size: 13px; font-weight: 500; display: flex; align-items: center; gap: 6px;">
-                            <span>⏳</span>
-                            7 jours max
+                        <div style="background: #fee2e2; color: #ef4444; padding: 6px 14px; border-radius: 9999px; font-size: 13px; font-weight: 500;">
+                            ⏳ 7 jours max
                         </div>
                     </div>
 
                     <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
                         <div style="flex: 1; min-width: 240px;">
-                            <label style="font-size: 13px; color: #64748b; font-weight: 500; display: block; margin-bottom: 6px;">
-                                📆 Date début
-                            </label>
-                            <select id="tension-start-date" onchange="onTensionStartDateChange()" style="margin-left: 4px; padding: 8px 12px; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 13px; font-weight: 500; background: #ffffff; cursor: pointer; min-width: 130px;">
-                                ${allClientsHourlyMatrix.dates.map((date, index) => `
-                                    <option value="${date}" ${index === 0 ? 'selected' : ''}>${date}</option>
-                                `).join('')}
+                            <label style="font-size: 13px; color: #64748b; font-weight: 500; display: block; margin-bottom: 6px;">📆 Date début</label>
+                            <select id="tension-start-date" onchange="onTensionStartDateChange()" style="padding: 8px 12px; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 13px; width: 100%;">
+                                ${datesToUse.map((date, index) => `<option value="${date}" ${index === Math.max(0, datesToUse.length - 7) ? 'selected' : ''}>${date}</option>`).join('')}
                             </select>
                         </div>
-
                         <div style="flex: 1; min-width: 240px;">
-                            <label style="font-size: 13px; color: #64748b; font-weight: 500; display: block; margin-bottom: 6px;">
-                                📆 Date fin
-                            </label>
-                            <select id="tension-end-date" style="margin-left: 4px; padding: 8px 12px; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 13px; font-weight: 500; background: #ffffff; cursor: pointer; min-width: 130px;">
-                                ${allClientsHourlyMatrix.dates.map((date, index, arr) => `
-                                    <option value="${date}" ${index === arr.length - 1 ? 'selected' : ''}>${date}</option>
-                                `).join('')}
+                            <label style="font-size: 13px; color: #64748b; font-weight: 500; display: block; margin-bottom: 6px;">📆 Date fin</label>
+                            <select id="tension-end-date" style="padding: 8px 12px; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 13px; width: 100%;">
+                                ${datesToUse.map((date, index, arr) => `<option value="${date}" ${index === arr.length - 1 ? 'selected' : ''}>${date}</option>`).join('')}
                             </select>
                         </div>
-
-                        <div style="display: flex; gap: 12px; align-items: flex-end; padding-top: 6px;">
-                            <button onclick="applyTensionDateFilter()" 
-                                    style="background: #ef4444; color: white; border: none; padding: 12px 28px; border-radius: 12px; font-weight: 600; font-size: 14px; cursor: pointer; display: flex; align-items: center; gap: 8px; box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);">
-                                <span style="font-size: 18px;">✅</span>
-                                Appliquer
-                            </button>
-                            
-                            <button onclick="resetTensionDateFilter()" 
-                                    style="background: white; color: #64748b; border: 1px solid #cbd5e1; padding: 12px 20px; border-radius: 12px; font-weight: 600; font-size: 14px; cursor: pointer; display: flex; align-items: center; gap: 8px;">
-                                <span>⟳</span>
-                                Réinitialiser
-                            </button>
+                        <div style="display: flex; gap: 12px;">
+                            <button onclick="applyTensionDateFilter()" style="background: #ef4444; color: white; border: none; padding: 10px 24px; border-radius: 12px; font-weight: 600; cursor: pointer;">✅ Appliquer</button>
+                            <button onclick="resetTensionDateFilter()" style="background: white; color: #64748b; border: 1px solid #cbd5e1; padding: 10px 20px; border-radius: 12px; font-weight: 600; cursor: pointer;">⟳ Réinitialiser</button>
                         </div>
                     </div>
 
-                    <div style="margin-top: 18px; margin-bottom: 18px; padding: 14px 18px; background: #f0f9ff; border-radius: 12px; border: 1px solid #bae6fd; display: flex; align-items: center; gap: 10px;">
-                        <span style="font-size: 18px;">📊</span>
-                        <div id="tension-current-range-badge" style="margin-top: 10px; font-size: 12px; color: #1e40af;">
-                            <span style="padding: 4px 10px; background: #dbeafe; border-radius: 999px; display: inline-flex; align-items: center; gap: 6px;">
-                                📊 Période affichée :
-                                <strong>
-                                    <span id="tension-range-start-label">${allClientsHourlyMatrix.dates[0]}</span>
-                                    &nbsp;→&nbsp;
-                                    <span id="tension-range-end-label">${allClientsHourlyMatrix.dates[allClientsHourlyMatrix.dates.length - 1]}</span>
-                                </strong>
-                            </span>
-                        </div>
+                    <div style="margin-top: 18px; padding: 12px 16px; background: #f0f9ff; border-radius: 12px;">
+                        <span>📊 Période affichée : <strong id="tension-range-start-label">${datesToUse[Math.max(0, datesToUse.length - 7)]}</strong> → <strong id="tension-range-end-label">${datesToUse[datesToUse.length - 1]}</strong></span>
                     </div>
-                    <div class="chart-container" style="height: 350px; width: 100%; position: relative;">
-                        <canvas id="tensionEvolutionChart" style="width: 100% !important; height: 420px !important;"></canvas>
+                    
+                    <div class="chart-container" style="height: 400px; width: 100%; margin-top: 20px;">
+                        <canvas id="tensionEvolutionChart" style="width: 100% !important; height: 100% !important;"></canvas>
                     </div>
                 </div>
 
-                ${combinedAnalysis && combinedAnalysis.allEvents.length > 0 ? `
-                    ${createDPDTOnlyTable(combinedAnalysis)}
-                ` : ''}
+                ${combinedAnalysis && combinedAnalysis.allEvents.length > 0 ? createDPDTOnlyTable(combinedAnalysis) : ''}
 
                 <div id="nominal-tension-table-container" style="margin-bottom: 20px;"></div>
             </div>
@@ -8219,169 +8184,99 @@ function displayAllClientsTab() {
         <div class="main-energy-card" style="background: white; border-radius: 24px; padding: 24px; margin: 30px 0; border: 2px solid #e2e8f0; box-shadow: 0 12px 30px rgba(0,0,0,0.1);">
 
             <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 25px; padding-bottom: 20px; border-bottom: 3px solid #22c55e;">
-                <div style="width: 60px; height: 60px; background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); border-radius: 18px; display: flex; align-items: center; justify-content: center; box-shadow: 0 10px 20px #22c55e80;">
+                <div style="width: 60px; height: 60px; background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); border-radius: 18px; display: flex; align-items: center; justify-content: center;">
                     <span style="font-size: 32px; color: white;">⚡</span>
                 </div>
                 <div>
                     <h3 style="margin: 0; font-size: 26px; font-weight: 800; color: #0f172a;">
                         Analyse général de l'Énergie
-                        <span style="margin-left: 12px; font-size: 14px; background: #f1f5f9; color: #475569; padding: 6px 16px; border-radius: 40px; font-weight: 600;">
+                        <span style="margin-left: 12px; font-size: 14px; background: #f1f5f9; color: #475569; padding: 6px 16px; border-radius: 40px;">
                             ${daysWithEnergy} jours de consommation
                         </span>
                     </h3>
-                    <div style="margin-top: 6px; font-size: 14px; color: #475569; display: flex; gap: 20px;">
-                        <span>📊 Max: ${maxEnergyValue} Wh</span>
-                        <span>📈 Moy: ${averageEnergyValue} Wh</span>
-                    </div>
                 </div>
             </div>
             
-            <div style="background: #f8fafc; border-radius: 20px; padding: 20px; margin-bottom: 25px; border: 1px solid #e2e8f0; overflow: visible; height: auto; min-height: auto;">
+            <div style="background: #f8fafc; border-radius: 20px; padding: 20px; margin-bottom: 25px;">
                 <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 20px;">
                     <div style="width: 44px; height: 44px; background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); border-radius: 12px; display: flex; align-items: center; justify-content: center;">
                         <span style="font-size: 22px; color: white;">📊</span>
                     </div>
                     <h4 style="margin: 0; font-size: 18px; font-weight: 700; color: #1e293b;">Énergie Totale par Jour (Somme des Max Clients)</h4>
                 </div>
-                <div class="chart-container all-clients-bar-chart-container" style="height: 400px; min-height: 400px; width: 100%; overflow: visible;">
+                <div class="chart-container" style="height: 400px; width: 100%;">
                     <canvas id="allClientsEnergyChart" style="width: 100% !important; height: 100% !important;"></canvas>
                 </div>
-                <div id="allClientsEnergySummary" style="margin-top: 20px; width: 100%; overflow: visible;"></div>
+                <div id="allClientsEnergySummary" style="margin-top: 20px;"></div>
             </div>
 
-            <div style="background: #f8fafc; border-radius: 20px; padding: 20px; border: 1px solid #e2e8f0; overflow: visible;">
+            <div style="background: #f8fafc; border-radius: 20px; padding: 20px;">
                 <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 20px;">
                     <div style="width: 44px; height: 44px; background: linear-gradient(135deg, #f97316 0%, #ea580c 100%); border-radius: 12px; display: flex; align-items: center; justify-content: center;">
                         <span style="font-size: 22px; color: white;">⏰</span>
                     </div>
-                    <h4 style="margin: 0; font-size: 18px; font-weight: 700; color: #1e293b;">Énergie Totale par Heure (Somme Clients)</h4>
+                    <h4 style="margin: 0; font-size: 18px; font-weight: 700; color: #1e293b;">Analyse Horaire de l'Énergie</h4>
                 </div>
                 
                 <div style="margin-bottom: 15px; padding: 12px 16px; background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0;">
                     <div style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap;">
-                        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-                            <span style="font-size: 13px; font-weight: 600; color: #334155;">📅 Plage de dates :</span>
-                            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-                                <label style="font-size: 12px; color: #64748b;">
-                                    Début
-                                    <select id="energy-hourly-start-date" onchange="onEnergyHourlyStartDateChange()" style="margin-left: 4px; padding: 8px 12px; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 13px; font-weight: 500; background: #ffffff; cursor: pointer; min-width: 130px;">
-                                        ${allClientsHourlyMatrix.dates.map((date, index) => `
-                                            <option value="${date}" ${index === Math.max(0, allClientsHourlyMatrix.dates.length - 7) ? 'selected' : ''}>${date}</option>
-                                        `).join('')}
-                                    </select>
-                                </label>
-                                <label style="font-size: 12px; color: #64748b;">
-                                    Fin
-                                    <select id="energy-hourly-end-date" style="margin-left: 4px; padding: 8px 12px; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 13px; font-weight: 500; background: #ffffff; cursor: pointer; min-width: 130px;">
-                                        ${allClientsHourlyMatrix.dates.map((date, index, arr) => `
-                                            <option value="${date}" ${index === arr.length - 1 ? 'selected' : ''}>${date}</option>
-                                        `).join('')}
-                                    </select>
-                                </label>
-                            </div>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <span style="font-size: 13px; font-weight: 600;">📅 Plage :</span>
+                            <select id="energy-hourly-start-date" onchange="onEnergyHourlyStartDateChange()" style="padding: 6px 10px; border-radius: 6px;">
+                                ${datesToUse.map((date, index) => `<option value="${date}" ${index === Math.max(0, datesToUse.length - 7) ? 'selected' : ''}>${date}</option>`).join('')}
+                            </select>
+                            <span>→</span>
+                            <select id="energy-hourly-end-date" style="padding: 6px 10px; border-radius: 6px;">
+                                ${datesToUse.map((date, index, arr) => `<option value="${date}" ${index === arr.length - 1 ? 'selected' : ''}>${date}</option>`).join('')}
+                            </select>
                         </div>
-
-                        <div style="display: flex; gap: 10px; margin-left: auto;">
-                            <button onclick="applyEnergyHourlyDateFilter()" style="padding: 9px 20px; background: #3b82f6; color: white; border: none; border-radius: 999px; font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 6px 12px rgba(59, 130, 246, 0.25);">
-                                <span>🔍</span> Appliquer le filtre
-                            </button>
-                            <button onclick="resetEnergyHourlyDateFilter()" style="padding: 9px 16px; background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; border-radius: 999px; font-size: 13px; font-weight: 600; cursor: pointer;">
-                                Réinitialiser
-                            </button>
+                        <div style="display: flex; gap: 10px;">
+                            <button onclick="applyEnergyHourlyDateFilter()" style="padding: 6px 16px; background: #3b82f6; color: white; border: none; border-radius: 8px; cursor: pointer;">🔍 Appliquer</button>
+                            <button onclick="resetEnergyHourlyDateFilter()" style="padding: 6px 16px; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 8px; cursor: pointer;">Réinitialiser</button>
                         </div>
                     </div>
-
-                    <div style="margin-top: 8px; font-size: 11px; color: #64748b; display: flex; align-items: center; gap: 6px;">
-                        <span style="font-size: 12px;">ℹ️</span>
-                        <span>Période limitée à <strong style="color:#334155;">7 jours maximum</strong>. La date de fin s'ajuste automatiquement selon la date de début.</span>
+                    <div id="energy-hourly-current-range-badge" style="margin-top: 10px; font-size: 12px;">
+                        📊 Période: <strong id="energy-hourly-range-start-label">${datesToUse[Math.max(0, datesToUse.length - 7)]}</strong> → <strong id="energy-hourly-range-end-label">${datesToUse[datesToUse.length - 1]}</strong>
                     </div>
-
-                    <div id="energy-hourly-current-range-badge" style="margin-top: 10px; font-size: 12px; color: #1e40af;">
-                        <span style="padding: 4px 10px; background: #dbeafe; border-radius: 999px; display: inline-flex; align-items: center; gap: 6px;">
-                            📊 Période affichée :
-                            <strong>
-                                <span id="energy-hourly-range-start-label">${allClientsHourlyMatrix.dates[Math.max(0, allClientsHourlyMatrix.dates.length - 7)]}</span>
-                                &nbsp;→&nbsp;
-                                <span id="energy-hourly-range-end-label">${allClientsHourlyMatrix.dates[allClientsHourlyMatrix.dates.length - 1]}</span>
-                            </strong>
-                        </span>
-                    </div>
-                    <div id="hourly-quick-stats" style="font-size: 13px; color: #1e293b; margin-top: 12px; display: flex; gap: 20px; flex-wrap: wrap;">
-                        Chargement des statistiques...
-                    </div>
+                    <div id="hourly-quick-stats" style="margin-top: 12px;"></div>
                 </div>
 
-                <div style="background: #f8fafc; border-radius: 20px; padding: 20px; margin-bottom: 25px; border: 1px solid #e2e8f0;">
-                    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 20px;">
-                        <div style="width: 44px; height: 44px; background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); border-radius: 12px; display: flex; align-items: center; justify-content: center;">
-                            <span style="font-size: 22px; color: white;">📊</span>
-                        </div>
-                        <h4 style="margin: 0; font-size: 18px; font-weight: 700; color: #1e293b;">Énergie Totale par Heure (Consommation horaire)</h4>
-                    </div>
-                    <div class="chart-container" style="height: 150px; width: 100%;">
+                <div style="margin-bottom: 25px;">
+                    <h5 style="margin: 0 0 15px 0; font-size: 15px;">Énergie Totale par Heure (Consommation horaire)</h5>
+                    <div class="chart-container" style="height: 300px;">
                         <canvas id="allClientsHourlyChart" style="width: 100% !important; height: 100% !important;"></canvas>
                     </div>
                 </div>
 
-                <div style="background: #f8fafc; border-radius: 20px; padding: 20px; margin-bottom: 25px; border: 1px solid #e2e8f0;">
-                    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 20px;">
-                        <div style="width: 44px; height: 44px; background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%); border-radius: 12px; display: flex; align-items: center; justify-content: center;">
-                            <span style="font-size: 22px; color: white;">📈</span>
-                        </div>
-                        <h4 style="margin: 0; font-size: 18px; font-weight: 700; color: #1e293b;">Cumul Journalier par Heure</h4>
-                    </div>
-                    <div class="chart-container" style="height: 150px; width: 100%;">
+                <div>
+                    <h5 style="margin: 0 0 15px 0; font-size: 15px;">Cumul Journalier par Heure</h5>
+                    <div class="chart-container" style="height: 300px;">
                         <canvas id="allClientsCumulativeChart" style="width: 100% !important; height: 100% !important;"></canvas>
                     </div>
                 </div>
             </div>
         </div>
 
+        <!-- BOUTON TABLEAU MATRICIEL -->
         <div style="margin: 20px 0;">
-            <button id="toggle-matrix-table-btn" style="
-                width: 100%;
-                padding: 15px 20px;
-                background: ${matrixTableVisible ? 'linear-gradient(135deg, #64748b 0%, #475569 100%)' : 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)'};
-                color: white;
-                border: none;
-                border-radius: 12px;
-                font-size: 16px;
-                font-weight: 600;
-                cursor: pointer;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                gap: 12px;
-                transition: all 0.3s ease;
-                box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);
-                border: 1px solid rgba(255, 255, 255, 0.2);
-            ">
+            <button id="toggle-matrix-table-btn" style="width: 100%; padding: 15px 20px; background: ${matrixTableVisible ? 'linear-gradient(135deg, #64748b 0%, #475569 100%)' : 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)'}; color: white; border: none; border-radius: 12px; font-size: 16px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 12px;">
                 <span style="font-size: 20px;">${matrixTableVisible ? '🔼' : '📊'}</span>
                 <span>${matrixTableVisible ? 'Masquer le tableau détaillé' : 'Afficher le tableau détaillé'}</span>
-                <span style="font-size: 12px; background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 30px;">
-                    ${window.filteredDates ? window.filteredDates.length : allClientsHourlyMatrix.dates.length} jours
-                </span>
+                <span style="font-size: 12px; background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 30px;">${datesToUse.length} jours</span>
             </button>
         </div>
 
+        <!-- TABLEAU MATRICIEL -->
         <div id="matrix-table-container" style="display: ${matrixTableVisible ? 'block' : 'none'};">
             <div class="table-controls">
-                <div class="pagination-controls">
-                    <div class="items-per-page">
-                        <label>Lignes par page:</label>
-                        <select class="items-per-page-select" onchange="changeAllClientsItemsPerPage(this.value)">
-                            <option value="50" ${itemsPerPage === 50 ? 'selected' : ''}>50</option>
-                            <option value="100" ${itemsPerPage === 100 ? 'selected' : ''}>100</option>
-                            <option value="200" ${itemsPerPage === 200 ? 'selected' : ''}>200</option>
-                            <option value="0" ${itemsPerPage === 0 ? 'selected' : ''}>Tous</option>
-                        </select>
-                    </div>
-                    ${window.filteredDates && window.filteredDates.length < allClientsHourlyMatrix.dates.length ?
-            `<div class="filter-info" style="margin-left: 20px; padding: 6px 12px; background: #dbeafe; border-radius: 6px; font-size: 12px; color: #1e40af;">
-                            <span>🔍</span>
-                            <span>Affichage des données filtrées (${window.filteredDates.length} jours)</span>
-                        </div>` : ''
-        }
+                <div class="items-per-page">
+                    <label>Lignes par page:</label>
+                    <select onchange="changeAllClientsItemsPerPage(this.value)">
+                        <option value="50" ${itemsPerPage === 50 ? 'selected' : ''}>50</option>
+                        <option value="100" ${itemsPerPage === 100 ? 'selected' : ''}>100</option>
+                        <option value="200" ${itemsPerPage === 200 ? 'selected' : ''}>200</option>
+                        <option value="0" ${itemsPerPage === 0 ? 'selected' : ''}>Tous</option>
+                    </select>
                 </div>
             </div>
             
@@ -8393,18 +8288,18 @@ function displayAllClientsTab() {
                                 <th class="sticky-header">#</th>
                                 <th class="sticky-header">Date</th>
                                 <th class="sticky-header">Heure</th>
-                                ${allClientsHourlyMatrix.clients.map(clientId => {
-            const clientData = allResultsByClient[clientId];
-            const clientLabel = `${clientId.padStart(2, '0')}-${clientData.forfait || 'N/A'}`;
-            return `<th class="client-header" title="Client ${clientLabel}">Énergie ${clientId.padStart(2, '0')}</th>`;
-        }).join('')}
+                                ${sortedClients.map(clientId => {
+                                    const clientData = allResultsByClient[clientId];
+                                    const clientLabel = `${clientId.padStart(2, '0')}-${clientData.forfait || 'N/A'}`;
+                                    return `<th class="client-header" title="Client ${clientLabel}">Énergie ${clientId.padStart(2, '0')}</th>`;
+                                }).join('')}
                                 <th class="sticky-header tension-header">Tension (V)</th>
                                 <th class="sticky-header energy-sum-header">∑ Énergie (Wh)</th>
                                 <th class="sticky-header intensity-header">Intensité (A)</th>
                             </tr>
                         </thead>
                         <tbody>
-                            ${window.filteredDates ? generateFilteredTableRows() : generateAllClientsTableRows(startIndex, endIndex)}
+                            ${generateFilteredTableRowsForDates(datesToUse, startIndex, endIndex)}
                         </tbody>
                     </table>
                 </div>
@@ -8412,45 +8307,11 @@ function displayAllClientsTab() {
                 ${totalPages > 1 ? `
                 <div class="table-footer">
                     <div class="pagination">
-                        <button class="pagination-btn first" 
-                                onclick="changeAllClientsMatrixPage(1)" 
-                                ${currentPage <= 1 ? 'disabled' : ''}>
-                            « Première
-                        </button>
-                        <button class="pagination-btn prev" 
-                                onclick="changeAllClientsMatrixPage(${currentPage - 1})" 
-                                ${currentPage <= 1 ? 'disabled' : ''}>
-                            ‹ Précédente
-                        </button>
-                        
-                        <div class="page-info">
-                            Page <strong>${currentPage}</strong> sur <strong>${totalPages}</strong>
-                            <span class="items-info">(${totalItems} point${totalItems !== 1 ? 's' : ''} de données)</span>
-                            ${window.filteredDates && window.filteredDates.length < allClientsHourlyMatrix.dates.length ?
-                `<span class="filter-info-badge" style="margin-left: 10px; padding: 2px 8px; background: #dbeafe; border-radius: 12px; font-size: 11px; color: #1e40af;">
-                                    🔍 Filtre actif
-                                </span>` : ''
-            }
-                        </div>
-                        
-                        <button class="pagination-btn next" 
-                                onclick="changeAllClientsMatrixPage(${currentPage + 1})" 
-                                ${currentPage >= totalPages ? 'disabled' : ''}>
-                            Suivante ›
-                        </button>
-                        <button class="pagination-btn last" 
-                                onclick="changeAllClientsMatrixPage(${totalPages})" 
-                                ${currentPage >= totalPages ? 'disabled' : ''}>
-                            Dernière »
-                        </button>
-                    </div>
-                    
-                    <div class="table-info">
-                        📋 Lignes ${startIndex + 1} à ${endIndex} sur ${totalItems} au total
-                        | 👥 ${allClientsHourlyMatrix.clients.length} client${allClientsHourlyMatrix.clients.length !== 1 ? 's' : ''}
-                        ${window.filteredDates && window.filteredDates.length < allClientsHourlyMatrix.dates.length ?
-                `| 📅 ${window.filteredDates.length} jour${window.filteredDates.length !== 1 ? 's' : ''} filtré${window.filteredDates.length !== 1 ? 's' : ''}` : ''
-            }
+                        <button class="pagination-btn first" onclick="changeAllClientsMatrixPage(1)" ${currentPage <= 1 ? 'disabled' : ''}>« Première</button>
+                        <button class="pagination-btn prev" onclick="changeAllClientsMatrixPage(${currentPage - 1})" ${currentPage <= 1 ? 'disabled' : ''}>‹ Précédente</button>
+                        <div class="page-info">Page <strong>${currentPage}</strong> sur <strong>${totalPages}</strong> <span class="items-info">(${totalItems} points)</span></div>
+                        <button class="pagination-btn next" onclick="changeAllClientsMatrixPage(${currentPage + 1})" ${currentPage >= totalPages ? 'disabled' : ''}>Suivante ›</button>
+                        <button class="pagination-btn last" onclick="changeAllClientsMatrixPage(${totalPages})" ${currentPage >= totalPages ? 'disabled' : ''}>Dernière »</button>
                     </div>
                 </div>
                 ` : ''}
@@ -8458,163 +8319,302 @@ function displayAllClientsTab() {
         </div>
     `;
 
-    // === INITIALISATION DES ÉVÉNEMENTS ===
-    initializeFilterEvents();
+    // === 14. INITIALISATION DES GRAPHIQUES ET ÉVÉNEMENTS ===
     setTimeout(() => {
+        initializeFilterEvents();
         initializeDPDTTableToggles();
-    }, 200);
-
-    // === CRÉER LES GRAPHIQUES ===
-    setTimeout(() => {
-        let filteredMaxEnergyValue = 0;
-        let filteredMaxEnergyDate = '';
-        Object.entries(filteredEnergyData).forEach(([date, energy]) => {
-            if (energy > filteredMaxEnergyValue) {
-                filteredMaxEnergyValue = energy;
-                filteredMaxEnergyDate = date;
-            }
-        });
-
-        // 1. Graphique d'énergie
-        createAllClientsEnergyChart(datesToUse, filteredEnergyData, filteredMaxEnergyDate);
-
-        // 2. Graphique de tension min/max par jour
+        initializeMatrixTableToggle();
+        
+        // Créer les graphiques avec les données filtrées
+        createAllClientsEnergyChart(datesToUse, filteredEnergyData, maxEnergyDate);
         createAllClientsTensionChart(datesToUse, filteredTensionData, systemType, systemLimits);
-
-        // 3. Graphique de stabilité
+        
         if (stabilityData) {
             createStabilityChart('stability-analysis-container', stabilityData, filteredTensionResults);
-            
-            setTimeout(() => {
-                const allDatesInPeriod = window.filteredDates || allClientsHourlyMatrix.dates;
-                const targetTension = systemType === '24V' ? 28.0 : 14.0;
-                
-                // Préparer les données pour le graphique
-                const dailyDataForChart = {};
-                allDatesInPeriod.forEach(date => {
-                    dailyDataForChart[date] = {
-                        nominalCount: 0,
-                        hasData: false
-                    };
-                });
-                
-                filteredTensionResults.forEach(item => {
-                    const date = item.date;
-                    const tension = parseFloat(item.tension || item.valeur || 0);
-                    
-                    if (!dailyDataForChart[date]) {
-                        dailyDataForChart[date] = {
-                            nominalCount: 0,
-                            hasData: false
-                        };
-                    }
-                    
-                    dailyDataForChart[date].hasData = true;
-                    
-                    if (tension >= targetTension) {
-                        dailyDataForChart[date].nominalCount++;
-                    }
-                });
-                
-                const sortedChartDates = Object.keys(dailyDataForChart).sort((a, b) => {
-                    const dateA = new Date(a.split('/').reverse().join('-'));
-                    const dateB = new Date(b.split('/').reverse().join('-'));
-                    return dateA - dateB;
-                });
-                
-                const chartCounts = sortedChartDates.map(date => {
-                    const day = dailyDataForChart[date];
-                    return day.hasData ? day.nominalCount : 0;
-                });
-                
-                const chartId = 'violations-chart-' + Date.now();
-                
-                const nominalTableHTML = createNominalTensionTableWithCanvas(
-                    filteredTensionResults,
-                    systemType,
-                    allDatesInPeriod,
-                    chartId
-                );
-                
-                const nominalContainer = document.getElementById('nominal-tension-table-container');
-                if (nominalContainer) {
-                    nominalContainer.innerHTML = nominalTableHTML;
-                    
-                    setTimeout(() => {
-                        initViolationsChart(chartId, sortedChartDates, chartCounts);
-                    }, 50);
-                }
-            }, 200);
         }
-
-        // 4. Graphique horaire d'énergie
-        setTimeout(() => {
-            initializeHourlyChartWithLastDate();
-        }, 200);
-
-        // 5. Graphique d'évolution de la tension
+        
+        // Graphique d'évolution de la tension
         if (tensionResults && tensionResults.length > 0) {
             window.tensionEvolutionContext = {
                 tensionResults: tensionResults,
                 systemType: systemType,
                 allDates: datesToUse
             };
-
-            setTimeout(() => {
-                const allDates = window.filteredDates || allClientsHourlyMatrix.dates;
-                const last7Days = allDates.slice(-7);
-
-                const startSelect = document.getElementById('tension-start-date');
-                const endSelect = document.getElementById('tension-end-date');
-
-                if (startSelect && endSelect) {
-                    startSelect.value = last7Days[0];
-                    onTensionStartDateChange();
-                    endSelect.value = last7Days[last7Days.length - 1];
-
-                    const startLabel = document.getElementById('tension-range-start-label');
-                    const endLabel = document.getElementById('tension-range-end-label');
-                    if (startLabel) startLabel.textContent = last7Days[0];
-                    if (endLabel) endLabel.textContent = last7Days[last7Days.length - 1];
-                }
-
-                createTensionEvolutionChart(last7Days, tensionResults, systemType);
-            }, 300);
+            const last7Days = datesToUse.slice(-7);
+            createTensionEvolutionChart(last7Days, tensionResults, systemType);
         }
-
-        // 6. Graphique journalier d'intensité
-        createDailyIntensityChart(dailyIntensityStats);
-
-        console.log(`✅ Onglet TECHNIQUE affiché avec ${datesToUse.length} jour(s)`);
-        console.log(`📊 Énergie moyenne: ${averageEnergyValue} Wh sur ${daysWithEnergy} jours`);
-        console.log(`⚡ Intensité moyenne: ${intensityStats.avgIntensity.toFixed(2)} A sur ${intensityStats.intensityCount} mesures`);
-
-        // Initialiser le toggle du tableau
-        initializeMatrixTableToggle();
         
-        const tableContainer = document.getElementById('matrix-table-container');
-        const toggleBtn = document.getElementById('toggle-matrix-table-btn');
-
-        if (tableContainer && toggleBtn) {
-            tableContainer.style.display = matrixTableVisible ? 'block' : 'none';
-            toggleBtn.innerHTML = matrixTableVisible ?
-                `<span style="font-size: 20px;">🔼</span>
-                <span>Masquer le tableau détaillé</span>
-                <span style="font-size: 12px; background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 30px;">
-                    ${getCurrentDaysCount()} jours
-                </span>` :
-                `<span style="font-size: 20px;">📊</span>
-                <span>Afficher le tableau détaillé</span>
-                <span style="font-size: 12px; background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 30px;">
-                    ${getCurrentDaysCount()} jours
-                </span>`;
-
-            toggleBtn.style.background = matrixTableVisible ?
-                'linear-gradient(135deg, #64748b 0%, #475569 100%)' :
-                'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)';
+        // Graphiques horaires
+        const hourlyData = calculateHourlyDataForDateRange(datesToUse.slice(-7));
+        createEnergyHourlyBarChart(hourlyData);
+        createEnergyCumulativeChart(hourlyData);
+        updateAdvancedHourlyStats(hourlyData);
+        
+        // Tableau des atteintes nominales
+        if (filteredTensionResults.length > 0) {
+            const targetTension = systemType === '24V' ? 28.0 : 14.0;
+            const chartId = 'violations-chart-' + Date.now();
+            const nominalHTML = createNominalTensionTableWithCanvas(filteredTensionResults, systemType, datesToUse, chartId);
+            const nominalContainer = document.getElementById('nominal-tension-table-container');
+            if (nominalContainer) {
+                nominalContainer.innerHTML = nominalHTML;
+                setTimeout(() => {
+                    const dailyDataForChart = {};
+                    datesToUse.forEach(date => { dailyDataForChart[date] = { nominalCount: 0, hasData: false }; });
+                    filteredTensionResults.forEach(item => {
+                        const tension = parseFloat(item.tension || item.valeur || 0);
+                        if (dailyDataForChart[item.date]) {
+                            dailyDataForChart[item.date].hasData = true;
+                            if (tension >= targetTension) dailyDataForChart[item.date].nominalCount++;
+                        }
+                    });
+                    const chartCounts = datesToUse.map(date => dailyDataForChart[date]?.nominalCount || 0);
+                    initViolationsChart(chartId, datesToUse, chartCounts);
+                }, 100);
+            }
         }
     }, 100);
 }
+
+// Calcule les statistiques d'intensité pour des dates spécifiques
+function calculateIntensityStatsForDates(datesToUse) {
+    const intensityData = [];
+    const previousValues = {};
+    
+    allClientsHourlyMatrix.clients.forEach(clientId => {
+        previousValues[clientId] = null;
+    });
+
+    let previousDate = null;
+    let maxIntensity = { value: 0, date: '', hour: '' };
+    let minIntensity = { value: Infinity, date: '', hour: '' };
+    let totalIntensity = 0;
+    let intensityCount = 0;
+
+    for (let i = 0; i < datesToUse.length; i++) {
+        const date = datesToUse[i];
+
+        if (previousDate !== null && date !== previousDate) {
+            allClientsHourlyMatrix.clients.forEach(clientId => {
+                previousValues[clientId] = null;
+            });
+        }
+
+        for (let j = 0; j < allClientsHourlyMatrix.hours.length; j++) {
+            const hour = allClientsHourlyMatrix.hours[j];
+            const key = `${date}_${hour}`;
+            const rowData = allClientsHourlyMatrix.data[key] || {};
+
+            const tension = rowData.tension;
+            if (!tension || tension <= 0) continue;
+
+            let totalConsoHeure = 0;
+            let hasValidData = false;
+
+            allClientsHourlyMatrix.clients.forEach(clientId => {
+                const energie = rowData[`client_${clientId}`];
+                if (energie !== null && energie !== undefined) {
+                    const valeur = parseFloat(energie);
+                    const previous = previousValues[clientId];
+                    if (previous !== null && valeur >= previous) {
+                        totalConsoHeure += (valeur - previous);
+                        hasValidData = true;
+                    }
+                    previousValues[clientId] = valeur;
+                }
+            });
+
+            if (hasValidData && totalConsoHeure > 0) {
+                const intensity = totalConsoHeure / tension;
+                totalIntensity += intensity;
+                intensityCount++;
+                
+                if (intensity > maxIntensity.value) {
+                    maxIntensity = { value: intensity, date, hour };
+                }
+                if (intensity < minIntensity.value) {
+                    minIntensity = { value: intensity, date, hour };
+                }
+            }
+        }
+        previousDate = date;
+    }
+
+    return {
+        avgIntensity: intensityCount > 0 ? totalIntensity / intensityCount : 0,
+        maxIntensity,
+        minIntensity,
+        intensityCount
+    };
+}
+
+// Calcule les statistiques d'intensité journalières pour des dates spécifiques
+function calculateDailyIntensityStatsForDates(datesToUse) {
+    const dailyIntensity = {};
+    const previousValues = {};
+    
+    allClientsHourlyMatrix.clients.forEach(clientId => {
+        previousValues[clientId] = null;
+    });
+
+    let previousDate = null;
+
+    for (let i = 0; i < datesToUse.length; i++) {
+        const date = datesToUse[i];
+
+        if (previousDate !== null && date !== previousDate) {
+            allClientsHourlyMatrix.clients.forEach(clientId => {
+                previousValues[clientId] = null;
+            });
+        }
+
+        let dailyTotal = 0;
+        let dailyCount = 0;
+        let dailyMax = 0;
+        let dailyMin = Infinity;
+
+        for (let j = 0; j < allClientsHourlyMatrix.hours.length; j++) {
+            const hour = allClientsHourlyMatrix.hours[j];
+            const key = `${date}_${hour}`;
+            const rowData = allClientsHourlyMatrix.data[key] || {};
+
+            const tension = rowData.tension;
+            if (!tension || tension <= 0) continue;
+
+            let totalConsoHeure = 0;
+            let hasValidData = false;
+
+            allClientsHourlyMatrix.clients.forEach(clientId => {
+                const energie = rowData[`client_${clientId}`];
+                if (energie !== null && energie !== undefined) {
+                    const valeur = parseFloat(energie);
+                    const previous = previousValues[clientId];
+                    if (previous !== null && valeur >= previous) {
+                        totalConsoHeure += (valeur - previous);
+                        hasValidData = true;
+                    }
+                    previousValues[clientId] = valeur;
+                }
+            });
+
+            if (hasValidData && totalConsoHeure > 0) {
+                const intensity = totalConsoHeure / tension;
+                dailyTotal += intensity;
+                dailyCount++;
+                dailyMax = Math.max(dailyMax, intensity);
+                dailyMin = Math.min(dailyMin, intensity);
+            }
+        }
+
+        previousDate = date;
+
+        if (dailyCount > 0) {
+            dailyIntensity[date] = {
+                avg: dailyTotal / dailyCount,
+                max: dailyMax,
+                min: dailyMin,
+                count: dailyCount
+            };
+        }
+    }
+
+    return dailyIntensity;
+}
+
+// Génère les lignes du tableau pour des dates spécifiques
+function generateFilteredTableRowsForDates(datesToUse, startIndex, endIndex) {
+    let rows = '';
+    let rowIndex = 0;
+    let displayIndex = 1;
+    
+    const previousValues = {};
+    allClientsHourlyMatrix.clients.forEach(clientId => {
+        previousValues[clientId] = null;
+    });
+    
+    let previousDate = null;
+
+    for (let i = 0; i < datesToUse.length; i++) {
+        const date = datesToUse[i];
+
+        if (previousDate !== null && date !== previousDate) {
+            allClientsHourlyMatrix.clients.forEach(clientId => {
+                previousValues[clientId] = null;
+            });
+        }
+
+        for (let j = 0; j < allClientsHourlyMatrix.hours.length; j++) {
+            const hour = allClientsHourlyMatrix.hours[j];
+            const key = `${date}_${hour}`;
+            const rowData = allClientsHourlyMatrix.data[key] || {};
+
+            const tension = rowData.tension;
+            const hasTension = tension !== null && tension !== undefined;
+
+            let totalCumul = 0;
+            let totalConsoHeure = 0;
+            let hasEnergy = false;
+            let hasPreviousForAnyClient = false;
+
+            allClientsHourlyMatrix.clients.forEach(clientId => {
+                const energie = rowData[`client_${clientId}`];
+                if (energie !== null && energie !== undefined) {
+                    const valeur = parseFloat(energie);
+                    totalCumul += valeur;
+                    hasEnergy = true;
+
+                    const previous = previousValues[clientId];
+                    if (previous !== null && valeur >= previous) {
+                        totalConsoHeure += (valeur - previous);
+                        hasPreviousForAnyClient = true;
+                    }
+                    previousValues[clientId] = valeur;
+                }
+            });
+
+            if (!hasEnergy && !hasTension) continue;
+
+            let intensity = null;
+            if (hasTension && tension > 0 && totalConsoHeure > 0 && hasPreviousForAnyClient) {
+                intensity = totalConsoHeure / tension;
+            }
+
+            let intensityColor = '#718096';
+            if (intensity !== null) {
+                if (intensity > 5) intensityColor = '#ef4444';
+                else if (intensity > 2) intensityColor = '#f59e0b';
+                else if (intensity > 0) intensityColor = '#10b981';
+            }
+
+            if (rowIndex >= startIndex && rowIndex < endIndex) {
+                const tensionColor = hasTension ? getTensionColor(tension) : '#718096';
+                
+                rows += `<tr>
+                    <td class="row-index">${displayIndex}</td>
+                    <td class="row-date">${date}</td>
+                    <td class="row-hour">${hour}</td>
+                    ${allClientsHourlyMatrix.clients.map(clientId => {
+                        const energie = rowData[`client_${clientId}`];
+                        return `<td class="row-energy client-energy">${energie !== null && energie !== undefined ? energie : '-'}</td>`;
+                    }).join('')}
+                    <td class="row-tension" style="color: ${tensionColor}">${hasTension ? tension.toFixed(1) : '-'}</td>
+                    <td class="row-energy-sum" style="font-weight: bold; color: #2563eb;">${totalCumul > 0 ? totalCumul.toFixed(1) : '-'}</td>
+                    <td class="row-intensity" style="color: ${intensityColor}; font-weight: bold;">${intensity !== null ? intensity.toFixed(2) : (hasPreviousForAnyClient ? '-' : '(première heure)')}</td>
+                </tr>`;
+                displayIndex++;
+            }
+
+            rowIndex++;
+            if (rowIndex >= endIndex) break;
+        }
+
+        previousDate = date;
+        if (rowIndex >= endIndex) break;
+    }
+
+    return rows;
+}
+
 function getCurrentDaysCount() {
     if (window.filteredDates && window.filteredDates.length > 0) {
         return window.filteredDates.length;
@@ -10474,58 +10474,110 @@ function initializeFilterEvents() {
     // Appliquer le filtre
     const applyBtn = document.getElementById('apply-filter-btn');
     if (applyBtn) {
-        applyBtn.addEventListener('click', function () {
-            applyGlobalDateFilter();
-            updateFilterIndicator();
-        });
+        applyBtn.removeEventListener('click', applyGlobalDateFilter);
+        applyBtn.addEventListener('click', applyGlobalDateFilter);
     }
 
     // Réinitialiser tous les filtres
     const resetBtn = document.getElementById('reset-all-filters-btn');
     if (resetBtn) {
+        resetBtn.removeEventListener('click', resetAllFilters);
         resetBtn.addEventListener('click', resetAllFilters);
     }
 
-    // Sélectionner/désélectionner toutes les dates
-    const selectAllBtn = document.getElementById('select-all-dates');
-    if (selectAllBtn) {
-        selectAllBtn.addEventListener('click', function () {
-            document.querySelectorAll('.date-checkbox').forEach(cb => {
-                cb.checked = true;
-                cb.parentElement.classList.add('checked');
-            });
-            updateSelectedCount();
-        });
-    }
-
-    const deselectAllBtn = document.getElementById('deselect-all-dates');
-    if (deselectAllBtn) {
-        deselectAllBtn.addEventListener('click', function () {
-            document.querySelectorAll('.date-checkbox').forEach(cb => {
-                cb.checked = false;
-                cb.parentElement.classList.remove('checked');
-            });
-            updateSelectedCount();
-        });
-    }
-
-    // Mettre à jour les cases à cocher quand les autres filtres changent
-    const dateInputs = document.querySelectorAll('.filter-date-input, .filter-select');
-    dateInputs.forEach(input => {
-        input.addEventListener('change', updateDateCheckboxesFromFilters);
+    // Initialiser les boutons de période prédéfinie
+    document.querySelectorAll('.preset-btn').forEach(btn => {
+        btn.removeEventListener('click', handlePresetClick);
+        btn.addEventListener('click', handlePresetClick);
     });
 
-    // Mettre à jour le style des cases quand elles changent
-    document.querySelectorAll('.date-checkbox').forEach(cb => {
-        cb.addEventListener('change', function () {
-            if (this.checked) {
-                this.parentElement.classList.add('checked');
-            } else {
-                this.parentElement.classList.remove('checked');
-            }
-            updateSelectedCount();
-        });
+    // Initialiser les sélecteurs de date manuels
+    const startDateInput = document.getElementById('filter-start-date');
+    const endDateInput = document.getElementById('filter-end-date');
+    const yearSelect = document.getElementById('filter-year');
+    const monthSelect = document.getElementById('filter-month');
+
+    if (startDateInput) startDateInput.addEventListener('change', updateTempDatesFromInputs);
+    if (endDateInput) endDateInput.addEventListener('change', updateTempDatesFromInputs);
+    if (yearSelect) yearSelect.addEventListener('change', updateTempDatesFromInputs);
+    if (monthSelect) monthSelect.addEventListener('change', updateTempDatesFromInputs);
+}
+function updateTempDatesFromInputs() {
+    const startDate = document.getElementById('filter-start-date').value;
+    const endDate = document.getElementById('filter-end-date').value;
+    const year = document.getElementById('filter-year').value;
+    const month = document.getElementById('filter-month').value;
+    
+    const allDates = allClientsHourlyMatrix.dates || [];
+    if (allDates.length === 0) return;
+    
+    // Convertir les dates pour comparaison
+    const dateObjects = allDates.map(date => {
+        const [day, monthStr, yearStr] = date.split('/');
+        return {
+            original: date,
+            dateObj: new Date(yearStr, parseInt(monthStr) - 1, parseInt(day))
+        };
     });
+    
+    let filteredDates = [...dateObjects];
+    
+    // Filtrer par période
+    if (startDate) {
+        const startObj = new Date(startDate);
+        filteredDates = filteredDates.filter(d => d.dateObj >= startObj);
+    }
+    
+    if (endDate) {
+        const endObj = new Date(endDate);
+        filteredDates = filteredDates.filter(d => d.dateObj <= endObj);
+    }
+    
+    // Filtrer par année
+    if (year !== 'all') {
+        filteredDates = filteredDates.filter(d => d.dateObj.getFullYear() === parseInt(year));
+    }
+    
+    // Filtrer par mois
+    if (month !== 'all') {
+        filteredDates = filteredDates.filter(d => d.dateObj.getMonth() + 1 === parseInt(month));
+    }
+    
+    // Stocker temporairement
+    window.tempFilteredDates = filteredDates.map(d => d.original);
+    
+    // Mettre à jour l'affichage
+    const selectedPeriodSpan = document.querySelector('.selected-period-left span');
+    if (selectedPeriodSpan && window.tempFilteredDates.length > 0) {
+        const sortedDates = [...window.tempFilteredDates].sort((a, b) => {
+            const [da, ma, ya] = a.split('/');
+            const [db, mb, yb] = b.split('/');
+            return new Date(ya, ma - 1, da) - new Date(yb, mb - 1, db);
+        });
+        selectedPeriodSpan.textContent = `Période sélectionnée : ${sortedDates[0]} → ${sortedDates[sortedDates.length - 1]} (${sortedDates.length} jours)`;
+    }
+    
+    // Enlever la sélection des boutons prédéfinis
+    document.querySelectorAll('.preset-btn').forEach(btn => {
+        btn.classList.remove('selected');
+    });
+    
+    console.log(`📅 Filtres manuels appliqués: ${window.tempFilteredDates.length} jours`);
+}
+function handlePresetClick(event) {
+    const btn = event.currentTarget;
+    const days = btn.getAttribute('data-days');
+    
+    // Mettre à jour le style
+    document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+    
+    // Sélectionner temporairement les dates
+    if (days === 'all') {
+        selectTempLastNDays('all');
+    } else {
+        selectTempLastNDays(parseInt(days));
+    }
 }
 
 function updateSelectedCount() {
@@ -14611,4 +14663,27 @@ window.addEventListener('scroll', function () {
             analyzeButton.style.fontSize = '18px';
         }
     }
-});
+}); 
+
+// Fonction globale pour afficher/masquer le tableau des atteintes nominales
+window.toggleNominalTable = function() {
+    const table = document.getElementById('nominal-tension-table');
+    const button = document.getElementById('toggle-nominal-table');
+    
+    if (!table || !button) {
+        console.error('Tableau ou bouton non trouvé');
+        return;
+    }
+    
+    if (table.style.display === 'none') {
+        table.style.display = 'block';
+        button.innerHTML = '<span style="font-size: 18px;">🔼</span><span>Masquer le tableau détaillé</span>';
+        button.style.background = 'linear-gradient(135deg, #64748b 0%, #475569 100%)';
+        console.log('✅ Tableau nominal affiché');
+    } else {
+        table.style.display = 'none';
+        button.innerHTML = '<span style="font-size: 18px;">🔽</span><span>Afficher le tableau détaillé</span>';
+        button.style.background = 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)';
+        console.log('✅ Tableau nominal masqué');
+    }
+};

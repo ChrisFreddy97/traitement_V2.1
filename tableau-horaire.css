@@ -3497,3 +3497,15 @@ body {
 .sub-tab:hover {
   transform: translateY(-1px);
 }
+/* Styles pour les filtres de date */
+.filter-btn.selected {
+    background: #3b82f6 !important;
+    color: white !important;
+    border: 1px solid #2563eb !important;
+    transform: scale(0.98);
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.4);
+}
+
+.filter-btn:active {
+    transform: scale(0.96);
+}

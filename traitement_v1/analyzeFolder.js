@@ -11831,7 +11831,7 @@ function analyzeVoltageThresholdExceedances(tensionData, systemType = null) {
     if (!tensionData || tensionData.length === 0) {
         return { threshold: 0, days: [] };
     }
-    
+     
     // Déterminer le système si non fourni
     if (!systemType) {
         systemType = detectSystemType(tensionData);
