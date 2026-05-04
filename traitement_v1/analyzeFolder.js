@@ -11985,24 +11985,28 @@ function createVoltageThresholdTable() {
     
     legend.innerHTML = `
         <div style="display: flex; align-items: center; gap: 6px;">
+            <div style="width: 14px; height: 14px; background: #000000; border-radius: 3px;"></div>
+            <span style="color: #000000;"><strong>Excès</strong> (>8 atteintes)</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 6px;">
             <div style="width: 14px; height: 14px; background: #22c55e; border-radius: 3px;"></div>
-            <span style="color: #166534;"><strong>≥4</strong> atteintes</span>
+            <span style="color: #166534;"><strong>Excellent</strong> (≥4 atteintes)</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 6px;">
+            <div style="width: 14px; height: 14px; background: #3b82f6; border-radius: 3px;"></div>
+            <span style="color: #1e40af;"><strong>Très bien</strong> (3 atteintes)</span>
         </div>
         <div style="display: flex; align-items: center; gap: 6px;">
             <div style="width: 14px; height: 14px; background: #eab308; border-radius: 3px;"></div>
-            <span style="color: #854d0e;"><strong>3</strong> atteintes</span>
+            <span style="color: #854d0e;"><strong>Correct</strong> (2 atteintes)</span>
         </div>
         <div style="display: flex; align-items: center; gap: 6px;">
             <div style="width: 14px; height: 14px; background: #f97316; border-radius: 3px;"></div>
-            <span style="color: #9a3412;"><strong>2</strong> atteintes</span>
-        </div>
-        <div style="display: flex; align-items: center; gap: 6px;">
-            <div style="width: 14px; height: 14px; background: #f59e0b; border-radius: 3px;"></div>
-            <span style="color: #92400e;"><strong>1</strong> atteinte</span>
+            <span style="color: #9a3412;"><strong>Faible</strong> (1 atteinte)</span>
         </div>
         <div style="display: flex; align-items: center; gap: 6px;">
             <div style="width: 14px; height: 14px; background: #ef4444; border-radius: 3px;"></div>
-            <span style="color: #991b1b;"><strong>0</strong> atteinte</span>
+            <span style="color: #991b1b;"><strong>Trop faible</strong> (0 atteinte)</span>
         </div>
     `;
     
@@ -12028,21 +12032,21 @@ function createVoltageThresholdTable() {
     `;
 
     dashboard.innerHTML = `
-        <div style="background: white; border-radius: 8px; padding: 12px; border-left: 4px solid #8b5cf6; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+        <div style="background: white; border-radius: 8px; padding: 12px; border-left: 4px solid #000000; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
             <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
                 <span style="font-size: 18px;">🔴</span>
-                <span style="font-size: 12px; font-weight: 600; color: #6d28d9;">EXCÈS</span>
+                <span style="font-size: 12px; font-weight: 600; color: #000000;">EXCÈS</span>
             </div>
-            <div style="font-size: 24px; font-weight: 800; color: #8b5cf6; margin-bottom: 5px;">${exces}</div>
+            <div style="font-size: 24px; font-weight: 800; color: #000000; margin-bottom: 5px;">${exces}</div>
             <div style="font-size: 11px; color: #64748b;">${totalJours > 0 ? ((exces/totalJours*100).toFixed(1)) : 0}% des jours</div>
             <div style="margin-top: 8px; width: 100%; height: 4px; background: #e2e8f0; border-radius: 2px; overflow: hidden;">
-                <div style="width: ${totalJours > 0 ? (exces/totalJours*100) : 0}%; height: 100%; background: #8b5cf6;"></div>
+                <div style="width: ${totalJours > 0 ? (exces/totalJours*100) : 0}%; height: 100%; background: #000000;"></div>
             </div>
         </div>
         <div style="background: white; border-radius: 8px; padding: 12px; border-left: 4px solid #22c55e; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
             <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
                 <span style="font-size: 18px;">⭐</span>
-                <span style="font-size: 12px; font-weight: 600; color: #166534;">EXCELLENTE</span>
+                <span style="font-size: 12px; font-weight: 600; color: #166534;">EXCELLENT</span>
             </div>
             <div style="font-size: 24px; font-weight: 800; color: #22c55e; margin-bottom: 5px;">${excellent}</div>
             <div style="font-size: 11px; color: #64748b;">${totalJours > 0 ? ((excellent/totalJours*100).toFixed(1)) : 0}% des jours</div>
@@ -12050,37 +12054,37 @@ function createVoltageThresholdTable() {
                 <div style="width: ${totalJours > 0 ? (excellent/totalJours*100) : 0}%; height: 100%; background: #22c55e;"></div>
             </div>
         </div>
-        <div style="background: white; border-radius: 8px; padding: 12px; border-left: 4px solid #eab308; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+        <div style="background: white; border-radius: 8px; padding: 12px; border-left: 4px solid #3b82f6; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
             <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
                 <span style="font-size: 18px;">👍</span>
-                <span style="font-size: 12px; font-weight: 600; color: #854d0e;">TRÈS BIEN</span>
+                <span style="font-size: 12px; font-weight: 600; color: #1e40af;">TRÈS BIEN</span>
             </div>
-            <div style="font-size: 24px; font-weight: 800; color: #eab308; margin-bottom: 5px;">${tresBien}</div>
+            <div style="font-size: 24px; font-weight: 800; color: #3b82f6; margin-bottom: 5px;">${tresBien}</div>
             <div style="font-size: 11px; color: #64748b;">${totalJours > 0 ? ((tresBien/totalJours*100).toFixed(1)) : 0}% des jours</div>
             <div style="margin-top: 8px; width: 100%; height: 4px; background: #e2e8f0; border-radius: 2px; overflow: hidden;">
-                <div style="width: ${totalJours > 0 ? (tresBien/totalJours*100) : 0}%; height: 100%; background: #eab308;"></div>
+                <div style="width: ${totalJours > 0 ? (tresBien/totalJours*100) : 0}%; height: 100%; background: #3b82f6;"></div>
+            </div>
+        </div>
+        <div style="background: white; border-radius: 8px; padding: 12px; border-left: 4px solid #eab308; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                <span style="font-size: 18px;">🟡</span>
+                <span style="font-size: 12px; font-weight: 600; color: #854d0e;">CORRECT</span>
+            </div>
+            <div style="font-size: 24px; font-weight: 800; color: #eab308; margin-bottom: 5px;">${correct}</div>
+            <div style="font-size: 11px; color: #64748b;">${totalJours > 0 ? ((correct/totalJours*100).toFixed(1)) : 0}% des jours</div>
+            <div style="margin-top: 8px; width: 100%; height: 4px; background: #e2e8f0; border-radius: 2px; overflow: hidden;">
+                <div style="width: ${totalJours > 0 ? (correct/totalJours*100) : 0}%; height: 100%; background: #eab308;"></div>
             </div>
         </div>
         <div style="background: white; border-radius: 8px; padding: 12px; border-left: 4px solid #f97316; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
             <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
-                <span style="font-size: 18px;">🟡</span>
-                <span style="font-size: 12px; font-weight: 600; color: #9a3412;">CORRECT</span>
-            </div>
-            <div style="font-size: 24px; font-weight: 800; color: #f97316; margin-bottom: 5px;">${correct}</div>
-            <div style="font-size: 11px; color: #64748b;">${totalJours > 0 ? ((correct/totalJours*100).toFixed(1)) : 0}% des jours</div>
-            <div style="margin-top: 8px; width: 100%; height: 4px; background: #e2e8f0; border-radius: 2px; overflow: hidden;">
-                <div style="width: ${totalJours > 0 ? (correct/totalJours*100) : 0}%; height: 100%; background: #f97316;"></div>
-            </div>
-        </div>
-        <div style="background: white; border-radius: 8px; padding: 12px; border-left: 4px solid #f59e0b; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
-            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
                 <span style="font-size: 18px;">⚠️</span>
-                <span style="font-size: 12px; font-weight: 600; color: #92400e;">FAIBLE</span>
+                <span style="font-size: 12px; font-weight: 600; color: #9a3412;">FAIBLE</span>
             </div>
-            <div style="font-size: 24px; font-weight: 800; color: #f59e0b; margin-bottom: 5px;">${faible}</div>
+            <div style="font-size: 24px; font-weight: 800; color: #f97316; margin-bottom: 5px;">${faible}</div>
             <div style="font-size: 11px; color: #64748b;">${totalJours > 0 ? ((faible/totalJours*100).toFixed(1)) : 0}% des jours</div>
             <div style="margin-top: 8px; width: 100%; height: 4px; background: #e2e8f0; border-radius: 2px; overflow: hidden;">
-                <div style="width: ${totalJours > 0 ? (faible/totalJours*100) : 0}%; height: 100%; background: #f59e0b;"></div>
+                <div style="width: ${totalJours > 0 ? (faible/totalJours*100) : 0}%; height: 100%; background: #f97316;"></div>
             </div>
         </div>
         <div style="background: white; border-radius: 8px; padding: 12px; border-left: 4px solid #ef4444; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
@@ -12244,24 +12248,24 @@ function createVoltageThresholdTable() {
         };
         
         // Déterminer la couleur de fond selon le nombre d'atteintes
-        let bgColor = '#fee2e2';
-        let textColor = '#991b1b';
+        let bgColor = '#fef2f2';
+        let textColor = '#b91c1c';
         
         if (dayData.count > 8) {
-            bgColor = '#ede9fe'; // Violet clair pour excès de charge
-            textColor = '#581c87';
+            bgColor = '#f5f5f5';
+            textColor = '#000000';
         } else if (dayData.count >= 4) {
-            bgColor = '#dcfce7';
+            bgColor = '#f0fdf4';
             textColor = '#166534';
         } else if (dayData.count === 3) {
+            bgColor = '#eff6ff';
+            textColor = '#1e40af';
+        } else if (dayData.count === 2) {
             bgColor = '#fef9c3';
             textColor = '#854d0e';
-        } else if (dayData.count === 2) {
-            bgColor = '#ffedd5';
-            textColor = '#9a3412';
         } else if (dayData.count === 1) {
-            bgColor = '#fef3c7';
-            textColor = '#92400e';
+            bgColor = '#fff7ed';
+            textColor = '#9a3412';
         }
         
         const tr = document.createElement('tr');
@@ -12297,11 +12301,11 @@ function createVoltageThresholdTable() {
         
         let statusIcon = '';
         if (dayData.count > 8) statusIcon = '🔴 Excès';
-        else if (dayData.count >= 4) statusIcon = '⭐ Excellente';
+        else if (dayData.count >= 4) statusIcon = '⭐ Excellent';
         else if (dayData.count === 3) statusIcon = '👍 Très bien';
         else if (dayData.count === 2) statusIcon = '🟡 Correct';
         else if (dayData.count === 1) statusIcon = '⚠️ Faible';
-        else statusIcon = '🔴 Nulle';
+        else statusIcon = '🔴 Trop faible';
         
         tdCount.innerHTML = `
             <div style="display: flex; flex-direction: column; align-items: center;">
@@ -12353,7 +12357,7 @@ function createVoltageThresholdTable() {
         padding: 20px 25px;
         background: white;
         border-top: 1px solid #e2e8f0;
-        height: 480px;
+        height: 550px;
         position: relative;
         display: flex;
         flex-direction: column;
@@ -12378,26 +12382,30 @@ function createVoltageThresholdTable() {
                 ${analysis.days.length} jours analysés
             </span>
         </div>
-        <div style="display: flex; align-items: center; gap: 20px;">
+        <div style="display: flex; align-items: center; gap: 20px; flex-wrap: wrap;">
+            <div style="display: flex; align-items: center; gap: 6px;">
+                <div style="width: 14px; height: 14px; background: #000000; border-radius: 3px;"></div>
+                <span style="font-size: 11px; color: #000000; font-weight: 500;">Excès</span>
+            </div>
             <div style="display: flex; align-items: center; gap: 6px;">
                 <div style="width: 14px; height: 14px; background: #22c55e; border-radius: 3px;"></div>
-                <span style="font-size: 11px; color: #166534; font-weight: 500;">≥4 (Bon)</span>
+                <span style="font-size: 11px; color: #166534; font-weight: 500;">Excellent</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 6px;">
+                <div style="width: 14px; height: 14px; background: #3b82f6; border-radius: 3px;"></div>
+                <span style="font-size: 11px; color: #1e40af; font-weight: 500;">Très bien</span>
             </div>
             <div style="display: flex; align-items: center; gap: 6px;">
                 <div style="width: 14px; height: 14px; background: #eab308; border-radius: 3px;"></div>
-                <span style="font-size: 11px; color: #854d0e; font-weight: 500;">2-3 (Moyen)</span>
+                <span style="font-size: 11px; color: #854d0e; font-weight: 500;">Correct</span>
             </div>
             <div style="display: flex; align-items: center; gap: 6px;">
                 <div style="width: 14px; height: 14px; background: #f97316; border-radius: 3px;"></div>
-                <span style="font-size: 11px; color: #9a3412; font-weight: 500;">1 (Faible)</span>
+                <span style="font-size: 11px; color: #9a3412; font-weight: 500;">Faible</span>
             </div>
             <div style="display: flex; align-items: center; gap: 6px;">
                 <div style="width: 14px; height: 14px; background: #ef4444; border-radius: 3px;"></div>
-                <span style="font-size: 11px; color: #991b1b; font-weight: 500;">0 (Critique)</span>
-            </div>
-            <div style="display: flex; align-items: center; gap: 6px;">
-                <div style="width: 14px; height: 14px; background: #7c3aed; border-radius: 3px;"></div>
-                <span style="font-size: 11px; color: #581c87; font-weight: 500;">>8 (Excès)</span>
+                <span style="font-size: 11px; color: #991b1b; font-weight: 500;">Trop faible</span>
             </div>
         </div>
     `;
@@ -12405,7 +12413,7 @@ function createVoltageThresholdTable() {
     
     const canvasContainer = document.createElement('div');
     canvasContainer.style.cssText = `
-        height: 320px;
+        height: 500px;
         position: relative;
         margin-bottom: 10px;
         flex-shrink: 0;
@@ -12444,11 +12452,11 @@ function createVoltageThresholdTable() {
             analysis.days.map(d => d.formattedDate).reverse(), 
             analysis.days.map(d => d.count).reverse(), 
             analysis.days.map(d => {
-                if (d.count > 8) return '#7c3aed'; // Violet pour excès de charge
+                if (d.count > 8) return '#000000';
                 if (d.count >= 4) return '#22c55e';
-                if (d.count === 3) return '#eab308';
-                if (d.count === 2) return '#f97316';
-                if (d.count === 1) return '#f59e0b';
+                if (d.count === 3) return '#3b82f6';
+                if (d.count === 2) return '#eab308';
+                if (d.count === 1) return '#f97316';
                 return '#ef4444';
             }).reverse(), 
             analysis.threshold
@@ -12464,9 +12472,6 @@ function createVoltageThresholdChart(dates, counts, colors, threshold) {
     const existingChart = Chart.getChart(canvas);
     if (existingChart) existingChart.destroy();
     
-    // Créer un dataset pour la ligne de seuil à 4
-    const thresholdLineData = Array(dates.length).fill(4);
-    
     // Calculer le maximum pour l'échelle Y (avec une marge confortable)
     const maxCount = Math.max(...counts);
     const yMax = Math.max(10, maxCount + 3); // Minimum 10, ou max + 3
@@ -12480,6 +12485,17 @@ function createVoltageThresholdChart(dates, counts, colors, threshold) {
                     label: `Nombre d'atteintes ≥ ${threshold}V`,
                     data: counts,
                     borderColor: '#2563eb',
+                    segment: {
+                        borderColor: ctx => {
+                            const value = ctx.p0.parsed.y;
+                            if (value > 8) return '#000000';
+                            if (value >= 4) return '#22c55e';
+                            if (value === 3) return '#3b82f6';
+                            if (value === 2) return '#eab308';
+                            if (value === 1) return '#f97316';
+                            return '#ef4444';
+                        }
+                    },
                     backgroundColor: 'rgba(37, 99, 235, 0.05)',
                     borderWidth: 3,
                     pointRadius: 7,
@@ -12494,25 +12510,13 @@ function createVoltageThresholdChart(dates, counts, colors, threshold) {
                     fill: false,
                     order: 1,
                     spanGaps: true
-                },
-                {
-                    label: 'Seuil (4 atteintes)',
-                    data: thresholdLineData,
-                    borderColor: '#22c55e',
-                    borderWidth: 4,
-                    borderDash: [10, 8],
-                    pointRadius: 0,
-                    pointHoverRadius: 0,
-                    fill: false,
-                    tension: 0,
-                    order: 0,
-                    backgroundColor: 'transparent'
                 }
             ]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            aspectRatio: 1.5, // Réduit ce nombre pour augmenter la hauteur (plus petit = plus haut)
             animation: {
                 duration: 800,
                 easing: 'easeInOutQuart'
@@ -12549,25 +12553,22 @@ function createVoltageThresholdChart(dates, counts, colors, threshold) {
                     borderWidth: 1,
                     callbacks: {
                         label: function(context) {
-                            const datasetLabel = context.dataset.label || '';
                             const value = context.parsed.y;
-                            
-                            if (datasetLabel.includes('Seuil')) {
-                                return `📏 Seuil minimum: 4 atteintes`;
-                            }
                             
                             let status = '';
                             
                             if (value > 8) {
-                                status = '🔴 EXCÈS DE CHARGE';
+                                status = '🔴 EXCÈS';
                             } else if (value >= 4) {
-                                status = '✅ CONFORME';
-                            } else if (value >= 2) {
-                                status = '⚠️ MOYEN';
+                                status = '✅ EXCELLENT';
+                            } else if (value === 3) {
+                                status = '👍 TRÈS BIEN';
+                            } else if (value === 2) {
+                                status = '🟡 CORRECT';
                             } else if (value === 1) {
-                                status = '🔴 FAIBLE';
+                                status = '⚠️ FAIBLE';
                             } else {
-                                status = '⛔ CRITIQUE';
+                                status = '🔴 TROP FAIBLE';
                             }
                             
                             return [
@@ -12576,29 +12577,26 @@ function createVoltageThresholdChart(dates, counts, colors, threshold) {
                             ];
                         },
                         afterLabel: function(context) {
-                            if (!context.dataset.label.includes('Seuil')) {
-                                const value = context.parsed.y;
-                                const date = context.label;
-                                if (value > 8) {
-                                    const excess = value - 8;
-                                    return [
-                                        `⚠️ ${excess} atteinte${excess !== 1 ? 's' : ''} au-dessus de 8`,
-                                        `📅 ${date}`
-                                    ];
-                                } else if (value < 4) {
-                                    const diff = 4 - value;
-                                    return [
-                                        `⬇️ ${diff} atteinte${diff !== 1 ? 's' : ''} sous le seuil`,
-                                        `📅 ${date}`
-                                    ];
-                                } else {
-                                    return [
-                                        `✅ Au-dessus du seuil`,
-                                        `📅 ${date}`
-                                    ];
-                                }
+                            const value = context.parsed.y;
+                            const date = context.label;
+                            if (value > 8) {
+                                const excess = value - 8;
+                                return [
+                                    `⚠️ ${excess} atteinte${excess !== 1 ? 's' : ''} au-dessus de 8`,
+                                    `📅 ${date}`
+                                ];
+                            } else if (value < 4) {
+                                const diff = 4 - value;
+                                return [
+                                    `⬇️ ${diff} atteinte${diff !== 1 ? 's' : ''} sous le seuil`,
+                                    `📅 ${date}`
+                                ];
+                            } else {
+                                return [
+                                    `✅ Au-dessus du seuil`,
+                                    `📅 ${date}`
+                                ];
                             }
-                            return null;
                         }
                     }
                 }
@@ -12617,18 +12615,8 @@ function createVoltageThresholdChart(dates, counts, colors, threshold) {
                         }
                     },
                     grid: {
-                        color: function(context) {
-                            if (context.tick.value === 4) {
-                                return '#22c55e'; // Ligne de seuil en vert
-                            }
-                            return 'rgba(100, 116, 139, 0.15)';
-                        },
-                        lineWidth: function(context) {
-                            if (context.tick.value === 4) {
-                                return 2.5;
-                            }
-                            return 1;
-                        },
+                        color: 'rgba(100, 116, 139, 0.15)',
+                        lineWidth: 1,
                         tickLength: 10
                     },
                     title: {

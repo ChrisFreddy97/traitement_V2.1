@@ -1662,39 +1662,66 @@ function generateForfaitHistoryTable(forfaits, dailySummary, currentForfaitMax) 
 
 function generateForfaitProgressBars(forfaits, dailySummary, currentForfaitMax) {
     const stats = calculateClientStats(dailySummary, currentForfaitMax);
+    const totalDays = dailySummary.length;
+    const currentForfait = forfaits.find(f => f.isCurrent) || { name: 'Kit', max: currentForfaitMax };
+
+    const categories = [
+        {
+            title: 'Normal',
+            subtitle: `≤ ${Math.round(currentForfaitMax * 0.85)} Wh`,
+            value: stats.daysInLimits,
+            percent: stats.percentInLimits,
+            color: '#22c55e'
+        },
+        {
+            title: 'Tolérance',
+            subtitle: `≤ ${Math.round(currentForfaitMax * 1.15)} Wh`,
+            value: stats.daysInTolerance,
+            percent: stats.percentInTolerance,
+            color: '#f59e0b'
+        },
+        {
+            title: 'Hors tolérance',
+            subtitle: `> ${Math.round(currentForfaitMax * 1.15)} Wh`,
+            value: stats.daysOutOfTolerance,
+            percent: stats.percentOutOfTolerance,
+            color: '#ef4444'
+        }
+    ];
 
     return `
-        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 15px;">
-            <span style="font-size: 18px;">📊</span>
-            <span style="font-weight: 600; color: #1e293b;">Répartition de l'énergie consommée (seuils 85% et 115%)</span>
-        </div>
-        <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #e2e8f0;">
-            <div style="background: #f1f5f9; border-radius: 30px; height: 40px; overflow: hidden; display: flex; box-shadow: inset 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 10px;">
-                <div style="width: ${stats.percentInLimits}%; height: 100%; background: #22c55e; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; color: white;">
-                    ${stats.percentInLimits > 5 ? stats.percentInLimits + '%' : ''}
-                </div>
-                <div style="width: ${stats.percentInTolerance}%; height: 100%; background: #f59e0b; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; color: white;">
-                    ${stats.percentInTolerance > 5 ? stats.percentInTolerance + '%' : ''}
-                </div>
-                <div style="width: ${stats.percentOutOfTolerance}%; height: 100%; background: #ef4444; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; color: white;">
-                    ${stats.percentOutOfTolerance > 5 ? stats.percentOutOfTolerance + '%' : ''}
+        <div style="background: white; border-radius: 18px; border: 1px solid #e2e8f0; padding: 20px; box-shadow: 0 10px 25px rgba(15, 23, 42, 0.05); margin-bottom: 20px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px;">
+                <div>
+                    <div style="font-size: 14px; font-weight: 700; color: #0f172a; letter-spacing: 0.03em; text-transform: uppercase; margin-bottom: 6px;">Répartition cumulée par kits</div>
+                    <div style="display: flex; align-items: center; gap: 10px; font-size: 13px; color: #475569;">
+                        <span style="background: #ecfeff; color: #0f766e; padding: 5px 10px; border-radius: 999px; font-weight: 600;">Pic: ${stats.maxEnergy.toFixed(0)} Wh (${currentForfait.name})</span>
+                        <span style="background: #f8fafc; color: #64748b; padding: 5px 10px; border-radius: 999px;">${totalDays} jours</span>
+                    </div>
                 </div>
             </div>
-            
-            <div style="display: flex; flex-wrap: wrap; gap: 20px; justify-content: space-between; font-size: 12px; color: #475569;">
-                <div style="display: flex; align-items: center; gap: 6px;">
-                    <span style="width: 14px; height: 14px; background: #22c55e; border-radius: 3px;"></span>
-                    <span><strong>Normal (0-85%)</strong> · ${stats.daysInLimits} jours · ${stats.percentInLimits}%</span>
+
+            ${categories.map(category => `
+                <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 18px; flex-wrap: wrap;">
+                    <div style="display: flex; align-items: center; gap: 10px; min-width: 220px;">
+                        <span style="width: 14px; height: 14px; background: ${category.color}; border-radius: 6px; display: inline-block;"></span>
+                        <div>
+                            <div style="font-size: 14px; font-weight: 700; color: #0f172a;">${category.title}</div>
+                            <div style="font-size: 12px; color: #64748b;">${category.subtitle}</div>
+                        </div>
+                    </div>
+                    <div style="flex: 1; min-width: 320px; display: flex; align-items: center; gap: 14px;">
+                        <div style="flex: 1; background: #f1f5f9; border-radius: 999px; height: 14px; overflow: hidden; box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.08);">
+                            <div style="width: ${category.percent}%; height: 100%; background: ${category.color}; border-radius: 999px;"></div>
+                        </div>
+                        <div style="text-align: right; min-width: 120px;">
+                            <div style="font-size: 15px; font-weight: 700; color: #0f172a;">${category.value} / ${totalDays}</div>
+                            <div style="font-size: 12px; color: #64748b;">jours</div>
+                        </div>
+                        <div style="background: ${category.color}20; color: ${category.color}; padding: 5px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; min-width: 56px; text-align: center;">${category.percent}%</div>
+                    </div>
                 </div>
-                <div style="display: flex; align-items: center; gap: 6px;">
-                    <span style="width: 14px; height: 14px; background: #f59e0b; border-radius: 3px;"></span>
-                    <span><strong>Tolérance (85-115%)</strong> · ${stats.daysInTolerance} jours · ${stats.percentInTolerance}%</span>
-                </div>
-                <div style="display: flex; align-items: center; gap: 6px;">
-                    <span style="width: 14px; height: 14px; background: #ef4444; border-radius: 3px;"></span>
-                    <span><strong>Hors tolérance (>115%)</strong> · ${stats.daysOutOfTolerance} jours · ${stats.percentOutOfTolerance}%</span>
-                </div>
-            </div>
+            `).join('')}
         </div>
     `;
 }
@@ -6022,9 +6049,9 @@ function createNominalTensionTableWithCanvas(tensionResults, systemType, allDate
             textColor = '#64748b';
         } 
         else if (day.nominalCount >= 8) {
-            bgColor = '#f5f3ff';
-            badgeColor = '#a855f7';
-            textColor = '#6d28d9';
+            bgColor = '#f5f5f5';
+            badgeColor = '#000000';
+            textColor = '#000000';
         }
         else if (day.nominalCount >= 4) {
             bgColor = '#f0fdf4';
@@ -6032,14 +6059,14 @@ function createNominalTensionTableWithCanvas(tensionResults, systemType, allDate
             textColor = '#166534';
         }
         else if (day.nominalCount === 3) {
+            bgColor = '#eff6ff';
+            badgeColor = '#3b82f6';
+            textColor = '#1e40af';
+        }
+        else if (day.nominalCount === 2) {
             bgColor = '#fef9c3';
             badgeColor = '#eab308';
             textColor = '#854d0e';
-        }
-        else if (day.nominalCount === 2) {
-            bgColor = '#fef3c7';
-            badgeColor = '#f59e0b';
-            textColor = '#92400e';
         }
         else if (day.nominalCount === 1) {
             bgColor = '#fff7ed';
@@ -6127,44 +6154,48 @@ function createNominalTensionTableWithCanvas(tensionResults, systemType, allDate
             <div style="background: white; border-radius: 20px; padding: 24px; margin-bottom: 30px; border: 2px solid #e2e8f0; box-shadow: 0 8px 20px rgba(0,0,0,0.05);">
                 <div style="padding: 10px 20px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; display: flex; align-items: center; gap: 20px; flex-wrap: wrap; font-size: 11px;">
                     <div style="display: flex; align-items: center; gap: 6px;">
+                        <div style="width: 14px; height: 14px; background: #000000; border-radius: 3px;"></div>
+                        <span style="color: #000000;"><strong>≥8</strong> atteintes (Excès)</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 6px;">
                         <div style="width: 14px; height: 14px; background: #22c55e; border-radius: 3px;"></div>
-                        <span style="color: #166534;"><strong>≥4</strong> atteintes</span>
+                        <span style="color: #166534;"><strong>≥4</strong> atteintes (Excellent)</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        <div style="width: 14px; height: 14px; background: #3b82f6; border-radius: 3px;"></div>
+                        <span style="color: #1e40af;"><strong>3</strong> atteintes (Très bien)</span>
                     </div>
                     <div style="display: flex; align-items: center; gap: 6px;">
                         <div style="width: 14px; height: 14px; background: #eab308; border-radius: 3px;"></div>
-                        <span style="color: #854d0e;"><strong>3</strong> atteintes</span>
+                        <span style="color: #854d0e;"><strong>2</strong> atteintes (Correct)</span>
                     </div>
                     <div style="display: flex; align-items: center; gap: 6px;">
                         <div style="width: 14px; height: 14px; background: #f97316; border-radius: 3px;"></div>
-                        <span style="color: #9a3412;"><strong>2</strong> atteintes</span>
-                    </div>
-                    <div style="display: flex; align-items: center; gap: 6px;">
-                        <div style="width: 14px; height: 14px; background: #f59e0b; border-radius: 3px;"></div>
-                        <span style="color: #92400e;"><strong>1</strong> atteinte</span>
+                        <span style="color: #9a3412;"><strong>1</strong> atteinte (Faible)</span>
                     </div>
                     <div style="display: flex; align-items: center; gap: 6px;">
                         <div style="width: 14px; height: 14px; background: #ef4444; border-radius: 3px;"></div>
-                        <span style="color: #991b1b;"><strong>0</strong> atteinte</span>
+                        <span style="color: #991b1b;"><strong>0</strong> atteinte (Trop faible)</span>
                     </div>
                 </div>
 
                 <!-- Grille des pourcentages -->
                 <div style="padding: 15px 20px; background: #f8fafc; border-top: 1px solid #e2e8f0; display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px;">
-                    <div style="background: white; border-radius: 8px; padding: 12px; border-left: 4px solid #8b5cf6; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+                    <div style="background: white; border-radius: 8px; padding: 12px; border-left: 4px solid #000000; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
                         <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
                             <span style="font-size: 18px;">🔴</span>
-                            <span style="font-size: 12px; font-weight: 600; color: #6d28d9;">EXCÈS</span>
+                            <span style="font-size: 12px; font-weight: 600; color: #000000;">EXCÈS</span>
                         </div>
-                        <div style="font-size: 24px; font-weight: 800; color: #8b5cf6; margin-bottom: 5px;">${percent8Plus}%</div>
+                        <div style="font-size: 24px; font-weight: 800; color: #000000; margin-bottom: 5px;">${percent8Plus}%</div>
                         <div style="font-size: 11px; color: #64748b;">${daysWith8Plus} jours</div>
                         <div style="margin-top: 8px; width: 100%; height: 4px; background: #e2e8f0; border-radius: 2px; overflow: hidden;">
-                            <div style="width: ${percent8Plus}%; height: 100%; background: #8b5cf6;"></div>
+                            <div style="width: ${percent8Plus}%; height: 100%; background: #000000;"></div>
                         </div>
                     </div>
                     <div style="background: white; border-radius: 8px; padding: 12px; border-left: 4px solid #22c55e; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
                         <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
                             <span style="font-size: 18px;">⭐</span>
-                            <span style="font-size: 12px; font-weight: 600; color: #166534;">EXCELLENTE</span>
+                            <span style="font-size: 12px; font-weight: 600; color: #166534;">EXCELLENT</span>
                         </div>
                         <div style="font-size: 24px; font-weight: 800; color: #22c55e; margin-bottom: 5px;">${percent4Plus}%</div>
                         <div style="font-size: 11px; color: #64748b;">${daysWith4Plus} jours</div>
@@ -6172,37 +6203,37 @@ function createNominalTensionTableWithCanvas(tensionResults, systemType, allDate
                             <div style="width: ${percent4Plus}%; height: 100%; background: #22c55e;"></div>
                         </div>
                     </div>
-                    <div style="background: white; border-radius: 8px; padding: 12px; border-left: 4px solid #eab308; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+                    <div style="background: white; border-radius: 8px; padding: 12px; border-left: 4px solid #3b82f6; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
                         <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
                             <span style="font-size: 18px;">👍</span>
-                            <span style="font-size: 12px; font-weight: 600; color: #854d0e;">TRÈS BIEN</span>
+                            <span style="font-size: 12px; font-weight: 600; color: #1e40af;">TRÈS BIEN</span>
                         </div>
-                        <div style="font-size: 24px; font-weight: 800; color: #eab308; margin-bottom: 5px;">${percent3}%</div>
+                        <div style="font-size: 24px; font-weight: 800; color: #3b82f6; margin-bottom: 5px;">${percent3}%</div>
                         <div style="font-size: 11px; color: #64748b;">${daysWith3} jours</div>
                         <div style="margin-top: 8px; width: 100%; height: 4px; background: #e2e8f0; border-radius: 2px; overflow: hidden;">
-                            <div style="width: ${percent3}%; height: 100%; background: #eab308;"></div>
+                            <div style="width: ${percent3}%; height: 100%; background: #3b82f6;"></div>
+                        </div>
+                    </div>
+                    <div style="background: white; border-radius: 8px; padding: 12px; border-left: 4px solid #eab308; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+                        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                            <span style="font-size: 18px;">🟡</span>
+                            <span style="font-size: 12px; font-weight: 600; color: #854d0e;">CORRECT</span>
+                        </div>
+                        <div style="font-size: 24px; font-weight: 800; color: #eab308; margin-bottom: 5px;">${percent2}%</div>
+                        <div style="font-size: 11px; color: #64748b;">${daysWith2} jours</div>
+                        <div style="margin-top: 8px; width: 100%; height: 4px; background: #e2e8f0; border-radius: 2px; overflow: hidden;">
+                            <div style="width: ${percent2}%; height: 100%; background: #eab308;"></div>
                         </div>
                     </div>
                     <div style="background: white; border-radius: 8px; padding: 12px; border-left: 4px solid #f97316; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
                         <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
-                            <span style="font-size: 18px;">🟡</span>
-                            <span style="font-size: 12px; font-weight: 600; color: #9a3412;">CORRECT</span>
-                        </div>
-                        <div style="font-size: 24px; font-weight: 800; color: #f97316; margin-bottom: 5px;">${percent2}%</div>
-                        <div style="font-size: 11px; color: #64748b;">${daysWith2} jours</div>
-                        <div style="margin-top: 8px; width: 100%; height: 4px; background: #e2e8f0; border-radius: 2px; overflow: hidden;">
-                            <div style="width: ${percent2}%; height: 100%; background: #f97316;"></div>
-                        </div>
-                    </div>
-                    <div style="background: white; border-radius: 8px; padding: 12px; border-left: 4px solid #f59e0b; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
-                        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
                             <span style="font-size: 18px;">⚠️</span>
-                            <span style="font-size: 12px; font-weight: 600; color: #92400e;">FAIBLE</span>
+                            <span style="font-size: 12px; font-weight: 600; color: #9a3412;">FAIBLE</span>
                         </div>
-                        <div style="font-size: 24px; font-weight: 800; color: #f59e0b; margin-bottom: 5px;">${percent1}%</div>
+                        <div style="font-size: 24px; font-weight: 800; color: #f97316; margin-bottom: 5px;">${percent1}%</div>
                         <div style="font-size: 11px; color: #64748b;">${daysWith1} jours</div>
                         <div style="margin-top: 8px; width: 100%; height: 4px; background: #e2e8f0; border-radius: 2px; overflow: hidden;">
-                            <div style="width: ${percent1}%; height: 100%; background: #f59e0b;"></div>
+                            <div style="width: ${percent1}%; height: 100%; background: #f97316;"></div>
                         </div>
                     </div>
                     <div style="background: white; border-radius: 8px; padding: 12px; border-left: 4px solid #ef4444; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
@@ -6237,28 +6268,28 @@ function createNominalTensionTableWithCanvas(tensionResults, systemType, allDate
                 <div style="display: flex; gap: 20px; margin-top: 15px; padding: 10px; 
                           background: #f8fafc; border-radius: 10px; flex-wrap: wrap;">
                     <div style="display: flex; align-items: center; gap: 8px;">
+                        <span style="width: 12px; height: 12px; background: #000000; border-radius: 50%;"></span>
+                        <span style="font-size: 11px; color: #000000;">Excès de charge (≥8 atteintes)</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px;">
                         <span style="width: 12px; height: 12px; background: #22c55e; border-radius: 50%;"></span>
-                        <span style="font-size: 11px; color: #166534;">Points conformes (≥ seuil)</span>
+                        <span style="font-size: 11px; color: #166534;">Points conformes (≥4 atteintes - Excellent)</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span style="width: 12px; height: 12px; background: #3b82f6; border-radius: 50%;"></span>
+                        <span style="font-size: 11px; color: #1e40af;">Points moyens (3 atteintes - Très bien)</span>
                     </div>
                     <div style="display: flex; align-items: center; gap: 8px;">
                         <span style="width: 12px; height: 12px; background: #eab308; border-radius: 50%;"></span>
-                        <span style="font-size: 11px; color: #166534;">Points moyens (3 atteintes)</span>
+                        <span style="font-size: 11px; color: #854d0e;">Points faibles (2 atteintes - Correct)</span>
                     </div>
                     <div style="display: flex; align-items: center; gap: 8px;">
                         <span style="width: 12px; height: 12px; background: #f97316; border-radius: 50%;"></span>
-                        <span style="font-size: 11px; color: #166534;">Points faibles (2 atteintes)</span>
-                    </div>
-                    <div style="display: flex; align-items: center; gap: 8px;">
-                        <span style="width: 12px; height: 12px; background: #f59e0b; border-radius: 50%;"></span>
-                        <span style="font-size: 11px; color: #166534;">Points très faibles (1 atteinte)</span>
+                        <span style="font-size: 11px; color: #9a3412;">Points très faibles (1 atteinte - Faible)</span>
                     </div>
                     <div style="display: flex; align-items: center; gap: 8px;">
                         <span style="width: 12px; height: 12px; background: #ef4444; border-radius: 50%;"></span>
-                        <span style="font-size: 11px; color: #166534;">Points critiques (0 atteinte)</span>
-                    </div>
-                    <div style="display: flex; align-items: center; gap: 8px;">
-                        <span style="width: 12px; height: 12px; background: #a855f7; border-radius: 50%;"></span>
-                        <span style="font-size: 11px; color: #166534;">Excès de charge (≥8)</span>
+                        <span style="font-size: 11px; color: #991b1b;">Points critiques (0 atteinte - Trop faible)</span>
                     </div>
                     <div style="display: flex; align-items: center; gap: 8px;">
                         <span style="width: 20px; height: 3px; background: #22c55e; border-radius: 2px;"></span>
@@ -6318,28 +6349,28 @@ function createNominalTensionTableWithCanvas(tensionResults, systemType, allDate
             <div style="display: flex; gap: 20px; margin-top: 20px; padding: 12px 16px; 
                       background: #f8fafc; border-radius: 12px; font-size: 12px; flex-wrap: wrap;">
                 <div style="display: flex; align-items: center; gap: 8px;">
-                    <span style="width: 14px; height: 14px; background: #a855f7; border-radius: 4px;"></span>
-                    <span style="color: #6d28d9;">≥8 atteintes (Excès de charge)</span>
+                    <span style="width: 14px; height: 14px; background: #000000; border-radius: 4px;"></span>
+                    <span style="color: #000000;">≥8 atteintes (Excès)</span>
                 </div>
                 <div style="display: flex; align-items: center; gap: 8px;">
                     <span style="width: 14px; height: 14px; background: #22c55e; border-radius: 4px;"></span>
-                    <span style="color: #166534;">≥4 atteintes</span>
+                    <span style="color: #166534;">≥4 atteintes (Excellent)</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="width: 14px; height: 14px; background: #3b82f6; border-radius: 4px;"></span>
+                    <span style="color: #1e40af;">3 atteintes (Très bien)</span>
                 </div>
                 <div style="display: flex; align-items: center; gap: 8px;">
                     <span style="width: 14px; height: 14px; background: #eab308; border-radius: 4px;"></span>
-                    <span style="color: #854d0e;">3 atteintes</span>
-                </div>
-                <div style="display: flex; align-items: center; gap: 8px;">
-                    <span style="width: 14px; height: 14px; background: #f59e0b; border-radius: 4px;"></span>
-                    <span style="color: #92400e;">2 atteintes</span>
+                    <span style="color: #854d0e;">2 atteintes (Correct)</span>
                 </div>
                 <div style="display: flex; align-items: center; gap: 8px;">
                     <span style="width: 14px; height: 14px; background: #f97316; border-radius: 4px;"></span>
-                    <span style="color: #9a3412;">1 atteinte</span>
+                    <span style="color: #9a3412;">1 atteinte (Faible)</span>
                 </div>
                 <div style="display: flex; align-items: center; gap: 8px;">
                     <span style="width: 14px; height: 14px; background: #ef4444; border-radius: 4px;"></span>
-                    <span style="color: #b91c1c;">0 atteinte</span>
+                    <span style="color: #b91c1c;">0 atteinte (Trop faible)</span>
                 </div>
                 <div style="display: flex; align-items: center; gap: 8px; margin-left: auto;">
                     <span style="width: 14px; height: 14px; background: repeating-linear-gradient(45deg, #cbd5e1, #cbd5e1 5px, #e2e8f0 5px, #e2e8f0 10px); border-radius: 4px;"></span>
@@ -6354,7 +6385,7 @@ function createNominalTensionTableWithCanvas(tensionResults, systemType, allDate
                 <span>
                     <strong>Tension ≥ ${targetTension.toFixed(1)}V</strong> • 
                     Comptage des mesures où la tension atteint ou dépasse ${targetTension.toFixed(1)}V • 
-                    <strong style="color: #a855f7;">🟣 Excès de charge détecté pour ≥8 atteintes</strong>
+                    <strong style="color: #000000;">⚫ Excès de charge détecté pour ≥8 atteintes</strong>
                 </span>
             </div>
         </div>
@@ -6431,16 +6462,15 @@ function initViolationsChart(chartId, sortedDates, chartCounts) {
     const finalCounts = chartCounts.map(c => c !== null && c !== undefined ? c : 0);
     
     const colors = finalCounts.map(count => {
-        if (count >= 8) return '#a855f7';
+        if (count >= 8) return '#000000';
         if (count >= 4) return '#22c55e';
-        if (count === 3) return '#eab308';
-        if (count === 2) return '#f97316';
-        if (count === 1) return '#f59e0b';
+        if (count === 3) return '#3b82f6';
+        if (count === 2) return '#eab308';
+        if (count === 1) return '#f97316';
         return '#ef4444';
     });
     
     const yMax = Math.max(...finalCounts, threshold * 2, 10);
-    const thresholdLineData = new Array(sortedDates.length).fill(threshold);
     
     return new Chart(canvas, {
         type: 'line',
@@ -6451,6 +6481,17 @@ function initViolationsChart(chartId, sortedDates, chartCounts) {
                     label: '📈 Nombre d\'atteintes',
                     data: finalCounts,
                     borderColor: '#22c55e',
+                    segment: {
+                        borderColor: ctx => {
+                            const count = ctx.p0.parsed.y;
+                            if (count >= 8) return '#000000';
+                            if (count >= 4) return '#22c55e';
+                            if (count === 3) return '#3b82f6';
+                            if (count === 2) return '#eab308';
+                            if (count === 1) return '#f97316';
+                            return '#ef4444';
+                        }
+                    },
                     backgroundColor: 'rgba(34, 197, 94, 0.05)',
                     borderWidth: 3,
                     pointRadius: 7,
@@ -6465,19 +6506,6 @@ function initViolationsChart(chartId, sortedDates, chartCounts) {
                     fill: true,
                     order: 1,
                     spanGaps: true
-                },
-                {
-                    label: '🎯 Seuil minimum (4 atteintes)',
-                    data: thresholdLineData,
-                    borderColor: '#2563eb',
-                    borderWidth: 4,
-                    borderDash: [10, 8],
-                    pointRadius: 0,
-                    pointHoverRadius: 0,
-                    fill: false,
-                    tension: 0,
-                    order: 0,
-                    backgroundColor: 'transparent'
                 }
             ]
         },
@@ -6526,15 +6554,8 @@ function initViolationsChart(chartId, sortedDates, chartCounts) {
                         }
                     },
                     grid: {
-                        color: function(context) {
-                            if (context.tick.value === threshold) return '#2563eb';
-                            if (context.tick.value === 8) return '#a855f7';
-                            return 'rgba(34, 197, 94, 0.1)';
-                        },
-                        lineWidth: function(context) {
-                            if (context.tick.value === threshold || context.tick.value === 8) return 2.5;
-                            return 1;
-                        }
+                        color: 'rgba(34, 197, 94, 0.1)',
+                        lineWidth: 1
                     },
                     title: {
                         display: true,
@@ -8189,7 +8210,7 @@ function displayAllClientsTab() {
                 </div>
                 <div>
                     <h3 style="margin: 0; font-size: 26px; font-weight: 800; color: #0f172a;">
-                        Analyse général de l'Énergie
+                        Analyse générale de l'Énergie
                         <span style="margin-left: 12px; font-size: 14px; background: #f1f5f9; color: #475569; padding: 6px 16px; border-radius: 40px;">
                             ${daysWithEnergy} jours de consommation
                         </span>
@@ -12200,33 +12221,49 @@ function createSimplifiedDimensioningHTML(stats, kitThresholds) {
         if (percentage === 0 && count === 0) return;
 
         const kitInfo = kitLabel === 'Kit 4+'
-            ? { color: '#dc2626' }
+            ? { color: '#dc2626', value: kitThresholds[kitThresholds.length - 1].value }
             : kitThresholds.find(k => k.label === kitLabel);
 
+        const thresholdText = kitLabel === 'Kit 4+'
+            ? `> ${kitInfo.value} Wh`
+            : `≤ ${kitInfo.value} Wh`;
+
         html += `
-            <div style="margin-bottom: 15px;">
-                <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
-                    <span>
-                        <span style="display: inline-block; width: 12px; height: 12px; background: ${kitInfo.color}; border-radius: 4px; margin-right: 6px;"></span>
-                        <span style="font-weight: 500;">${kitLabel}</span>
-                        <span style="color: #64748b; font-size: 12px; margin-left: 8px;">${count}j</span>
-                    </span>
-                    <span style="font-weight: 600; color: ${kitInfo.color};">${percentage}%</span>
+            <div style="margin-bottom: 18px;">
+                <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px;">
+                    <div style="display: flex; align-items: center; gap: 10px; min-width: 240px;">
+                        <span style="display: inline-block; width: 14px; height: 14px; background: ${kitInfo.color}; border-radius: 6px;"></span>
+                        <div style="font-size: 14px; font-weight: 700; color: #0f172a; display: flex; align-items: center; gap: 8px;">
+                            <span>${kitLabel}</span>
+                            <span style="font-size: 12px; color: #64748b; font-weight: 500;">${thresholdText}</span>
+                        </div>
+                    </div>
+                    <div style="text-align: right; min-width: 170px; display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
+                        <div style="font-size: 18px; font-weight: 800; color: ${kitInfo.color};">${percentage}%</div>
+                        <div style="font-size: 12px; color: #475569; display: flex; gap: 6px; align-items: center; justify-content: flex-end;">
+                            <span>${count}</span>
+                            <span style="opacity: 0.8;">/</span>
+                            <span>${stats.totalDays} jours</span>
+                        </div>
+                    </div>
                 </div>
-                <div style="width: 100%; height: 16px; background: #edf2f7; border-radius: 8px; overflow: hidden;">
-                    <div style="width: ${percentage}%; height: 100%; background: ${kitInfo.color}; border-radius: 8px;"></div>
+                <div style="width: 100%; height: 14px; background: #f1f5f9; border-radius: 999px; overflow: hidden; box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.06);">
+                    <div style="width: ${percentage}%; height: 100%; background: ${kitInfo.color}; border-radius: 999px;"></div>
                 </div>
             </div>
         `;
     });
 
     return `
-        <div style="background: white; border-radius: 12px; border: 1px solid #e2e8f0; margin-top: 20px; overflow: hidden;">
-            <div style="background: #f8fafc; padding: 12px 16px; border-bottom: 1px solid #e2e8f0;">
-                <span style="font-weight: 600;">📊 Répartition cumulée par kit</span>
-                <span style="float: right; color: #64748b; font-size: 12px;">${stats.totalDays} jours</span>
+        <div style="background: white; border-radius: 18px; border: 1px solid #e2e8f0; margin-top: 20px; overflow: hidden; box-shadow: 0 10px 20px rgba(15, 23, 42, 0.04);">
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 20px; background: #f8fafc; border-bottom: 1px solid #e2e8f0;">
+                <div style="display: flex; align-items: center; gap: 12px; font-weight: 700; color: #0f172a; font-size: 14px;">
+                    <span>📊</span>
+                    <span>Répartition cumulée par kit</span>
+                </div>
+                <div style="font-size: 12px; color: #64748b;">${stats.totalDays} jours</div>
             </div>
-            <div style="padding: 16px;">
+            <div style="padding: 20px;">
                 ${html}
             </div>
         </div>
@@ -12235,9 +12272,9 @@ function createSimplifiedDimensioningHTML(stats, kitThresholds) {
 
 // ======================== CALCUL DES POURCENTAGES DE DIMENSIONNEMENT (VERSION CUMULÉE) ========================
 function calculateDimensioningPercentages(energyData, kitThresholds) {
-    // Filtrer les jours avec consommation > 0
+    // Inclure tous les jours, même ceux sans consommation
+    const totalDays = energyData.length;
     const daysWithConsumption = energyData.filter(v => v && v > 0);
-    const totalDays = daysWithConsumption.length;
 
     if (totalDays === 0) {
         return {
@@ -12268,7 +12305,9 @@ function calculateDimensioningPercentages(energyData, kitThresholds) {
     let maxEnergy = 0;
     let maxKitReached = null;
 
-    daysWithConsumption.forEach(energy => {
+    energyData.forEach(rawEnergy => {
+        const energy = rawEnergy || 0;
+
         // Trouver le kit correspondant à cette consommation
         let kitForDay = null;
         let percentageForDay = 0;

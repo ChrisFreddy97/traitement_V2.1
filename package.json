@@ -13,10 +13,10 @@
         "create-icon": "node create-simple-icon.js"
     },
     "devDependencies": {
-        "electron": "^26.6.10",
-        "electron-builder": "^24.0.0",
-        "tailwindcss": "^4.1.17",
-        "canvas": "^2.11.2"
+        "canvas": "^2.11.2",
+        "electron": "^41.5.0",
+        "electron-builder": "^26.8.1",
+        "tailwindcss": "^4.1.17"
     },
     "build": {
         "appId": "com.nanoe.traitementrelevesV2.1",
@@ -31,7 +31,9 @@
             "target": [
                 {
                     "target": "nsis",
-                    "arch": ["x64"]
+                    "arch": [
+                        "x64"
+                    ]
                 }
             ],
             "icon": "img/logo.jpg"
