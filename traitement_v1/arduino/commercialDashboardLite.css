@@ -693,29 +693,17 @@ html {
 /* ===== 2. VARIABLES RESPONSIVES ===== */
 :root {
     --base-font-size-web: 16px;
-<<<<<<< HEAD
     --base-font-size-electron: 9px;
-=======
-    --base-font-size-electron: 15px;
->>>>>>> 446a6002e4fdc8765452d6a7d81e985e4532af3b
     --base-font-size-tablet: 14px;
     --base-font-size-mobile: 13px;
     
     --container-padding-web: 2rem;
-<<<<<<< HEAD
     --container-padding-electron: 1.25rem;
-=======
-    --container-padding-electron: 1.75rem;
->>>>>>> 446a6002e4fdc8765452d6a7d81e985e4532af3b
     --container-padding-tablet: 1.25rem;
     --container-padding-mobile: 0.75rem;
     
     --radius-base-web: 16px;
-<<<<<<< HEAD
     --radius-base-electron: 12px;
-=======
-    --radius-base-electron: 14px;
->>>>>>> 446a6002e4fdc8765452d6a7d81e985e4532af3b
     --radius-base-tablet: 12px;
     --radius-base-mobile: 10px;
 }
@@ -889,28 +877,7 @@ html {
     backface-visibility: hidden;
 }
 
-<<<<<<< HEAD
 
-=======
-/* ===== 11. DARK MODE ===== */
-@media (prefers-color-scheme: dark) {
-    .platform-web.dark-mode,
-    .platform-electron.dark-mode {
-        --dark: #e2e8f0;
-        --gray-100: #1a202c;
-        --gray-200: #2d3748;
-        --gray-400: #718096;
-        --gray-600: #a0aec0;
-        --white: #1a202c;
-    }
-    
-    .platform-web.dark-mode .card,
-    .platform-electron.dark-mode .card {
-        background: #2d3748;
-        border-color: #4a5568;
-    }
-}
->>>>>>> 446a6002e4fdc8765452d6a7d81e985e4532af3b
 /* ============================================
    FALLBACK POUR TRÈS PETITS ÉCRANS
    (utilisé uniquement si classes plateforme absentes)

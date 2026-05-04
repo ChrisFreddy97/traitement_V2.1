@@ -10,18 +10,11 @@ import { FORFAIT_NAMES } from './arduinoConstants.js';
 
 // Variable globale pour suivre l'état d'affichage
 window.tablesVisible = false;
-<<<<<<< HEAD
 let toggleButton = null; // Référence au bouton
-=======
->>>>>>> 446a6002e4fdc8765452d6a7d81e985e4532af3b
 
 // Fonction pour afficher/masquer les tableaux
 window.toggleTablesContainer = function() {
     const container = document.getElementById('tablesContainer');
-<<<<<<< HEAD
-=======
-    const buttons = document.querySelectorAll('.toggle-tables-btn');
->>>>>>> 446a6002e4fdc8765452d6a7d81e985e4532af3b
     
     window.tablesVisible = !window.tablesVisible;
     
@@ -95,19 +88,15 @@ export function renderByTab() {
         renderEventDashboard();
     }
     
-<<<<<<< HEAD
     // Mettre à jour le bouton (création ou mise à jour)
     updateToggleButton();
     
-=======
->>>>>>> 446a6002e4fdc8765452d6a7d81e985e4532af3b
     // Afficher les tableaux avec délai
     console.log("⏳ Attente 100ms avant displayTables...");
     setTimeout(() => {
         console.log("🔄 Appel de displayTables avec:", visibleTableIndices);
         displayTables(visibleTableIndices);
         
-<<<<<<< HEAD
         // Initialiser l'état des tableaux (masqués par défaut)
         const container = document.getElementById('tablesContainer');
         if (container) {
@@ -116,23 +105,6 @@ export function renderByTab() {
             if (toggleButton) toggleButton.innerHTML = '📋 Afficher les tableaux détaillés';
         }
         
-=======
-        // Initialiser l'état des boutons
-        const container = document.getElementById('tablesContainer');
-        const buttons = document.querySelectorAll('.toggle-tables-btn');
-        
-        if (container) {
-            // Par défaut, les tableaux sont masqués
-            container.style.display = 'none';
-            window.tablesVisible = false;
-        }
-        
-        // Mettre à jour le texte des boutons s'ils existent
-        buttons.forEach(btn => {
-            btn.innerHTML = '📋 Afficher les tableaux détaillés';
-        });
-        
->>>>>>> 446a6002e4fdc8765452d6a7d81e985e4532af3b
         console.log("✅ renderByTab() terminé");
     }, 100);
 }
@@ -205,11 +177,7 @@ export function displayTables(visibleTableIndices) {
                             <span onclick="window.handleCellClick('${table.id}', '${clientColumn.clientId}', '${timestamp}', this, '${originalValue}')" 
                                   class="${className}">${displayText}</span>
                             <span class="event-indicator" style="background:${getEventColor(event.type)};"></span>
-<<<<<<< HEAD
                           </td>\n`;
-=======
-                         </td>\n`;
->>>>>>> 446a6002e4fdc8765452d6a7d81e985e4532af3b
                     } else {
                         bodyHTML += `<td>${originalValue}</td>\n`;
                     }
@@ -243,8 +211,4 @@ export function displayTables(visibleTableIndices) {
     container.classList.add('show');
     attachPaginationEvents(renderByTab);
     console.log("✅ displayTables() terminé");
-<<<<<<< HEAD
 }
-=======
-}
->>>>>>> 446a6002e4fdc8765452d6a7d81e985e4532af3b

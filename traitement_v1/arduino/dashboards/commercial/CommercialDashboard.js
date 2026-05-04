@@ -443,12 +443,6 @@ export function renderCommercialDashboard() {
         <div class="section-title"><h2>💳 ANALYSE CRÉDIT ET RECHARGE</h2></div>
         <div id="creditBoard" class="card"></div>
         
-<<<<<<< HEAD
-=======
-        <button class="toggle-tables-btn" onclick="window.toggleTablesContainer?.()">
-            📋 Afficher les tableaux détaillés
-        </button>
->>>>>>> 446a6002e4fdc8765452d6a7d81e985e4532af3b
     `;
     
     renderGlobalClientTabs();
@@ -517,16 +511,13 @@ function renderAllBoards() {
 }
 
 // ===========================================
-<<<<<<< HEAD
 // RENDU CONSOMMATION BOARD - STYLE IDENTIQUE AU CODE 1
-=======
-// RENDU CONSOMMATION BOARD
->>>>>>> 446a6002e4fdc8765452d6a7d81e985e4532af3b
 // ===========================================
 
 function renderConsumptionBoard() {
     const container = document.getElementById('consumptionBoard');
     if (!container) return;
+    
     if (!activeClientId) {
         container.innerHTML = '<div class="error-message show">❌ Aucun client sélectionné</div>';
         return;
@@ -546,7 +537,6 @@ function renderConsumptionBoard() {
     const forfaitHistory = buildForfaitHistory(client);
     const forfaitStats = computeForfaitStats(client, forfaitHistory);
     
-<<<<<<< HEAD
     // Déterminer si le client est actif
     let isActive = false;
     const consoJournaliere = client.consommation?.journaliere ?? [];
@@ -668,37 +658,6 @@ function renderConsumptionBoard() {
                                     <td style="padding: 12px 15px; text-align: center; font-weight: 600; color: #7c3aed; background: #f5f3ff;">
                                         ${stat.avgEnergy} Wh
                                     </td>
-=======
-    let html = `<h3 class="card-title">📋 HISTORIQUE FORFAITS & CONSOMMATION - Client ${client.id}</h3><div class="client-card">`;
-    
-    if (forfaitStats.length > 0) {
-        html += `
-            <div style="overflow-x: auto; margin-bottom: 25px;">
-                <table style="width: 100%; border-collapse: collapse; font-size: 13px; min-width: 1100px;">
-                    <thead style="background: ${STYLES.colors.grayBg}; border-bottom: 2px solid ${STYLES.colors.border};">
-                        <tr>
-                            <th style="padding: ${STYLES.spacing.md} 10px; text-align: center;">Forfait</th>
-                            <th style="padding: ${STYLES.spacing.md} 10px; text-align: center;">Changement</th>
-                            <th style="padding: ${STYLES.spacing.md} 10px; text-align: center;">Jours totaux</th>
-                            <th style="padding: ${STYLES.spacing.md} 10px; text-align: center;">Jours avec conso</th>
-                            <th style="padding: ${STYLES.spacing.md} 10px; text-align: center;">Jours sans conso</th>
-                            <th style="padding: ${STYLES.spacing.md} 10px; text-align: center;">Énergie max</th>
-                            <th style="padding: ${STYLES.spacing.md} 10px; text-align: center;">Énergie moy</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${forfaitStats.map((stat, idx) => {
-                            const bgColor = idx % 2 === 0 ? '#ffffff' : '#fafbfc';
-                            return `
-                                <tr style="border-bottom: 1px solid ${STYLES.colors.border}; background: ${bgColor};">
-                                    <td style="padding: ${STYLES.spacing.md} 10px; text-align: center;">${renderBadge(stat.forfait, stat.isCurrent ? STYLES.colors.success : STYLES.colors.primary, stat.isCurrent)}</td>
-                                    <td style="padding: ${STYLES.spacing.md} 10px; text-align: center; white-space: nowrap;">${stat.changeText}</td>
-                                    <td style="padding: ${STYLES.spacing.md} 10px; text-align: center; font-weight: 600;">${stat.totalDays}</td>
-                                    <td style="padding: ${STYLES.spacing.md} 10px; text-align: center; font-weight: 600; color: ${STYLES.colors.success};">${stat.daysWithConso}</td>
-                                    <td style="padding: ${STYLES.spacing.md} 10px; text-align: center; font-weight: 600; color: ${STYLES.colors.gray};">${stat.daysWithoutConso}</td>
-                                    <td style="padding: ${STYLES.spacing.md} 10px; text-align: center;">${stat.maxEnergy} Wh</td>
-                                    <td style="padding: ${STYLES.spacing.md} 10px; text-align: center;">${stat.avgEnergy} Wh</td>
->>>>>>> 446a6002e4fdc8765452d6a7d81e985e4532af3b
                                 </tr>
                             `;
                         }).join('')}
@@ -707,7 +666,6 @@ function renderConsumptionBoard() {
             </div>
         `;
         
-<<<<<<< HEAD
         // Barres de progression pour chaque forfait (style code 1)
         html += `
             <div style="margin-top: 15px;">
@@ -727,24 +685,11 @@ function renderConsumptionBoard() {
                         <div style="display: flex; align-items: center; gap: 10px;">
                             <span style="font-weight: 600; color: ${stat.isCurrent ? '#22c55e' : '#9f7aea'};">${stat.forfait}</span>
                             <span style="font-size: 11px; color: #64748b;">${startDateStr} → ${endDateStr}</span>
-=======
-        forfaitStats.forEach(stat => {
-            const startDate = formatDateToFrench(stat.startDate);
-            const endDate = stat.endDate ? formatDateToFrench(stat.endDate) : 'Présent';
-            
-            html += `
-                <div style="margin-bottom: 20px; padding: ${STYLES.spacing.lg}; background: ${STYLES.colors.grayBg}; border-radius: ${STYLES.borderRadius.xl}; border: 1px solid ${STYLES.colors.border};">
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
-                        <div>
-                            ${renderBadge(stat.forfait, stat.isCurrent ? STYLES.colors.success : STYLES.colors.primary, false)}
-                            <span style="font-size: 12px; color: ${STYLES.colors.gray};">${startDate} → ${endDate}</span>
->>>>>>> 446a6002e4fdc8765452d6a7d81e985e4532af3b
                         </div>
                         <span style="font-size: 12px; background: white; padding: 4px 12px; border-radius: 20px; border: 1px solid #e2e8f0;">
                             ${stat.daysWithConso} jours avec conso
                         </span>
                     </div>
-<<<<<<< HEAD
                     
                     <!-- Barre de progression style code 1 (hauteur 40px, pourcentages affichés) -->
                     <div style="background: #f1f5f9; border-radius: 30px; height: 40px; overflow: hidden; display: flex; box-shadow: inset 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 10px;">
@@ -772,44 +717,18 @@ function renderConsumptionBoard() {
                         <div style="display: flex; align-items: center; gap: 5px;">
                             <div style="width: 12px; height: 12px; background: #ef4444; border-radius: 3px;"></div>
                             <span><strong>${stat.daysAbove115} jours</strong> >${stat.seuil115.toFixed(0)}Wh · ${stat.percentAbove115}%</span>
-=======
-                    ${renderProgressBar(
-                        [stat.percentBelow85, stat.percentInTolerance, stat.percentAbove115],
-                        [`≤85% : ${stat.daysBelow85} jours`, `85-115% : ${stat.daysInTolerance} jours`, `>115% : ${stat.daysAbove115} jours`],
-                        [STYLES.colors.success, STYLES.colors.warning, STYLES.colors.danger]
-                    )}
-                    <div class="progress-legend" style="display: flex; flex-wrap: wrap; gap: 20px; justify-content: center;">
-                        <div class="legend-item" style="display: flex; align-items: center; gap: 5px;">
-                            <span class="legend-dot success" style="width: 12px; height: 12px; background: ${STYLES.colors.success}; border-radius: 3px;"></span>
-                            <span style="font-size: 12px;">≤${stat.seuil85.toFixed(0)}Wh: ${stat.daysBelow85}j (${stat.percentBelow85}%)</span>
-                        </div>
-                        <div class="legend-item" style="display: flex; align-items: center; gap: 5px;">
-                            <span class="legend-dot warning" style="width: 12px; height: 12px; background: ${STYLES.colors.warning}; border-radius: 3px;"></span>
-                            <span style="font-size: 12px;">${stat.seuil85.toFixed(0)}-${stat.seuil115.toFixed(0)}Wh: ${stat.daysInTolerance}j (${stat.percentInTolerance}%)</span>
-                        </div>
-                        <div class="legend-item" style="display: flex; align-items: center; gap: 5px;">
-                            <span class="legend-dot danger" style="width: 12px; height: 12px; background: ${STYLES.colors.danger}; border-radius: 3px;"></span>
-                            <span style="font-size: 12px;">>${stat.seuil115.toFixed(0)}Wh: ${stat.daysAbove115}j (${stat.percentAbove115}%)</span>
->>>>>>> 446a6002e4fdc8765452d6a7d81e985e4532af3b
                         </div>
                     </div>
                 </div>
             `;
         });
         
-<<<<<<< HEAD
         // Légende finale (bloc gris avec 📌) - style code 1
         html += `
             <div style="margin-top: 15px; padding: 15px; background: #f1f5f9; border-radius: 8px; font-size: 12px; display: flex; flex-direction: column; gap: 10px;">
                 <div style="display: flex; align-items: center; gap: 10px; color: #475569;">
                     <span style="font-size: 14px;">📌</span>
                     <span><strong>Légende des seuils de consommation :</strong></span>
-=======
-        if (forfaitStats[0]?.suspendECount > 0) {
-            html += `
-                <div class="info-note" style="margin-top: ${STYLES.spacing.lg}; padding: ${STYLES.spacing.sm}; background: #fee2e2; border-radius: ${STYLES.borderRadius.md}; font-size: 12px;">
-                    ⚠️ ${forfaitStats[0].suspendECount} jour(s) avec SuspendE détecté(s) (comptés dans la zone rouge)
->>>>>>> 446a6002e4fdc8765452d6a7d81e985e4532af3b
                 </div>
                 <div style="display: flex; flex-wrap: wrap; gap: 20px; justify-content: space-around;">
                     <div style="display: flex; align-items: center; gap: 8px;">
@@ -990,13 +909,10 @@ function renderConsumptionBoard() {
 // RENDU EVENTS BOARD - STYLE IDENTIQUE AU CODE 1
 // ===========================================
 
-// ===========================================
-// RENDU EVENTS BOARD
-// ===========================================
-
 function renderEventsBoard() {
     const container = document.getElementById('commercialEventsBoard');
     if (!container) return;
+    
     if (!activeClientId) {
         container.innerHTML = '<div class="error-message show">❌ Aucun client sélectionné</div>';
         return;
@@ -1014,7 +930,6 @@ function renderEventsBoard() {
     }
     
     container.innerHTML = renderEventsClient(client);
-<<<<<<< HEAD
     
     // ✅ Attacher les événements après l'injection du HTML
     setTimeout(() => {
@@ -1039,8 +954,6 @@ function renderEventsBoard() {
             });
         }
     }, 50);
-=======
->>>>>>> 446a6002e4fdc8765452d6a7d81e985e4532af3b
 }
 
 function renderEventsClient(client) {
@@ -1101,12 +1014,9 @@ function renderEventsClient(client) {
     const daysWithCreditNul = new Set(eventsByDay.filter(d => d.CreditNul > 0).map(d => d.date));
     const daysWithSuspendP = new Set(eventsByDay.filter(d => d.SuspendP > 0).map(d => d.date));
     const daysWithSuspendE = new Set(eventsByDay.filter(d => d.SuspendE > 0).map(d => d.date));
-<<<<<<< HEAD
     
     const totalEvents = events.length + zeroCreditDates.length;
     const hasAnyEvent = daysWithCreditNul.size > 0 || daysWithSuspendP.size > 0 || daysWithSuspendE.size > 0;
-=======
->>>>>>> 446a6002e4fdc8765452d6a7d81e985e4532af3b
     
     // Format du numéro client avec zéro devant (comme code 1)
     const clientNumberFormatted = client.id.toString().padStart(2, '0');
@@ -1142,7 +1052,6 @@ function renderEventsClient(client) {
                 <span>Événements - Client ${clientNumberFormatted}</span>
             </div>
             
-<<<<<<< HEAD
             <div style="padding: 20px;">
                 <!-- 3 stats cards -->
                 <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 20px;">
@@ -1192,19 +1101,6 @@ function renderEventsClient(client) {
                     <span>📊 ${eventsByDay.length} jours avec événements</span>
                     <span>⚡ ${totalEvents} signalements</span>
                 </div>
-=======
-            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: ${STYLES.spacing.sm}; margin-bottom: 20px;">
-                ${renderStatCard('💰', 'CRÉDIT NUL', daysWithCreditNul.size, percentCreditNul, STYLES.gradients.creditNul)}
-                ${renderStatCard('📈', 'PUISSANCE', daysWithSuspendP.size, percentSuspendP, STYLES.gradients.puissance)}
-                ${renderStatCard('🔋', 'ÉNERGIE', daysWithSuspendE.size, percentSuspendE, STYLES.gradients.energie)}
-            </div>
-            
-            <div style="background: ${STYLES.colors.grayBg}; border-radius: ${STYLES.borderRadius.md}; padding: ${STYLES.spacing.sm} ${STYLES.spacing.lg}; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; font-size: 12px; border: 1px solid ${STYLES.colors.border};">
-                <span>📅 ${totalDays} jours analysés</span>
-                <span>📊 ${eventsByDay.length} jours avec événements</span>
-                <span>⚡ ${events.length + zeroCreditDates.length} signalements</span>
-            </div>
->>>>>>> 446a6002e4fdc8765452d6a7d81e985e4532af3b
     `;
     
     if (eventsByDay.length > 0) {
@@ -1212,34 +1108,34 @@ function renderEventsClient(client) {
         const tableId = `events-table-${client.id}`;
         
         html += `
-            <button id="${toggleId}" style="width: 100%; padding: ${STYLES.spacing.md}; background: #f1f5f9; border: 1px solid ${STYLES.colors.borderDark}; border-radius: ${STYLES.borderRadius.md}; color: ${STYLES.colors.text}; font-size: 14px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: ${STYLES.spacing.lg};">
-                <span style="font-size: 16px;">🔽</span> Afficher le tableau détaillé
+            <button id="${toggleId}" style="width: 100%; padding: 12px; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 8px; color: #334155; font-size: 14px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 15px;">
+                <span style="font-size: 16px;">🔽</span>
+                <span>Afficher le tableau détaillé</span>
             </button>
             
-            <div id="${tableId}" style="display: none; border: 2px solid ${STYLES.colors.border}; border-radius: ${STYLES.borderRadius.xl}; overflow: hidden; margin-bottom: ${STYLES.spacing.lg}; max-height: 350px; overflow-y: auto; overflow-x: auto;">
+            <div id="${tableId}" style="display: none; border: 2px solid #e2e8f0; border-radius: 12px; overflow: hidden; margin-bottom: 15px; max-height: 350px; overflow-y: auto; overflow-x: auto;">
                 <table style="width: 100%; border-collapse: collapse; font-size: 12px; min-width: 900px;">
                     <thead style="position: sticky; top: 0; z-index: 10;">
                         <tr>
-                            <th rowspan="2" style="padding: ${STYLES.spacing.lg} ${STYLES.spacing.sm}; text-align: left; border-right: 2px solid ${STYLES.colors.borderDark}; background: #f1f5f9; font-size: 14px; position: sticky; left: 0; z-index: 11;">📅 DATE</th>
-                            <th colspan="3" style="padding: ${STYLES.spacing.md} ${STYLES.spacing.sm}; text-align: center; background: ${STYLES.colors.blue}; color: white; border-right: 2px solid ${STYLES.colors.blueDark};">📈 PUISSANCE DÉPASSÉE</th>
-                            <th colspan="1" style="padding: ${STYLES.spacing.md} ${STYLES.spacing.sm}; text-align: center; background: ${STYLES.colors.warning}; color: white; border-right: 2px solid #d97706;">💰 CRÉDIT NUL</th>
-                            <th colspan="3" style="padding: ${STYLES.spacing.md} ${STYLES.spacing.sm}; text-align: center; background: ${STYLES.colors.info}; color: white;">🔋 ÉNERGIE ÉPUISÉE</th>
+                            <th rowspan="2" style="padding: 15px 10px; text-align: left; border-right: 2px solid #cbd5e1; background: #f1f5f9; font-size: 14px; position: sticky; left: 0; z-index: 11;">📅 DATE</th>
+                            <th colspan="3" style="padding: 12px 10px; text-align: center; background: #3b82f6; color: white; border-right: 2px solid #2563eb;">📈 PUISSANCE DÉPASSÉE</th>
+                            <th colspan="1" style="padding: 12px 10px; text-align: center; background: #f59e0b; color: white; border-right: 2px solid #d97706;">💰 CRÉDIT NUL</th>
+                            <th colspan="3" style="padding: 12px 10px; text-align: center; background: #0ea5e9; color: white;">🔋 ÉNERGIE ÉPUISÉE</th>
                         </tr>
                         <tr style="background: #f1f5f9;">
-                            <th style="padding: ${STYLES.spacing.sm} 8px; text-align: center;">Début</th>
-                            <th style="padding: ${STYLES.spacing.sm} 8px; text-align: center;">Fin</th>
-                            <th style="padding: ${STYLES.spacing.sm} 8px; text-align: center; border-right: 2px solid ${STYLES.colors.borderDark};">Durée</th>
-                            <th style="padding: ${STYLES.spacing.sm} 8px; text-align: center; border-right: 2px solid ${STYLES.colors.borderDark};">Signalement</th>
-                            <th style="padding: ${STYLES.spacing.sm} 8px; text-align: center;">Début</th>
-                            <th style="padding: ${STYLES.spacing.sm} 8px; text-align: center;">Fin</th>
-                            <th style="padding: ${STYLES.spacing.sm} 8px; text-align: center;">Durée</th>
+                            <th style="padding: 10px 8px; text-align: center; border-bottom: 1px solid #cbd5e1;">Début</th>
+                            <th style="padding: 10px 8px; text-align: center; border-bottom: 1px solid #cbd5e1;">Fin</th>
+                            <th style="padding: 10px 8px; text-align: center; border-bottom: 1px solid #cbd5e1; border-right: 2px solid #cbd5e1;">Durée</th>
+                            <th style="padding: 10px 8px; text-align: center; border-bottom: 1px solid #cbd5e1; border-right: 2px solid #cbd5e1;">Signalement</th>
+                            <th style="padding: 10px 8px; text-align: center; border-bottom: 1px solid #cbd5e1;">Début</th>
+                            <th style="padding: 10px 8px; text-align: center; border-bottom: 1px solid #cbd5e1;">Fin</th>
+                            <th style="padding: 10px 8px; text-align: center; border-bottom: 1px solid #cbd5e1;">Durée</th>
                         </tr>
                     </thead>
                     <tbody>
                         ${eventsByDay.sort((a, b) => b.dateObj - a.dateObj).map((day, idx) => {
                             const bgColor = idx % 2 === 0 ? '#ffffff' : '#fafbfc';
                             return `
-<<<<<<< HEAD
                                 <tr style="border-bottom: 1px solid #e2e8f0; background: ${bgColor};">
                                     <td style="padding: 12px 10px; font-weight: 600; border-right: 2px solid #e2e8f0; position: sticky; left: 0; background: ${bgColor};">
                                         ${formatDateToFrench(day.date)}
@@ -1265,17 +1161,6 @@ function renderEventsClient(client) {
                                     <td style="padding: 10px 8px; text-align: center; ${day.SuspendE > 0 ? 'background: #0ea5e920; font-weight: 700; color: #0284c7;' : 'color: #94a3b8;'}">
                                         ${day.SuspendE_duration || '-'}
                                     </td>
-=======
-                                <tr style="border-bottom: 1px solid ${STYLES.colors.border}; background: ${bgColor};">
-                                    <td style="padding: ${STYLES.spacing.md} ${STYLES.spacing.sm}; font-weight: 600; border-right: 2px solid ${STYLES.colors.border}; position: sticky; left: 0; background: ${bgColor};">${formatDateToFrench(day.date)}</td>
-                                    <td style="padding: ${STYLES.spacing.sm} 8px; text-align: center; ${day.SuspendP > 0 ? `background: ${STYLES.colors.blue}10; font-weight: 600; color: ${STYLES.colors.blueDark};` : `color: ${STYLES.colors.grayLight};`}">${day.SuspendP_start || '-'}</td>
-                                    <td style="padding: ${STYLES.spacing.sm} 8px; text-align: center; ${day.SuspendP > 0 ? `background: ${STYLES.colors.blue}10; font-weight: 600; color: ${STYLES.colors.blueDark};` : `color: ${STYLES.colors.grayLight};`}">${day.SuspendP_end || '-'}</td>
-                                    <td style="padding: ${STYLES.spacing.sm} 8px; text-align: center; border-right: 2px solid ${STYLES.colors.border}; ${day.SuspendP > 0 ? `background: ${STYLES.colors.blue}20; font-weight: 700; color: ${STYLES.colors.blueDark};` : `color: ${STYLES.colors.grayLight};`}">${day.SuspendP_duration || '-'}</td>
-                                    <td style="padding: ${STYLES.spacing.sm} 8px; text-align: center; border-right: 2px solid ${STYLES.colors.border}; ${day.CreditNul > 0 ? `background: ${STYLES.colors.warning}; color: white; font-weight: 700;` : `background: #f1f5f9; color: ${STYLES.colors.grayLight};`}">${day.CreditNul > 0 ? '⚠️ CRÉDIT NUL' : '✓ Normal'}</td>
-                                    <td style="padding: ${STYLES.spacing.sm} 8px; text-align: center; ${day.SuspendE > 0 ? `background: ${STYLES.colors.info}10; font-weight: 600; color: ${STYLES.colors.infoDark};` : `color: ${STYLES.colors.grayLight};`}">${day.SuspendE_start || '-'}</td>
-                                    <td style="padding: ${STYLES.spacing.sm} 8px; text-align: center; ${day.SuspendE > 0 ? `background: ${STYLES.colors.info}10; font-weight: 600; color: ${STYLES.colors.infoDark};` : `color: ${STYLES.colors.grayLight};`}">${day.SuspendE_end || '-'}</td>
-                                    <td style="padding: ${STYLES.spacing.sm} 8px; text-align: center; ${day.SuspendE > 0 ? `background: ${STYLES.colors.info}20; font-weight: 700; color: ${STYLES.colors.infoDark};` : `color: ${STYLES.colors.grayLight};`}">${day.SuspendE_duration || '-'}</td>
->>>>>>> 446a6002e4fdc8765452d6a7d81e985e4532af3b
                                 </tr>
                             `;
                         }).join('')}
@@ -1283,23 +1168,15 @@ function renderEventsClient(client) {
                 </table>
             </div>
             
-<<<<<<< HEAD
             <div style="margin-top: 15px; padding: 12px 20px; background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0; display: flex; align-items: center; gap: 20px; flex-wrap: wrap; font-size: 12px;">
                 <span><span style="color: #3b82f6;">⬤</span> Puissance dépassée</span>
                 <span><span style="color: #f59e0b;">⬤</span> Crédit nul</span>
                 <span><span style="color: #0ea5e9;">⬤</span> Énergie épuisée</span>
-=======
-            <div style="margin-top: ${STYLES.spacing.lg}; padding: ${STYLES.spacing.md} ${STYLES.spacing.xl}; background: ${STYLES.colors.grayBg}; border-radius: ${STYLES.borderRadius.md}; border: 1px solid ${STYLES.colors.border}; display: flex; align-items: center; gap: 20px; flex-wrap: wrap; font-size: 12px;">
-                <span><span style="color:${STYLES.colors.blue};">⬤</span> Puissance dépassée (SuspendP)</span>
-                <span><span style="color:${STYLES.colors.warning};">⬤</span> Crédit nul</span>
-                <span><span style="color:${STYLES.colors.info};">⬤</span> Énergie épuisée (SuspendE)</span>
->>>>>>> 446a6002e4fdc8765452d6a7d81e985e4532af3b
             </div>
         `;
         
         // Script pour le toggle (inline car pas de setTimeout nécessaire)
         html += `
-<<<<<<< HEAD
             <script>
                 (function() {
                     const btn = document.getElementById('${toggleId}');
@@ -1428,12 +1305,6 @@ function renderEventsClient(client) {
                     <h3 style="margin: 0 0 8px 0; color: #1e293b;">Aucun événement</h3>
                     <p style="margin: 0; font-size: 14px;">Aucun événement enregistré pour ce client</p>
                 </div>
-=======
-            <div style="text-align: center; padding: 40px; color: ${STYLES.colors.grayLight}; background: ${STYLES.colors.grayBg}; border-radius: ${STYLES.borderRadius.xl};">
-                <span style="font-size: 48px; display: block; margin-bottom: ${STYLES.spacing.lg};">✅</span>
-                <h3 style="margin: 0 0 10px 0; color: ${STYLES.colors.textDark};">Aucun événement</h3>
-                <p style="margin: 0; font-size: 14px;">Aucun événement pour ce client</p>
->>>>>>> 446a6002e4fdc8765452d6a7d81e985e4532af3b
             </div>
         `;
     }
@@ -1443,7 +1314,6 @@ function renderEventsClient(client) {
     const percentSuspendP = ((daysWithSuspendP.size / totalDays) * 100).toFixed(1);
     const percentSuspendE = ((daysWithSuspendE.size / totalDays) * 100).toFixed(1);
     
-<<<<<<< HEAD
     let html = `
         <div style="background: white; border-radius: 16px; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08); overflow: hidden; border: 1px solid #e2e8f0; margin-bottom: 20px;">
             <!-- En-tête style renderInfoCard -->
@@ -1473,21 +1343,6 @@ function renderEventsClient(client) {
                     <span>⚡ ${totalEvents} signalements</span>
                 </div>
     `;
-=======
-    setTimeout(() => {
-        const toggleBtn = document.getElementById(`toggle-events-${client.id}`);
-        const table = document.getElementById(`events-table-${client.id}`);
-        if (toggleBtn && table) {
-            toggleBtn.onclick = () => {
-                const isHidden = table.style.display === 'none';
-                table.style.display = isHidden ? 'block' : 'none';
-                toggleBtn.innerHTML = isHidden 
-                    ? '<span style="font-size:16px;">🔼</span> Masquer le tableau'
-                    : '<span style="font-size:16px;">🔽</span> Afficher le tableau détaillé';
-            };
-        }
-    }, 100);
->>>>>>> 446a6002e4fdc8765452d6a7d81e985e4532af3b
     
     if (eventsByDay.length > 0) {
         const toggleId = `toggle-events-${client.id}`;
@@ -1571,27 +1426,6 @@ function renderStatCard(icon, label, value, percent, gradient) {
 // RENDU CREDIT BOARD
 // ===========================================
 
-function renderStatCard(icon, label, value, percent, gradient) {
-    return `
-        <div style="background: ${gradient}; border-radius: ${STYLES.borderRadius.lg}; padding: ${STYLES.spacing.md}; color: white;">
-            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
-                <span style="font-size: 20px;">${icon}</span>
-                <span style="font-size: 12px; font-weight: 600; opacity: 0.9;">${label}</span>
-            </div>
-            <div style="font-size: 28px; font-weight: 800; margin-bottom: 4px;">${value}</div>
-            <div style="font-size: 11px; opacity: 0.9;">jour(s) concerné(s)</div>
-            <div style="margin-top: 8px; background: rgba(255,255,255,0.2); height: 4px; border-radius: 2px; overflow: hidden;">
-                <div style="width: ${percent}%; height: 100%; background: white; border-radius: 2px;"></div>
-            </div>
-            <div style="margin-top: 5px; font-size: 11px; font-weight: 600;">${percent}%</div>
-        </div>
-    `;
-}
-
-// ===========================================
-// RENDU CREDIT BOARD
-// ===========================================
-
 function renderCreditBoard() {
     destroyCreditChart(); 
     const container = document.getElementById('creditBoard');
@@ -1630,15 +1464,6 @@ function renderCreditBoard() {
             <div style="padding: ${STYLES.spacing.lg};">
 
     `;
-<<<<<<< HEAD
-=======
-
-    html += renderCreditEvolutionChart(credits, client.id);
-    html += renderMonthlyCreditAnalysis(credits, zeroCreditDates);
-    const summaryHTML = renderCreditSummaryDashboard(credits, zeroCreditDates);
-    
-    
->>>>>>> 446a6002e4fdc8765452d6a7d81e985e4532af3b
     if (rechargeData.hasData) {
         html += renderRechargeHabits(rechargeData);
     }
@@ -1653,11 +1478,7 @@ function renderCreditBoard() {
         
         <div id="${detailsId}" style="display: none; margin-top: ${STYLES.spacing.lg};">
     `;
-<<<<<<< HEAD
 
-=======
-    
->>>>>>> 446a6002e4fdc8765452d6a7d81e985e4532af3b
     if (rechargeData.hasData) {
         html += renderRechargeTable(rechargeData);
     }
@@ -2001,26 +1822,16 @@ function initCreditChart() {
     const monthColors = {
         1: '#8b5cf6',  // Janvier - Violet
         2: '#FF0000',  // Février - Violet clair
-<<<<<<< HEAD
         3: '#54ff54',  // Mars - Lavande
-=======
-        3: '#008000',  // Mars - Lavande
->>>>>>> 446a6002e4fdc8765452d6a7d81e985e4532af3b
         4: '#0000FF',  // Avril - Rose violet
         5: '#f472b6',  // Mai - Rose
         6: '#fb7185',  // Juin - Rose saumon
         7: '#FF8C00',  // Juillet - Orange
         8: '#FF00FF',  // Août - Jaune orange
         9: '#00CED1',  // Septembre - Jaune
-<<<<<<< HEAD
         10: '#cc5907', // Octobre - Vert lime
         11: '#0f6f01', // Novembre - Vert
         12: '#ffd900'  // Décembre - Cyan
-=======
-        10: '#8B4513', // Octobre - Vert lime
-        11: '#808080', // Novembre - Vert
-        12: '#FFD700'  // Décembre - Cyan
->>>>>>> 446a6002e4fdc8765452d6a7d81e985e4532af3b
     };
     
     function getMonthColor(month) {
@@ -2275,26 +2086,18 @@ function renderMonthlyCreditAnalysis(credits, zeroCreditDates) {
         monthData.sumCredit += value;
     });
     
-<<<<<<< HEAD
     // 3. Calculer les stats par mois et trier par date croissante (comme code 1)
-=======
-    // 3. Calculer les stats par mois et trier par date décroissante
->>>>>>> 446a6002e4fdc8765452d6a7d81e985e4532af3b
     const sortedMonths = Array.from(monthlyData.values())
         .map(month => {
             const avgCredit = month.sumCredit / month.totalDays;
             const percentZeroDays = (month.zeroDays / month.totalDays) * 100;
             const availabilityRate = 100 - percentZeroDays;
-<<<<<<< HEAD
             const positiveCreditDays = month.totalDays - month.zeroDays;
-=======
->>>>>>> 446a6002e4fdc8765452d6a7d81e985e4532af3b
             
             return {
                 ...month,
                 avgCredit: avgCredit,
                 percentZeroDays: percentZeroDays,
-<<<<<<< HEAD
                 availabilityRate: availabilityRate,
                 positiveCreditDays: positiveCreditDays
             };
@@ -2302,14 +2105,6 @@ function renderMonthlyCreditAnalysis(credits, zeroCreditDates) {
         .sort((a, b) => {
             if (a.year !== b.year) return a.year - b.year;  // Tri croissant (code 1)
             return a.month - b.month;  // Tri croissant
-=======
-                availabilityRate: availabilityRate
-            };
-        })
-        .sort((a, b) => {
-            if (a.year !== b.year) return b.year - a.year;
-            return b.month - a.month;
->>>>>>> 446a6002e4fdc8765452d6a7d81e985e4532af3b
         });
     
     if (sortedMonths.length === 0) {
@@ -2322,7 +2117,6 @@ function renderMonthlyCreditAnalysis(credits, zeroCreditDates) {
         `;
     }
     
-<<<<<<< HEAD
     // 4. Couleurs par mois (comme code 1)
     const monthColors = {
         0: '#22c55e', 1: '#eab308', 2: '#a855f7', 3: '#f97316',
@@ -2338,27 +2132,10 @@ function renderMonthlyCreditAnalysis(credits, zeroCreditDates) {
     }
     
     // 6. Générer le HTML du tableau
-=======
-    // 4. Fonction pour obtenir l'icône et la couleur selon le taux de disponibilité
-    function getAvailabilityStatus(rate, zeroPercent) {
-        if (zeroPercent === 0) {
-            return { icon: '✅', color: '#22c55e', bgOpacity: '20', label: 'Parfait' };
-        } else if (rate >= 95) {
-            return { icon: '🟢', color: '#22c55e', bgOpacity: '20', label: 'Excellent' };
-        } else if (rate >= 80) {
-            return { icon: '⚠️', color: '#f59e0b', bgOpacity: '20', label: 'Attention' };
-        } else {
-            return { icon: '🔴', color: '#ef4444', bgOpacity: '20', label: 'Critique' };
-        }
-    }
-    
-    // 5. Générer le HTML du tableau
->>>>>>> 446a6002e4fdc8765452d6a7d81e985e4532af3b
     const monthNames = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
     
     const rowsHTML = sortedMonths.map(month => {
         const monthName = monthNames[month.month - 1];
-<<<<<<< HEAD
         const totalDays = month.totalDays;
         const availabilityRate = month.availabilityRate.toFixed(1);
         const percentZeroDays = month.percentZeroDays.toFixed(1);
@@ -2385,36 +2162,6 @@ function renderMonthlyCreditAnalysis(credits, zeroCreditDates) {
                 </td>
                 <td style="padding: 12px 8px; text-align: center; color: #16a34a; font-weight: 600;">${month.maxCredit} j</td>
                 <td style="padding: 12px 8px; text-align: center; font-weight: 500;">${month.avgCredit.toFixed(1)} j</td>
-=======
-        const percentZeroDays = month.percentZeroDays.toFixed(1);
-        const availabilityRate = month.availabilityRate.toFixed(1);
-        const status = getAvailabilityStatus(month.availabilityRate, month.zeroDays);
-        
-        return `
-            <tr style="border-bottom: 1px solid ${STYLES.colors.border};">
-                <td style="padding: ${STYLES.spacing.md} ${STYLES.spacing.sm}; font-weight: 600;">
-                    ${monthName} ${month.year}
-                </td>
-                <td style="padding: ${STYLES.spacing.md} ${STYLES.spacing.sm}; text-align: center;">
-                    ${month.totalDays}
-                    <span style="font-size: 10px; color: ${STYLES.colors.gray};"> (100%)</span>
-                </td>
-                <td style="padding: ${STYLES.spacing.md} ${STYLES.spacing.sm}; text-align: center;">
-                    ${month.zeroDays}
-                    <span style="font-size: 10px; color: ${STYLES.colors.gray};"> (${percentZeroDays}%)</span>
-                </td>
-                <td style="padding: ${STYLES.spacing.md} ${STYLES.spacing.sm}; text-align: center;">
-                    <span style="display: inline-flex; align-items: center; gap: 6px; background: ${status.color}${status.bgOpacity}; color: ${status.color}; font-weight: 600; padding: 4px 10px; border-radius: 20px; font-size: 12px;">
-                        ${status.icon} ${availabilityRate}%
-                    </span>
-                </td>
-                <td style="padding: ${STYLES.spacing.md} ${STYLES.spacing.sm}; text-align: center; font-weight: 600; color: ${STYLES.colors.primary};">
-                    ${month.maxCredit}
-                </td>
-                <td style="padding: ${STYLES.spacing.md} ${STYLES.spacing.sm}; text-align: center;">
-                    ${month.avgCredit.toFixed(1)}
-                </td>
->>>>>>> 446a6002e4fdc8765452d6a7d81e985e4532af3b
             </tr>
         `;
     }).join('');
@@ -2422,7 +2169,6 @@ function renderMonthlyCreditAnalysis(credits, zeroCreditDates) {
     // Calcul des totaux généraux
     const totalDays = sortedMonths.reduce((sum, m) => sum + m.totalDays, 0);
     const totalZeroDays = sortedMonths.reduce((sum, m) => sum + m.zeroDays, 0);
-<<<<<<< HEAD
     const overallAvailabilityRate = totalDays > 0 ? ((totalDays - totalZeroDays) / totalDays * 100).toFixed(1) : 0;
     const totalZeroPercent = totalDays > 0 ? (totalZeroDays / totalDays * 100).toFixed(1) : 0;
     const overallMaxCredit = Math.max(...sortedMonths.map(m => m.maxCredit), 0);
@@ -2432,17 +2178,6 @@ function renderMonthlyCreditAnalysis(credits, zeroCreditDates) {
     return `
         <div style="background: white; border-radius: 12px; margin-bottom: 20px; overflow: hidden; border: 1px solid #e2e8f0;">
             <div style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: white; padding: 12px 20px;">
-=======
-    const totalAvailabilityRate = totalDays > 0 ? ((totalDays - totalZeroDays) / totalDays * 100).toFixed(1) : 0;
-    const totalZeroPercent = totalDays > 0 ? (totalZeroDays / totalDays * 100).toFixed(1) : 0;
-    const overallMaxCredit = Math.max(...sortedMonths.map(m => m.maxCredit), 0);
-    const overallAvgCredit = sortedMonths.reduce((sum, m) => sum + (m.avgCredit * m.totalDays), 0) / totalDays;
-    const totalStatus = getAvailabilityStatus(parseFloat(totalAvailabilityRate), totalZeroDays);
-    
-    return `
-        <div style="background: white; border-radius: ${STYLES.borderRadius.md}; margin-bottom: ${STYLES.spacing.md}; overflow: hidden; border: 1px solid ${STYLES.colors.border};">
-            <div style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: white; padding: ${STYLES.spacing.sm} ${STYLES.spacing.lg};">
->>>>>>> 446a6002e4fdc8765452d6a7d81e985e4532af3b
                 <div style="display: flex; align-items: center; gap: 8px;">
                     <span style="font-size: 16px;">📅</span>
                     <span style="font-weight: 600; font-size: 14px;">Analyse mensuelle du crédit</span>
@@ -2451,7 +2186,6 @@ function renderMonthlyCreditAnalysis(credits, zeroCreditDates) {
             
             <div style="overflow-x: auto;">
                 <table style="width: 100%; border-collapse: collapse; font-size: 13px; min-width: 700px;">
-<<<<<<< HEAD
                     <thead style="background: #f8fafc; border-bottom: 2px solid #e2e8f0;">
                         <tr>
                             <th style="padding: 12px 10px; text-align: left;">Mois</th>
@@ -2460,22 +2194,11 @@ function renderMonthlyCreditAnalysis(credits, zeroCreditDates) {
                             <th style="padding: 12px 8px; text-align: center;">Taux de disponibilité</th>
                             <th style="padding: 12px 8px; text-align: center;">Crédit maximum</th>
                             <th style="padding: 12px 8px; text-align: center;">Crédit moyen</th>
-=======
-                    <thead style="background: ${STYLES.colors.grayBg}; border-bottom: 2px solid ${STYLES.colors.border};">
-                        <tr>
-                            <th style="padding: ${STYLES.spacing.md} ${STYLES.spacing.sm}; text-align: left;">Mois</th>
-                            <th style="padding: ${STYLES.spacing.md} ${STYLES.spacing.sm}; text-align: center;">Jours analysés</th>
-                            <th style="padding: ${STYLES.spacing.md} ${STYLES.spacing.sm}; text-align: center;">Jours sans crédit</th>
-                            <th style="padding: ${STYLES.spacing.md} ${STYLES.spacing.sm}; text-align: center;">Taux de disponibilité</th>
-                            <th style="padding: ${STYLES.spacing.md} ${STYLES.spacing.sm}; text-align: center;">Crédit max</th>
-                            <th style="padding: ${STYLES.spacing.md} ${STYLES.spacing.sm}; text-align: center;">Crédit moyen</th>
->>>>>>> 446a6002e4fdc8765452d6a7d81e985e4532af3b
                         </tr>
                     </thead>
                     <tbody>
                         ${rowsHTML}
                     </tbody>
-<<<<<<< HEAD
                     <tfoot style="background: #f8fafc; border-top: 2px solid #e2e8f0; font-weight: 600;">
                         <tr>
                             <td style="padding: 12px 10px; text-align: left;">📊 TOTAL</td>
@@ -2492,36 +2215,15 @@ function renderMonthlyCreditAnalysis(credits, zeroCreditDates) {
                             </td>
                             <td style="padding: 12px 8px; text-align: center; color: #16a34a;">${overallMaxCredit} j</td>
                             <td style="padding: 12px 8px; text-align: center;">${overallAvgCredit.toFixed(1)} j</td>
-=======
-                    <tfoot style="background: ${STYLES.colors.grayBg}; border-top: 2px solid ${STYLES.colors.border}; font-weight: 600;">
-                        <tr>
-                            <td style="padding: ${STYLES.spacing.md} ${STYLES.spacing.sm}; text-align: left;">📊 TOTAL</td>
-                            <td style="padding: ${STYLES.spacing.md} ${STYLES.spacing.sm}; text-align: center;">${totalDays}</td>
-                            <td style="padding: ${STYLES.spacing.md} ${STYLES.spacing.sm}; text-align: center;">${totalZeroDays} <span style="font-size: 10px; color: ${STYLES.colors.gray};"> (${totalZeroPercent}%)</span></td>
-                            <td style="padding: ${STYLES.spacing.md} ${STYLES.spacing.sm}; text-align: center;">
-                                <span style="display: inline-flex; align-items: center; gap: 6px; background: ${totalStatus.color}${totalStatus.bgOpacity}; color: ${totalStatus.color}; font-weight: 600; padding: 4px 10px; border-radius: 20px; font-size: 12px;">
-                                    ${totalStatus.icon} ${totalAvailabilityRate}%
-                                </span>
-                            </td>
-                            <td style="padding: ${STYLES.spacing.md} ${STYLES.spacing.sm}; text-align: center; color: ${STYLES.colors.primary};">${overallMaxCredit}</td>
-                            <td style="padding: ${STYLES.spacing.md} ${STYLES.spacing.sm}; text-align: center;">${overallAvgCredit.toFixed(1)}</td>
->>>>>>> 446a6002e4fdc8765452d6a7d81e985e4532af3b
                         </tr>
                     </tfoot>
                 </table>
             </div>
             
-<<<<<<< HEAD
             <div style="padding: 10px 20px; background: #f8fafc; font-size: 11px; color: #64748b; border-top: 1px solid #e2e8f0; display: flex; flex-wrap: wrap; gap: 20px; justify-content: center;">
                 <span><span style="color: #22c55e;">✅</span> ≥90% disponible</span>
                 <span><span style="color: #f59e0b;">⚠️</span> 70-89% disponible</span>
                 <span><span style="color: #dc2626;">🔴</span> <70% disponible</span>
-=======
-            <div style="padding: ${STYLES.spacing.sm} ${STYLES.spacing.lg}; background: ${STYLES.colors.grayBg}; font-size: 11px; color: ${STYLES.colors.gray}; border-top: 1px solid ${STYLES.colors.border}; display: flex; flex-wrap: wrap; gap: 20px; justify-content: center;">
-                <span><span style="color: #22c55e;">✅</span> 0% sans crédit</span>
-                <span><span style="color: #f59e0b;">⚠️</span> 1-20% sans crédit</span>
-                <span><span style="color: #ef4444;">🔴</span> >20% sans crédit</span>
->>>>>>> 446a6002e4fdc8765452d6a7d81e985e4532af3b
             </div>
         </div>
     `;

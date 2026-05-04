@@ -223,23 +223,6 @@ input[type="file"] {
     animation: fadeIn 0.3s ease;
 }
 
-<<<<<<< HEAD
-=======
-.info-section {
-    background: #d5f5e3;
-    border-left: 4px solid var(--success);
-    padding: 15px;
-    border-radius: 8px;
-    margin-bottom: 20px;
-    display: none;
-}
-
-.info-section.show {
-    display: block;
-    animation: fadeIn 0.3s ease;
-}
-
->>>>>>> 446a6002e4fdc8765452d6a7d81e985e4532af3b
 /* ----- TABS ----- */
 .tabs {
     display: flex;

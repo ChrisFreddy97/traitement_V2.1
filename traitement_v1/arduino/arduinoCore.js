@@ -1,4 +1,6 @@
 // arduinoCore.js
+
+
 export const database = {
     tables: [],
     pages: [],
