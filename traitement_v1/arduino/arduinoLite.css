@@ -223,6 +223,8 @@ input[type="file"] {
     animation: fadeIn 0.3s ease;
 }
 
+<<<<<<< HEAD
+=======
 .info-section {
     background: #d5f5e3;
     border-left: 4px solid var(--success);
@@ -237,6 +239,7 @@ input[type="file"] {
     animation: fadeIn 0.3s ease;
 }
 
+>>>>>>> 446a6002e4fdc8765452d6a7d81e985e4532af3b
 /* ----- TABS ----- */
 .tabs {
     display: flex;

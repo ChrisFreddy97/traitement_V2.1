@@ -25,11 +25,19 @@
 
         /* En-tête */
         .upload-header {
+<<<<<<< HEAD
+            background: linear-gradient(135deg, #0e1a81 0%, #490783 100%);
+            border-radius: 16px;
+            padding: 20px 30px;
+            margin-bottom: 25px;
+            box-shadow: 0 8px 25px rgba(81, 22, 22, 0.15);
+=======
             background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
             border-radius: 16px;
             padding: 20px 30px;
             margin-bottom: 25px;
             box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+>>>>>>> 446a6002e4fdc8765452d6a7d81e985e4532af3b
         }
 
         .header-content {
@@ -48,7 +56,11 @@
         }
 
         .btn-secondary {
+<<<<<<< HEAD
+            background: rgba(255, 255, 255, 0.15);
+=======
             background: linear-gradient(135deg, #808080, #000000);
+>>>>>>> 446a6002e4fdc8765452d6a7d81e985e4532af3b
             color: white;
             border: none;
             padding: 10px 20px;
@@ -89,7 +101,11 @@
         .stat-number {
             font-size: 36px;
             font-weight: 800;
+<<<<<<< HEAD
+            background: linear-gradient(135deg, #880bf5 0%, #0645d9 100%);
+=======
             background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+>>>>>>> 446a6002e4fdc8765452d6a7d81e985e4532af3b
             -webkit-background-clip: text;
             background-clip: text;
             color: transparent;
@@ -369,9 +385,12 @@
             }
         }
     </style>
+<<<<<<< HEAD
+=======
     <link rel="stylesheet" href="./commercialDashboardLite.css">
     <link rel="stylesheet" href="./technicalDashboardLite.css">
     <link rel="stylesheet" href="./arduinoLite.css">
+>>>>>>> 446a6002e4fdc8765452d6a7d81e985e4532af3b
 </head>
 <body>
     <div class="container">
@@ -520,8 +539,13 @@
                     <td><strong style="color: #f59e0b;">${escapeHtml(file.nr)}</strong></td>
                     <td>${new Date(file.date).toLocaleDateString('fr-FR')}</td>
                     <td>
+<<<<<<< HEAD
+                        <button class="action-btn view" onclick="viewFile('${file.id}')" title="Analyser">📊Analyser</button>
+                        <button class="action-btn delete" onclick="deleteFile('${file.id}')" title="Supprimer">🗑️Supprimer</button>
+=======
                         <button class="action-btn view" onclick="viewFile('${file.id}')" title="Analyser">📊</button>
                         <button class="action-btn delete" onclick="deleteFile('${file.id}')" title="Supprimer">🗑️</button>
+>>>>>>> 446a6002e4fdc8765452d6a7d81e985e4532af3b
                     </td>
                 </tr>
             `).join('');

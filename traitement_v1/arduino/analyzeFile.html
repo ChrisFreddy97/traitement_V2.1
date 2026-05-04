@@ -17,7 +17,11 @@
 
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+<<<<<<< HEAD
+            background: linear-gradient(135deg, #88aae1 0%, #88aae1 100%);
+=======
             background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+>>>>>>> 446a6002e4fdc8765452d6a7d81e985e4532af3b
             min-height: 100vh;
         }
 
@@ -28,7 +32,11 @@
         }
 
         .analyze-header {
+<<<<<<< HEAD
+            background: linear-gradient(135deg, #0e1a81 0%, #490783 100%);
+=======
             background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+>>>>>>> 446a6002e4fdc8765452d6a7d81e985e4532af3b
             border-radius: 16px;
             padding: 20px 30px;
             margin-bottom: 25px;
@@ -118,7 +126,11 @@
 
         .tab.active {
             color: white;
+<<<<<<< HEAD
+            background: linear-gradient(135deg, #0e1a81 0%, #490783 100%);
+=======
             background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+>>>>>>> 446a6002e4fdc8765452d6a7d81e985e4532af3b
             box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);
         }
 
@@ -155,7 +167,11 @@
 
         /* Bouton toggle tables */
         .toggle-tables-btn {
+<<<<<<< HEAD
+            background: linear-gradient(135deg, #0e1a81 0%, #490783 100%) !important;
+=======
             background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%) !important;
+>>>>>>> 446a6002e4fdc8765452d6a7d81e985e4532af3b
             color: white !important;
             border: none !important;
             padding: 12px 24px !important;
@@ -229,7 +245,11 @@
                 <button id="go-back-btn" class="btn-secondary" style="margin-top: 20px;">← Retour à l'upload</button>
             `;
             document.getElementById('go-back-btn')?.addEventListener('click', () => {
+<<<<<<< HEAD
+                window.location.href = 'arduino.html';
+=======
                 window.location.href = 'uploadFile.html';
+>>>>>>> 446a6002e4fdc8765452d6a7d81e985e4532af3b
             });
         } else {
             try {
@@ -241,18 +261,33 @@
                 document.getElementById('analysis-content').innerHTML = `
                     <!-- Section INFO -->
                     <div class="info-section" id="infoSection">
+<<<<<<< HEAD
+=======
                         <h3>🔍 Informations extraites</h3>
                         <div class="nanoreseau-value" id="nanoreseauValue">-</div>
                         
+>>>>>>> 446a6002e4fdc8765452d6a7d81e985e4532af3b
                         <!-- ONGLETS PRINCIPAUX -->
                         <div class="tabs">
                             <div class="tab active" data-tab="Technique">Technique</div>
                             <div class="tab" data-tab="Commercial">Commercial</div>
+<<<<<<< HEAD
+=======
                             <div class="tab" data-tab="Evenement">Événements</div>
+>>>>>>> 446a6002e4fdc8765452d6a7d81e985e4532af3b
                         </div>
                         
                         <!-- CONTENEURS DES DASHBOARDS -->
                         <div id="technicalDashboard"></div>
+<<<<<<< HEAD
+                        <div id="commercialDashboard"></div>                    
+                        <div class="type-legend" id="typeLegend"></div>
+                    </div>
+
+                    <div id="toggleButtonContainer"></div>
+                    <div id="tablesContainer" style="display: none;"></div>
+
+=======
                         <div id="commercialDashboard"></div>
                         <div id="eventDashboard"></div>
                         
@@ -264,6 +299,7 @@
                     </button>
 
                     <div id="tablesContainer" style="display: none;"></div>
+>>>>>>> 446a6002e4fdc8765452d6a7d81e985e4532af3b
                 `;
                 
                 // Ajouter les gestionnaires d'onglets
@@ -299,14 +335,22 @@
                     <button id="go-back-btn" class="btn-secondary" style="margin-top: 20px;">← Retour à l'upload</button>
                 `;
                 document.getElementById('go-back-btn')?.addEventListener('click', () => {
+<<<<<<< HEAD
+                    window.location.href = 'arduino.html';
+=======
                     window.location.href = 'uploadFile.html';
+>>>>>>> 446a6002e4fdc8765452d6a7d81e985e4532af3b
                 });
             }
         }
         
         // Bouton retour
         document.getElementById('back-btn')?.addEventListener('click', () => {
+<<<<<<< HEAD
+            window.location.href = 'arduino.html';
+=======
             window.location.href = 'uploadFile.html';
+>>>>>>> 446a6002e4fdc8765452d6a7d81e985e4532af3b
         });
     </script>
 </body>
