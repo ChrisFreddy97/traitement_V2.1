@@ -8365,11 +8365,9 @@ function countTotalFiles(structure) {
 
 function displayFolderInfo() {
     const titleEl = document.getElementById('folder-title');
-    const subtitleEl = document.getElementById('folder-info-subtitle');
     
     // Plus besoin d'ajouter des classes, tout est déjà dans le HTML
-    titleEl.textContent = '📂 Relèves-' + escapeHtml(currentFolder.name);
-    subtitleEl.textContent = 'Créé le ' + currentFolder.date;
+    titleEl.textContent = '📂' + escapeHtml(currentFolder.name);
     
     // Le badge est déjà dans le HTML, pas besoin de l'ajouter
 }
