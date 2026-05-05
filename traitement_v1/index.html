@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Analyse V1</title>
+    <title>Modules Traitement V1</title>
     <style>
         * {
             margin: 0;
@@ -15,54 +15,12 @@
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
-            padding: 40px 100px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: flex-start;
+            padding: 40px 20px;
         }
 
         .container {
-            width: 100%;
-            max-width: 1400px;
+            max-width: 900px;
             margin: 0 auto;
-        }
-
-        /* Header */
-        .management-header {
-            width: 100%;
-            background: white;
-            border-radius: 12px;
-            padding: 20px;
-            margin-bottom: 20px;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-        }
-
-        .header-content {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            position: relative;
-        }
-
-        .header-content h1 {
-            color: #2c3e50;
-            font-size: 28px;
-            margin: 0;
-        }
-
-        .home-btn {
-            background: linear-gradient(135deg, #808080, #000000);
-            color: white;
-            border: 2px solid white;
-            border-radius: 8px;
-            padding: 10px 20px;
-            font-weight: 600;
-            cursor: pointer;
-            font-size: 14px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
         }
 
         h1 {
@@ -73,9 +31,8 @@
         }
 
         .modules-grid {
-            width: 100%;
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
             gap: 20px;
             margin-bottom: 40px;
         }
@@ -192,14 +149,12 @@
 </head>
 <body>
     <div class="container">
-        <header class="management-header">
-            <div class="header-content">
-                <h1>📦 ANALYSE RELÈVES V1</h1>
-                <button class="home-btn" onclick="window.location.href='../home.html'">
-                    <i class="fas fa-home"></i> ← Retour à l'accueil
-                </button>
-            </div>
-        </header>
+        <h1>📦 Modules Traitement V1</h1>
+
+        <div class="info-section">
+            <h3>ℹ️ À propos</h3>
+            <p>Bienvenue dans la section Traitement V1. Ici vous trouverez tous les modules spécialisés pour la gestion avancée des données et des fichiers.</p>
+        </div>
 
         <div class="modules-grid">
             <!-- Module Upload Dossier -->
@@ -217,6 +172,19 @@
                     Accéder →
                 </button>
             </div>
+        </div>
+
+        <!-- module pour tester -->
+        <!-- <div class="back-section">
+            <button class="back-btn" onclick="window.location.href='test/arduino.html'">
+                TESTE ARDUINO
+            </button>
+        </div> -->
+
+        <div class="back-section">
+            <button class="back-btn" onclick="window.location.href='../home.html'">
+                ← Retour à l'Accueil
+            </button>
         </div>
     </div>
 </body>

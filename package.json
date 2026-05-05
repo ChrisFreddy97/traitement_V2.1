@@ -1,7 +1,7 @@
 {
-    "name": "traitement-releves-v2.1",
-    "version": "1.1.0",
-    "description": "Traitement Releves V2.1",
+    "name": "traitement-releves-v2",
+    "version": "1.0.0",
+    "description": "Traitement Releves V2",
     "main": "main.js",
     "author": "Nanoé <christianofreddy.nanoe@gmail.com>",
     "scripts": {
@@ -13,14 +13,14 @@
         "create-icon": "node create-simple-icon.js"
     },
     "devDependencies": {
-        "canvas": "^2.11.2",
-        "electron": "^41.5.0",
-        "electron-builder": "^26.8.1",
-        "tailwindcss": "^4.1.17"
+        "electron": "^26.6.10",
+        "electron-builder": "^24.0.0",
+        "tailwindcss": "^4.1.17",
+        "canvas": "^2.11.2"
     },
     "build": {
-        "appId": "com.nanoe.traitementrelevesV2.1",
-        "productName": "Traitement Releves V2.1",
+        "appId": "com.nanoe.traitementrelevesV2",
+        "productName": "Traitement Releves V2",
         "directories": {
             "output": "dist"
         },
@@ -31,9 +31,7 @@
             "target": [
                 {
                     "target": "nsis",
-                    "arch": [
-                        "x64"
-                    ]
+                    "arch": ["x64"]
                 }
             ],
             "icon": "img/logo.jpg"
@@ -44,7 +42,7 @@
             "allowElevation": true,
             "createDesktopShortcut": true,
             "createStartMenuShortcut": true,
-            "shortcutName": "Traitement Releves V2.1"
+            "shortcutName": "Traitement Releves V2"
         }
     }
 }

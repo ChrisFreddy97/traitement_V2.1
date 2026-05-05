@@ -92,7 +92,7 @@
         .content-wrapper {
             flex: 1;
             display: flex;
-            align-items: center;
+            align-items: flex-start;
             justify-content: center;
             width: 100%;
             padding: 20px;
@@ -398,8 +398,8 @@
     <!-- Header -->
     <header class="hero-header">
         <img src="img/logo.jpg" alt="Logo" class="logo-image float">
-        <h1>Analyse des Relèves</h1>
-        <p class="subtitle">Système de traitement et d'analyse des relèves</p>
+        <h1>Gestion des Relevés</h1>
+        <p class="subtitle">Système de gestion et d'analyse des relèves</p>
     </header>
 
     <!-- Contenu principal -->
@@ -412,31 +412,31 @@
             <div class="cards-container">
                 <div class="card">
                     <div class="card-icon">📊</div>
-                    <h4>Relève v2</h4>
+                    <h4>Gestion Relève v2</h4>
                     <p>Analyse avancée des relèves du contrôleur V2</p>
                     <button class="card-btn" onclick="window.location.href='files.html'">
                         <i class="fas fa-chart-line btn-icon"></i>
-                        Analyser les relèves
+                        Gérer les relèves
                     </button>
                 </div>
 
                 <div class="card">
                     <div class="card-icon">📂</div>
-                    <h4>Relève v1</h4>
+                    <h4>Gestion Relève v1</h4>
                     <p>Analyse avancée des relèves du contrôleur V1</p>
                     <button class="card-btn" onclick="window.location.href='traitement_v1/index.html'">
-                        <i class="fas fa-chart-line btn-icon"></i>
-                        Analyser les relèves
+                        <i class="fas fa-folder-upload btn-icon"></i>
+                        Gérer les relèves
                     </button>
                 </div>
                 
                 <div class="card">
                     <div class="card-icon">⚡</div>
-                    <h4>Relève CF</h4>
-                    <p>Analyse avancée des relèves de la Carte Frigo</p>
+                    <h4>Gestion Relève CF</h4>
+                    <p>Gestion spécifique des relèves de la Carte Frigo</p>
                     <button class="card-btn" onclick="window.location.href='congel/congel.html'">
                         <i class="fas fa-snowflake btn-icon"></i>
-                        Analyser les relèves
+                        Gérer les relèves
                     </button>
                 </div>
             </div>
@@ -455,11 +455,11 @@
         </button>
         <button class="nav-btn" onclick="window.location.href='files.html'">
             <i class="fas fa-microchip nav-icon"></i>
-            Relèves V2
+            Relevés V2
         </button>
         <button class="nav-btn" onclick="window.location.href='traitement_v1/index.html'">
             <i class="fas fa-microchip nav-icon"></i>
-            Relèves V1
+            Relevés V1
         </button>
         <button class="nav-btn" onclick="window.location.href='congel/congel.html'">
             <i class="fas fa-thermometer-half nav-icon"></i>

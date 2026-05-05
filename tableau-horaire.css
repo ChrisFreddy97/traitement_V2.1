@@ -5,21 +5,12 @@
     box-sizing: border-box;
 }
 
-html {
-    min-height: 100%;
-}
-
 body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
     background: #f5f7fa;
     color: #333;
     line-height: 1.6;
     width: 100%;
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    justify-content: flex-start;
-    align-items: stretch;
     overflow-x: auto; /* Permet le défilement horizontal si nécessaire */
 }
 
@@ -84,27 +75,6 @@ body {
     display: flex;
     align-items: center;
     gap: 10px;
-}
-
-.home-btn {
-    padding: 8px 16px;
-    background: linear-gradient(135deg, #808080, #000000);
-    color: white;
-    border: none;
-    border-radius: 6px;
-    font-size: 14px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.home-btn:hover {
-    background: #5a67d8;
-    transform: translateY(-1px);
-    box-shadow: 0 4px 8px rgba(102, 126, 234, 0.3);
 }
 
 .badge {
@@ -208,7 +178,6 @@ body {
     font-weight: 600;
     transition: all 0.3s ease;
     color: white;
-    transition: all 0.25s ease;
 }
 
 .main-tab:hover {
@@ -424,6 +393,7 @@ body {
     display: flex;
     flex-wrap: wrap;
     gap: 15px;
+    justify-content: center;
 }
 
 .stat-item {
@@ -3459,83 +3429,4 @@ body {
     border-radius: 30px;
     font-size: 12px;
     font-weight: 500;
-}
-/* ===== CONTAINER ===== */
-.main-tabs-container {
-  display: flex;
-  border-radius: 12px;
-  overflow: hidden;
-  background: #f3f4f6;
-  margin-bottom: 20px;
-}
-
-/* ===== ONGLET ===== */
-.main-tab {
-  flex: 1;
-  padding: 14px 24px;
-  font-size: 15px;
-  font-weight: 600;
-  cursor: pointer;
-  border: none;
-  background: #e5e7eb;
-  color: #374151;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  transition: all 0.3s ease;
-}
-
-/* ===== ONGLET ACTIF (GRADIENT) ===== */
-.main-tab.active {
-  background: linear-gradient(90deg, #5f6fd6, #7c3aed);
-  color: white;
-}
-
-/* ===== HOVER ===== */
-.main-tab:hover {
-  opacity: 0.9;
-}
-
-/* ===== SOUS ONGLETS ===== */
-.sub-tabs-container {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-bottom: 20px;
-}
-
-.sub-tab {
-  background: #f1f5f9;
-  color: #475569;
-  border: none;
-  padding: 8px 18px;
-  border-radius: 999px;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-/* actif */
-.sub-tab.active {
-  background: linear-gradient(90deg, #5f6fd6, #7c3aed);
-  color: white;
-}
-
-/* hover */
-.sub-tab:hover {
-  transform: translateY(-1px);
-}
-/* Styles pour les filtres de date */
-.filter-btn.selected {
-    background: #3b82f6 !important;
-    color: white !important;
-    border: 1px solid #2563eb !important;
-    transform: scale(0.98);
-    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.4);
-}
-
-.filter-btn:active {
-    transform: scale(0.96);
 }

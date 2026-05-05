@@ -246,10 +246,13 @@ function createFolderRow(folder) {
         </td>
         <td class="folder-actions-cell">
             <button class="btn btn-primary btn-small advanced-folder-btn" data-nr="${folder.nr}" title="Analyse avancée">
-                📈 Analyser
+                📈 Avancée
             </button>
             <button class="btn btn-danger btn-small delete-folder-btn" data-nr="${folder.nr}" title="Supprimer ce dossier">
                 🗑️ Supprimer
+            </button>
+            <button class="btn btn-primary btn-small analyze-folder-btn" data-nr="${folder.nr}" title="Analyser ce dossier" disabled>
+                ▶️ Analyser 
             </button>
         </td>
     `;

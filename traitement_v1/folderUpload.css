@@ -51,9 +51,7 @@ body {
     font-weight: 600;
     cursor: pointer;
     transition: all 0.3s ease;
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
+    display: inline-block;
 }
 
 .btn:hover {
@@ -62,16 +60,16 @@ body {
 }
 
 .btn-primary {
-    background: linear-gradient(135deg, #2196F3 0%, #1976D2 100%);
+    background: #667eea;
     color: white;
 }
 
 .btn-primary:hover {
-    background: linear-gradient(135deg, #2196F3 0%, #1976D2 100%);
+    background: #5568d3;
 }
 
 .btn-secondary {
-    background: linear-gradient(135deg, #808080, #000000);
+    background: #95a5a6;
     color: white;
 }
 
@@ -95,12 +93,12 @@ body {
 }
 
 .btn-danger {
-    background: linear-gradient(135deg, #f44336 0%, #d32f2f 100%);
+    background: #e74c3c;
     color: white;
 }
 
 .btn-danger:hover {
-    background: linear-gradient(135deg, #d32f2f 0%, #c62828 100%);
+    background: #c0392b;
 }
 
 .btn-info {
@@ -902,14 +900,14 @@ body {
 
 /* Style spécifique pour le bouton SD */
 #open-upload-modal-btn {
-    background: linear-gradient(135deg, #2196F3 0%, #1976D2 100%);
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     border: none;
 }
 
 #open-upload-modal-btn:hover {
-    background: linear-gradient(135deg, #1976D2 0%, #1565C0 100%);
+    background: linear-gradient(135deg, #5568d3 0%, #653a92 100%);
     transform: translateY(-3px);
-    box-shadow: 0 6px 15px rgba(33, 150, 243, 0.3);
+    box-shadow: 0 6px 15px rgba(102, 126, 234, 0.3);
 }
 
 /* Responsive */
@@ -1039,22 +1037,22 @@ body {
 }
 
 .folder-actions-cell .btn-primary {
-    background: linear-gradient(135deg, #2196F3 0%, #1976D2 100%);
-    color: white;
+    background-color: #e7f1ff;
+    color: #0d6efd;
 }
 
 .folder-actions-cell .btn-primary:hover {
-    background: linear-gradient(135deg, #1976D2 0%, #1565C0 100%);
+    background-color: #0d6efd;
     color: white;
 }
 
 .folder-actions-cell .btn-danger {
-    background: linear-gradient(135deg, #f44336 0%, #d32f2f 100%);
-    color: white;
+    background-color: #f8d7da;
+    color: #dc3545;
 }
 
 .folder-actions-cell .btn-danger:hover {
-    background: linear-gradient(135deg, #d32f2f 0%, #c62828 100%);
+    background-color: #dc3545;
     color: white;
 }
 

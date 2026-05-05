@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Analyse V2</title>
+    <title>Gestion des Fichiers</title>
     <link rel="stylesheet" href="files.css">
 </head>
 <body>
     <div class="container">
         <header class="management-header">
             <div class="header-content">
-                <h1>📊 ANALYSE RELÈVES V2</h1>
+                <h1>📊 Gestion des Relèves V2</h1>
                 <button id="back-to-home-btn" class="btn btn-secondary">
                     ← Retour à l'accueil
                 </button>
@@ -20,19 +20,19 @@
         <main class="management-main">
             <!-- Barre de recherche -->
             <div class="search-section">
-                <input type="text" id="folder-search" placeholder="🔍 tapez un numéro NR...." class="search-input">
+                <input type="text" id="folder-search" placeholder="🔍 Rechercher un dossier par nom NR..." class="search-input">
             </div>
 
             <!-- Bouton pour ouvrir le modal d'ajout -->
             <div class="add-folder-section">
                 <button id="open-add-modal-btn" class="btn btn-primary btn-large">
-                    ➕ Ajouter une nouvelle relève
+                    ➕ Ajouter un nouveau relève
                 </button>
             </div>
 
             <!-- Section Liste des Dossiers - VERSION TABLEAU -->
             <div id="folders-list-section" class="folders-section">
-                <h2>📁 Liste des dossiers ajoutés</h2>
+                <h2>📁 Dossiers Relèves Créés</h2>
                 <div class="table-container">
                     <table class="folders-table">
                         <thead>
@@ -64,28 +64,6 @@
                 <span class="close">&times;</span>
             </div>
             <div class="modal-body">
-                <!-- ALERTE IMPORTANTE - RENOMMER LE DOSSIER -->
-                <div class="folder-rename-alert" style="background: linear-gradient(135deg, #fff4e5 0%, #ffe6cc 100%); border-left: 5px solid #ff9800; padding: 15px; margin-bottom: 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
-                    <div style="display: flex; align-items: flex-start; gap: 12px;">
-                        <div style="font-size: 28px;">⚠️</div>
-                        <div style="flex: 1;">
-                            <h3 style="color: #e67e22; margin: 0 0 8px 0; font-size: 16px; font-weight: bold;">IMPORTANT : Renommage obligatoire du dossier</h3>
-                            <p style="color: #a05a15; margin: 0 0 8px 0; font-size: 14px; line-height: 1.4;">
-                                Avant d'importer votre dossier, vous <strong>DEVEZ impérativement le renommer</strong> selon le format suivant :
-                            </p>
-                            <p style="color: #e67e22; margin: 0; font-size: 18px; font-weight: bold; font-family: monospace;">
-                                📁 <strong style="background: #fff0d0; padding: 3px 8px; border-radius: 5px;">NR + numéro du NR</strong>
-                            </p>
-                            <p style="color: #a05a15; margin: 8px 0 0 0; font-size: 13px;">
-                                <strong>Exemple :</strong> <code style="background: #fff0d0; padding: 2px 6px; border-radius: 4px; font-weight: bold;">NR755</code>, <code style="background: #fff0d0; padding: 2px 6px; border-radius: 4px;">NR3125</code>, <code style="background: #fff0d0; padding: 2px 6px; border-radius: 4px;">NR1024</code>
-                            </p>
-                            <div style="background: #ffebcc; margin-top: 10px; padding: 8px 12px; border-radius: 6px; font-size: 12px; color: #b85c00;">
-                                💡 <strong>Pourquoi ?</strong> Le numéro NR sera automatiquement extrait du nom du dossier pour faciliter la gestion de vos relevés.
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
                 <!-- Section Sélection de dossier -->
                 <div class="upload-section">
                     <div class="upload-card">
