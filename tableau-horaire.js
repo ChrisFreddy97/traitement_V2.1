@@ -1608,27 +1608,30 @@ function generateForfaitProgressBars(forfaits, dailySummary, currentForfaitMax) 
                 </div>
             </div>
 
-            ${categories.map(category => `
-                <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 18px; flex-wrap: wrap;">
-                    <div style="display: flex; align-items: center; gap: 10px; min-width: 220px;">
-                        <span style="width: 14px; height: 14px; background: ${category.color}; border-radius: 6px; display: inline-block;"></span>
-                        <div>
-                            <div style="font-size: 14px; font-weight: 700; color: #0f172a;">${category.title}</div>
-                            <div style="font-size: 12px; color: #64748b;">${category.subtitle}</div>
-                        </div>
-                    </div>
-                    <div style="flex: 1; min-width: 320px; display: flex; align-items: center; gap: 14px;">
-                        <div style="flex: 1; background: #f1f5f9; border-radius: 999px; height: 14px; overflow: hidden; box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.08);">
-                            <div style="width: ${category.percent}%; height: 100%; background: ${category.color}; border-radius: 999px;"></div>
-                        </div>
-                        <div style="text-align: right; min-width: 120px;">
-                            <div style="font-size: 15px; font-weight: 700; color: #0f172a;">${category.value} / ${totalDays}</div>
-                            <div style="font-size: 12px; color: #64748b;">jours</div>
-                        </div>
-                        <div style="background: ${category.color}20; color: ${category.color}; padding: 5px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; min-width: 56px; text-align: center;">${category.percent}%</div>
-                    </div>
+            <!-- Barre de progression combinée -->
+            <div style="margin-top: 20px;">
+                <div style="flex: 1; background: #f1f5f9; border-radius: 999px; height: 32px; overflow: hidden; box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.08); display: flex;">
+                    ${(() => {
+                        return categories.filter(category => category.percent > 0).map(category => {
+                            return `<div style="width: ${category.percent}%; min-width: 0; height: 100%; background: ${category.color}; display: flex; align-items: center; justify-content: center; padding: 0 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                                <span style="color: white; font-size: 12px; font-weight: 700; text-shadow: 0 1px 2px rgba(0,0,0,0.35);">${category.percent}%</span>
+                            </div>`;
+                        }).join('');
+                    })()}
                 </div>
-            `).join('')}
+            </div>
+
+            <!-- Légende des catégories -->
+            <div style="display: flex; flex-wrap: wrap; gap: 12px; margin-top: 18px;">
+                ${categories.filter(category => category.percent > 0).map(category => `
+                    <div style="display: flex; align-items: center; gap: 10px; min-width: 220px;">
+                        <span style="width: 14px; height: 14px; background: ${category.color}; border-radius: 999px; display: inline-block;"></span>
+                        <div style="font-size: 13px; color: #334155;">
+                            <span style="font-weight: 700;">${category.value} jours</span> ${category.subtitle} · <span style="font-weight: 700; color: ${category.color};">${category.percent}%</span>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
         </div>
     `;
 }
@@ -2417,10 +2420,6 @@ function createCreditCard(clientId) {
                 ${significantStreaks.length > 5 ? `<div style="margin-top: 10px; font-size: 11px; color: #94a3b8; text-align: center;">+ ${significantStreaks.length - 5} autre(s) série(s)</div>` : ''}
             </div>
             ` : `
-            <div style="padding: 20px; text-align: center; background: #f8fafc;">
-                <span style="font-size: 48px; display: block; margin-bottom: 10px; color: #94a3b8;">✅</span>
-                <span style="color: #64748b; font-size: 13px;">Aucune période sans crédit (>1 jour) détectée</span>
-            </div>
             `}
             
             <!-- Pied de carte -->
