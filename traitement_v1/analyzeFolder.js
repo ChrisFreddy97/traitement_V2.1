@@ -698,11 +698,20 @@ function analyzeCreditBehavior(creditData) {
         const purchases = [];
         const sortedDates = Object.keys(dailyData).sort();
         
+        // Obtenir la date de première recharge pour ce client
+        const firstRechargeData = analyzeRechargeData(i);
+        const firstRechargeDate = firstRechargeData.hasData && firstRechargeData.firstRecharge 
+            ? firstRechargeData.firstRecharge.split(' ')[0] 
+            : null;
+        
         sortedDates.forEach(date => {
             const credit = dailyData[date][creditKey];
             if (credit !== undefined) {
-                clientData.push(credit);
-                if (credit === 0) zeroDays++;
+                // Ne compter que les jours à partir de la première recharge
+                if (!firstRechargeDate || date >= firstRechargeDate) {
+                    clientData.push(credit);
+                    if (credit === 0) zeroDays++;
+                }
                 if (previousCredit === 0 && credit > 0) purchases.push({ date, amount: credit });
                 previousCredit = credit;
             }
@@ -6819,7 +6828,15 @@ function displayCreditBehaviorAnalysis() {
     
     const tableContainer = document.createElement('div');
     tableContainer.style.cssText = `overflow-x: auto; border: 1px solid #e2e8f0; border-radius: 8px;`;
-    let tableHTML = `<table style="width: 100%; border-collapse: collapse; font-size: 12px;"><thead style="background: #f1f5f9;"><tr><th style="padding: 12px 8px; text-align: left; color: #475569; font-weight: 600; border-bottom: 2px solid #cbd5e1;">Client</th><th style="padding: 12px 8px; text-align: center; color: #475569; font-weight: 600; border-bottom: 2px solid #cbd5e1;">Crédit Max (jours)</th><th style="padding: 12px 8px; text-align: center; color: #475569; font-weight: 600; border-bottom: 2px solid #cbd5e1;">Moyenne (jours)</th><th style="padding: 12px 8px; text-align: center; color: #475569; font-weight: 600; border-bottom: 2px solid #cbd5e1;">Jours à Zéro</th><th style="padding: 12px 8px; text-align: center; color: #475569; font-weight: 600; border-bottom: 2px solid #cbd5e1;">Nombre d'Achats</th><th style="padding: 12px 8px; text-align: center; color: #475569; font-weight: 600; border-bottom: 2px solid #cbd5e1;">Fiabilité</th></tr></thead><tbody>`;
+    let tableHTML = `<table style="width: 100%; border-collapse: collapse; font-size: 12px;"><thead style="background: #f1f5f9;">`;
+    tableHTML += `<tr>
+        <th style="padding: 12px 8px; text-align: left; color: #475569; font-weight: 600; border-bottom: 2px solid #cbd5e1;">Client</th>
+        <th style="padding: 12px 8px; text-align: center; color: #475569; font-weight: 600; border-bottom: 2px solid #cbd5e1;">Crédit Max (jours)</th>
+        <th style="padding: 12px 8px; text-align: center; color: #475569; font-weight: 600; border-bottom: 2px solid #cbd5e1;">Moyenne (jours)</th>
+        <th style="padding: 12px 8px; text-align: center; color: #475569; font-weight: 600; border-bottom: 2px solid #cbd5e1;">Jours à Zéro</th>
+        <th style="padding: 12px 8px; text-align: center; color: #475569; font-weight: 600; border-bottom: 2px solid #cbd5e1;">Nombre d'Achats</th>
+        <th style="padding: 12px 8px; text-align: center; color: #475569; font-weight: 600; border-bottom: 2px solid #cbd5e1;">Fiabilité</th>
+    </tr></thead><tbody>`;
     
     for (let i = 1; i <= 6; i++) {
         const creditKey = `Credit${i}`;
@@ -6827,12 +6844,40 @@ function displayCreditBehaviorAnalysis() {
         const avgCredit = creditData.averageCredit[creditKey];
         const zeroDays = creditData.zeroCreditDays[creditKey];
         const purchases = creditData.purchasePatterns[creditKey];
+        
         if (maxCredit !== undefined) {
             const purchaseCount = purchases ? purchases.length : 0;
-            const reliabilityPercent = creditData.totalDays > 0 ? Math.round(((creditData.totalDays - zeroDays) / creditData.totalDays) * 100) : 0;
-            let reliability = reliabilityPercent >= 90 ? '✅ Excellent' : reliabilityPercent >= 70 ? '👍 Bon' : reliabilityPercent >= 50 ? '⚠️ Moyen' : '🔴 Faible';
-            let reliabilityColor = reliabilityPercent >= 90 ? '#22c55e' : reliabilityPercent >= 70 ? '#3b82f6' : reliabilityPercent >= 50 ? '#f59e0b' : '#ef4444';
-            tableHTML += `<tr style="border-bottom: 1px solid #f1f5f9; background: ${i % 2 === 0 ? '#fafbfc' : 'white'};"><td style="padding: 10px 8px; color: #1e293b; font-weight: 500;">Client ${i}</td><td style="padding: 10px 8px; text-align: center; color: #1e293b; font-weight: 600;">${maxCredit.toFixed(0)}</td><td style="padding: 10px 8px; text-align: center; color: #1e293b; font-weight: 500;">${avgCredit.toFixed(1)}</td><td style="padding: 10px 8px; text-align: center;"><span style="background: rgba(239, 68, 68, 0.1); color: #991b1b; padding: 4px 8px; border-radius: 4px; font-weight: 600;">${zeroDays} jour${zeroDays !== 1 ? 's' : ''}</span></td><td style="padding: 10px 8px; text-align: center; color: #1e293b; font-weight: 500;">${purchaseCount}</td><td style="padding: 10px 8px; text-align: center; color: ${reliabilityColor}; font-weight: 600;">${reliability} (${reliabilityPercent}%)</td></tr>`;
+            
+            // ✅ CORRECTION : Compter uniquement les jours où CE client a des données de crédit
+            let clientSpecificTotalDays = 0;
+            if (combinedSoldeData && combinedSoldeData.length > 0) {
+                combinedSoldeData.forEach(row => {
+                    const value = row[creditKey];
+                    if (value && value.toString().trim() !== '' && value.toString().trim() !== '-') {
+                        clientSpecificTotalDays++;
+                    }
+                });
+            }
+            
+            // Utiliser clientSpecificTotalDays au lieu de creditData.totalDays
+            const reliabilityPercent = clientSpecificTotalDays > 0 ? 
+                Math.round(((clientSpecificTotalDays - zeroDays) / clientSpecificTotalDays) * 100) : 0;
+            
+            let reliability = reliabilityPercent >= 90 ? '✅ Excellent' : 
+                            reliabilityPercent >= 70 ? '👍 Bon' : 
+                            reliabilityPercent >= 50 ? '⚠️ Moyen' : '🔴 Faible';
+            let reliabilityColor = reliabilityPercent >= 90 ? '#22c55e' : 
+                                  reliabilityPercent >= 70 ? '#3b82f6' : 
+                                  reliabilityPercent >= 50 ? '#f59e0b' : '#ef4444';
+            
+            tableHTML += `<tr style="border-bottom: 1px solid #f1f5f9; background: ${i % 2 === 0 ? '#fafbfc' : 'white'};">
+                <td style="padding: 10px 8px; color: #1e293b; font-weight: 500;">Client ${i}</td>
+                <td style="padding: 10px 8px; text-align: center; color: #1e293b; font-weight: 600;">${maxCredit.toFixed(0)}</td>
+                <td style="padding: 10px 8px; text-align: center; color: #1e293b; font-weight: 500;">${avgCredit.toFixed(1)}</td>
+                <td style="padding: 10px 8px; text-align: center;"><span style="background: rgba(239, 68, 68, 0.1); color: #991b1b; padding: 4px 8px; border-radius: 4px; font-weight: 600;">${zeroDays} jour${zeroDays !== 1 ? 's' : ''}</span></td>
+                <td style="padding: 10px 8px; text-align: center; color: #1e293b; font-weight: 500;">${purchaseCount}</td>
+                <td style="padding: 10px 8px; text-align: center; color: ${reliabilityColor}; font-weight: 600;">${reliability} (${reliabilityPercent}%)</td>
+            </tr>`;
         }
     }
     tableHTML += `</tbody></table>`;
@@ -6840,11 +6885,28 @@ function displayCreditBehaviorAnalysis() {
     content.appendChild(tableContainer);
     
     const totalClients = Object.keys(creditData.averageCredit).length;
-    const goodClients = Object.keys(creditData.averageCredit).filter(key => { const zeroDays = creditData.zeroCreditDays[key] || 0; const reliability = creditData.totalDays > 0 ? Math.round(((creditData.totalDays - zeroDays) / creditData.totalDays) * 100) : 0; return reliability >= 70; }).length;
+    const goodClients = Object.keys(creditData.averageCredit).filter(key => { 
+        const zeroDays = creditData.zeroCreditDays[key] || 0;
+        
+        // Recalculer correctement pour chaque client dans le résumé aussi
+        let clientSpecificTotalDays = 0;
+        if (combinedSoldeData && combinedSoldeData.length > 0) {
+            combinedSoldeData.forEach(row => {
+                const value = row[key];
+                if (value && value.toString().trim() !== '' && value.toString().trim() !== '-') {
+                    clientSpecificTotalDays++;
+                }
+            });
+        }
+        const reliability = clientSpecificTotalDays > 0 ? 
+            Math.round(((clientSpecificTotalDays - zeroDays) / clientSpecificTotalDays) * 100) : 0;
+        return reliability >= 70; 
+    }).length;
     
     const conclusionDiv = document.createElement('div');
     conclusionDiv.style.cssText = `background: #f8fafc; border-radius: 10px; padding: 16px; margin-top: 20px; border: 1px solid #e2e8f0;`;
-    conclusionDiv.innerHTML = `<div style="font-weight: 600; color: #2d3748; margin-bottom: 8px; font-size: 13px; display: flex; align-items: center; gap: 8px;"><span>📈</span> Synthèse de Fiabilité</div><div style="color: #4b5563; font-size: 12px; line-height: 1.5;">${totalClients} client${totalClients !== 1 ? 's' : ''} analysé${totalClients !== 1 ? 's' : ''} sur ${creditData.totalDays} jour${creditData.totalDays !== 1 ? 's' : ''}. ${goodClients} client${goodClients !== 1 ? 's' : ''} (${totalClients > 0 ? Math.round((goodClients / totalClients) * 100) : 0}%) présentent une fiabilité de recharge satisfaisante. Les jours à crédit zéro indiquent des périodes de coupure potentielles nécessitant une attention particulière.</div>`;
+    conclusionDiv.innerHTML = `<div style="font-weight: 600; color: #2d3748; margin-bottom: 8px; font-size: 13px; display: flex; align-items: center; gap: 8px;"><span>📈</span> Synthèse de Fiabilité</div>
+    <div style="color: #4b5563; font-size: 12px; line-height: 1.5;">${totalClients} client${totalClients !== 1 ? 's' : ''} analysé${totalClients !== 1 ? 's' : ''}. ${goodClients} client${goodClients !== 1 ? 's' : ''} (${totalClients > 0 ? Math.round((goodClients / totalClients) * 100) : 0}%) présentent une fiabilité de recharge satisfaisante. Les jours à crédit zéro indiquent des périodes de coupure potentielles nécessitant une attention particulière.</div>`;
     content.appendChild(conclusionDiv);
     analysisDiv.appendChild(content);
     
@@ -9860,9 +9922,7 @@ function createClientEventsTable(clientNumber) {
         border: 1px solid #e2e8f0;
     `;
     periodInfo.innerHTML = `
-        <span>📅 ${totalDiagnosticDays} jours analysés</span>
         <span>📊 ${new Set(eventsByDay.map(d => d.date)).size} jours avec événements</span>
-        <span>⚡ ${eventsByDay.reduce((sum, d) => sum + d.SuspendP + d.SuspendE + d.CreditNul, 0)} événements</span>
     `;
     content.appendChild(periodInfo);
     
@@ -10024,28 +10084,6 @@ function createClientEventsTable(clientNumber) {
     tableHTML += `</tbody></table>`;
     tableWrapper.innerHTML = tableHTML;
     content.appendChild(tableWrapper);
-    
-    // Légende
-    const legend = document.createElement('div');
-    legend.style.cssText = `
-        margin-top: 15px;
-        padding: 12px 20px;
-        background: #f8fafc;
-        border-radius: 8px;
-        border: 1px solid #e2e8f0;
-        display: flex;
-        align-items: center;
-        gap: 20px;
-        flex-wrap: wrap;
-        font-size: 12px;
-    `;
-    
-    legend.innerHTML = `
-        <span><span style="color:#3b82f6;">⬤</span> Puissance dépassée (heure / valeur en A)</span>
-        <span><span style="color:#f59e0b;">⬤</span> Crédit nul</span>
-        <span><span style="color:#0ea5e9;">⬤</span> Énergie épuisée (heure / valeur en Wh)</span>
-    `;
-    content.appendChild(legend);
     
     container.appendChild(content);
     
@@ -11447,11 +11485,6 @@ function createClientCreditAnalysis(clientNumber) {
                         <span><strong>Habitude :</strong> <span style="background: ${mainInterval.color}20; color: ${mainInterval.color}; padding: 2px 12px; border-radius: 20px; font-weight: 700;">${mainInterval.name}</span> (${mainInterval.percent}%, ${mainInterval.range})</span>
                     </div>
                 </div>
-                
-                <!-- Bouton -->
-                <button id="toggle-credit-${clientNumber}" style="width:100%; padding:8px; margin-top:12px; background:#f1f5f9; border:1px solid #cbd5e1; border-radius:6px; font-size:13px; font-weight:600; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:5px;">
-                    <span style="font-size:14px;">🔽</span> Afficher les détails
-                </button>
             `;
             
             content.appendChild(habitSection);
@@ -11580,195 +11613,6 @@ function createClientCreditAnalysis(clientNumber) {
                     }
                 }, 100);
             }
-            
-            // === TABLEAUX DÉTAILS (cachés) - VERSION ORIGINALE RESTAURÉE ===
-            const detailsContainer = document.createElement('div');
-            detailsContainer.id = `credit-details-${clientNumber}`;
-            detailsContainer.style.cssText = `display: none; margin-top: 15px;`;
-            
-            // Tableau des recharges - Version originale
-            if (rechargeAnalysis.hasData) {
-                const rechargeTable = document.createElement('div');
-                rechargeTable.style.cssText = `
-                    border: 2px solid #e2e8f0;
-                    border-radius: 12px;
-                    overflow: hidden;
-                    margin-bottom: 20px;
-                `;
-                
-                const tableHeader = document.createElement('div');
-                tableHeader.style.cssText = `
-                    background: linear-gradient(135deg, #9f7aea 0%, #805ad5 100%);
-                    color: white;
-                    padding: 15px 20px;
-                    font-size: 16px;
-                    font-weight: 700;
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                `;
-                tableHeader.innerHTML = `
-                    <span style="display: flex; align-items: center; gap: 10px;">
-                        <span style="font-size: 20px;">⚡</span>
-                        Historique des recharges
-                    </span>
-                    <span style="background: rgba(255,255,255,0.2); padding: 5px 15px; border-radius: 30px; font-size: 13px;">
-                        ${rechargeAnalysis.totalRecharges} opération(s)
-                    </span>
-                `;
-                
-                const tableWrapper = document.createElement('div');
-                tableWrapper.style.cssText = `
-                    max-height: 350px;
-                    overflow-y: auto;
-                    overflow-x: auto;
-                    background: white;
-                `;
-                
-                let tableHTML = `
-                    <table style="width: 100%; border-collapse: collapse; font-size: 12px; min-width: 700px;">
-                        <thead style="position: sticky; top: 0; background: #f8fafc; z-index: 10;">
-                            <tr style="border-bottom: 2px solid #e2e8f0;">
-                                <th style="padding: 12px 10px; text-align: left;">Date</th>
-                                <th style="padding: 12px 10px; text-align: center;">Code 3 (jours)</th>
-                                <th style="padding: 12px 10px; text-align: center;">Statut</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                `;
-                
-                const sortedRecharges = [...combinedRechargeData]
-                    .filter(row => row['Code 1']?.toString().trim() === clientNumber.toString())
-                    .sort((a, b) => new Date(b['Date et Heure']) - new Date(a['Date et Heure']));
-                
-                sortedRecharges.forEach((row, index) => {
-                    const date = row['Date et Heure'] || '-';
-                    const code3 = row['Code 3'] || '-';
-                    const status = row['Status'] || '-';
-                    
-                    const statusColor = status.toLowerCase().includes('reussie') ? '#22c55e' : 
-                                    status.toLowerCase().includes('echoue') ? '#ef4444' : '#f59e0b';
-                    
-                    const bgColor = index % 2 === 0 ? '#ffffff' : '#fafbfc';
-                    
-                    tableHTML += `
-                        <tr style="border-bottom: 1px solid #e2e8f0; background: ${bgColor};">
-                            <td style="padding: 10px; white-space: nowrap;">${date}</td>
-                            <td style="padding: 10px; text-align: center; font-weight: 600; color: #f97316;">${code3}</td>
-                            <td style="padding: 10px; text-align: center;">
-                                <span style="background: ${statusColor}20; color: ${statusColor}; padding: 3px 10px; border-radius: 20px; font-weight: 600; font-size: 11px;">
-                                    ${status}
-                                </span>
-                            </td>
-                        </tr>
-                    `;
-                });
-                
-                tableHTML += `</tbody></table>`;
-                tableWrapper.innerHTML = tableHTML;
-                rechargeTable.appendChild(tableHeader);
-                rechargeTable.appendChild(tableWrapper);
-                detailsContainer.appendChild(rechargeTable);
-            }
-            
-            // Tableau des soldes - Version originale
-            if (creditData.length > 0) {
-                const soldeTable = document.createElement('div');
-                soldeTable.style.cssText = `
-                    border: 2px solid #e2e8f0;
-                    border-radius: 12px;
-                    overflow: hidden;
-                    margin-bottom: 20px;
-                `;
-                
-                const soldeHeader = document.createElement('div');
-                soldeHeader.style.cssText = `
-                    background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
-                    color: white;
-                    padding: 15px 20px;
-                    font-size: 16px;
-                    font-weight: 700;
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                `;
-                soldeHeader.innerHTML = `
-                    <span style="display: flex; align-items: center; gap: 10px;">
-                        <span style="font-size: 20px;">💰</span>
-                        Historique des soldes (crédits)
-                    </span>
-                    <span style="background: rgba(255,255,255,0.2); padding: 5px 15px; border-radius: 30px; font-size: 13px;">
-                        ${creditData.length} relevé(s)
-                    </span>
-                `;
-                
-                const soldeWrapper = document.createElement('div');
-                soldeWrapper.style.cssText = `
-                    max-height: 350px;
-                    overflow-y: auto;
-                    overflow-x: auto;
-                    background: white;
-                `;
-                
-                const clientSoldeData = [...combinedSoldeData]
-                    .filter(row => row[`Credit${clientNumber}`] && row[`Credit${clientNumber}`].toString().trim() !== '')
-                    .sort((a, b) => new Date(b['Date et Heure']) - new Date(a['Date et Heure']));
-                
-                let soldeHTML = `
-                    <table style="width: 100%; border-collapse: collapse; font-size: 12px; min-width: 400px;">
-                        <thead style="position: sticky; top: 0; background: #f8fafc; z-index: 10;">
-                            <tr style="border-bottom: 2px solid #e2e8f0;">
-                                <th style="padding: 12px 10px; text-align: left;">Date</th>
-                                <th style="padding: 12px 10px; text-align: center;">Crédit (jours)</th>
-                                <th style="padding: 12px 10px; text-align: center;">Statut</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                `;
-                
-                clientSoldeData.forEach((row, index) => {
-                    const date = row['Date et Heure'] || '-';
-                    const value = parseFloat(row[`Credit${clientNumber}`]) || 0;
-                    const bgColor = index % 2 === 0 ? '#ffffff' : '#fafbfc';
-                    
-                    soldeHTML += `
-                        <tr style="border-bottom: 1px solid #e2e8f0; background: ${bgColor};">
-                            <td style="padding: 10px; white-space: nowrap;">${date}</td>
-                            <td style="padding: 10px; text-align: center; font-weight: 600; color: ${value === 0 ? '#ef4444' : '#48bb78'};">${value}</td>
-                            <td style="padding: 10px; text-align: center;">
-                                ${value === 0 ? 
-                                    '<span style="background: #ef444420; color: #ef4444; padding: 3px 10px; border-radius: 20px; font-size: 11px;">Sans crédit</span>' : 
-                                    '<span style="background: #48bb7820; color: #48bb78; padding: 3px 10px; border-radius: 20px; font-size: 11px;">Crédit disponible</span>'}
-                            </td>
-                        </tr>
-                    `;
-                });
-                
-                soldeHTML += `</tbody></table>`;
-                soldeWrapper.innerHTML = soldeHTML;
-                soldeTable.appendChild(soldeHeader);
-                soldeTable.appendChild(soldeWrapper);
-                detailsContainer.appendChild(soldeTable);
-            }
-            
-            content.appendChild(detailsContainer);
-            
-            // Événement bouton
-            setTimeout(() => {
-                const btn = document.getElementById(`toggle-credit-${clientNumber}`);
-                const details = document.getElementById(`credit-details-${clientNumber}`);
-                if (btn && details) {
-                    btn.addEventListener('click', () => {
-                        if (details.style.display === 'none') {
-                            details.style.display = 'block';
-                            btn.innerHTML = `<span style="font-size:14px;">🔼</span> Masquer les détails`;
-                        } else {
-                            details.style.display = 'none';
-                            btn.innerHTML = `<span style="font-size:14px;">🔽</span> Afficher les détails`;
-                        }
-                    });
-                }
-            }, 100);
         }
     }
     
@@ -13216,7 +13060,7 @@ function createCreditEvolutionChart(clientNumber, creditData, consumptionByDay =
                             canvas.parentNode;
     
     if (parentContainer) {
-        addCreditMonthlyStatsToSection(sortedData, clientNumber, parentContainer, consumptionByDay);
+        addCreditMonthlyStatsToSection(sortedData, clientNumber, parentContainer);
     }
 }
 
@@ -13292,7 +13136,7 @@ function addCreditMonthLegendToSection(clientNumber, monthColors, parentContaine
 }
 
 // ==================== STATISTIQUES MENSUELLES CRÉDIT UNIQUEMENT ====================
-function addCreditMonthlyStatsToSection(data, clientNumber, parentContainer) {
+function addCreditMonthlyStatsToSection(data, clientNumber, parentContainer, rechargeAnalysis = null) {
     if (!data || data.length === 0) return;
     
     // Supprimer les anciennes stats
@@ -13474,12 +13318,214 @@ function addCreditMonthlyStatsToSection(data, clientNumber, parentContainer) {
         </div>
         <div>
             <div style="font-size: 12px; color: #64748b;">⚠️ Jours sans crédit</div>
-            <div style="font-size: 20px; font-weight: 700; color: ${totalZeroCredit > 0 ? '#dc2626' : '#16a34a'};">${totalZeroCredit}</div>
-            <div style="font-size: 11px; color: #94a3b8;">${((totalZeroCredit / totalDays) * 100).toFixed(1)}% du temps</div>
+            <div style="font-size: 20px; font-weight: 700; color: ${totalZeroCredit > 0 ? '#dc2626' : '#16a34a'};">${((totalZeroCredit / totalDays) * 100).toFixed(1)}%</div>
+            <div style="font-size: 11px; color: #94a3b8;">${totalZeroCredit} jours</div>
         </div>
     `;
     
     statsContainer.appendChild(summaryDiv);
+    
+    // Bouton "Afficher les détails" déplacé depuis la section habitudes
+    const detailsButton = document.createElement('button');
+    detailsButton.id = `toggle-credit-${clientNumber}`;
+    detailsButton.style.cssText = `width:100%; padding:8px; margin-top:12px; background:#f1f5f9; border:1px solid #cbd5e1; border-radius:6px; font-size:13px; font-weight:600; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:5px;`;
+    detailsButton.innerHTML = `<span style="font-size:14px;">🔽</span> Afficher les détails`;
+    statsContainer.appendChild(detailsButton);
+    
+    // Ajouter l'événement du bouton
+    setTimeout(() => {
+        const btn = document.getElementById(`toggle-credit-${clientNumber}`);
+        const details = document.getElementById(`credit-details-${clientNumber}`);
+        if (btn && details) {
+            btn.addEventListener('click', () => {
+                if (details.style.display === 'none') {
+                    details.style.display = 'block';
+                    btn.innerHTML = `<span style="font-size:14px;">🔼</span> Masquer les détails`;
+                } else {
+                    details.style.display = 'none';
+                    btn.innerHTML = `<span style="font-size:14px;">🔽</span> Afficher les détails`;
+                }
+            });
+        }
+    }, 100);
+    
+    // === TABLEAUX DÉTAILS (cachés) - DÉPLACÉS ICI ===
+    const detailsContainer = document.createElement('div');
+    detailsContainer.id = `credit-details-${clientNumber}`;
+    detailsContainer.style.cssText = `display: none; margin-top: 15px;`;
+    
+    // Créer rechargeAnalysis si non fourni
+    if (!rechargeAnalysis) {
+        rechargeAnalysis = analyzeRechargeData(clientNumber);
+    }
+    
+    // Tableau des recharges - Version originale
+    if (rechargeAnalysis && rechargeAnalysis.hasData) {
+        const rechargeTable = document.createElement('div');
+        rechargeTable.style.cssText = `
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            overflow: hidden;
+            margin-bottom: 20px;
+        `;
+        
+        const tableHeader = document.createElement('div');
+        tableHeader.style.cssText = `
+            background: linear-gradient(135deg, #9f7aea 0%, #805ad5 100%);
+            color: white;
+            padding: 15px 20px;
+            font-size: 16px;
+            font-weight: 700;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        `;
+        tableHeader.innerHTML = `
+            <span style="display: flex; align-items: center; gap: 10px;">
+                <span style="font-size: 20px;">⚡</span>
+                Historique des recharges
+            </span>
+            <span style="background: rgba(255,255,255,0.2); padding: 5px 15px; border-radius: 30px; font-size: 13px;">
+                ${rechargeAnalysis.totalRecharges} opération(s)
+            </span>
+        `;
+        
+        const tableWrapper = document.createElement('div');
+        tableWrapper.style.cssText = `
+            max-height: 350px;
+            overflow-y: auto;
+            overflow-x: auto;
+            background: white;
+        `;
+        
+        let tableHTML = `
+            <table style="width: 100%; border-collapse: collapse; font-size: 12px; min-width: 700px;">
+                <thead style="position: sticky; top: 0; background: #f8fafc; z-index: 10;">
+                    <tr style="border-bottom: 2px solid #e2e8f0;">
+                        <th style="padding: 12px 10px; text-align: left;">Date</th>
+                        <th style="padding: 12px 10px; text-align: center;">Code 3 (jours)</th>
+                        <th style="padding: 12px 10px; text-align: center;">Statut</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+        
+        const sortedRecharges = [...combinedRechargeData]
+            .filter(row => row['Code 1']?.toString().trim() === clientNumber.toString())
+            .sort((a, b) => new Date(b['Date et Heure']) - new Date(a['Date et Heure']));
+        
+        sortedRecharges.forEach((row, index) => {
+            const date = row['Date et Heure'] || '-';
+            const code3 = row['Code 3'] || '-';
+            const status = row['Status'] || '-';
+            
+            const statusColor = status.toLowerCase().includes('reussie') ? '#22c55e' : 
+                            status.toLowerCase().includes('echoue') ? '#ef4444' : '#f59e0b';
+            
+            const bgColor = index % 2 === 0 ? '#ffffff' : '#fafbfc';
+            
+            tableHTML += `
+                <tr style="border-bottom: 1px solid #e2e8f0; background: ${bgColor};">
+                    <td style="padding: 10px; white-space: nowrap;">${date}</td>
+                    <td style="padding: 10px; text-align: center; font-weight: 600; color: #f97316;">${code3}</td>
+                    <td style="padding: 10px; text-align: center;">
+                        <span style="background: ${statusColor}20; color: ${statusColor}; padding: 3px 10px; border-radius: 20px; font-weight: 600; font-size: 11px;">
+                            ${status}
+                        </span>
+                    </td>
+                </tr>
+            `;
+        });
+        
+        tableHTML += `</tbody></table>`;
+        tableWrapper.innerHTML = tableHTML;
+        rechargeTable.appendChild(tableHeader);
+        rechargeTable.appendChild(tableWrapper);
+        detailsContainer.appendChild(rechargeTable);
+    }
+    
+    // Tableau des soldes - Version originale
+    if (data && data.length > 0) {
+        const soldeTable = document.createElement('div');
+        soldeTable.style.cssText = `
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            overflow: hidden;
+            margin-bottom: 20px;
+        `;
+        
+        const soldeHeader = document.createElement('div');
+        soldeHeader.style.cssText = `
+            background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+            color: white;
+            padding: 15px 20px;
+            font-size: 16px;
+            font-weight: 700;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        `;
+        soldeHeader.innerHTML = `
+            <span style="display: flex; align-items: center; gap: 10px;">
+                <span style="font-size: 20px;">💰</span>
+                Historique des soldes (crédits)
+            </span>
+            <span style="background: rgba(255,255,255,0.2); padding: 5px 15px; border-radius: 30px; font-size: 13px;">
+                ${data.length} relevé(s)
+            </span>
+        `;
+        
+        const soldeWrapper = document.createElement('div');
+        soldeWrapper.style.cssText = `
+            max-height: 350px;
+            overflow-y: auto;
+            overflow-x: auto;
+            background: white;
+        `;
+        
+        const clientSoldeData = [...combinedSoldeData]
+            .filter(row => row[`Credit${clientNumber}`] && row[`Credit${clientNumber}`].toString().trim() !== '')
+            .sort((a, b) => new Date(b['Date et Heure']) - new Date(a['Date et Heure']));
+        
+        let soldeHTML = `
+            <table style="width: 100%; border-collapse: collapse; font-size: 12px; min-width: 400px;">
+                <thead style="position: sticky; top: 0; background: #f8fafc; z-index: 10;">
+                    <tr style="border-bottom: 2px solid #e2e8f0;">
+                        <th style="padding: 12px 10px; text-align: left;">Date</th>
+                        <th style="padding: 12px 10px; text-align: center;">Crédit (jours)</th>
+                        <th style="padding: 12px 10px; text-align: center;">Statut</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+        
+        clientSoldeData.forEach((row, index) => {
+            const date = row['Date et Heure'] || '-';
+            const value = parseFloat(row[`Credit${clientNumber}`]) || 0;
+            const bgColor = index % 2 === 0 ? '#ffffff' : '#fafbfc';
+            
+            soldeHTML += `
+                <tr style="border-bottom: 1px solid #e2e8f0; background: ${bgColor};">
+                    <td style="padding: 10px; white-space: nowrap;">${date}</td>
+                    <td style="padding: 10px; text-align: center; font-weight: 600; color: ${value === 0 ? '#ef4444' : '#48bb78'};">${value}</td>
+                    <td style="padding: 10px; text-align: center;">
+                        ${value === 0 ? 
+                            '<span style="background: #ef444420; color: #ef4444; padding: 3px 10px; border-radius: 20px; font-size: 11px;">Sans crédit</span>' : 
+                            '<span style="background: #48bb7820; color: #48bb78; padding: 3px 10px; border-radius: 20px; font-size: 11px;">Crédit disponible</span>'}
+                    </td>
+                </tr>
+            `;
+        });
+        
+        soldeHTML += `</tbody></table>`;
+        soldeWrapper.innerHTML = soldeHTML;
+        soldeTable.appendChild(soldeHeader);
+        soldeTable.appendChild(soldeWrapper);
+        detailsContainer.appendChild(soldeTable);
+    }
+    
+    statsContainer.appendChild(detailsContainer);
+    
     parentContainer.appendChild(statsContainer);
 }
 

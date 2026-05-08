@@ -1371,12 +1371,19 @@ function generateCommercialView(clientId) {
         </div>
 
         <!-- HISTORIQUE DES FORFAITS ET CONSOMMATION -->
-        <div style="background: white; border-radius: 12px; border: 1px solid #e2e8f0; margin: 20px 0; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
-            <div style="padding: 16px 20px; background: #f8fafc; border-bottom: 1px solid #e2e8f0;">
-                <div style="display: flex; align-items: center; gap: 10px;">
-                    <span style="font-size: 20px;">📋</span>
-                    <span style="font-weight: 700; color: #1e293b; font-size: 16px;">Historique des forfaits et consommation</span>
-                    <span style="margin-left: auto; font-size: 12px; color: #64748b;">${allForfaits.length} forfait(s) · Analyse détaillée par période</span>
+        <div style="background: white;
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 25px;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);">
+            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 15px;">
+                <div style="width: 40px; height: 40px; background: linear-gradient(135deg, #9f7aea 0%, #805ad5 100%); border-radius: 10px; display: flex; align-items: center; justify-content: center;">
+                    <span style="font-size: 20px; color: white;">📋</span>
+                </div>
+                <div>
+                    <h3 style="margin: 0; font-size: 16px; font-weight: 700; color: #1e293b;">Historique des forfaits et consommation</h3>
+                    <p style="margin: 2px 0 0 0; font-size: 12px; color: #64748b;">1 forfait(s) · Analyse détaillée par période</p>
                 </div>
             </div>
             <div style="padding: 20px;">
@@ -1597,40 +1604,53 @@ function generateForfaitProgressBars(forfaits, dailySummary, currentForfaitMax) 
     ];
 
     return `
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 5px;">
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 15px;">
+                <span style="font-size: 18px;">📊</span>
+                <span style="font-weight: 600; color: #1e293b;">Répartition de l'énergie consommée (seuils 85% et 115%)</span>
+            </div>
+        </div>
         <div style="background: white; border-radius: 18px; border: 1px solid #e2e8f0; padding: 20px; box-shadow: 0 10px 25px rgba(15, 23, 42, 0.05); margin-bottom: 20px;">
-            <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px;">
-                <div>
-                    <div style="font-size: 14px; font-weight: 700; color: #0f172a; letter-spacing: 0.03em; text-transform: uppercase; margin-bottom: 6px;">Répartition cumulée par kits</div>
-                    <div style="display: flex; align-items: center; gap: 10px; font-size: 13px; color: #475569;">
-                        <span style="background: #ecfeff; color: #0f766e; padding: 5px 10px; border-radius: 999px; font-weight: 600;">Pic: ${stats.maxEnergy.toFixed(0)} Wh (${currentForfait.name})</span>
-                        <span style="background: #f8fafc; color: #64748b; padding: 5px 10px; border-radius: 999px;">${totalDays} jours</span>
-                    </div>
-                </div>
+            <!-- Barre de progression combinée avec le style du CODE 1 -->
+            <div style="background: #f1f5f9; border-radius: 30px; height: 40px; overflow: hidden; display: flex; box-shadow: inset 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 10px;">
+                ${(() => {
+                    return categories.filter(category => category.percent > 0).map(category => {
+                        return `<div style="width: ${category.percent}%; height: 100%; background: ${category.color}; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600; color: white;">
+                            ${category.percent > 5 ? category.percent + '%' : ''}
+                        </div>`;
+                    }).join('');
+                })()}
             </div>
 
-            <!-- Barre de progression combinée -->
-            <div style="margin-top: 20px;">
-                <div style="flex: 1; background: #f1f5f9; border-radius: 999px; height: 32px; overflow: hidden; box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.08); display: flex;">
-                    ${(() => {
-                        return categories.filter(category => category.percent > 0).map(category => {
-                            return `<div style="width: ${category.percent}%; min-width: 0; height: 100%; background: ${category.color}; display: flex; align-items: center; justify-content: center; padding: 0 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                                <span style="color: white; font-size: 12px; font-weight: 700; text-shadow: 0 1px 2px rgba(0,0,0,0.35);">${category.percent}%</span>
-                            </div>`;
-                        }).join('');
-                    })()}
-                </div>
-            </div>
-
-            <!-- Légende des catégories -->
-            <div style="display: flex; flex-wrap: wrap; gap: 12px; margin-top: 18px;">
+            <!-- Légende des catégories avec le style du CODE 1 -->
+            <div style="display: flex; flex-wrap: wrap; gap: 15px; justify-content: space-between; font-size: 11px; margin-top: 10px;">
                 ${categories.filter(category => category.percent > 0).map(category => `
-                    <div style="display: flex; align-items: center; gap: 10px; min-width: 220px;">
-                        <span style="width: 14px; height: 14px; background: ${category.color}; border-radius: 999px; display: inline-block;"></span>
-                        <div style="font-size: 13px; color: #334155;">
-                            <span style="font-weight: 700;">${category.value} jours</span> ${category.subtitle} · <span style="font-weight: 700; color: ${category.color};">${category.percent}%</span>
-                        </div>
+                    <div style="display: flex; align-items: center; gap: 5px;">
+                        <div style="width: 12px; height: 12px; background: ${category.color}; border-radius: 3px;"></div>
+                        <span><strong>${category.value} jours</strong> ${category.subtitle} · ${category.percent}%</span>
                     </div>
                 `).join('')}
+            </div>
+        </div>
+
+        <div style="margin-top: 15px; padding: 15px; background: #f1f5f9; border-radius: 8px; font-size: 12px; display: flex; flex-direction: column; gap: 10px;">
+            <div style="display: flex; align-items: center; gap: 10px; color: #475569;">
+                <span style="font-size: 14px;">📌</span>
+                <span><strong>Légende des seuils de consommation :</strong></span>
+            </div>
+            <div style="display: flex; flex-wrap: wrap; gap: 20px; justify-content: space-around;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <div style="width: 16px; height: 16px; background: #22c55e; border-radius: 4px;"></div>
+                    <span><strong>Normal</strong> (0-85% du forfait)</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <div style="width: 16px; height: 16px; background: #f59e0b; border-radius: 4px;"></div>
+                    <span><strong>Tolérance</strong> (85-115% du forfait)</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <div style="width: 16px; height: 16px; background: #ef4444; border-radius: 4px;"></div>
+                    <span><strong>Hors tolérance</strong> (>115% du forfait ou événement SuspendE)</span>
+                </div>
             </div>
         </div>
     `;
@@ -2211,29 +2231,21 @@ function createMonthlyCreditTable(monthlyStats) {
     return `
         <div style="margin-top: 20px;">
             <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 15px;">
-                <div style="width: 36px; height: 36px; background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%); 
-                          border-radius: 10px; display: flex; align-items: center; justify-content: center;">
-                    <span style="font-size: 18px; color: white;">📅</span>
-                </div>
-                <div>
-                    <div style="font-weight: 700; color: #1e293b; font-size: 16px;">Analyse mensuelle du crédit</div>
-                    <div style="font-size: 11px; color: #64748b;">Évolution mensuelle de la disponibilité et du crédit</div>
-                </div>
-                <div style="margin-left: auto; background: #f1f5f9; padding: 4px 12px; border-radius: 20px; font-size: 12px;">
-                    📊 ${monthlyStats.length} mois analysés
+                <div style="font-weight: 700; margin-bottom: 10px; font-size: 18px; color: #0c4a6e;">
+                    📊 Analyse mensuelle du crédit
                 </div>
             </div>
             
             <div style="overflow-x: auto; border-radius: 12px; border: 1px solid #e2e8f0; background: white;">
-                <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+                <table style="width: 100%; border-collapse: collapse; font-size: 13px; background: white; border-radius: 8px; overflow: hidden;">
                     <thead>
-                        <tr style="background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); border-bottom: 2px solid #e2e8f0;">
-                            <th style="padding: 14px 12px; text-align: left; font-weight: 700; color: #334155;">Mois</th>
-                            <th style="padding: 14px 12px; text-align: center; font-weight: 700; color: #334155;">Jours analysés</th>
-                            <th style="padding: 14px 12px; text-align: center; font-weight: 700; color: #334155;">Jours sans crédit</th>
-                            <th style="padding: 14px 12px; text-align: center; font-weight: 700; color: #334155;">Taux de disponibilité</th>
-                            <th style="padding: 14px 12px; text-align: center; font-weight: 700; color: #334155;">Crédit maximum</th>
-                            <th style="padding: 14px 12px; text-align: center; font-weight: 700; color: #334155;">Crédit moyen</th>
+                        <tr style="background: #334155; color: white;">
+                            <th style="padding: 12px 10px; text-align: left;">Mois</th>
+                            <th style="padding: 12px 10px; text-align: center;">Jours analysés</th>
+                            <th style="padding: 12px 10px; text-align: center;">Jours sans crédit</th>
+                            <th style="padding: 12px 10px; text-align: center;">Taux de disponibilité</th>
+                            <th style="padding: 12px 10px; text-align: center;">Crédit maximum</th>
+                            <th style="padding: 12px 10px; text-align: center;">Crédit moyen</th>
                          </tr>
                     </thead>
                     <tbody>
@@ -2261,33 +2273,6 @@ function createMonthlyCreditTable(monthlyStats) {
                  </table>
             </div>
             
-            <!-- Légende -->
-            <div style="display: flex; gap: 20px; margin-top: 12px; padding: 10px 0; font-size: 11px; color: #64748b; flex-wrap: wrap;">
-                <div style="display: flex; align-items: center; gap: 6px;">
-                    <span style="width: 12px; height: 12px; background: #22c55e; border-radius: 2px;"></span>
-                    <span>Taux ≥ 95%</span>
-                </div>
-                <div style="display: flex; align-items: center; gap: 6px;">
-                    <span style="width: 12px; height: 12px; background: #f59e0b; border-radius: 2px;"></span>
-                    <span>Taux 80-95%</span>
-                </div>
-                <div style="display: flex; align-items: center; gap: 6px;">
-                    <span style="width: 12px; height: 12px; background: #ef4444; border-radius: 2px;"></span>
-                    <span>Taux < 80%</span>
-                </div>
-                <div style="display: flex; align-items: center; gap: 6px;">
-                    <span style="font-size: 12px;">✅</span>
-                    <span>0 jour sans crédit</span>
-                </div>
-                <div style="display: flex; align-items: center; gap: 6px;">
-                    <span style="font-size: 12px;">⚠️</span>
-                    <span>1-20% sans crédit</span>
-                </div>
-                <div style="display: flex; align-items: center; gap: 6px;">
-                    <span style="font-size: 12px;">🔴</span>
-                    <span>>20% sans crédit</span>
-                </div>
-            </div>
         </div>
     `;
 }
@@ -2368,69 +2353,55 @@ function createCreditCard(clientId) {
             <div style="padding: 20px; border-top: 1px solid #e2e8f0;">
                 ${createMonthlyCreditTable(monthlyStats)}
             </div>
-            
-            <!-- RÉSUMÉ STATISTIQUE -->
-            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; padding: 15px 20px; background: #f8fafc; border-top: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0;">
-                <div style="text-align: center;">
-                    <div style="font-size: 11px; color: #64748b;">Crédit moyen</div>
-                    <div style="font-size: 22px; font-weight: 700; color: #f59e0b;">${avgCredit}j</div>
-                </div>
-                <div style="text-align: center;">
-                    <div style="font-size: 11px; color: #64748b;">Jours sans crédit</div>
-                    <div style="font-size: 22px; font-weight: 700; color: ${totalDays > 0 ? '#ef4444' : '#22c55e'};">${totalDays}</div>
-                </div>
-                <div style="text-align: center;">
-                    <div style="font-size: 11px; color: #64748b;">Plus longue série</div>
-                    <div style="font-size: 22px; font-weight: 700; color: ${longestStreak > 3 ? '#ef4444' : '#f59e0b'};">${longestStreak}j</div>
-                </div>
-                <div style="text-align: center;">
-                    <div style="font-size: 11px; color: #64748b;">Risque</div>
-                    <div style="display: flex; align-items: center; justify-content: center; gap: 5px; margin-top: 5px;">
-                        <span style="font-size: 18px;">${riskIcon}</span>
-                        <span style="font-weight: 700; color: ${riskColor};">${riskLevel.toUpperCase()}</span>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- SÉRIES SANS CRÉDIT (version compacte) -->
-            ${significantStreaks.length > 0 ? `
-            <div style="padding: 16px 20px;">
-                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
-                    <span style="font-size: 16px;">🔗</span>
-                    <span style="font-weight: 600; color: #1e293b; font-size: 14px;">Périodes sans crédit</span>
-                    <span style="background: #f1f5f9; color: #475569; padding: 2px 10px; border-radius: 30px; font-size: 11px;">${significantStreaks.length} série(s)</span>
-                </div>
-                <div style="display: flex; flex-wrap: wrap; gap: 12px;">
-                    ${significantStreaks.slice(0, 5).map((streak, index) => {
-                        const isLongest = streak.days === longestStreak;
-                        return `
-                            <div style="flex: 1 1 180px; background: white; border-radius: 10px; border: 1px solid #e2e8f0; overflow: hidden;">
-                                <div style="background: ${isLongest ? '#ef4444' : '#f59e0b'}; padding: 6px 12px; display: flex; justify-content: space-between;">
-                                    <span style="color: white; font-weight: 600; font-size: 11px;">Série ${index + 1}</span>
-                                    ${isLongest ? '<span style="background: white; color: #ef4444; padding: 2px 8px; border-radius: 20px; font-size: 9px; font-weight: 700;">MAX</span>' : ''}
-                                </div>
-                                <div style="padding: 10px;">
-                                    <div style="font-size: 20px; font-weight: 800; color: ${isLongest ? '#ef4444' : '#f59e0b'};">${streak.days} jours</div>
-                                    <div style="font-size: 11px; color: #64748b; font-family: monospace;">${streak.startDate} → ${streak.endDate}</div>
-                                </div>
-                            </div>
-                        `;
-                    }).join('')}
-                </div>
-                ${significantStreaks.length > 5 ? `<div style="margin-top: 10px; font-size: 11px; color: #94a3b8; text-align: center;">+ ${significantStreaks.length - 5} autre(s) série(s)</div>` : ''}
-            </div>
-            ` : `
-            `}
-            
-            <!-- Pied de carte -->
-            <div style="padding: 12px 22px; background: #f8fafc; border-top: 1px solid #e2e8f0; font-size: 11px; color: #64748b; display: flex; justify-content: space-between;">
-                <span>📈 Graphique: Évolution du crédit (jours) | 📊 Analyse mensuelle</span>
-                <span>Client ${clientNumber} · Dernière analyse: ${new Date().toLocaleDateString('fr-FR')}</span>
-            </div>
         </div>
     `;
 }
+// ======================== EXTRAIRE LES ANNÉES DISPONIBLES ========================
+function getAvailableYears(creditData) {
+    if (!creditData || !creditData.results || creditData.results.length === 0) {
+        return [];
+    }
+    
+    const years = new Set();
+    creditData.results.forEach(item => {
+        const dateStr = item.date;
+        if (dateStr) {
+            const [day, month, year] = dateStr.split('/');
+            if (year) {
+                years.add(parseInt(year));
+            }
+        }
+    });
+    
+    return Array.from(years).sort((a, b) => a - b);
+}
 
+// ======================== FILTRER LES DONNÉES DE CRÉDIT PAR ANNÉE ========================
+function filterCreditDataByYear(creditData, selectedYear) {
+    if (!creditData || !creditData.results || creditData.results.length === 0) {
+        return { results: [], dailySummary: [] };
+    }
+    
+    if (selectedYear === 'all') {
+        return creditData;
+    }
+    
+    const filteredResults = creditData.results.filter(item => {
+        const [day, month, year] = item.date.split('/');
+        return parseInt(year) === parseInt(selectedYear);
+    });
+    
+    // Recalculer le dailySummary avec les données filtrées
+    let filteredDailySummary = [];
+    if (creditData.dailySummary && window.generateCreditDailySummary) {
+        filteredDailySummary = window.generateCreditDailySummary(filteredResults);
+    }
+    
+    return {
+        results: filteredResults,
+        dailySummary: filteredDailySummary
+    };
+}
 function displayClientEventsTab(clientId) {
     console.log(`🔍 ===== DÉBUT displayClientEventsTab pour client ${clientId} =====`);
 
@@ -2820,12 +2791,6 @@ function displayClientEventsTab(clientId) {
                         </tbody>
                     </table>
                 </div>
-            </div>
-            
-            <!-- Pied de carte -->
-            <div style="padding: 8px 16px; background: #f8fafc; border-top: 1px solid #e2e8f0; font-size: 10px; color: #64748b; display: flex; justify-content: space-between;">
-                <span>📊 Créneaux de 15 min (ex: 02:32-48 = de 02:32 à 02:48)</span>
-                <span>Client ${parseInt(clientId).toString().padStart(2, '0')}</span>
             </div>
         </div>
     `;

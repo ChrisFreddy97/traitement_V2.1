@@ -1021,6 +1021,20 @@ function renderEventsClient(client) {
     // Format du numéro client avec zéro devant (comme code 1)
     const clientNumberFormatted = client.id.toString().padStart(2, '0');
     
+    // ✅ Calculer le nombre de jours entre la première recharge et le dernier jour du relevé
+    let totalDaysForPercentage = totalDays;
+    if (client.firstRechargeDate && eventsByDay.length > 0) {
+        const allDates = eventsByDay.map(d => new Date(d.date)).sort((a, b) => a - b);
+        const firstDate = new Date(client.firstRechargeDate);
+        const lastDate = allDates[allDates.length - 1];
+        
+        if (firstDate && lastDate) {
+            // Calculer le nombre de jours entre firstDate et lastDate (inclus)
+            const timeDiff = lastDate - firstDate;
+            totalDaysForPercentage = Math.floor(timeDiff / (1000 * 60 * 60 * 24)) + 1; // +1 pour inclure les deux jours
+        }
+    }
+    
     // ✅ CONDITION : si aucun événement
     if (!hasAnyEvent || totalEvents === 0) {
         return `
@@ -1033,16 +1047,16 @@ function renderEventsClient(client) {
                     <span style="font-size: 48px; display: block; margin-bottom: 15px;">✅</span>
                     <h3 style="margin: 0 0 10px 0; color: #1e293b;">Aucun événement</h3>
                     <p style="margin: 0; font-size: 14px;">Aucun événement pour ce client</p>
-                    <p style="margin-top: 10px; font-size: 12px; color: #64748b;">Sur ${totalDays} jour(s) de diagnostic</p>
+                    <p style="margin-top: 10px; font-size: 12px; color: #64748b;">Sur ${totalDaysForPercentage} jour(s) analysé(s)</p>
                 </div>
             </div>
         `;
     }
     
     // Calcul des pourcentages
-    const percentCreditNul = ((daysWithCreditNul.size / totalDays) * 100).toFixed(1);
-    const percentSuspendP = ((daysWithSuspendP.size / totalDays) * 100).toFixed(1);
-    const percentSuspendE = ((daysWithSuspendE.size / totalDays) * 100).toFixed(1);
+    const percentCreditNul = ((daysWithCreditNul.size / totalDaysForPercentage) * 100).toFixed(1);
+    const percentSuspendP = ((daysWithSuspendP.size / totalDaysForPercentage) * 100).toFixed(1);
+    const percentSuspendE = ((daysWithSuspendE.size / totalDaysForPercentage) * 100).toFixed(1);
     
     let html = `
         <div style="background: white; border-radius: 16px; box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08); overflow: hidden; border: 2px solid #e2e8f0; margin-bottom: 25px;">
@@ -1287,6 +1301,20 @@ function renderEventsClient(client) {
     const totalEvents = events.length + zeroCreditDates.length;
     const hasAnyEvent = daysWithCreditNul.size > 0 || daysWithSuspendP.size > 0 || daysWithSuspendE.size > 0;
     
+    // ✅ Calculer le nombre de jours entre la première recharge et le dernier jour du relevé
+    let totalDaysForPercentage = totalDays;
+    if (client.firstRechargeDate && eventsByDay.length > 0) {
+        const allDates = eventsByDay.map(d => new Date(d.date)).sort((a, b) => a - b);
+        const firstDate = new Date(client.firstRechargeDate);
+        const lastDate = allDates[allDates.length - 1];
+        
+        if (firstDate && lastDate) {
+            // Calculer le nombre de jours entre firstDate et lastDate (inclus)
+            const timeDiff = lastDate - firstDate;
+            totalDaysForPercentage = Math.floor(timeDiff / (1000 * 60 * 60 * 24)) + 1; // +1 pour inclure les deux jours
+        }
+    }
+    
     // ✅ CONDITION : si aucun événement (toutes les valeurs à 0)
     if (!hasAnyEvent || totalEvents === 0) {
         return `
@@ -1310,9 +1338,9 @@ function renderEventsClient(client) {
     }
     
     // Sinon, afficher le dashboard complet avec l'en-tête style renderInfoCard
-    const percentCreditNul = ((daysWithCreditNul.size / totalDays) * 100).toFixed(1);
-    const percentSuspendP = ((daysWithSuspendP.size / totalDays) * 100).toFixed(1);
-    const percentSuspendE = ((daysWithSuspendE.size / totalDays) * 100).toFixed(1);
+    const percentCreditNul = ((daysWithCreditNul.size / totalDaysForPercentage) * 100).toFixed(1);
+    const percentSuspendP = ((daysWithSuspendP.size / totalDaysForPercentage) * 100).toFixed(1);
+    const percentSuspendE = ((daysWithSuspendE.size / totalDaysForPercentage) * 100).toFixed(1);
     
     let html = `
         <div style="background: white; border-radius: 16px; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08); overflow: hidden; border: 1px solid #e2e8f0; margin-bottom: 20px;">
