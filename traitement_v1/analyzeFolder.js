@@ -53,6 +53,9 @@ let currentPageFonc = 1;
 let totalRowsFonc = 0;
 let foncDetailsTableVisible = false;
 
+//variable globale pour stocker la date de première recharge
+let firstRechargeDate = null;
+
 // ==================== DICTIONNAIRE DES FORFAITS ====================
 const FORFAIT_NAMES = {
     1: "ECO",
@@ -872,7 +875,7 @@ function analyzeRechargeData(clientNumber) {
     };
 }
 // ==================== ANALYSE DES JOURS SANS CRÉDIT ====================
-function analyzeDaysWithoutCredit(clientNumber) {
+function analyzeDaysWithoutCredit(clientNumber, startDateFilter = null) {
     if (!combinedSoldeData || combinedSoldeData.length === 0) {
         return {
             clientNumber: clientNumber,
@@ -899,7 +902,14 @@ function analyzeDaysWithoutCredit(clientNumber) {
     const clientData = combinedSoldeData
         .filter(row => {
             const value = row[creditKey];
-            return value && value.toString().trim() !== '' && value.toString().trim() !== '-';
+            if (!value || value.toString().trim() === '' || value.toString().trim() === '-') return false;
+            
+            // ✅ APPLIQUER LE FILTRE DE DATE DE DÉBUT
+            const dateStr = row['Date et Heure'].split(' ')[0];
+            const dateObj = new Date(dateStr);
+            if (startDateFilter && dateObj < startDateFilter) return false;
+            
+            return true;
         })
         .map(row => ({
             dateTime: row['Date et Heure'],
@@ -986,12 +996,10 @@ function analyzeDaysWithoutCredit(clientNumber) {
     let currentStreakStart = null;
     
     if (lastRecord && lastRecord.value === 0) {
-        // Vérifier si les derniers jours sont sans crédit
-        const today = new Date().toISOString().split('T')[0];
         let checkDate = new Date(lastRecord.date);
         let streakCount = 0;
         
-        while (streakCount < 30) { // Limiter à 30 jours pour éviter les boucles infinies
+        while (streakCount < 30) {
             const dateStr = checkDate.toISOString().split('T')[0];
             const recordForDate = clientData.find(r => r.date === dateStr);
             
@@ -1033,46 +1041,46 @@ function applyDateFilters() {
         year: filterYear
     });
     
-    // Trouver la date la plus récente dans les données (optimisé avec échantillonnage)
-    let lastDate = null;
-    const allDates = [];
-    const maxSamples = 1000; // Limiter le nombre d'échantillons pour éviter surcharge
-    let sampleCount = 0;
-    
-    // Collecter les dates des données d'énergie (échantillonnage)
-    if (combinedEnergyData.length > 0) {
-        const step = Math.max(1, Math.floor(combinedEnergyData.length / (maxSamples / 2)));
-        for (let i = 0; i < combinedEnergyData.length && sampleCount < maxSamples / 2; i += step) {
-            const row = combinedEnergyData[i];
-            if (row['Date et Heure']) {
-                const date = new Date(row['Date et Heure'].split(' ')[0]);
-                if (!isNaN(date.getTime())) {
-                    allDates.push(date);
-                    sampleCount++;
+    // ✅ CRÉER UNE FONCTION POUR TROUVER LA DATE LA PLUS RÉCENTE (SANS ÉCHANTILLONNAGE POUR LA PRÉCISION)
+    function getLastDateFromData() {
+        let lastDate = null;
+        
+        // Vérifier dans les données d'énergie
+        if (combinedEnergyData.length > 0) {
+            for (const row of combinedEnergyData) {
+                if (row['Date et Heure']) {
+                    const date = new Date(row['Date et Heure'].split(' ')[0]);
+                    if (!isNaN(date.getTime())) {
+                        if (!lastDate || date > lastDate) {
+                            lastDate = date;
+                        }
+                    }
                 }
             }
         }
-    }
-    
-    // Collecter les dates des données de tension (échantillonnage)
-    if (combinedTensionData.length > 0) {
-        const step = Math.max(1, Math.floor(combinedTensionData.length / (maxSamples / 2)));
-        for (let i = 0; i < combinedTensionData.length && sampleCount < maxSamples; i += step) {
-            const row = combinedTensionData[i];
-            if (row['Date et Heure']) {
-                const date = new Date(row['Date et Heure'].split(' ')[0]);
-                if (!isNaN(date.getTime())) {
-                    allDates.push(date);
-                    sampleCount++;
+        
+        // Vérifier dans les données de tension si nécessaire
+        if (combinedTensionData.length > 0) {
+            for (const row of combinedTensionData) {
+                if (row['Date et Heure']) {
+                    const date = new Date(row['Date et Heure'].split(' ')[0]);
+                    if (!isNaN(date.getTime())) {
+                        if (!lastDate || date > lastDate) {
+                            lastDate = date;
+                        }
+                    }
                 }
             }
         }
+        
+        return lastDate;
     }
     
-    // Trouver la date la plus récente
-    if (allDates.length > 0) {
-        lastDate = new Date(Math.max(...allDates));
-        console.log('📅 Date la plus récente dans les données (échantillonnage):', lastDate.toLocaleDateString('fr-FR'));
+    // ✅ TROUVER LA DATE LA PLUS RÉCENTE (une seule fois, de manière fiable)
+    let lastDate = getLastDateFromData();
+    
+    if (lastDate) {
+        console.log('📅 Date la plus récente dans les données:', lastDate.toLocaleDateString('fr-FR'));
     }
     
     // 1. Appliquer les filtres aux données d'énergie
@@ -1092,8 +1100,18 @@ function applyDateFilters() {
                 if (isNaN(rowDate.getTime())) return false;
                 
                 let pass = true;
-                if (filterStartDate) pass = pass && (rowDate >= filterStartDate);
-                if (filterEndDate) pass = pass && (rowDate <= filterEndDate);
+                if (filterStartDate) {
+                    const startDateOnly = new Date(filterStartDate);
+                    startDateOnly.setHours(0, 0, 0, 0);
+                    const rowDateOnly = new Date(rowDate);
+                    rowDateOnly.setHours(0, 0, 0, 0);
+                    pass = pass && (rowDateOnly >= startDateOnly);
+                }
+                if (filterEndDate) {
+                    const endDateOnly = new Date(filterEndDate);
+                    endDateOnly.setHours(23, 59, 59, 999);
+                    pass = pass && (rowDate <= endDateOnly);
+                }
                 return pass;
             });
         }
@@ -1101,53 +1119,61 @@ function applyDateFilters() {
         else if (filterPeriod && filterPeriod !== 'all' && lastDate) {
             filterApplied = true;
             
-            // Créer une copie de la dernière date pour le calcul
-            let startDate = new Date(lastDate);
+            // ✅ CRÉER LA DATE DE FIN (la plus récente des données)
+            const endDate = new Date(lastDate);
+            endDate.setHours(23, 59, 59, 999);
             
-            // Soustraire la période appropriée
+            // ✅ CRÉER LA DATE DE DÉBUT
+            let startDate = new Date(lastDate);
+            startDate.setHours(0, 0, 0, 0);
+            
             switch (filterPeriod) {
                 case '5days':
-                    startDate.setDate(lastDate.getDate() - 5);
-                    filterDescription = `5 derniers jours (du ${startDate.toLocaleDateString('fr-FR')} au ${lastDate.toLocaleDateString('fr-FR')})`;
+                    // 5 jours = J-4, J-3, J-2, J-1, J
+                    startDate.setDate(startDate.getDate() - 4);
+                    filterDescription = `5 derniers jours (du ${startDate.toLocaleDateString('fr-FR')} au ${endDate.toLocaleDateString('fr-FR')})`;
                     break;
                 case '7days':
-                    startDate.setDate(lastDate.getDate() - 7);
-                    filterDescription = `7 derniers jours (du ${startDate.toLocaleDateString('fr-FR')} au ${lastDate.toLocaleDateString('fr-FR')})`;
+                    startDate.setDate(startDate.getDate() - 6);
+                    filterDescription = `7 derniers jours (du ${startDate.toLocaleDateString('fr-FR')} au ${endDate.toLocaleDateString('fr-FR')})`;
                     break;
                 case '15days':
-                    startDate.setDate(lastDate.getDate() - 15);
-                    filterDescription = `15 derniers jours (du ${startDate.toLocaleDateString('fr-FR')} au ${lastDate.toLocaleDateString('fr-FR')})`;
+                    startDate.setDate(startDate.getDate() - 14);
+                    filterDescription = `15 derniers jours (du ${startDate.toLocaleDateString('fr-FR')} au ${endDate.toLocaleDateString('fr-FR')})`;
                     break;
                 case '30days':
-                    startDate.setDate(lastDate.getDate() - 30);
-                    filterDescription = `30 derniers jours (du ${startDate.toLocaleDateString('fr-FR')} au ${lastDate.toLocaleDateString('fr-FR')})`;
+                    startDate.setDate(startDate.getDate() - 29);
+                    filterDescription = `30 derniers jours (du ${startDate.toLocaleDateString('fr-FR')} au ${endDate.toLocaleDateString('fr-FR')})`;
                     break;
                 case '2months':
-                    startDate.setMonth(lastDate.getMonth() - 2);
-                    filterDescription = `2 derniers mois (du ${startDate.toLocaleDateString('fr-FR')} au ${lastDate.toLocaleDateString('fr-FR')})`;
+                    startDate.setMonth(startDate.getMonth() - 2);
+                    filterDescription = `2 derniers mois (du ${startDate.toLocaleDateString('fr-FR')} au ${endDate.toLocaleDateString('fr-FR')})`;
                     break;
                 case '3months':
-                    startDate.setMonth(lastDate.getMonth() - 3);
-                    filterDescription = `3 derniers mois (du ${startDate.toLocaleDateString('fr-FR')} au ${lastDate.toLocaleDateString('fr-FR')})`;
+                    startDate.setMonth(startDate.getMonth() - 3);
+                    filterDescription = `3 derniers mois (du ${startDate.toLocaleDateString('fr-FR')} au ${endDate.toLocaleDateString('fr-FR')})`;
                     break;
                 case '6months':
-                    startDate.setMonth(lastDate.getMonth() - 6);
-                    filterDescription = `6 derniers mois (du ${startDate.toLocaleDateString('fr-FR')} au ${lastDate.toLocaleDateString('fr-FR')})`;
+                    startDate.setMonth(startDate.getMonth() - 6);
+                    filterDescription = `6 derniers mois (du ${startDate.toLocaleDateString('fr-FR')} au ${endDate.toLocaleDateString('fr-FR')})`;
                     break;
                 case '1year':
-                    startDate.setFullYear(lastDate.getFullYear() - 1);
-                    filterDescription = `1 dernière année (du ${startDate.toLocaleDateString('fr-FR')} au ${lastDate.toLocaleDateString('fr-FR')})`;
+                    startDate.setFullYear(startDate.getFullYear() - 1);
+                    filterDescription = `1 dernière année (du ${startDate.toLocaleDateString('fr-FR')} au ${endDate.toLocaleDateString('fr-FR')})`;
                     break;
             }
             
-            // Ajouter 1 jour à la date de fin pour inclure le dernier jour complet
-            const endDate = new Date(lastDate);
-            endDate.setHours(23, 59, 59, 999);
+            // ✅ S'ASSURER QUE LA DATE DE DÉBUT EST À MINUIT
+            startDate.setHours(0, 0, 0, 0);
+            
+            console.log(`📅 Filtre ${filterPeriod}: début=${startDate.toLocaleDateString('fr-FR')}, fin=${endDate.toLocaleDateString('fr-FR')}`);
+            console.log(`📊 Nombre de jours: ${Math.round((endDate - startDate) / (1000 * 60 * 60 * 24)) + 1}`);
             
             filteredEnergy = filteredEnergy.filter(row => {
                 if (!row['Date et Heure']) return false;
                 const rowDate = new Date(row['Date et Heure']);
-                return !isNaN(rowDate.getTime()) && rowDate >= startDate && rowDate <= endDate;
+                if (isNaN(rowDate.getTime())) return false;
+                return rowDate >= startDate && rowDate <= endDate;
             });
         }
         // Si un mois/année est spécifié
@@ -1191,7 +1217,6 @@ function applyDateFilters() {
         
         filteredEnergyData = filteredEnergy;
         
-        // Vérifier si le filtre a retourné des résultats
         if (filterApplied && filteredEnergyData.length === 0) {
             showWarningMessage(`⚠️ Aucune donnée d'énergie trouvée pour ${filterDescription}`);
         } else if (filterApplied) {
@@ -1199,7 +1224,7 @@ function applyDateFilters() {
         }
     }
     
-    // 2. Appliquer les filtres aux données de tension (même logique)
+    // 2. Appliquer les mêmes corrections aux données de tension
     if (combinedTensionData.length > 0) {
         let filteredTension = [...combinedTensionData];
         let filterApplied = false;
@@ -1215,58 +1240,72 @@ function applyDateFilters() {
                 if (isNaN(rowDate.getTime())) return false;
                 
                 let pass = true;
-                if (filterStartDate) pass = pass && (rowDate >= filterStartDate);
-                if (filterEndDate) pass = pass && (rowDate <= filterEndDate);
+                if (filterStartDate) {
+                    const startDateOnly = new Date(filterStartDate);
+                    startDateOnly.setHours(0, 0, 0, 0);
+                    const rowDateOnly = new Date(rowDate);
+                    rowDateOnly.setHours(0, 0, 0, 0);
+                    pass = pass && (rowDateOnly >= startDateOnly);
+                }
+                if (filterEndDate) {
+                    const endDateOnly = new Date(filterEndDate);
+                    endDateOnly.setHours(23, 59, 59, 999);
+                    pass = pass && (rowDate <= endDateOnly);
+                }
                 return pass;
             });
         }
         else if (filterPeriod && filterPeriod !== 'all' && lastDate) {
             filterApplied = true;
             
+            const endDate = new Date(lastDate);
+            endDate.setHours(23, 59, 59, 999);
+            
             let startDate = new Date(lastDate);
+            startDate.setHours(0, 0, 0, 0);
             
             switch (filterPeriod) {
                 case '5days':
-                    startDate.setDate(lastDate.getDate() - 5);
-                    filterDescription = `5 derniers jours (du ${startDate.toLocaleDateString('fr-FR')} au ${lastDate.toLocaleDateString('fr-FR')})`;
+                    startDate.setDate(startDate.getDate() - 4);
+                    filterDescription = `5 derniers jours (du ${startDate.toLocaleDateString('fr-FR')} au ${endDate.toLocaleDateString('fr-FR')})`;
                     break;
                 case '7days':
-                    startDate.setDate(lastDate.getDate() - 7);
-                    filterDescription = `7 derniers jours (du ${startDate.toLocaleDateString('fr-FR')} au ${lastDate.toLocaleDateString('fr-FR')})`;
+                    startDate.setDate(startDate.getDate() - 6);
+                    filterDescription = `7 derniers jours (du ${startDate.toLocaleDateString('fr-FR')} au ${endDate.toLocaleDateString('fr-FR')})`;
                     break;
                 case '15days':
-                    startDate.setDate(lastDate.getDate() - 15);
-                    filterDescription = `15 derniers jours (du ${startDate.toLocaleDateString('fr-FR')} au ${lastDate.toLocaleDateString('fr-FR')})`;
+                    startDate.setDate(startDate.getDate() - 14);
+                    filterDescription = `15 derniers jours (du ${startDate.toLocaleDateString('fr-FR')} au ${endDate.toLocaleDateString('fr-FR')})`;
                     break;
                 case '30days':
-                    startDate.setDate(lastDate.getDate() - 30);
-                    filterDescription = `30 derniers jours (du ${startDate.toLocaleDateString('fr-FR')} au ${lastDate.toLocaleDateString('fr-FR')})`;
+                    startDate.setDate(startDate.getDate() - 29);
+                    filterDescription = `30 derniers jours (du ${startDate.toLocaleDateString('fr-FR')} au ${endDate.toLocaleDateString('fr-FR')})`;
                     break;
                 case '2months':
-                    startDate.setMonth(lastDate.getMonth() - 2);
-                    filterDescription = `2 derniers mois (du ${startDate.toLocaleDateString('fr-FR')} au ${lastDate.toLocaleDateString('fr-FR')})`;
+                    startDate.setMonth(startDate.getMonth() - 2);
+                    filterDescription = `2 derniers mois (du ${startDate.toLocaleDateString('fr-FR')} au ${endDate.toLocaleDateString('fr-FR')})`;
                     break;
                 case '3months':
-                    startDate.setMonth(lastDate.getMonth() - 3);
-                    filterDescription = `3 derniers mois (du ${startDate.toLocaleDateString('fr-FR')} au ${lastDate.toLocaleDateString('fr-FR')})`;
+                    startDate.setMonth(startDate.getMonth() - 3);
+                    filterDescription = `3 derniers mois (du ${startDate.toLocaleDateString('fr-FR')} au ${endDate.toLocaleDateString('fr-FR')})`;
                     break;
                 case '6months':
-                    startDate.setMonth(lastDate.getMonth() - 6);
-                    filterDescription = `6 derniers mois (du ${startDate.toLocaleDateString('fr-FR')} au ${lastDate.toLocaleDateString('fr-FR')})`;
+                    startDate.setMonth(startDate.getMonth() - 6);
+                    filterDescription = `6 derniers mois (du ${startDate.toLocaleDateString('fr-FR')} au ${endDate.toLocaleDateString('fr-FR')})`;
                     break;
                 case '1year':
-                    startDate.setFullYear(lastDate.getFullYear() - 1);
-                    filterDescription = `1 dernière année (du ${startDate.toLocaleDateString('fr-FR')} au ${lastDate.toLocaleDateString('fr-FR')})`;
+                    startDate.setFullYear(startDate.getFullYear() - 1);
+                    filterDescription = `1 dernière année (du ${startDate.toLocaleDateString('fr-FR')} au ${endDate.toLocaleDateString('fr-FR')})`;
                     break;
             }
             
-            const endDate = new Date(lastDate);
-            endDate.setHours(23, 59, 59, 999);
+            startDate.setHours(0, 0, 0, 0);
             
             filteredTension = filteredTension.filter(row => {
                 if (!row['Date et Heure']) return false;
                 const rowDate = new Date(row['Date et Heure']);
-                return !isNaN(rowDate.getTime()) && rowDate >= startDate && rowDate <= endDate;
+                if (isNaN(rowDate.getTime())) return false;
+                return rowDate >= startDate && rowDate <= endDate;
             });
         }
         else if (filterMonth && filterYear) {
@@ -1307,15 +1346,13 @@ function applyDateFilters() {
         
         filteredTensionData = filteredTension;
         
-        // Vérifier si le filtre a retourné des résultats
         if (filterApplied && filteredTensionData.length === 0) {
             showWarningMessage(`⚠️ Aucune donnée de tension trouvée pour ${filterDescription}`);
         } else if (filterApplied) {
             console.log(`✅ Données tension filtrées: ${filteredTensionData.length} lignes sur ${combinedTensionData.length} - ${filterDescription}`);
         }
     }
-    // Après avoir appliqué les filtres, montrer un message plus détaillé
-
+    
     // 3. Si aucun filtre n'est appliqué, réinitialiser les données filtrées
     if (!filterStartDate && !filterEndDate && (!filterPeriod || filterPeriod === 'all') && !filterMonth && !filterYear) {
         filteredEnergyData = combinedEnergyData;
@@ -1329,7 +1366,7 @@ function applyDateFilters() {
     currentPageSolde = 1;
     currentPageRecharge = 1;
     
-    // 5. Mettre à jour tous les éléments avec les nouvelles données filtrées
+    // 5. Mettre à jour tous les éléments
     updateEnergyTable();
     updateTensionTable();
     
@@ -1355,7 +1392,7 @@ function applyDateFilters() {
         }
     }, 400);
     
-    console.log('✅ Tous les éléments mis à jour avec les filtres appliqués');
+    console.log('✅ Tous les éléments mis à jour');
 }
 function showWarningMessage(message) {
     const oldMessage = document.getElementById('warning-message');
@@ -1683,143 +1720,170 @@ function setupFilterEvents(dateBadgeContainer) {
         
         let startDateFormatted = '';
         let endDateFormatted = '';
+        let totalRecords = 0;
         
-        // Calculer les dates réelles en fonction du filtre
+        // Calculer les dates réelles en fonction du filtre SÉLECTIONNÉ
         if (filterPeriod && filterPeriod !== 'all') {
-            // Trouver la dernière date dans les données avec échantillonnage
+            // Trouver la dernière date dans les données FILTRÉES ou brutes
             let lastDate = null;
-            const allDates = [];
-            const maxSamples = 1000;
+            const dataToCheck = filteredEnergyData.length > 0 ? filteredEnergyData : combinedEnergyData;
             
-            // Échantillonnage des données d'énergie
-            if (combinedEnergyData.length > 0) {
-                const step = Math.max(1, Math.floor(combinedEnergyData.length / maxSamples));
-                for (let i = 0; i < combinedEnergyData.length; i += step) {
-                    const row = combinedEnergyData[i];
+            if (dataToCheck.length > 0) {
+                for (let i = 0; i < dataToCheck.length; i++) {
+                    const row = dataToCheck[i];
                     if (row['Date et Heure']) {
                         const date = new Date(row['Date et Heure'].split(' ')[0]);
-                        if (!isNaN(date.getTime())) allDates.push(date);
+                        if (!isNaN(date.getTime())) {
+                            if (!lastDate || date > lastDate) {
+                                lastDate = date;
+                            }
+                        }
                     }
                 }
             }
             
-            // Échantillonnage des données de tension
-            if (combinedTensionData.length > 0) {
-                const step = Math.max(1, Math.floor(combinedTensionData.length / maxSamples));
-                for (let i = 0; i < combinedTensionData.length; i += step) {
-                    const row = combinedTensionData[i];
-                    if (row['Date et Heure']) {
-                        const date = new Date(row['Date et Heure'].split(' ')[0]);
-                        if (!isNaN(date.getTime())) allDates.push(date);
-                    }
-                }
-            }
-            
-            if (allDates.length > 0) {
-                lastDate = new Date(Math.max(...allDates));
-                
-                // Calculer la date de début selon la période
+            if (lastDate) {
                 let startDate = new Date(lastDate);
+                startDate.setHours(0, 0, 0, 0);
+                
                 switch (filterPeriod) {
                     case '5days':
-                        startDate.setDate(lastDate.getDate() - 5);
+                        startDate.setDate(lastDate.getDate() - 4);
+                        startDateFormatted = startDate.toLocaleDateString('fr-FR');
+                        endDateFormatted = lastDate.toLocaleDateString('fr-FR');
+                        totalRecords = 5;
                         break;
                     case '7days':
-                        startDate.setDate(lastDate.getDate() - 7);
+                        startDate.setDate(lastDate.getDate() - 6);
+                        startDateFormatted = startDate.toLocaleDateString('fr-FR');
+                        endDateFormatted = lastDate.toLocaleDateString('fr-FR');
+                        totalRecords = 7;
                         break;
                     case '15days':
-                        startDate.setDate(lastDate.getDate() - 15);
+                        startDate.setDate(lastDate.getDate() - 14);
+                        startDateFormatted = startDate.toLocaleDateString('fr-FR');
+                        endDateFormatted = lastDate.toLocaleDateString('fr-FR');
+                        totalRecords = 15;
                         break;
                     case '30days':
-                        startDate.setDate(lastDate.getDate() - 30);
+                        startDate.setDate(lastDate.getDate() - 29);
+                        startDateFormatted = startDate.toLocaleDateString('fr-FR');
+                        endDateFormatted = lastDate.toLocaleDateString('fr-FR');
+                        totalRecords = 30;
                         break;
                     case '2months':
                         startDate.setMonth(lastDate.getMonth() - 2);
+                        startDateFormatted = startDate.toLocaleDateString('fr-FR');
+                        endDateFormatted = lastDate.toLocaleDateString('fr-FR');
+                        totalRecords = Math.ceil((lastDate - startDate) / (1000 * 60 * 60 * 24)) + 1;
                         break;
                     case '3months':
                         startDate.setMonth(lastDate.getMonth() - 3);
+                        startDateFormatted = startDate.toLocaleDateString('fr-FR');
+                        endDateFormatted = lastDate.toLocaleDateString('fr-FR');
+                        totalRecords = Math.ceil((lastDate - startDate) / (1000 * 60 * 60 * 24)) + 1;
                         break;
                     case '6months':
                         startDate.setMonth(lastDate.getMonth() - 6);
+                        startDateFormatted = startDate.toLocaleDateString('fr-FR');
+                        endDateFormatted = lastDate.toLocaleDateString('fr-FR');
+                        totalRecords = Math.ceil((lastDate - startDate) / (1000 * 60 * 60 * 24)) + 1;
                         break;
                     case '1year':
                         startDate.setFullYear(lastDate.getFullYear() - 1);
+                        startDateFormatted = startDate.toLocaleDateString('fr-FR');
+                        endDateFormatted = lastDate.toLocaleDateString('fr-FR');
+                        totalRecords = Math.ceil((lastDate - startDate) / (1000 * 60 * 60 * 24)) + 1;
                         break;
+                    default:
+                        startDateFormatted = getPeriodName(filterPeriod);
+                        endDateFormatted = '';
+                        totalRecords = 0;
                 }
-                
-                startDateFormatted = startDate.toLocaleDateString('fr-FR');
-                endDateFormatted = lastDate.toLocaleDateString('fr-FR');
+            } else {
+                startDateFormatted = getPeriodName(filterPeriod);
+                endDateFormatted = '';
             }
         } 
         else if (filterStartDate || filterEndDate) {
             startDateFormatted = filterStartDate ? filterStartDate.toLocaleDateString('fr-FR') : 'début';
             endDateFormatted = filterEndDate ? filterEndDate.toLocaleDateString('fr-FR') : 'fin';
+            
+            if (filterStartDate && filterEndDate) {
+                const daysDiff = Math.round((filterEndDate - filterStartDate) / (1000 * 60 * 60 * 24)) + 1;
+                totalRecords = daysDiff;
+            }
         }
         else if (filterMonth && filterYear) {
-            // Pour un mois, on calcule le premier et dernier jour du mois
             const firstDay = new Date(filterYear, filterMonth - 1, 1);
             const lastDay = new Date(filterYear, filterMonth, 0);
             startDateFormatted = firstDay.toLocaleDateString('fr-FR');
             endDateFormatted = lastDay.toLocaleDateString('fr-FR');
-        }
-        else if (filterYear && !filterMonth) {
-            // Pour une année, on calcule le premier et dernier jour de l'année
-            const firstDay = new Date(filterYear, 0, 1);
-            const lastDay = new Date(filterYear, 11, 31);
-            startDateFormatted = firstDay.toLocaleDateString('fr-FR');
-            endDateFormatted = lastDay.toLocaleDateString('fr-FR');
+            totalRecords = lastDay.getDate();
         }
         else {
-            // ✅ CAS PAR DÉFAUT "Tous" : afficher la première et la dernière date disponible
+            // ✅ CAS PAR DÉFAUT "Tous" : première et dernière date des données FILTRÉES
             let firstDate = null;
             let lastDate = null;
-            const allDates = [];
-            const maxSamples = 1000;
             
-            // Échantillonnage des données d'énergie
-            if (combinedEnergyData.length > 0) {
-                const step = Math.max(1, Math.floor(combinedEnergyData.length / maxSamples));
-                for (let i = 0; i < combinedEnergyData.length; i += step) {
-                    const row = combinedEnergyData[i];
-                    if (row['Date et Heure']) {
-                        const date = new Date(row['Date et Heure'].split(' ')[0]);
-                        if (!isNaN(date.getTime())) allDates.push(date);
+            const dataToCheck = filteredEnergyData.length > 0 ? filteredEnergyData : combinedEnergyData;
+            
+            for (let i = 0; i < dataToCheck.length; i++) {
+                const row = dataToCheck[i];
+                if (row['Date et Heure']) {
+                    const date = new Date(row['Date et Heure'].split(' ')[0]);
+                    if (!isNaN(date.getTime())) {
+                        if (!firstDate || date < firstDate) firstDate = date;
+                        if (!lastDate || date > lastDate) lastDate = date;
                     }
                 }
             }
             
-            // Échantillonnage des données de tension
-            if (combinedTensionData.length > 0) {
-                const step = Math.max(1, Math.floor(combinedTensionData.length / maxSamples));
-                for (let i = 0; i < combinedTensionData.length; i += step) {
-                    const row = combinedTensionData[i];
-                    if (row['Date et Heure']) {
-                        const date = new Date(row['Date et Heure'].split(' ')[0]);
-                        if (!isNaN(date.getTime())) allDates.push(date);
+            const tensionDataToCheck = filteredTensionData.length > 0 ? filteredTensionData : combinedTensionData;
+            for (let i = 0; i < tensionDataToCheck.length; i++) {
+                const row = tensionDataToCheck[i];
+                if (row['Date et Heure']) {
+                    const date = new Date(row['Date et Heure'].split(' ')[0]);
+                    if (!isNaN(date.getTime())) {
+                        if (!firstDate || date < firstDate) firstDate = date;
+                        if (!lastDate || date > lastDate) lastDate = date;
                     }
                 }
             }
             
-            if (allDates.length > 0) {
-                firstDate = new Date(Math.min(...allDates));
-                lastDate = new Date(Math.max(...allDates));
+            if (firstDate && lastDate) {
                 startDateFormatted = firstDate.toLocaleDateString('fr-FR');
                 endDateFormatted = lastDate.toLocaleDateString('fr-FR');
+                const daysDiff = Math.round((lastDate - firstDate) / (1000 * 60 * 60 * 24)) + 1;
+                totalRecords = daysDiff;
             } else {
-                startDateFormatted = 'Non disponible';
-                endDateFormatted = 'Non disponible';
+                startDateFormatted = 'Toutes les données';
+                endDateFormatted = '';
+                totalRecords = 0;
             }
         }
         
-        // ✅ Toujours afficher le badge (même pour "Tous")
+        // ✅ AFFICHAGE AMÉLIORÉ
         badgeElement.style.display = 'flex';
-        dateRangeSpan.innerHTML = `<strong>${startDateFormatted}</strong> → <strong>${endDateFormatted}</strong>`;
+        
+        if (endDateFormatted && startDateFormatted !== 'Toutes les données') {
+            dateRangeSpan.innerHTML = `<strong>${startDateFormatted}</strong> → <strong>${endDateFormatted}</strong>`;
+        } else {
+            dateRangeSpan.innerHTML = `<strong>${startDateFormatted}</strong>`;
+        }
+        
+        if (recordsCountSpan) {
+            if (totalRecords > 0) {
+                recordsCountSpan.innerHTML = `📅 ${totalRecords} jour${totalRecords > 1 ? 's' : ''}`;
+            } else {
+                recordsCountSpan.innerHTML = '';
+            }
+        }
     }
     
-    // ✅ Stocker la fonction globalement pour qu'elle soit accessible depuis resetFilters
     window.updateDateBadge = updateDateBadge;
     
-    // Bouton pour effacer le badge (réinitialiser les filtres)
+    // ✅ BOUTON POUR EFFACER LE BADGE (réinitialiser les filtres)
     const clearBadgeBtn = document.getElementById('clear-badge-btn');
     if (clearBadgeBtn) {
         clearBadgeBtn.addEventListener('click', () => {
@@ -1827,81 +1891,154 @@ function setupFilterEvents(dateBadgeContainer) {
         });
     }
     
+    // ✅ GESTION DES BOUTONS DE PÉRIODE - Ne font que sélectionner, pas appliquer
     document.querySelectorAll('.period-btn').forEach(btn => {
         btn.addEventListener('click', function() {
+            // Mettre à jour l'apparence des boutons
             document.querySelectorAll('.period-btn').forEach(b => {
                 b.classList.remove('active');
                 b.style.cssText = `padding: 10px; border: 1px solid #dee2e6; border-radius: 4px; background: white; color: #495057; cursor: pointer; font-size: 12px; transition: all 0.3s;`;
             });
             this.classList.add('active');
             this.style.cssText = `padding: 10px; border: 2px solid #3498db; border-radius: 4px; background: #3498db; color: white; cursor: pointer; font-size: 12px; font-weight: bold;`;
+            
+            // ✅ STOCKER LA PÉRIODE SÉLECTIONNÉE
             filterPeriod = this.dataset.period;
+            
             if (filterPeriod !== 'all') {
+                // Réinitialiser les autres filtres
                 document.getElementById('start-date-input').value = '';
                 document.getElementById('end-date-input').value = '';
                 document.getElementById('year-filter-select').value = '';
                 document.getElementById('month-filter-select').value = '';
-                filterStartDate = null; filterEndDate = null; filterMonth = null; filterYear = null;
+                filterStartDate = null;
+                filterEndDate = null;
+                filterMonth = null;
+                filterYear = null;
+            } else {
+                // Si "Tout" est sélectionné, on peut réinitialiser
+                resetFilters();
             }
-            // Mettre à jour le badge immédiatement
-            setTimeout(() => updateDateBadge(), 50);
+            
+            // ✅ Mettre à jour le badge avec les dates réelles
+            updateDateBadge();
+            
+            // ✅ Afficher un message plus informatif
+            const periodName = getPeriodName(filterPeriod);
+            const badge = document.getElementById('filter-date-badge');
+            const dateRangeSpan = document.getElementById('filter-date-range');
+            
+            if (badge && dateRangeSpan && filterPeriod !== 'all') {
+                // Extraire les dates affichées dans le badge
+                const dateRangeText = dateRangeSpan.innerText;
+                showFilterMessage(`📅 Période sélectionnée: ${periodName} (${dateRangeText}) - Cliquez sur "Appliquer"`);
+            } else if (filterPeriod === 'all') {
+                showFilterMessage(`📅 Toutes les données - Cliquez sur "Appliquer"`);
+            } else {
+                showFilterMessage(`📅 Période sélectionnée: ${periodName} - Cliquez sur "Appliquer"`);
+            }
         });
     });
     
+    // ✅ BOUTON "APPLIQUER" - C'est lui qui applique TOUS les filtres
     document.getElementById('apply-filters-btn').addEventListener('click', function() {
         const startDateInput = document.getElementById('start-date-input').value;
         const endDateInput = document.getElementById('end-date-input').value;
         const yearFilter = document.getElementById('year-filter-select').value;
         const monthFilter = document.getElementById('month-filter-select').value;
         
-        filterStartDate = startDateInput ? new Date(startDateInput + 'T00:00:00') : null;
-        filterEndDate = endDateInput ? new Date(endDateInput + 'T23:59:59') : null;
+        // Vérifier si l'utilisateur a utilisé la sélection manuelle
+        const hasManualSelection = startDateInput || endDateInput;
+        const hasMonthYearSelection = (yearFilter && monthFilter);
         
-        if (yearFilter && monthFilter) {
-            filterYear = parseInt(yearFilter); filterMonth = parseInt(monthFilter); filterPeriod = 'all';
-            document.querySelectorAll('.period-btn').forEach(b => {
-                b.classList.remove('active');
-                b.style.cssText = `padding: 10px; border: 1px solid #dee2e6; border-radius: 4px; background: white; color: #495057; cursor: pointer; font-size: 12px;`;
-            });
-            document.querySelector('.period-btn[data-period="all"]').classList.add('active');
-            document.querySelector('.period-btn[data-period="all"]').style.cssText = `padding: 10px; border: 2px solid #3498db; border-radius: 4px; background: #3498db; color: white; cursor: pointer; font-size: 12px; font-weight: bold;`;
-        } else if (yearFilter || monthFilter) {
-            filterYear = null; filterMonth = null;
-            document.getElementById('year-filter-select').value = '';
-            document.getElementById('month-filter-select').value = '';
-            alert('Veuillez sélectionner à la fois un mois et une année');
-            return;
-        } else { filterYear = null; filterMonth = null; }
-        
-        if (startDateInput || endDateInput) {
+        if (hasManualSelection) {
+            // Sélection manuelle de dates
             filterPeriod = 'all';
+            
+            // Désactiver l'aspect visuel des boutons de période
             document.querySelectorAll('.period-btn').forEach(b => {
                 b.classList.remove('active');
                 b.style.cssText = `padding: 10px; border: 1px solid #dee2e6; border-radius: 4px; background: white; color: #495057; cursor: pointer; font-size: 12px;`;
             });
-            document.querySelector('.period-btn[data-period="all"]').classList.add('active');
-            document.querySelector('.period-btn[data-period="all"]').style.cssText = `padding: 10px; border: 2px solid #3498db; border-radius: 4px; background: #3498db; color: white; cursor: pointer; font-size: 12px; font-weight: bold;`;
+            const allBtn = document.querySelector('.period-btn[data-period="all"]');
+            if (allBtn) {
+                allBtn.classList.add('active');
+                allBtn.style.cssText = `padding: 10px; border: 2px solid #3498db; border-radius: 4px; background: #3498db; color: white; cursor: pointer; font-size: 12px; font-weight: bold;`;
+            }
+            
+            filterStartDate = startDateInput ? new Date(startDateInput + 'T00:00:00') : null;
+            filterEndDate = endDateInput ? new Date(endDateInput + 'T23:59:59') : null;
+            filterYear = null;
+            filterMonth = null;
+            
+            applyDateFilters();
+            updateDateBadge();
+            showFilterMessage(`✅ Filtre appliqué: ${startDateInput || 'début'} → ${endDateInput || 'fin'}`);
         }
-        
-        applyDateFilters();
-        showFilterMessage('Filtres appliqués');
-        
-        // Mettre à jour le badge après application des filtres
-        setTimeout(() => updateDateBadge(), 100);
+        else if (hasMonthYearSelection) {
+            // Sélection mois/année
+            filterPeriod = 'all';
+            
+            document.querySelectorAll('.period-btn').forEach(b => {
+                b.classList.remove('active');
+                b.style.cssText = `padding: 10px; border: 1px solid #dee2e6; border-radius: 4px; background: white; color: #495057; cursor: pointer; font-size: 12px;`;
+            });
+            const allBtn = document.querySelector('.period-btn[data-period="all"]');
+            if (allBtn) {
+                allBtn.classList.add('active');
+                allBtn.style.cssText = `padding: 10px; border: 2px solid #3498db; border-radius: 4px; background: #3498db; color: white; cursor: pointer; font-size: 12px; font-weight: bold;`;
+            }
+            
+            filterYear = parseInt(yearFilter);
+            filterMonth = parseInt(monthFilter);
+            filterStartDate = null;
+            filterEndDate = null;
+            
+            applyDateFilters();
+            updateDateBadge();
+            showFilterMessage(`✅ Filtre appliqué: ${getMonthName(filterMonth)} ${filterYear}`);
+        }
+        else if (filterPeriod && filterPeriod !== 'all') {
+            // Période prédéfinie sélectionnée
+            applyDateFilters();
+            updateDateBadge();
+            showFilterMessage(`✅ Filtre appliqué: ${getPeriodName(filterPeriod)}`);
+        }
+        else {
+            showWarningMessage('⚠️ Veuillez sélectionner un filtre (période, dates manuelles ou mois/année)');
+        }
     });
     
+    // ✅ BOUTON RÉINITIALISER
     document.getElementById('reset-filters-btn').addEventListener('click', () => {
         resetFilters();
+        updateDateBadge();
     });
     
-    document.querySelectorAll('.period-btn').forEach(btn => {
-        if (btn.classList.contains('active')) {
-            btn.style.cssText = `padding: 10px; border: 2px solid #3498db; border-radius: 4px; background: #3498db; color: white; cursor: pointer; font-size: 12px; font-weight: bold;`;
-        }
-    });
-    
-    // ✅ Initialiser le badge au chargement (affichera la plage complète des données)
+    // Initialiser le badge
     setTimeout(() => updateDateBadge(), 500);
+}
+
+// ✅ FONCTIONS UTILITAIRES (à ajouter si elles n'existent pas)
+function getPeriodName(period) {
+    const periodNames = {
+        '5days': '5 derniers jours',
+        '7days': '7 derniers jours',
+        '15days': '15 derniers jours',
+        '30days': '30 derniers jours',
+        '2months': '2 derniers mois',
+        '3months': '3 derniers mois',
+        '6months': '6 derniers mois',
+        '1year': '1 dernière année',
+        'all': 'Toutes les données'
+    };
+    return periodNames[period] || period;
+}
+
+function getMonthName(month) {
+    const monthNames = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 
+                        'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
+    return monthNames[month - 1] || month;
 }
 
 // ==================== CARD 2 : DONNÉES TECHNIQUES ====================
@@ -2320,110 +2457,106 @@ function analyzeDelestageEvents() {
         };
     }
 
+    // ✅ RÉCUPÉRER LA DATE DE DÉBUT DU FILTRE (si actif)
+    let filterStartDateTime = null;
+    let filterEndDateTime = null;
+    
+    if (filterPeriod && filterPeriod !== 'all') {
+        // Trouver la dernière date dans les données FILTRÉES
+        let lastDate = null;
+        const dataToCheck = filteredEnergyData.length > 0 ? filteredEnergyData : combinedEnergyData;
+        
+        for (let i = 0; i < dataToCheck.length; i++) {
+            const row = dataToCheck[i];
+            if (row['Date et Heure']) {
+                const date = new Date(row['Date et Heure'].split(' ')[0]);
+                if (!isNaN(date.getTime())) {
+                    if (!lastDate || date > lastDate) {
+                        lastDate = date;
+                    }
+                }
+            }
+        }
+        
+        if (lastDate) {
+            filterEndDateTime = new Date(lastDate);
+            filterEndDateTime.setHours(23, 59, 59, 999);
+            
+            filterStartDateTime = new Date(lastDate);
+            filterStartDateTime.setHours(0, 0, 0, 0);
+            
+            switch (filterPeriod) {
+                case '5days':
+                    filterStartDateTime.setDate(lastDate.getDate() - 4);
+                    break;
+                case '7days':
+                    filterStartDateTime.setDate(lastDate.getDate() - 6);
+                    break;
+                case '15days':
+                    filterStartDateTime.setDate(lastDate.getDate() - 14);
+                    break;
+                case '30days':
+                    filterStartDateTime.setDate(lastDate.getDate() - 29);
+                    break;
+                case '2months':
+                    filterStartDateTime.setMonth(lastDate.getMonth() - 2);
+                    break;
+                case '3months':
+                    filterStartDateTime.setMonth(lastDate.getMonth() - 3);
+                    break;
+                case '6months':
+                    filterStartDateTime.setMonth(lastDate.getMonth() - 6);
+                    break;
+                case '1year':
+                    filterStartDateTime.setFullYear(lastDate.getFullYear() - 1);
+                    break;
+            }
+            filterStartDateTime.setHours(0, 0, 0, 0);
+        }
+    } else if (filterStartDate || filterEndDate) {
+        if (filterStartDate) {
+            filterStartDateTime = new Date(filterStartDate);
+            filterStartDateTime.setHours(0, 0, 0, 0);
+        }
+        if (filterEndDate) {
+            filterEndDateTime = new Date(filterEndDate);
+            filterEndDateTime.setHours(23, 59, 59, 999);
+        }
+    } else if (filterMonth && filterYear) {
+        filterStartDateTime = new Date(filterYear, filterMonth - 1, 1);
+        filterEndDateTime = new Date(filterYear, filterMonth, 0);
+        filterEndDateTime.setHours(23, 59, 59, 999);
+    }
+
     // Appliquer les filtres de dates aux données d'événements
     let filteredEventData = [...combinedEventData];
     
-    if (filterStartDate || filterEndDate) {
+    if (filterStartDateTime || filterEndDateTime) {
         filteredEventData = filteredEventData.filter(row => {
             if (!row['Date et Heure']) return false;
             const rowDate = new Date(row['Date et Heure']);
             if (isNaN(rowDate.getTime())) return false;
             
             let pass = true;
-            if (filterStartDate) pass = pass && (rowDate >= filterStartDate);
-            if (filterEndDate) pass = pass && (rowDate <= filterEndDate);
+            if (filterStartDateTime) pass = pass && (rowDate >= filterStartDateTime);
+            if (filterEndDateTime) pass = pass && (rowDate <= filterEndDateTime);
             return pass;
-        });
-    }
-    else if (filterPeriod && filterPeriod !== 'all') {
-        let lastDate = null;
-        combinedEventData.forEach(row => {
-            if (row['Date et Heure']) {
-                const date = new Date(row['Date et Heure']);
-                if (!isNaN(date.getTime()) && (!lastDate || date > lastDate)) {
-                    lastDate = date;
-                }
-            }
-        });
-        
-        if (lastDate) {
-            let startDate = new Date(lastDate);
-            
-            switch (filterPeriod) {
-                case '5days':
-                    startDate.setDate(lastDate.getDate() - 5);
-                    break;
-                case '7days':
-                    startDate.setDate(lastDate.getDate() - 7);
-                    break;
-                case '15days':
-                    startDate.setDate(lastDate.getDate() - 15);
-                    break;
-                case '30days':
-                    startDate.setDate(lastDate.getDate() - 30);
-                    break;
-                case '2months':
-                    startDate.setMonth(lastDate.getMonth() - 2);
-                    break;
-                case '3months':
-                    startDate.setMonth(lastDate.getMonth() - 3);
-                    break;
-                case '6months':
-                    startDate.setMonth(lastDate.getMonth() - 6);
-                    break;
-                case '1year':
-                    startDate.setFullYear(lastDate.getFullYear() - 1);
-                    break;
-            }
-            
-            const endDate = new Date(lastDate);
-            endDate.setHours(23, 59, 59, 999);
-            
-            filteredEventData = filteredEventData.filter(row => {
-                if (!row['Date et Heure']) return false;
-                const rowDate = new Date(row['Date et Heure']);
-                return !isNaN(rowDate.getTime()) && rowDate >= startDate && rowDate <= endDate;
-            });
-        }
-    }
-    else if (filterMonth && filterYear) {
-        filteredEventData = filteredEventData.filter(row => {
-            if (!row['Date et Heure']) return false;
-            const rowDate = new Date(row['Date et Heure']);
-            return !isNaN(rowDate.getTime()) && 
-                   rowDate.getFullYear() === filterYear && 
-                   (rowDate.getMonth() + 1) === filterMonth;
-        });
-    }
-    else if (filterYear && !filterMonth) {
-        filteredEventData = filteredEventData.filter(row => {
-            if (!row['Date et Heure']) return false;
-            const rowDate = new Date(row['Date et Heure']);
-            return !isNaN(rowDate.getTime()) && rowDate.getFullYear() === filterYear;
-        });
-    }
-    else if (filterMonth && !filterYear) {
-        const currentYear = new Date().getFullYear();
-        filteredEventData = filteredEventData.filter(row => {
-            if (!row['Date et Heure']) return false;
-            const rowDate = new Date(row['Date et Heure']);
-            return !isNaN(rowDate.getTime()) && 
-                   rowDate.getFullYear() === currentYear && 
-                   (rowDate.getMonth() + 1) === filterMonth;
         });
     }
 
     const eventsByDayMap = new Map();
 
-    // ✅ Récupérer les données FONC pour les démarrages
-    // Structure: F;DateHeure;Valeur1;Valeur2;Valeur3;Valeur4;...
-    // Valeur1 = Event, Valeur2 = Type, Valeur3 = ?, Valeur4 = Tension
+    // Récupérer les données FONC pour les démarrages
     const foncDataByDate = new Map();
     if (combinedFoncData && combinedFoncData.length > 0) {
         combinedFoncData.forEach(row => {
             if (!row['Date et Heure']) return;
             const dateTime = new Date(row['Date et Heure']);
             if (isNaN(dateTime.getTime())) return;
+            
+            // ✅ APPLIQUER LE FILTRE AUX DONNÉES FONC
+            if (filterStartDateTime && dateTime < filterStartDateTime) return;
+            if (filterEndDateTime && dateTime > filterEndDateTime) return;
             
             const dateKey = dateTime.getFullYear() + '-' + 
                            String(dateTime.getMonth() + 1).padStart(2, '0') + '-' + 
@@ -2439,10 +2572,10 @@ function analyzeDelestageEvents() {
             foncDataByDate.get(dateKey).push({
                 time: time,
                 dateTime: dateTime,
-                valeur1: row['Valeur1'] || '',  // Event
-                valeur2: row['Valeur2'] || '',  // Type
-                valeur3: row['Valeur3'] || '',  // (autre valeur si existante)
-                valeur4: row['Valeur4'] || ''   // ✅ Tension (Valeur4)
+                valeur1: row['Valeur1'] || '',
+                valeur2: row['Valeur2'] || '',
+                valeur3: row['Valeur3'] || '',
+                valeur4: row['Valeur4'] || ''
             });
         });
     }
@@ -2452,7 +2585,6 @@ function analyzeDelestageEvents() {
 
         const event = row['Évènements'].trim();
 
-        // Vérifier si c'est un événement de délestage
         if (event.includes('DelestagePartiel') || event.includes('DelestageTotal')) {
             const dateTime = new Date(row['Date et Heure']);
             if (isNaN(dateTime.getTime())) return;
@@ -2461,10 +2593,8 @@ function analyzeDelestageEvents() {
                 day: '2-digit', month: '2-digit', year: 'numeric'
             });
             
-            // Ignorer les dates fausses (horloge déréglée)
             if (dateStr === '01/01/2010') return;
             
-            // Utiliser la date locale pour éviter les décalages de fuseau horaire
             const dateKey = dateTime.getFullYear() + '-' + 
                            String(dateTime.getMonth() + 1).padStart(2, '0') + '-' + 
                            String(dateTime.getDate()).padStart(2, '0');
@@ -2475,7 +2605,6 @@ function analyzeDelestageEvents() {
             const eventType = event.includes('DelestagePartiel') ? 'partiel' : 'total';
             const value = row['Code 2'] ? parseFloat(row['Code 2']).toFixed(2) : '0.00';
 
-            // Initialiser le jour si nécessaire
             if (!eventsByDayMap.has(dateKey)) {
                 eventsByDayMap.set(dateKey, {
                     date: dateStr,
@@ -2483,13 +2612,11 @@ function analyzeDelestageEvents() {
                     partiel: [],
                     total: [],
                     hasBoth: false,
-                    demarrages: [] // ✅ Nouveau tableau pour les démarrages
+                    demarrages: []
                 });
             }
 
             const dayData = eventsByDayMap.get(dateKey);
-
-            // Ajouter l'événement individuel avec heure et valeur formatée
             const formattedValue = parseFloat(value).toFixed(2);
             dayData[eventType].push({
                 time: time,
@@ -2499,24 +2626,22 @@ function analyzeDelestageEvents() {
         }
     });
 
-    // ✅ Ajouter les données de démarrage aux jours correspondants
+    // Ajouter les données de démarrage
     foncDataByDate.forEach((demarrages, dateKey) => {
         if (eventsByDayMap.has(dateKey)) {
             const dayData = eventsByDayMap.get(dateKey);
             demarrages.forEach(demarrage => {
                 dayData.demarrages.push({
                     time: demarrage.time,
-                    valeur1: demarrage.valeur1,  // Event
-                    valeur2: demarrage.valeur2,  // Type
-                    valeur3: demarrage.valeur3,  // (autre valeur si existante)
-                    valeur4: demarrage.valeur4,  // ✅ Tension (Valeur4)
+                    valeur1: demarrage.valeur1,
+                    valeur2: demarrage.valeur2,
+                    valeur3: demarrage.valeur3,
+                    valeur4: demarrage.valeur4,
                     display: `${demarrage.time} | ${demarrage.valeur1} | ${demarrage.valeur2} | ${demarrage.valeur4}`
                 });
             });
-            // Trier les démarrages par heure
             dayData.demarrages.sort((a, b) => a.time.localeCompare(b.time));
         } else if (demarrages.length > 0) {
-            // ✅ Si un jour a des démarrages mais pas de délestages, on l'ajoute quand même
             const dateKeyParts = dateKey.split('-');
             const dateStr = new Date(parseInt(dateKeyParts[0]), parseInt(dateKeyParts[1]) - 1, parseInt(dateKeyParts[2]))
                 .toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
@@ -2532,13 +2657,11 @@ function analyzeDelestageEvents() {
         }
     });
 
-    // Traiter chaque jour
     const eventsByDay = [];
     let totalPartiel = 0;
     let totalTotal = 0;
 
     eventsByDayMap.forEach((day, dateKey) => {
-        // Trier les événements par heure
         day.partiel.sort((a, b) => a.time.localeCompare(b.time));
         day.total.sort((a, b) => a.time.localeCompare(b.time));
 
@@ -2549,14 +2672,14 @@ function analyzeDelestageEvents() {
         eventsByDay.push(day);
     });
 
-    // Trier par date décroissante
     eventsByDay.sort((a, b) => new Date(b.dateObj) - new Date(a.dateObj));
 
-    // ✅ CALCULER LE NOMBRE TOTAL DE JOURS DE DIAGNOSTIC
+    // ✅ CALCULER LE NOMBRE TOTAL DE JOURS DE DIAGNOSTIC (FILTRÉ)
     const totalDiagnosticDays = new Set();
 
-    if (combinedEnergyData.length > 0) {
-        combinedEnergyData.forEach(row => {
+    // Utiliser les données FILTRÉES (pas les données brutes)
+    if (filteredEnergyData.length > 0) {
+        filteredEnergyData.forEach(row => {
             if (row['Date et Heure']) {
                 const date = row['Date et Heure'].split(' ')[0];
                 totalDiagnosticDays.add(date);
@@ -2564,14 +2687,36 @@ function analyzeDelestageEvents() {
         });
     }
 
-    if (combinedTensionData.length > 0) {
-        combinedTensionData.forEach(row => {
+    if (filteredTensionData.length > 0) {
+        filteredTensionData.forEach(row => {
             if (row['Date et Heure']) {
                 const date = row['Date et Heure'].split(' ')[0];
                 totalDiagnosticDays.add(date);
             }
         });
     }
+
+    // ✅ Si aucun filtre actif, utiliser les données brutes
+    if (totalDiagnosticDays.size === 0) {
+        if (combinedEnergyData.length > 0) {
+            combinedEnergyData.forEach(row => {
+                if (row['Date et Heure']) {
+                    const date = row['Date et Heure'].split(' ')[0];
+                    totalDiagnosticDays.add(date);
+                }
+            });
+        }
+        if (combinedTensionData.length > 0) {
+            combinedTensionData.forEach(row => {
+                if (row['Date et Heure']) {
+                    const date = row['Date et Heure'].split(' ')[0];
+                    totalDiagnosticDays.add(date);
+                }
+            });
+        }
+    }
+
+    console.log(`📊 Jours de diagnostic (filtrés): ${totalDiagnosticDays.size}`);
 
     return {
         eventsByDay: eventsByDay,
@@ -4173,7 +4318,7 @@ function createHourlyTensionPeriodFilter() {
             </div>
             <div>
                 <h4 style="margin: 0; font-size: 16px; font-weight: 700; color: #1e293b;">
-                    Filtre période (max 7 jours)
+                    Filtre période
                 </h4>
                 <p style="margin: 2px 0 0 0; font-size: 11px; color: #64748b;">
                     ${sortedDates.length} jours disponibles · ${formatDateRange(sortedDates)}
@@ -7610,6 +7755,8 @@ function parseAndCombineSoldeData() {
 
 function parseAndCombineRechargeData() {
     const dataMap = new Map();
+    let globalFirstRecharge = null;
+    
     rechargeData.forEach(file => {
         file.lines.forEach(line => {
             const parts = line.split(';');
@@ -7625,11 +7772,98 @@ function parseAndCombineRechargeData() {
                     row['Code 2'] = parts[6] ? parts[6].trim() : '';
                     row['Code 3'] = parts[7] ? parts[7].trim() : '';
                     row['Code 4'] = parts[8] ? parts[8].trim() : '';
+                    
+                    // ✅ DETECTER LA PREMIÈRE RECHARGE GLOBALE
+                    if (row['Code 3'] && parseInt(row['Code 3']) > 0) {
+                        if (!globalFirstRecharge || new Date(timestamp) < new Date(globalFirstRecharge)) {
+                            globalFirstRecharge = timestamp;
+                        }
+                    }
                 }
             }
         });
     });
-    combinedRechargeData = Array.from(dataMap.values()).filter(row => row['Date et Heure']).sort((a, b) => new Date(a['Date et Heure']) - new Date(b['Date et Heure']));
+    
+    combinedRechargeData = Array.from(dataMap.values())
+        .filter(row => row['Date et Heure'])
+        .sort((a, b) => new Date(a['Date et Heure']) - new Date(b['Date et Heure']));
+    
+    // ✅ STOCKER LA DATE DE PREMIÈRE RECHARGE GLOBALE
+    firstRechargeDate = globalFirstRecharge ? globalFirstRecharge.split(' ')[0] : null;
+    console.log('📅 Date de première recharge détectée:', firstRechargeDate);
+    
+    // Filtrer les données par date de première recharge
+    if (firstRechargeDate) {
+        filterDataByFirstRecharge();
+    }
+}
+
+// ✅ NOUVELLE FONCTION : Filtrer toutes les données à partir de la date du premier recharge
+function filterDataByFirstRecharge() {
+    if (!firstRechargeDate) return;
+    
+    const firstRechargeDateTime = new Date(firstRechargeDate);
+    firstRechargeDateTime.setHours(0, 0, 0, 0);
+    
+    console.log('🔍 Filtrage des données à partir du:', firstRechargeDate);
+    
+    // Filtrer les données d'énergie
+    if (combinedEnergyData.length > 0) {
+        const originalEnergyCount = combinedEnergyData.length;
+        combinedEnergyData = combinedEnergyData.filter(row => {
+            if (!row['Date et Heure']) return false;
+            const rowDate = new Date(row['Date et Heure']);
+            return rowDate >= firstRechargeDateTime;
+        });
+        filteredEnergyData = combinedEnergyData;
+        console.log(`⚡ Énergie: ${originalEnergyCount} → ${combinedEnergyData.length} lignes (filtré à partir du ${firstRechargeDate})`);
+    }
+    
+    // Filtrer les données de tension
+    if (combinedTensionData.length > 0) {
+        const originalTensionCount = combinedTensionData.length;
+        combinedTensionData = combinedTensionData.filter(row => {
+            if (!row['Date et Heure']) return false;
+            const rowDate = new Date(row['Date et Heure']);
+            return rowDate >= firstRechargeDateTime;
+        });
+        filteredTensionData = combinedTensionData;
+        console.log(`📊 Tension: ${originalTensionCount} → ${combinedTensionData.length} lignes (filtré à partir du ${firstRechargeDate})`);
+    }
+    
+    // Filtrer les données d'événements
+    if (combinedEventData.length > 0) {
+        const originalEventCount = combinedEventData.length;
+        combinedEventData = combinedEventData.filter(row => {
+            if (!row['Date et Heure']) return false;
+            const rowDate = new Date(row['Date et Heure']);
+            return rowDate >= firstRechargeDateTime;
+        });
+        console.log(`⚠️ Événements: ${originalEventCount} → ${combinedEventData.length} lignes (filtré à partir du ${firstRechargeDate})`);
+    }
+    
+    // Filtrer les données de solde
+    if (combinedSoldeData.length > 0) {
+        const originalSoldeCount = combinedSoldeData.length;
+        combinedSoldeData = combinedSoldeData.filter(row => {
+            if (!row['Date et Heure']) return false;
+            const rowDate = new Date(row['Date et Heure']);
+            return rowDate >= firstRechargeDateTime;
+        });
+        console.log(`💰 Solde: ${originalSoldeCount} → ${combinedSoldeData.length} lignes (filtré à partir du ${firstRechargeDate})`);
+    }
+    
+    // Filtrer les données FONC
+    if (combinedFoncData.length > 0) {
+        const originalFoncCount = combinedFoncData.length;
+        combinedFoncData = combinedFoncData.filter(row => {
+            if (!row['Date et Heure']) return false;
+            const rowDate = new Date(row['Date et Heure']);
+            return rowDate >= firstRechargeDateTime;
+        });
+        filteredFoncData = combinedFoncData;
+        console.log(`📁 FONC: ${originalFoncCount} → ${combinedFoncData.length} lignes (filtré à partir du ${firstRechargeDate})`);
+    }
 }
 
 function parseAndCombineFoncData() {
@@ -9825,23 +10059,83 @@ function createClientEventsTable(clientNumber) {
     const content = document.createElement('div');
     content.style.cssText = `padding: 20px;`;
     
-    const totalDiagnosticDays = getTotalDiagnosticDaysForClient(clientNumber);
-    const eventsByDay = getEventsForClientGroupedByDay(clientNumber);
+    // ✅ RÉCUPÉRER LA DATE DE PREMIÈRE RECHARGE SPÉCIFIQUE POUR CE CLIENT
+    const clientFirstRecharge = getClientFirstRechargeDate(clientNumber);
+    
+    // ✅ UTILISER clientFirstRecharge au lieu de firstRechargeDate global
+    const effectiveStartDate = clientFirstRecharge || firstRechargeDate;
+    
+    // ✅ COMPTER LES JOURS UNIQUEMENT À PARTIR DE LA DATE DE PREMIÈRE RECHARGE DU CLIENT
+    let daysSinceFirstRecharge = 0;
+    let daysWithData = 0;
+    
+    if (effectiveStartDate) {
+        const startDateTime = new Date(effectiveStartDate);
+        startDateTime.setHours(0, 0, 0, 0);
+        const today = new Date();
+        
+        // Calculer le nombre total de jours depuis la première recharge
+        const diffTime = Math.abs(today - startDateTime);
+        daysSinceFirstRecharge = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        
+        // Compter les jours où on a des données (énergie ou solde) APRÈS la première recharge
+        const energyKey = `Energie${clientNumber}`;
+        const daysSet = new Set();
+        
+        if (combinedEnergyData.length > 0) {
+            combinedEnergyData.forEach(row => {
+                if (row['Date et Heure']) {
+                    const date = row['Date et Heure'].split(' ')[0];
+                    const dateObj = new Date(date);
+                    if (dateObj >= startDateTime) {
+                        const value = row[energyKey];
+                        if (value && value.toString().trim() !== '' && value.toString().trim() !== '-') {
+                            const energyValue = parseFloat(value.toString().replace(',', '.'));
+                            if (!isNaN(energyValue) && energyValue > 0) {
+                                daysSet.add(date);
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        if (combinedSoldeData.length > 0) {
+            const creditKey = `Credit${clientNumber}`;
+            combinedSoldeData.forEach(row => {
+                if (row['Date et Heure']) {
+                    const date = row['Date et Heure'].split(' ')[0];
+                    const dateObj = new Date(date);
+                    if (dateObj >= startDateTime) {
+                        const value = row[creditKey];
+                        if (value && value.toString().trim() !== '' && value.toString().trim() !== '-') {
+                            daysSet.add(date);
+                        }
+                    }
+                }
+            });
+        }
+        
+        daysWithData = daysSet.size;
+    }
+    
+    // ✅ RÉCUPÉRER LES ÉVÉNEMENTS AVEC LA DATE DE DÉBUT CORRECTE
+    const eventsByDay = getEventsForClientGroupedByDay(clientNumber, null, null, effectiveStartDate);
     
     if (eventsByDay.length === 0) {
         content.innerHTML = `
             <div style="text-align: center; padding: 40px; color: #94a3b8; background: #f8fafc; border-radius: 12px;">
                 <span style="font-size: 48px; display: block; margin-bottom: 15px;">✅</span>
                 <h3 style="margin: 0 0 10px 0; color: #1e293b;">Aucun événement</h3>
-                <p style="margin: 0; font-size: 14px;">Aucun événement pour ce client</p>
-                <p style="margin-top: 10px; font-size: 12px; color: #64748b;">Sur ${totalDiagnosticDays} jour(s) de diagnostic</p>
+                <p style="margin: 0; font-size: 14px;">Aucun événement pour ce client depuis la première recharge</p>
+                ${effectiveStartDate ? `<p style="margin-top: 10px; font-size: 12px; color: #64748b;">Analyse à partir du ${new Date(effectiveStartDate).toLocaleDateString('fr-FR')}</p>` : ''}
             </div>
         `;
         container.appendChild(content);
         return container;
     }
     
-    // Calculer les statistiques
+    // ✅ CALCULER LES STATISTIQUES (UNIQUEMENT SUR LES JOURS DEPUIS LA PREMIÈRE RECHARGE)
     const daysWithCreditNul = new Set();
     const daysWithSuspendP = new Set();
     const daysWithSuspendE = new Set();
@@ -9852,11 +10146,43 @@ function createClientEventsTable(clientNumber) {
         if (day.SuspendE > 0) daysWithSuspendE.add(day.date);
     });
     
-    const percentCreditNul = totalDiagnosticDays > 0 ? ((daysWithCreditNul.size / totalDiagnosticDays) * 100).toFixed(1) : 0;
-    const percentSuspendP = totalDiagnosticDays > 0 ? ((daysWithSuspendP.size / totalDiagnosticDays) * 100).toFixed(1) : 0;
-    const percentSuspendE = totalDiagnosticDays > 0 ? ((daysWithSuspendE.size / totalDiagnosticDays) * 100).toFixed(1) : 0;
+    // ✅ UTILISER daysSinceFirstRecharge comme base pour les pourcentages
+    const analyzedDays = daysSinceFirstRecharge > 0 ? daysSinceFirstRecharge : daysWithData;
     
-    // Tableau de bord compact
+    const percentCreditNul = analyzedDays > 0 ? ((daysWithCreditNul.size / analyzedDays) * 100).toFixed(1) : 0;
+    const percentSuspendP = analyzedDays > 0 ? ((daysWithSuspendP.size / analyzedDays) * 100).toFixed(1) : 0;
+    const percentSuspendE = analyzedDays > 0 ? ((daysWithSuspendE.size / analyzedDays) * 100).toFixed(1) : 0;
+    
+    // ✅ AJOUTER LE BADGE D'INFORMATION CORRECT
+    if (effectiveStartDate) {
+        const infoBadge = document.createElement('div');
+        infoBadge.style.cssText = `
+            background: #dbeafe;
+            border-radius: 8px;
+            padding: 10px 15px;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 12px;
+            color: #1e40af;
+            border: 1px solid #bfdbfe;
+            flex-wrap: wrap;
+        `;
+        
+        const formattedStartDate = new Date(effectiveStartDate).toLocaleDateString('fr-FR');
+        
+        infoBadge.innerHTML = `
+            <span style="font-size: 16px;">📅</span>
+            <span><strong>Première recharge détectée:</strong> ${formattedStartDate}</span>
+            <span style="margin-left: auto; background: #bfdbfe; padding: 2px 10px; border-radius: 20px; font-size: 11px;">
+                📊 ${analyzedDays} jours analysés
+            </span>
+        `;
+        content.appendChild(infoBadge);
+    }
+    
+    // Tableau de bord (inchangé)
     const statsGrid = document.createElement('div');
     statsGrid.style.cssText = `
         display: grid;
@@ -9920,13 +10246,18 @@ function createClientEventsTable(clientNumber) {
         justify-content: space-between;
         font-size: 12px;
         border: 1px solid #e2e8f0;
+        flex-wrap: wrap;
+        gap: 10px;
     `;
+    
     periodInfo.innerHTML = `
-        <span>📊 ${new Set(eventsByDay.map(d => d.date)).size} jours avec événements</span>
+        <span>
+            📊 ${eventsByDay.length} jours avec événements depuis la première recharge
+        </span>
     `;
     content.appendChild(periodInfo);
     
-    // Filtre par événement
+    // Suite du code (filtres, tableau détaillé) - inchangé
     const filterContainer = document.createElement('div');
     filterContainer.style.cssText = `
         background: #f8fafc;
@@ -9980,7 +10311,7 @@ function createClientEventsTable(clientNumber) {
     `;
     content.appendChild(toggleBtn);
     
-    // TABLEAU DÉTAILLÉ AVEC COLONNES SÉPARÉES
+    // TABLEAU DÉTAILLÉ
     const tableWrapper = document.createElement('div');
     tableWrapper.id = `events-table-${clientNumber}`;
     tableWrapper.style.cssText = `
@@ -10023,13 +10354,7 @@ function createClientEventsTable(clientNumber) {
         const hasSuspendP = day.SuspendP > 0;
         const hasCreditNul = day.CreditNul > 0;
         const hasSuspendE = day.SuspendE > 0;
-        const rowClasses = [
-            hasSuspendP ? 'event-suspendp' : '',
-            hasCreditNul ? 'event-creditnul' : '',
-            hasSuspendE ? 'event-suspende' : ''
-        ].filter(cls => cls).join(' ');
         
-        // Formatage des heures et valeurs pour SuspendP
         let suspendPHoursHtml = '-';
         let suspendPValuesHtml = '-';
         if (day.SuspendP_times && day.SuspendP_times.length > 0) {
@@ -10037,7 +10362,6 @@ function createClientEventsTable(clientNumber) {
             suspendPValuesHtml = day.SuspendP_values.map(v => `<div style="margin: 2px 0;"><span style="color: #1d4ed8; font-weight: 700;">${v}</span></div>`).join('');
         }
         
-        // Formatage des heures et valeurs pour SuspendE
         let suspendEHoursHtml = '-';
         let suspendEValuesHtml = '-';
         if (day.SuspendE_times && day.SuspendE_times.length > 0) {
@@ -10046,34 +10370,24 @@ function createClientEventsTable(clientNumber) {
         }
         
         tableHTML += `
-            <tr class="${rowClasses}" style="border-bottom: 1px solid #e2e8f0; background: ${bgColor};">
+            <tr style="border-bottom: 1px solid #e2e8f0; background: ${bgColor};">
                 <td style="padding: 12px 10px; font-weight: 600; border-right: 2px solid #e2e8f0; position: sticky; left: 0; background: ${bgColor};">
                     ${new Date(day.date).toLocaleDateString('fr-FR', {
                         day: '2-digit', month: '2-digit', year: 'numeric'
                     })}
                 </td>
-                
-                <!-- SuspendP : Heure -->
                 <td style="padding: 10px 8px; text-align: center; border-right: 1px solid #e2e8f0; ${hasSuspendP ? 'background: #3b82f620;' : 'color: #94a3b8;'}">
                     ${suspendPHoursHtml}
                 </td>
-                
-                <!-- SuspendP : Valeur -->
                 <td style="padding: 10px 8px; text-align: center; border-right: 2px solid #e2e8f0; ${hasSuspendP ? 'background: #3b82f620;' : 'color: #94a3b8;'}">
                     ${suspendPValuesHtml}
                 </td>
-                
-                <!-- Crédit Nul -->
                 <td style="padding: 10px 8px; text-align: center; border-right: 2px solid #e2e8f0; ${hasCreditNul ? 'background: #f59e0b; color: white; font-weight: 700;' : 'background: #f1f5f9; color: #94a3b8;'}">
                     ${hasCreditNul ? '⚠️ CRÉDIT NUL' : '✓ Normal'}
                 </td>
-                
-                <!-- SuspendE : Heure -->
                 <td style="padding: 10px 8px; text-align: center; border-right: 1px solid #e2e8f0; ${hasSuspendE ? 'background: #0ea5e920;' : 'color: #94a3b8;'}">
                     ${suspendEHoursHtml}
                 </td>
-                
-                <!-- SuspendE : Valeur -->
                 <td style="padding: 10px 8px; text-align: center; ${hasSuspendE ? 'background: #0ea5e920;' : 'color: #94a3b8;'}">
                     ${suspendEValuesHtml}
                 </td>
@@ -10087,7 +10401,7 @@ function createClientEventsTable(clientNumber) {
     
     container.appendChild(content);
     
-    // Événements
+    // Événements des filtres et toggle
     setTimeout(() => {
         const btn = document.getElementById(`toggle-events-${clientNumber}`);
         const table = document.getElementById(`events-table-${clientNumber}`);
@@ -10110,21 +10424,19 @@ function createClientEventsTable(clientNumber) {
         function applyEventFilter() {
             if (!table) return;
             
-            const showSuspendP = filterSuspendP.checked;
-            const showCreditNul = filterCreditNul.checked;
-            const showSuspendE = filterSuspendE.checked;
+            const showSuspendP = filterSuspendP?.checked ?? true;
+            const showCreditNul = filterCreditNul?.checked ?? true;
+            const showSuspendE = filterSuspendE?.checked ?? true;
             
             const rows = table.querySelectorAll('tbody tr');
             rows.forEach(row => {
-                const hasSuspendP = row.classList.contains('event-suspendp');
-                const hasCreditNul = row.classList.contains('event-creditnul');
-                const hasSuspendE = row.classList.contains('event-suspende');
+                const hasSuspendP = row.querySelector('td:first-child + td')?.innerHTML !== '-' && 
+                                    row.querySelector('td:first-child + td')?.innerHTML.includes('background: #3b82f620');
+                const hasCreditNul = row.querySelector('td:nth-child(4)')?.innerHTML.includes('CRÉDIT NUL') ?? false;
+                const hasSuspendE = row.querySelector('td:nth-child(5)')?.innerHTML !== '-' && 
+                                    row.querySelector('td:nth-child(5)')?.innerHTML.includes('background: #0ea5e920');
                 
-                const shouldShow = 
-                    (hasSuspendP && showSuspendP) ||
-                    (hasCreditNul && showCreditNul) ||
-                    (hasSuspendE && showSuspendE);
-                
+                const shouldShow = (hasSuspendP && showSuspendP) || (hasCreditNul && showCreditNul) || (hasSuspendE && showSuspendE);
                 row.style.display = shouldShow ? '' : 'none';
             });
         }
@@ -10139,44 +10451,92 @@ function createClientEventsTable(clientNumber) {
     return container;
 }
 
+// ✅ NOUVELLE FONCTION : Récupérer la date de première recharge pour un client spécifique
+function getClientFirstRechargeDate(clientNumber) {
+    // Vérifier si les données de recharge existent
+    if (!combinedRechargeData || combinedRechargeData.length === 0) {
+        console.log(`⚠️ Client ${clientNumber} - Aucune donnée de recharge disponible`);
+        return null;
+    }
+    
+    // Filtrer les recharges pour ce client spécifique
+    const clientRecharges = combinedRechargeData
+        .filter(row => {
+            const code1 = row['Code 1']?.toString().trim() || '';
+            return code1 === clientNumber.toString();
+        })
+        .sort((a, b) => new Date(a['Date et Heure']) - new Date(b['Date et Heure']));
+    
+    if (clientRecharges.length === 0) {
+        console.log(`⚠️ Client ${clientNumber} - Aucune recharge trouvée`);
+        return null;
+    }
+    
+    // Chercher la première recharge avec Code 3 > 0 (recharge valide)
+    let firstValidRecharge = null;
+    for (const recharge of clientRecharges) {
+        const code3 = recharge['Code 3'] ? parseInt(recharge['Code 3'].toString().trim()) : 0;
+        if (code3 > 0) {
+            firstValidRecharge = recharge['Date et Heure'];
+            break;
+        }
+    }
+    
+    // Si aucune recharge avec code3 > 0, prendre la première recharge de la liste
+    if (!firstValidRecharge && clientRecharges.length > 0) {
+        firstValidRecharge = clientRecharges[0]['Date et Heure'];
+    }
+    
+    if (firstValidRecharge) {
+        // Extraire uniquement la date (sans l'heure)
+        const dateOnly = firstValidRecharge.split(' ')[0];
+        const resultDate = new Date(dateOnly);
+        console.log(`✅ Client ${clientNumber} - Première recharge détectée: ${dateOnly}`);
+        return resultDate;
+    }
+    
+    console.log(`⚠️ Client ${clientNumber} - Impossible de déterminer la première recharge`);
+    return null;
+}
 // Fonction pour calculer le nombre total de jours de diagnostic pour un client
 function getTotalDiagnosticDaysForClient(clientNumber) {
-    const totalDays = new Set();
+    // Récupérer la date de première recharge spécifique à ce client
+    const clientFirstRecharge = getClientFirstRechargeDate(clientNumber);
     
-    // Jours avec données d'énergie
-    if (combinedEnergyData.length > 0) {
-        const energyKey = `Energie${clientNumber}`;
-        combinedEnergyData.forEach(row => {
-            if (row['Date et Heure']) {
-                const value = row[energyKey];
-                if (value && value.toString().trim() !== '' && value.toString().trim() !== '-') {
-                    const date = row['Date et Heure'].split(' ')[0];
-                    totalDays.add(date);
-                }
-            }
-        });
+    // Si pas de première recharge détectée pour ce client, retourner 0
+    if (!clientFirstRecharge) {
+        console.log(`⚠️ Client ${clientNumber} - Aucune première recharge détectée`);
+        return 0;
     }
     
-    // Jours avec données de solde
-    if (combinedSoldeData.length > 0) {
-        const creditKey = `Credit${clientNumber}`;
-        combinedSoldeData.forEach(row => {
-            if (row['Date et Heure']) {
-                const value = row[creditKey];
-                if (value && value.toString().trim() !== '' && value.toString().trim() !== '-') {
-                    const date = row['Date et Heure'].split(' ')[0];
-                    totalDays.add(date);
-                }
-            }
-        });
-    }
+    // Définir la date de début (première recharge, à minuit)
+    const startDate = new Date(clientFirstRecharge);
+    startDate.setHours(0, 0, 0, 0);
     
-    return totalDays.size;
+    // Date d'aujourd'hui
+    const today = new Date();
+    today.setHours(23, 59, 59, 999);
+    
+    // Calculer la différence en millisecondes
+    const diffTime = Math.abs(today - startDate);
+    
+    // Convertir en jours (arrondi à l'entier supérieur pour inclure le jour en cours)
+    const daysSinceFirstRecharge = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    console.log(`📅 Client ${clientNumber} - Première recharge: ${startDate.toLocaleDateString('fr-FR')} - Jours écoulés: ${daysSinceFirstRecharge}`);
+    
+    return daysSinceFirstRecharge;
 }
 // Fonction pour récupérer les événements groupés par jour
-function getEventsForClientGroupedByDay(clientNumber, forfaitStartDate = null, forfaitEndDate = null) {
+function getEventsForClientGroupedByDay(clientNumber, forfaitStartDate = null, forfaitEndDate = null, globalFirstRechargeDate = null) {
     const eventsByDay = {};
     const clientStr = clientNumber.toString();
+    
+    // Utiliser la date de début la plus stricte
+    let effectiveStartDate = forfaitStartDate;
+    if (globalFirstRechargeDate && (!effectiveStartDate || globalFirstRechargeDate > effectiveStartDate)) {
+        effectiveStartDate = globalFirstRechargeDate;
+    }
     
     combinedEventData.forEach(row => {
         if (!row['Date et Heure'] || !row['Évènements']) return;
@@ -10187,11 +10547,10 @@ function getEventsForClientGroupedByDay(clientNumber, forfaitStartDate = null, f
         const code1 = row['Code 1']?.toString().trim() || '';
         const code2 = row['Code 2']?.toString().trim() || '';
         
-        if (forfaitStartDate || forfaitEndDate) {
-            const eventDateObj = new Date(date);
-            if (forfaitStartDate && eventDateObj < forfaitStartDate) return;
-            if (forfaitEndDate && eventDateObj > forfaitEndDate) return;
-        }
+        // ✅ APPLIQUER LE FILTRE DE DATE DE DÉBUT
+        const eventDateObj = new Date(date);
+        if (effectiveStartDate && eventDateObj < effectiveStartDate) return;
+        if (forfaitEndDate && eventDateObj > forfaitEndDate) return;
         
         if (!eventsByDay[date]) {
             eventsByDay[date] = {
@@ -10238,7 +10597,7 @@ function getEventsForClientGroupedByDay(clientNumber, forfaitStartDate = null, f
         }
     });
     
-    // Ajouter les données de crédit nul
+    // ✅ AJOUTER LE FILTRE DE DATE DE DÉBUT POUR LE CRÉDIT NUL AUSSI
     if (combinedSoldeData && combinedSoldeData.length > 0) {
         const creditKey = `Credit${clientNumber}`;
         
@@ -10249,11 +10608,9 @@ function getEventsForClientGroupedByDay(clientNumber, forfaitStartDate = null, f
             const [date, time] = dateTime.split(' ');
             const value = parseFloat(row[creditKey]) || 0;
             
-            if (forfaitStartDate || forfaitEndDate) {
-                const creditDateObj = new Date(date);
-                if (forfaitStartDate && creditDateObj < forfaitStartDate) return;
-                if (forfaitEndDate && creditDateObj > forfaitEndDate) return;
-            }
+            const creditDateObj = new Date(date);
+            if (effectiveStartDate && creditDateObj < effectiveStartDate) return;
+            if (forfaitEndDate && creditDateObj > forfaitEndDate) return;
             
             if (value === 0) {
                 if (!eventsByDay[date]) {
@@ -10289,6 +10646,7 @@ function getEventsForClientGroupedByDay(clientNumber, forfaitStartDate = null, f
     
     return Object.values(eventsByDay);
 }
+
 // Fonction utilitaire pour récupérer les événements d'un client
 function getEventsForClient(clientNumber) {
     const events = [];
@@ -11319,309 +11677,302 @@ function createClientCreditAnalysis(clientNumber) {
         font-weight: 600;
         display: flex;
         align-items: center;
+        justify-content: space-between;
         gap: 8px;
+        flex-wrap: wrap;
     `;
-    header.innerHTML = `💰 Crédit & Recharges - Client ${clientNumber}`;
+    header.innerHTML = `
+        <span>💰 Crédit & Recharges - Client ${clientNumber}</span>
+    `;
     analysisDiv.appendChild(header);
     
     const content = document.createElement('div');
     content.style.cssText = `padding: 15px;`;
-
-    // Analyser les données de solde
-    const creditData = combinedSoldeData.map(row => ({
-        date: row['Date et Heure'],
-        value: parseFloat(row[`Credit${clientNumber}`]) || 0
-    })).filter(d => !isNaN(d.value) && d.value !== null);
     
-    // Analyser les données de recharge
+    // ✅ RÉCUPÉRER LA DATE DE PREMIÈRE RECHARGE DU CLIENT
+    const clientFirstRecharge = getClientFirstRechargeDate(clientNumber);
+    const startDateFilter = clientFirstRecharge;
+    
+    // ✅ AJOUTER UN BADGE D'INFORMATION
+    if (startDateFilter) {
+        const infoBadge = document.createElement('div');
+        infoBadge.style.cssText = `
+            background: #dbeafe;
+            border-radius: 8px;
+            padding: 10px 15px;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 12px;
+            color: #1e40af;
+            border: 1px solid #bfdbfe;
+            flex-wrap: wrap;
+        `;
+        const formattedStartDate = startDateFilter.toLocaleDateString('fr-FR', {
+            day: '2-digit', month: '2-digit', year: 'numeric'
+        });
+        infoBadge.innerHTML = `
+            <span style="font-size: 16px;">📅</span>
+            <span><strong>Analyse à partir de la première recharge:</strong> ${formattedStartDate}</span>
+            <span style="margin-left: auto; background: #bfdbfe; padding: 2px 10px; border-radius: 20px; font-size: 11px;">
+                Données antérieures ignorées
+            </span>
+        `;
+        content.appendChild(infoBadge);
+    }
+    
+    // ✅ FILTRER LES DONNÉES DE SOLDE À PARTIR DE LA PREMIÈRE RECHARGE
+    let creditData = [];
+    if (combinedSoldeData && combinedSoldeData.length > 0) {
+        creditData = combinedSoldeData
+            .filter(row => {
+                const date = new Date(row['Date et Heure']);
+                if (startDateFilter && date < startDateFilter) return false;
+                return true;
+            })
+            .map(row => ({
+                date: row['Date et Heure'],
+                value: parseFloat(row[`Credit${clientNumber}`]) || 0
+            }))
+            .filter(d => !isNaN(d.value) && d.value !== null);
+    }
+    
+    // ✅ ANALYSER LES DONNÉES DE RECHARGE (déjà filtrées par client)
     const rechargeAnalysis = analyzeRechargeData(clientNumber);
     
     if (creditData.length === 0 && !rechargeAnalysis.hasData) {
-        content.innerHTML = `<div style="text-align: center; padding: 25px; color: #94a3b8;">Aucune donnée</div>`;
+        content.innerHTML = `<div style="text-align: center; padding: 25px; color: #94a3b8;">Aucune donnée disponible depuis la première recharge</div>`;
     } else {
         
-        // === SÉRIES CONSÉCUTIVES SANS CRÉDIT ===
-        const streaksCard = createDaysWithoutCreditCard(clientNumber);
+        // === SÉRIES CONSÉCUTIVES SANS CRÉDIT (avec filtre date) ===
+        const streaksCard = createDaysWithoutCreditCard(clientNumber, startDateFilter);
         content.appendChild(streaksCard);
         
         // === HABITUDES DE RECHARGE ===
         if (rechargeAnalysis.hasData && rechargeAnalysis.purchaseDays.length > 0) {
-            const totalPurchases = rechargeAnalysis.purchaseDays.length;
+            // Filtrer les recharges après la première recharge
+            let filteredPurchaseDays = rechargeAnalysis.purchaseDays;
+            if (startDateFilter) {
+                filteredPurchaseDays = rechargeAnalysis.purchaseDays.filter(item => {
+                    const itemDate = new Date(item.date);
+                    return itemDate >= startDateFilter;
+                });
+            }
             
-            // 1. HABITUDE DE RECHARGE (par nombre de jours spécifiques)
-            const daysCountMap = new Map();
-            rechargeAnalysis.purchaseDays.forEach(item => {
-                const days = item.days;
-                daysCountMap.set(days, (daysCountMap.get(days) || 0) + 1);
-            });
+            const totalPurchases = filteredPurchaseDays.length;
             
-            const sortedDays = Array.from(daysCountMap.entries()).sort((a, b) => b[0] - a[0]);
-            
-            let mainHabit = { days: 0, count: 0, percentage: 0 };
-            sortedDays.forEach(([days, count]) => {
-                if (count > mainHabit.count) {
-                    mainHabit = { days, count, percentage: (count / totalPurchases * 100).toFixed(1) };
-                }
-            });
-            
-            // 2. RÉPARTITION PAR INTERVALLES
-            let intervalJours = 0;      // 1-6 jours
-            let intervalSemaine = 0;    // 7-29 jours
-            let intervalMois = 0;        // >=30 jours
-            
-            rechargeAnalysis.purchaseDays.forEach(item => {
-                const days = item.days;
-                if (days >= 1 && days <= 6) intervalJours++;
-                else if (days >= 7 && days <= 28) intervalSemaine++;
-                else if (days >= 29) intervalMois++;
-            });
-            
-            const percentJours = totalPurchases > 0 ? (intervalJours / totalPurchases * 100).toFixed(1) : 0;
-            const percentSemaine = totalPurchases > 0 ? (intervalSemaine / totalPurchases * 100).toFixed(1) : 0;
-            const percentMois = totalPurchases > 0 ? (intervalMois / totalPurchases * 100).toFixed(1) : 0;
-            
-            const intervals = [
-                { name: 'Jours', value: intervalJours, percent: percentJours, color: '#f97316', range: '1-6j' },
-                { name: 'Semaine', value: intervalSemaine, percent: percentSemaine, color: '#3b82f6', range: '7-28j' },
-                { name: 'Mois', value: intervalMois, percent: percentMois, color: '#22c55e', range: '>28j' }
-            ];
-            
-            const mainInterval = intervals.reduce((max, interval) => 
-                interval.value > max.value ? interval : max
-            );
-            
-            const habitSection = document.createElement('div');
-            habitSection.style.cssText = `
-                background: #f8fafc;
-                border-radius: 8px;
-                padding: 12px;
-                margin-bottom: 12px;
-                border: 1px solid #e2e8f0;
-            `;
-            
-            // Construction de la barre d'habitude (détail par jour)
-            let habitBarHTML = '';
-            let habitLegendHTML = '';
-            
-            sortedDays.forEach(([days, count]) => {
-                const percentage = (count / totalPurchases * 100).toFixed(1);
-                const isMain = days === mainHabit.days;
+            if (totalPurchases > 0) {
+                // 1. HABITUDE DE RECHARGE (par nombre de jours spécifiques)
+                const daysCountMap = new Map();
+                filteredPurchaseDays.forEach(item => {
+                    const days = item.days;
+                    daysCountMap.set(days, (daysCountMap.get(days) || 0) + 1);
+                });
                 
-                let bgColor = '';
-                if (days >= 30) bgColor = '#22c55e';
-                else if (days >= 20) bgColor = '#84cc16';
-                else if (days >= 15) bgColor = '#eab308';
-                else if (days >= 10) bgColor = '#f97316';
-                else if (days >= 7) bgColor = '#ef4444';
-                else if (days >= 5) bgColor = '#ec4899';
-                else if (days >= 3) bgColor = '#8b5cf6';
-                else bgColor = '#94a3b8';
+                const sortedDays = Array.from(daysCountMap.entries()).sort((a, b) => b[0] - a[0]);
                 
-                habitBarHTML += `
-                    <div style="width: ${percentage}%; height: 100%; background: ${bgColor}; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 600; color: white; position: relative;" title="${days}j : ${percentage}%">
-                        ${percentage > 8 ? percentage + '%' : ''}
-                        ${isMain ? '<span style="position: absolute; top: -6px; font-size: 12px;">⭐</span>' : ''}
-                    </div>
-                `;
+                let mainHabit = { days: 0, count: 0, percentage: 0 };
+                sortedDays.forEach(([days, count]) => {
+                    if (count > mainHabit.count) {
+                        mainHabit = { days, count, percentage: (count / totalPurchases * 100).toFixed(1) };
+                    }
+                });
                 
-                habitLegendHTML += `
-                    <span style="display: flex; align-items: center; gap: 3px; font-size: 9px;">
-                        <span style="width: 8px; height: 8px; background: ${bgColor}; border-radius: 2px;"></span>
-                        ${days}j ${percentage}%${isMain ? ' ⭐' : ''}
-                    </span>
-                `;
-            });
-            
-            habitSection.innerHTML = `
+                // 2. RÉPARTITION PAR INTERVALLES
+                let intervalJours = 0;      // 1-6 jours
+                let intervalSemaine = 0;    // 7-29 jours
+                let intervalMois = 0;        // >=30 jours
                 
-                <!-- Répartition par intervalles -->
-                <div style="margin-top: 10px;">
-                    <div style="display: flex; align-items: center; gap: 5px; margin-bottom: 8px;">
-                        <span style="font-size: 14px;">📈</span>
-                        <span style="font-weight: 600; font-size: 12px;">Habitude d'achat</span>
-                    </div>
-                    
-                    <div style="height: 36px; background: #f1f5f9; border-radius: 18px; overflow: hidden; display: flex; margin-bottom: 10px; box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);">
-                        <div style="width: ${percentJours}%; height: 100%; background: #f97316; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: white; transition: all 0.2s;" 
-                            title="1-6 jours : ${intervalJours} recharge(s) (${percentJours}%)"
-                            onmouseover="this.style.opacity='0.9'"
-                            onmouseout="this.style.opacity='1'">
-                            ${percentJours > 8 ? percentJours + '%' : ''}
-                        </div>
-                        <div style="width: ${percentSemaine}%; height: 100%; background: #3b82f6; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: white; transition: all 0.2s;" 
-                            title="7-29 jours : ${intervalSemaine} recharge(s) (${percentSemaine}%)"
-                            onmouseover="this.style.opacity='0.9'"
-                            onmouseout="this.style.opacity='1'">
-                            ${percentSemaine > 8 ? percentSemaine + '%' : ''}
-                        </div>
-                        <div style="width: ${percentMois}%; height: 100%; background: #22c55e; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: white; transition: all 0.2s;" 
-                            title="≥30 jours : ${intervalMois} recharge(s) (${percentMois}%)"
-                            onmouseover="this.style.opacity='0.9'"
-                            onmouseout="this.style.opacity='1'">
-                            ${percentMois > 8 ? percentMois + '%' : ''}
-                        </div>
-                    </div>
-                    
-                    <div style="display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-around; margin-bottom: 8px;">
-                        <div style="display: flex; align-items: center; gap: 5px; ${mainInterval.name === 'Jours' ? 'background: #f1f5f9; padding: 3px 10px; border-radius: 20px;' : ''}">
-                            <div style="width: 14px; height: 14px; background: #f97316; border-radius: 3px; ${mainInterval.name === 'Jours' ? 'box-shadow: 0 0 0 2px white, 0 0 0 3px #f97316;' : ''}"></div>
-                            <span style="font-size: 11px;"><strong>Jours</strong> 1-6j: ${intervalJours}x (${percentJours}%)</span>
-                            ${mainInterval.name === 'Jours' ? '<span style="font-size: 14px;">👑</span>' : ''}
-                        </div>
-                        <div style="display: flex; align-items: center; gap: 5px; ${mainInterval.name === 'Semaine' ? 'background: #f1f5f9; padding: 3px 10px; border-radius: 20px;' : ''}">
-                            <div style="width: 14px; height: 14px; background: #3b82f6; border-radius: 3px; ${mainInterval.name === 'Semaine' ? 'box-shadow: 0 0 0 2px white, 0 0 0 3px #3b82f6;' : ''}"></div>
-                            <span style="font-size: 11px;"><strong>Semaine</strong> 7-28j: ${intervalSemaine}x (${percentSemaine}%)</span>
-                            ${mainInterval.name === 'Semaine' ? '<span style="font-size: 14px;">👑</span>' : ''}
-                        </div>
-                        <div style="display: flex; align-items: center; gap: 5px; ${mainInterval.name === 'Mois' ? 'background: #f1f5f9; padding: 3px 10px; border-radius: 20px;' : ''}">
-                            <div style="width: 14px; height: 14px; background: #22c55e; border-radius: 3px; ${mainInterval.name === 'Mois' ? 'box-shadow: 0 0 0 2px white, 0 0 0 3px #22c55e;' : ''}"></div>
-                            <span style="font-size: 11px;"><strong>Mois</strong> >28j: ${intervalMois}x (${percentMois}%)</span>
-                            ${mainInterval.name === 'Mois' ? '<span style="font-size: 14px;">👑</span>' : ''}
-                        </div>
-                    </div>
-                    
-                    <div style="background: #f1f5f9; padding: 6px 10px; border-radius: 6px; font-size: 11px; display: flex; align-items: center; gap: 8px;">
-                        <span style="font-size: 14px;">🏆</span>
-                        <span><strong>Habitude :</strong> <span style="background: ${mainInterval.color}20; color: ${mainInterval.color}; padding: 2px 12px; border-radius: 20px; font-weight: 700;">${mainInterval.name}</span> (${mainInterval.percent}%, ${mainInterval.range})</span>
-                    </div>
-                </div>
-            `;
-            
-            content.appendChild(habitSection);
-            
-            // === GRAPHIQUE ÉVOLUTION DU CRÉDIT ===
-            if (creditData.length > 0) {
-                // Extraire les années disponibles
-                const availableYears = [...new Set(creditData.map(d => new Date(d.date).getFullYear()))].sort((a, b) => b - a);
+                filteredPurchaseDays.forEach(item => {
+                    const days = item.days;
+                    if (days >= 1 && days <= 6) intervalJours++;
+                    else if (days >= 7 && days <= 28) intervalSemaine++;
+                    else if (days >= 29) intervalMois++;
+                });
                 
-                const chartSection = document.createElement('div');
-                chartSection.style.cssText = `
+                const percentJours = totalPurchases > 0 ? (intervalJours / totalPurchases * 100).toFixed(1) : 0;
+                const percentSemaine = totalPurchases > 0 ? (intervalSemaine / totalPurchases * 100).toFixed(1) : 0;
+                const percentMois = totalPurchases > 0 ? (intervalMois / totalPurchases * 100).toFixed(1) : 0;
+                
+                const intervals = [
+                    { name: 'Jours', value: intervalJours, percent: percentJours, color: '#f97316', range: '1-6j' },
+                    { name: 'Semaine', value: intervalSemaine, percent: percentSemaine, color: '#3b82f6', range: '7-28j' },
+                    { name: 'Mois', value: intervalMois, percent: percentMois, color: '#22c55e', range: '>28j' }
+                ];
+                
+                const mainInterval = intervals.reduce((max, interval) => 
+                    interval.value > max.value ? interval : max
+                );
+                
+                const habitSection = document.createElement('div');
+                habitSection.style.cssText = `
                     background: #f8fafc;
                     border-radius: 8px;
-                    padding: 15px;
+                    padding: 12px;
                     margin-bottom: 12px;
                     border: 1px solid #e2e8f0;
                 `;
                 
-                chartSection.innerHTML = `
-                    <div style="display: flex; align-items: center; gap: 5px; margin-bottom: 15px;">
-                        <span style="font-size: 16px;">📊</span>
-                        <span style="font-weight: 600; font-size: 13px;">Évolution du crédit</span>
-                        <span style="margin-left: auto; background: #e2e8f0; padding: 2px 8px; border-radius: 12px; font-size: 10px;" class="releve-count">
-                            ${creditData.length} relevé(s)
-                        </span>
-                    </div>
-                    
-                    <!-- Filtre par année -->
-                    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 15px; padding: 10px; background: #f1f5f9; border-radius: 6px; border: 1px solid #e2e8f0;">
-                        <span style="font-size: 14px;">🔍</span>
-                        <label for="year-filter-${clientNumber}" style="font-weight: 600; font-size: 12px;">Filtrer par année :</label>
-                        <select id="year-filter-${clientNumber}" style="padding: 5px 10px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 12px; background: white;">
-                            ${availableYears.map((year, index) => `<option value="${year}" ${index === 0 ? 'selected' : ''}>${year}</option>`).join('')}
-                        </select>
-                        <button id="apply-year-filter-${clientNumber}" style="padding: 5px 15px; background: #3b82f6; color: white; border: none; border-radius: 4px; font-size: 12px; font-weight: 600; cursor: pointer; transition: background 0.2s;">
-                            Appliquer
-                        </button>
-                    </div>
-                    
-                    <div style="height: 500px; position: relative;">
-                        <canvas id="credit-chart-${clientNumber}" style="width: 100%; height: 100%;"></canvas>
-                    </div>
-                    
-                    <div style="margin-top: 10px; display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: #64748b;">
-                        <div style="font-size: 10px; color: #94a3b8;">
-                            Dernière mise à jour: ${creditData.length > 0 ? new Date(creditData[creditData.length - 1].date).toLocaleDateString('fr-FR') : 'N/A'}
+                habitSection.innerHTML = `
+                    <div style="margin-top: 10px;">
+                        <div style="display: flex; align-items: center; gap: 5px; margin-bottom: 8px;">
+                            <span style="font-size: 14px;">📈</span>
+                            <span style="font-weight: 600; font-size: 12px;">Habitude d'achat (depuis première recharge)</span>
+                            ${startDateFilter ? `<span style="font-size: 10px; color: #64748b; margin-left: 8px;">${totalPurchases} recharge(s) analysée(s)</span>` : ''}
+                        </div>
+                        
+                        <div style="height: 36px; background: #f1f5f9; border-radius: 18px; overflow: hidden; display: flex; margin-bottom: 10px; box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);">
+                            <div style="width: ${percentJours}%; height: 100%; background: #f97316; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: white;" 
+                                title="1-6 jours : ${intervalJours} recharge(s) (${percentJours}%)">
+                                ${percentJours > 8 ? percentJours + '%' : ''}
+                            </div>
+                            <div style="width: ${percentSemaine}%; height: 100%; background: #3b82f6; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: white;" 
+                                title="7-29 jours : ${intervalSemaine} recharge(s) (${percentSemaine}%)">
+                                ${percentSemaine > 8 ? percentSemaine + '%' : ''}
+                            </div>
+                            <div style="width: ${percentMois}%; height: 100%; background: #22c55e; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: white;" 
+                                title="≥30 jours : ${intervalMois} recharge(s) (${percentMois}%)">
+                                ${percentMois > 8 ? percentMois + '%' : ''}
+                            </div>
+                        </div>
+                        
+                        <div style="display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-around; margin-bottom: 8px;">
+                            <div style="display: flex; align-items: center; gap: 5px; ${mainInterval.name === 'Jours' ? 'background: #f1f5f9; padding: 3px 10px; border-radius: 20px;' : ''}">
+                                <div style="width: 14px; height: 14px; background: #f97316; border-radius: 3px; ${mainInterval.name === 'Jours' ? 'box-shadow: 0 0 0 2px white, 0 0 0 3px #f97316;' : ''}"></div>
+                                <span style="font-size: 11px;"><strong>Jours</strong> 1-6j: ${intervalJours}x (${percentJours}%)</span>
+                                ${mainInterval.name === 'Jours' ? '<span style="font-size: 14px;">👑</span>' : ''}
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 5px; ${mainInterval.name === 'Semaine' ? 'background: #f1f5f9; padding: 3px 10px; border-radius: 20px;' : ''}">
+                                <div style="width: 14px; height: 14px; background: #3b82f6; border-radius: 3px; ${mainInterval.name === 'Semaine' ? 'box-shadow: 0 0 0 2px white, 0 0 0 3px #3b82f6;' : ''}"></div>
+                                <span style="font-size: 11px;"><strong>Semaine</strong> 7-28j: ${intervalSemaine}x (${percentSemaine}%)</span>
+                                ${mainInterval.name === 'Semaine' ? '<span style="font-size: 14px;">👑</span>' : ''}
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 5px; ${mainInterval.name === 'Mois' ? 'background: #f1f5f9; padding: 3px 10px; border-radius: 20px;' : ''}">
+                                <div style="width: 14px; height: 14px; background: #22c55e; border-radius: 3px; ${mainInterval.name === 'Mois' ? 'box-shadow: 0 0 0 2px white, 0 0 0 3px #22c55e;' : ''}"></div>
+                                <span style="font-size: 11px;"><strong>Mois</strong> >28j: ${intervalMois}x (${percentMois}%)</span>
+                                ${mainInterval.name === 'Mois' ? '<span style="font-size: 14px;">👑</span>' : ''}
+                            </div>
+                        </div>
+                        
+                        <div style="background: #f1f5f9; padding: 6px 10px; border-radius: 6px; font-size: 11px; display: flex; align-items: center; gap: 8px;">
+                            <span style="font-size: 14px;">🏆</span>
+                            <span><strong>Habitude :</strong> <span style="background: ${mainInterval.color}20; color: ${mainInterval.color}; padding: 2px 12px; border-radius: 20px; font-weight: 700;">${mainInterval.name}</span> (${mainInterval.percent}%, ${mainInterval.range})</span>
                         </div>
                     </div>
                 `;
                 
-                content.appendChild(chartSection);
-                
-                // Fonction de filtrage par année
-                function filterCreditDataByYear(selectedYear) {
-                    if (!selectedYear || selectedYear === 'all') {
-                        return creditData;
-                    }
-                    return creditData.filter(d => new Date(d.date).getFullYear() === parseInt(selectedYear));
-                }
-                
-                // Gestionnaire d'événement pour le bouton Appliquer
-                setTimeout(() => {
-                    const applyButton = document.getElementById(`apply-year-filter-${clientNumber}`);
-                    console.log('Bouton trouvé:', applyButton, `apply-year-filter-${clientNumber}`);
-                    if (applyButton) {
-                        applyButton.addEventListener('click', function() {
-                            console.log('Bouton cliqué!');
-                            const yearFilter = document.getElementById(`year-filter-${clientNumber}`);
-                            const selectedYear = yearFilter.value;
-                            console.log('Année sélectionnée:', selectedYear);
-                            const filteredData = filterCreditDataByYear(selectedYear);
-                            console.log('Données filtrées:', filteredData.length, 'éléments');
-                            
-                            // Créer consumptionByDay à partir des données filtrées
-                            const consumptionByDay = {};
-                            filteredData.forEach(item => {
-                                const dateKey = item.date.split(' ')[0];
-                                consumptionByDay[dateKey] = { hasConsumption: false };
-                            });
-                            
-                            // Détruire le graphique existant s'il existe
-                            const existingChart = Chart.getChart(`credit-chart-${clientNumber}`);
-                            if (existingChart) {
-                                existingChart.destroy();
-                            }
-                            
-                            // Recréer le graphique avec les données filtrées
-                            createCreditEvolutionChart(clientNumber, filteredData, consumptionByDay);
-                            
-                            // Mettre à jour le compteur de relevés
-                            const countElement = chartSection.querySelector('.releve-count');
-                            if (countElement) {
-                                countElement.textContent = `${filteredData.length} relevé(s)`;
-                            }
-                            
-                            // Feedback visuel
-                            this.style.background = '#1d4ed8';
-                            setTimeout(() => {
-                                this.style.background = '#3b82f6';
-                            }, 200);
-                        });
-                    } else {
-                        console.error('Bouton non trouvé:', `apply-year-filter-${clientNumber}`);
-                    }
-                }, 500);
-                
-                // Créer le graphique initial avec l'année la plus récente
-                setTimeout(() => {
-                    const initialYearFilter = document.getElementById(`year-filter-${clientNumber}`);
-                    const initialSelectedYear = initialYearFilter ? initialYearFilter.value : availableYears[0];
-                    const initialFilteredData = filterCreditDataByYear(initialSelectedYear);
-                    
-                    // Créer consumptionByDay à partir des données de crédit (par défaut, pas de consommation)
-                    const consumptionByDay = {};
-                    initialFilteredData.forEach(item => {
-                        const dateKey = item.date.split(' ')[0];
-                        consumptionByDay[dateKey] = { hasConsumption: false };
-                    });
-                    
-                    createCreditEvolutionChart(clientNumber, initialFilteredData, consumptionByDay);
-                    
-                    // Mettre à jour le compteur de relevés initial
-                    const countElement = chartSection.querySelector('.releve-count');
-                    if (countElement) {
-                        countElement.textContent = `${initialFilteredData.length} relevé(s)`;
-                    }
-                }, 100);
+                content.appendChild(habitSection);
             }
+        }
+        
+        // === GRAPHIQUE ÉVOLUTION DU CRÉDIT (avec filtre date) ===
+        if (creditData.length > 0) {
+            // Extraire les années disponibles
+            const availableYears = [...new Set(creditData.map(d => new Date(d.date).getFullYear()))].sort((a, b) => b - a);
+            
+            const chartSection = document.createElement('div');
+            chartSection.style.cssText = `
+                background: #f8fafc;
+                border-radius: 8px;
+                padding: 15px;
+                margin-bottom: 12px;
+                border: 1px solid #e2e8f0;
+            `;
+            
+            chartSection.innerHTML = `
+                <div style="display: flex; align-items: center; gap: 5px; margin-bottom: 15px;">
+                    <span style="font-size: 16px;">📊</span>
+                    <span style="font-weight: 600; font-size: 13px;">Évolution du crédit</span>
+                </div>
+                
+                <!-- Filtre par année -->
+                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 15px; padding: 10px; background: #f1f5f9; border-radius: 6px; border: 1px solid #e2e8f0;">
+                    <span style="font-size: 14px;">🔍</span>
+                    <label for="year-filter-${clientNumber}" style="font-weight: 600; font-size: 12px;">Filtrer par année :</label>
+                    <select id="year-filter-${clientNumber}" style="padding: 5px 10px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 12px; background: white;">
+                        <option value="all">Toutes les années</option>
+                        ${availableYears.map(year => `<option value="${year}">${year}</option>`).join('')}
+                    </select>
+                    <button id="apply-year-filter-${clientNumber}" style="padding: 5px 15px; background: #3b82f6; color: white; border: none; border-radius: 4px; font-size: 12px; font-weight: 600; cursor: pointer; transition: background 0.2s;">
+                        Appliquer
+                    </button>
+                </div>
+                
+                <div style="height: 400px; position: relative;">
+                    <canvas id="credit-chart-${clientNumber}" style="width: 100%; height: 100%;"></canvas>
+                </div>
+            `;
+            
+            content.appendChild(chartSection);
+            
+            // Fonction de filtrage par année
+            function filterCreditDataByYear(selectedYear) {
+                if (!selectedYear || selectedYear === 'all') {
+                    return creditData;
+                }
+                return creditData.filter(d => new Date(d.date).getFullYear() === parseInt(selectedYear));
+            }
+            
+            // Gestionnaire d'événement pour le bouton Appliquer
+            setTimeout(() => {
+                const applyButton = document.getElementById(`apply-year-filter-${clientNumber}`);
+                if (applyButton) {
+                    applyButton.addEventListener('click', function() {
+                        const yearFilter = document.getElementById(`year-filter-${clientNumber}`);
+                        const selectedYear = yearFilter.value;
+                        const filteredData = filterCreditDataByYear(selectedYear);
+                        
+                        // Créer consumptionByDay à partir des données filtrées
+                        const consumptionByDay = {};
+                        filteredData.forEach(item => {
+                            const dateKey = item.date.split(' ')[0];
+                            consumptionByDay[dateKey] = { hasConsumption: false };
+                        });
+                        
+                        // Détruire le graphique existant
+                        const existingChart = Chart.getChart(`credit-chart-${clientNumber}`);
+                        if (existingChart) {
+                            existingChart.destroy();
+                        }
+                        
+                        // Recréer le graphique avec les données filtrées
+                        createCreditEvolutionChart(clientNumber, filteredData, consumptionByDay);
+                        
+                        // Mettre à jour le compteur de relevés
+                        const countElement = chartSection.querySelector('.releve-count');
+                        if (countElement) {
+                            countElement.textContent = `${filteredData.length} relevé(s)`;
+                        }
+                        
+                        // Feedback visuel
+                        this.style.background = '#1d4ed8';
+                        setTimeout(() => {
+                            this.style.background = '#3b82f6';
+                        }, 200);
+                    });
+                }
+            }, 500);
+            
+            // Créer le graphique initial
+            setTimeout(() => {
+                const consumptionByDay = {};
+                creditData.forEach(item => {
+                    const dateKey = item.date.split(' ')[0];
+                    consumptionByDay[dateKey] = { hasConsumption: false };
+                });
+                createCreditEvolutionChart(clientNumber, creditData, consumptionByDay);
+            }, 100);
         }
     }
     
     analysisDiv.appendChild(content);
     return analysisDiv;
 }
+
 // ==================== CARTE DES JOURS SANS CRÉDIT ====================
-function createDaysWithoutCreditCard(clientNumber) {
-    const analysis = analyzeDaysWithoutCredit(clientNumber);
+function createDaysWithoutCreditCard(clientNumber, startDateFilter = null) {
+    const analysis = analyzeDaysWithoutCredit(clientNumber, startDateFilter);
     
     const card = document.createElement('div');
     card.style.cssText = `
@@ -11647,25 +11998,13 @@ function createDaysWithoutCreditCard(clientNumber) {
         `;
         noData.innerHTML = `
             <span style="font-size: 14px;">🔗</span>
-            <span>Aucune série >1 jour sans crédit</span>
+            <span>Aucune série >1 jour sans crédit depuis la première recharge</span>
         `;
         card.appendChild(noData);
         return card;
     }
     
-    const content = document.createElement('div');
-    content.style.cssText = `padding: 12px;`;
     
-    let significantStreaks = analysis.consecutiveDays.filter(group => group.length > 1);
-    // Trier par nombre de jours décroissant (plus grande série en haut)
-    significantStreaks = significantStreaks.sort((a, b) => {
-        const diff = b.length - a.length;
-        if (diff !== 0) return diff;
-        // Si égalité sur la longueur, trier par date de début la plus récente d'abord
-        return new Date(b[0].date) - new Date(a[0].date);
-    });
-    
-    card.appendChild(content);
     return card;
 }
 // ==================== ANALYSE DES DÉPASSEMENTS DE TENSION À 14.0V/28V ====================
@@ -11879,8 +12218,8 @@ function createVoltageThresholdTable() {
                 <span style="font-size: 18px;">🔴</span>
                 <span style="font-size: 12px; font-weight: 600; color: #000000;">EXCÈS</span>
             </div>
-            <div style="font-size: 24px; font-weight: 800; color: #000000; margin-bottom: 5px;">${exces}</div>
-            <div style="font-size: 11px; color: #64748b;">${totalJours > 0 ? ((exces/totalJours*100).toFixed(1)) : 0}% des jours</div>
+            <div style="font-size: 24px; font-weight: 800; color: #000000; margin-bottom: 5px;">${totalJours > 0 ? ((exces/totalJours*100).toFixed(1)) : 0}%</div>
+            <div style="font-size: 11px; color: #64748b;">${exces} jours</div>
             <div style="margin-top: 8px; width: 100%; height: 4px; background: #e2e8f0; border-radius: 2px; overflow: hidden;">
                 <div style="width: ${totalJours > 0 ? (exces/totalJours*100) : 0}%; height: 100%; background: #000000;"></div>
             </div>
@@ -11890,8 +12229,8 @@ function createVoltageThresholdTable() {
                 <span style="font-size: 18px;">⭐</span>
                 <span style="font-size: 12px; font-weight: 600; color: #166534;">EXCELLENT</span>
             </div>
-            <div style="font-size: 24px; font-weight: 800; color: #22c55e; margin-bottom: 5px;">${excellent}</div>
-            <div style="font-size: 11px; color: #64748b;">${totalJours > 0 ? ((excellent/totalJours*100).toFixed(1)) : 0}% des jours</div>
+            <div style="font-size: 24px; font-weight: 800; color: #22c55e; margin-bottom: 5px;">${totalJours > 0 ? ((excellent/totalJours*100).toFixed(1)) : 0}%</div>
+            <div style="font-size: 11px; color: #64748b;">${excellent} jours</div>
             <div style="margin-top: 8px; width: 100%; height: 4px; background: #e2e8f0; border-radius: 2px; overflow: hidden;">
                 <div style="width: ${totalJours > 0 ? (excellent/totalJours*100) : 0}%; height: 100%; background: #22c55e;"></div>
             </div>
@@ -11901,8 +12240,8 @@ function createVoltageThresholdTable() {
                 <span style="font-size: 18px;">👍</span>
                 <span style="font-size: 12px; font-weight: 600; color: #1e40af;">TRÈS BIEN</span>
             </div>
-            <div style="font-size: 24px; font-weight: 800; color: #3b82f6; margin-bottom: 5px;">${tresBien}</div>
-            <div style="font-size: 11px; color: #64748b;">${totalJours > 0 ? ((tresBien/totalJours*100).toFixed(1)) : 0}% des jours</div>
+            <div style="font-size: 24px; font-weight: 800; color: #3b82f6; margin-bottom: 5px;">${totalJours > 0 ? ((tresBien/totalJours*100).toFixed(1)) : 0}%</div>
+            <div style="font-size: 11px; color: #64748b;">${tresBien} jours</div>
             <div style="margin-top: 8px; width: 100%; height: 4px; background: #e2e8f0; border-radius: 2px; overflow: hidden;">
                 <div style="width: ${totalJours > 0 ? (tresBien/totalJours*100) : 0}%; height: 100%; background: #3b82f6;"></div>
             </div>
@@ -11912,8 +12251,8 @@ function createVoltageThresholdTable() {
                 <span style="font-size: 18px;">🟡</span>
                 <span style="font-size: 12px; font-weight: 600; color: #854d0e;">CORRECT</span>
             </div>
-            <div style="font-size: 24px; font-weight: 800; color: #eab308; margin-bottom: 5px;">${correct}</div>
-            <div style="font-size: 11px; color: #64748b;">${totalJours > 0 ? ((correct/totalJours*100).toFixed(1)) : 0}% des jours</div>
+            <div style="font-size: 24px; font-weight: 800; color: #eab308; margin-bottom: 5px;">${totalJours > 0 ? ((correct/totalJours*100).toFixed(1)) : 0}%</div>
+            <div style="font-size: 11px; color: #64748b;">${correct} jours</div>
             <div style="margin-top: 8px; width: 100%; height: 4px; background: #e2e8f0; border-radius: 2px; overflow: hidden;">
                 <div style="width: ${totalJours > 0 ? (correct/totalJours*100) : 0}%; height: 100%; background: #eab308;"></div>
             </div>
@@ -11923,8 +12262,8 @@ function createVoltageThresholdTable() {
                 <span style="font-size: 18px;">⚠️</span>
                 <span style="font-size: 12px; font-weight: 600; color: #9a3412;">FAIBLE</span>
             </div>
-            <div style="font-size: 24px; font-weight: 800; color: #f97316; margin-bottom: 5px;">${faible}</div>
-            <div style="font-size: 11px; color: #64748b;">${totalJours > 0 ? ((faible/totalJours*100).toFixed(1)) : 0}% des jours</div>
+            <div style="font-size: 24px; font-weight: 800; color: #f97316; margin-bottom: 5px;">${totalJours > 0 ? ((faible/totalJours*100).toFixed(1)) : 0}%</div>
+            <div style="font-size: 11px; color: #64748b;">${faible} jours</div>
             <div style="margin-top: 8px; width: 100%; height: 4px; background: #e2e8f0; border-radius: 2px; overflow: hidden;">
                 <div style="width: ${totalJours > 0 ? (faible/totalJours*100) : 0}%; height: 100%; background: #f97316;"></div>
             </div>
@@ -11934,8 +12273,8 @@ function createVoltageThresholdTable() {
                 <span style="font-size: 18px;">🔴</span>
                 <span style="font-size: 12px; font-weight: 600; color: #991b1b;">TROP FAIBLE</span>
             </div>
-            <div style="font-size: 24px; font-weight: 800; color: #ef4444; margin-bottom: 5px;">${nulle}</div>
-            <div style="font-size: 11px; color: #64748b;">${totalJours > 0 ? ((nulle/totalJours*100).toFixed(1)) : 0}% des jours</div>
+            <div style="font-size: 24px; font-weight: 800; color: #ef4444; margin-bottom: 5px;">${totalJours > 0 ? ((nulle/totalJours*100).toFixed(1)) : 0}%</div>
+            <div style="font-size: 11px; color: #64748b;">${nulle} jours</div>
             <div style="margin-top: 8px; width: 100%; height: 4px; background: #e2e8f0; border-radius: 2px; overflow: hidden;">
                 <div style="width: ${totalJours > 0 ? (nulle/totalJours*100) : 0}%; height: 100%; background: #ef4444;"></div>
             </div>

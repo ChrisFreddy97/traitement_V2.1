@@ -959,11 +959,26 @@ function renderEventsBoard() {
 function renderEventsClient(client) {
     const events = client.events ?? [];
     const zeroCreditDates = client.zeroCreditDates ?? [];
-    const totalDays = client.consommation?.journaliere?.length ?? client.credits?.length ?? zeroCreditDates.length ?? 1;
+    
+    // ✅ CORRECTION: Filtrer TOUTES les données à partir de la première recharge
+    const firstRechargeDate = client.firstRechargeDate;
+    const startDate = firstRechargeDate ? firstRechargeDate.split('T')[0] : null;
+    
+    // Filtrer les événements
+    const filteredEvents = startDate 
+        ? events.filter(e => e.date && e.date.split('T')[0] >= startDate)
+        : events;
+    
+    // Filtrer les jours sans crédit
+    const filteredZeroCreditDates = startDate
+        ? zeroCreditDates.filter(date => date.split('T')[0] >= startDate)
+        : zeroCreditDates;
+    
+    const totalDays = client.consommation?.journaliere?.length ?? client.credits?.length ?? filteredZeroCreditDates.length ?? 1;
     
     const eventsMap = new Map();
     
-    events.forEach(event => {
+    filteredEvents.forEach(event => {
         if (!event.date) return;
         const dateStr = event.date.split('T')[0];
         const hour = event.date.includes('T') ? event.date.split('T')[1]?.substring(0,5) : '';
@@ -995,13 +1010,7 @@ function renderEventsClient(client) {
         }
     });
     
-    zeroCreditDates.forEach(date => {
-        const dateStr = date.split('T')[0];
-        if (!eventsMap.has(dateStr)) {
-            eventsMap.set(dateStr, {
-                date: dateStr, dateObj: new Date(date),
-                SuspendE: 0, SuspendE_start: '', SuspendE_end: '', SuspendE_duration: '',
-                SuspendP: 0, SuspendP_start: '', SuspendP_end: '', SuspendP_duration: '',
+    filteredZeroCreditDates.forEach(date => {
                 CreditNul: 1
             });
         } else {
@@ -1021,17 +1030,39 @@ function renderEventsClient(client) {
     // Format du numéro client avec zéro devant (comme code 1)
     const clientNumberFormatted = client.id.toString().padStart(2, '0');
     
-    // ✅ Calculer le nombre de jours entre la première recharge et le dernier jour du relevé
+    // ✅ Calculer le nombre de jours entre la première recharge et le dernier jour du relevé (corrigé)
     let totalDaysForPercentage = totalDays;
-    if (client.firstRechargeDate && eventsByDay.length > 0) {
-        const allDates = eventsByDay.map(d => new Date(d.date)).sort((a, b) => a - b);
-        const firstDate = new Date(client.firstRechargeDate);
-        const lastDate = allDates[allDates.length - 1];
+    if (client.firstRechargeDate) {
+        // Récupérer toutes les dates disponibles (événements + consommation + crédit)
+        const allDates = [];
         
-        if (firstDate && lastDate) {
-            // Calculer le nombre de jours entre firstDate et lastDate (inclus)
-            const timeDiff = lastDate - firstDate;
-            totalDaysForPercentage = Math.floor(timeDiff / (1000 * 60 * 60 * 24)) + 1; // +1 pour inclure les deux jours
+        // Ajouter les dates des événements
+        eventsByDay.forEach(d => allDates.push(new Date(d.date)));
+        
+        // Ajouter les dates de consommation si disponibles
+        if (client.consommation?.journaliere?.length > 0) {
+            client.consommation.journaliere.forEach(d => {
+                if (d.date) allDates.push(new Date(d.date.split('T')[0]));
+            });
+        }
+        
+        // Ajouter les dates de crédit si disponibles
+        if (client.credits?.length > 0) {
+            client.credits.forEach(c => {
+                if (c.date) allDates.push(new Date(c.date.split('T')[0]));
+            });
+        }
+        
+        if (allDates.length > 0) {
+            // Trouver la dernière date
+            const lastDate = new Date(Math.max(...allDates.map(d => d.getTime())));
+            const firstDate = new Date(client.firstRechargeDate);
+            
+            if (firstDate && lastDate) {
+                // Calculer le nombre de jours entre firstDate et lastDate (inclus)
+                const timeDiff = lastDate - firstDate;
+                totalDaysForPercentage = Math.floor(timeDiff / (1000 * 60 * 60 * 24)) + 1; // +1 pour inclure les deux jours
+            }
         }
     }
     
@@ -1242,11 +1273,26 @@ function renderEventsBoard() {
 function renderEventsClient(client) {
     const events = client.events ?? [];
     const zeroCreditDates = client.zeroCreditDates ?? [];
-    const totalDays = client.consommation?.journaliere?.length ?? client.credits?.length ?? zeroCreditDates.length ?? 1;
+    
+    // ✅ CORRECTION: Filtrer TOUTES les données à partir de la première recharge
+    const firstRechargeDate = client.firstRechargeDate;
+    const startDate = firstRechargeDate ? firstRechargeDate.split('T')[0] : null;
+    
+    // Filtrer les événements
+    const filteredEvents = startDate 
+        ? events.filter(e => e.date && e.date.split('T')[0] >= startDate)
+        : events;
+    
+    // Filtrer les jours sans crédit
+    const filteredZeroCreditDates = startDate
+        ? zeroCreditDates.filter(date => date.split('T')[0] >= startDate)
+        : zeroCreditDates;
+    
+    const totalDays = client.consommation?.journaliere?.length ?? client.credits?.length ?? filteredZeroCreditDates.length ?? 1;
     
     const eventsMap = new Map();
     
-    events.forEach(event => {
+    filteredEvents.forEach(event => {
         if (!event.date) return;
         const dateStr = event.date.split('T')[0];
         const hour = event.date.includes('T') ? event.date.split('T')[1]?.substring(0,5) : '';
@@ -1278,7 +1324,7 @@ function renderEventsClient(client) {
         }
     });
     
-    zeroCreditDates.forEach(date => {
+    filteredZeroCreditDates.forEach(date => {
         const dateStr = date.split('T')[0];
         if (!eventsMap.has(dateStr)) {
             eventsMap.set(dateStr, {
@@ -1301,17 +1347,39 @@ function renderEventsClient(client) {
     const totalEvents = events.length + zeroCreditDates.length;
     const hasAnyEvent = daysWithCreditNul.size > 0 || daysWithSuspendP.size > 0 || daysWithSuspendE.size > 0;
     
-    // ✅ Calculer le nombre de jours entre la première recharge et le dernier jour du relevé
+    // ✅ Calculer le nombre de jours entre la première recharge et le dernier jour du relevé (corrigé)
     let totalDaysForPercentage = totalDays;
-    if (client.firstRechargeDate && eventsByDay.length > 0) {
-        const allDates = eventsByDay.map(d => new Date(d.date)).sort((a, b) => a - b);
-        const firstDate = new Date(client.firstRechargeDate);
-        const lastDate = allDates[allDates.length - 1];
+    if (client.firstRechargeDate) {
+        // Récupérer toutes les dates disponibles (événements + consommation + crédit)
+        const allDates = [];
         
-        if (firstDate && lastDate) {
-            // Calculer le nombre de jours entre firstDate et lastDate (inclus)
-            const timeDiff = lastDate - firstDate;
-            totalDaysForPercentage = Math.floor(timeDiff / (1000 * 60 * 60 * 24)) + 1; // +1 pour inclure les deux jours
+        // Ajouter les dates des événements
+        eventsByDay.forEach(d => allDates.push(new Date(d.date)));
+        
+        // Ajouter les dates de consommation si disponibles
+        if (client.consommation?.journaliere?.length > 0) {
+            client.consommation.journaliere.forEach(d => {
+                if (d.date) allDates.push(new Date(d.date.split('T')[0]));
+            });
+        }
+        
+        // Ajouter les dates de crédit si disponibles
+        if (client.credits?.length > 0) {
+            client.credits.forEach(c => {
+                if (c.date) allDates.push(new Date(c.date.split('T')[0]));
+            });
+        }
+        
+        if (allDates.length > 0) {
+            // Trouver la dernière date
+            const lastDate = new Date(Math.max(...allDates.map(d => d.getTime())));
+            const firstDate = new Date(client.firstRechargeDate);
+            
+            if (firstDate && lastDate) {
+                // Calculer le nombre de jours entre firstDate et lastDate (inclus)
+                const timeDiff = lastDate - firstDate;
+                totalDaysForPercentage = Math.floor(timeDiff / (1000 * 60 * 60 * 24)) + 1; // +1 pour inclure les deux jours
+            }
         }
     }
     
@@ -1478,7 +1546,20 @@ function renderCreditBoard() {
     const recharges = client.recharges ?? [];
     const zeroCreditDates = client.zeroCreditDates ?? [];
     
-    const streaksData = processCreditStreaks(credits, zeroCreditDates);
+    // ✅ CORRECTION: Filtrer les crédits à partir de la première recharge (date de début d'achat)
+    const firstRechargeDate = client.firstRechargeDate;
+    const startDate = firstRechargeDate ? firstRechargeDate.split('T')[0] : null;
+    
+    const filteredCredits = startDate 
+        ? credits.filter(c => c.date && c.date.split('T')[0] >= startDate)
+        : credits;
+    
+    // ✅ Filtrer aussi les zeroCreditDates
+    const filteredZeroCreditDates = startDate
+        ? zeroCreditDates.filter(date => date.split('T')[0] >= startDate)
+        : zeroCreditDates;
+    
+    const streaksData = processCreditStreaks(filteredCredits, filteredZeroCreditDates);
     const rechargeData = processRechargeData(recharges);
 
 
@@ -1521,8 +1602,9 @@ function renderCreditBoard() {
     </div>`;
     
 
-    html += renderCreditEvolutionChart(credits, client.id);
-    html += renderMonthlyCreditAnalysis(credits, zeroCreditDates);
+    // ✅ CORRECTION: Passer les crédits filtrés (à partir de la première recharge) aux analyses
+    html += renderCreditEvolutionChart(filteredCredits, client.id, firstRechargeDate);
+    html += renderMonthlyCreditAnalysis(filteredCredits, filteredZeroCreditDates, firstRechargeDate);
     const summaryHTML = renderCreditSummaryDashboard(credits, zeroCreditDates);
 
     container.innerHTML = html;
@@ -1756,7 +1838,7 @@ window.showClientDetail = (clientId) => {
 let currentCreditChart = null;
 let currentCreditChartClientId = null;
 
-function renderCreditEvolutionChart(credits, clientId) {
+function renderCreditEvolutionChart(credits, clientId, firstRechargeDate) {
     if (!credits || credits.length === 0) {
         return `
             <div style="background: white; border-radius: ${STYLES.borderRadius.md}; margin-bottom: ${STYLES.spacing.md}; padding: ${STYLES.spacing.xl}; text-align: center; color: ${STYLES.colors.gray}; border: 1px solid ${STYLES.colors.border};">
@@ -1765,12 +1847,18 @@ function renderCreditEvolutionChart(credits, clientId) {
         `;
     }
     
+    // ✅ CORRECTION: Filtrer les données à partir de la première recharge
+    const startDate = firstRechargeDate ? firstRechargeDate.split('T')[0] : null;
+    
     // Traiter les données : regrouper par date
     const creditByDate = new Map();
     credits.forEach(c => {
         if (c.date) {
             const dateStr = c.date.split('T')[0];
-            creditByDate.set(dateStr, c.value ?? 0);
+            // ✅ Inclure seulement les données après la première recharge
+            if (!startDate || dateStr >= startDate) {
+                creditByDate.set(dateStr, c.value ?? 0);
+            }
         }
     });
     
@@ -2052,7 +2140,7 @@ function destroyCreditChart() {
 // ANALYSE MENSUELLE DU CRÉDIT
 // ===========================================
 
-function renderMonthlyCreditAnalysis(credits, zeroCreditDates) {
+function renderMonthlyCreditAnalysis(credits, zeroCreditDates, firstRechargeDate) {
     if (!credits || credits.length === 0) {
         return `
             <div style="background: white; border-radius: ${STYLES.borderRadius.md}; margin-bottom: ${STYLES.spacing.md}; overflow: hidden; border: 1px solid ${STYLES.colors.border};">
@@ -2064,20 +2152,29 @@ function renderMonthlyCreditAnalysis(credits, zeroCreditDates) {
         `;
     }
     
+    // ✅ CORRECTION: Filtrer à partir de la première recharge
+    const startDate = firstRechargeDate ? firstRechargeDate.split('T')[0] : null;
+    
     // 1. Construire un Map jour par jour avec les valeurs de crédit
     const creditByDate = new Map();
     
     credits.forEach(c => {
         if (c.date) {
             const dateStr = c.date.split('T')[0];
-            creditByDate.set(dateStr, c.value ?? 0);
+            // ✅ Inclure seulement les données après la première recharge
+            if (!startDate || dateStr >= startDate) {
+                creditByDate.set(dateStr, c.value ?? 0);
+            }
         }
     });
     
-    // Ajouter les jours sans crédit (valeur 0)
+    // Ajouter les jours sans crédit (valeur 0) - déjà filtrés dans commercialAnalytics.js
     zeroCreditDates.forEach(date => {
         const dateStr = date.split('T')[0];
-        creditByDate.set(dateStr, 0);
+        // ✅ Inclure seulement les jours après la première recharge
+        if (!startDate || dateStr >= startDate) {
+            creditByDate.set(dateStr, 0);
+        }
     });
     
     // 2. Grouper par mois et analyser

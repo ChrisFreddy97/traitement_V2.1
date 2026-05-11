@@ -1348,6 +1348,36 @@ function generateCommercialView(clientId) {
         return `<div class="no-data-message">Aucune donnée de consommation disponible pour ce client.</div>`;
     }
 
+    // ✅ CORRECTION : Calculer le nombre TOTAL de jours entre la première et la dernière date
+    let totalDaysInPeriod = 0;
+    let startDateObj = null;
+    let endDateObj = null;
+    
+    if (dailySummary.length > 0) {
+        // Trier les dates pour obtenir la première et la dernière
+        const sortedDates = [...dailySummary].sort((a, b) => {
+            const [da, ma, ya] = a.date.split('/');
+            const [db, mb, yb] = b.date.split('/');
+            return new Date(ya, ma-1, da) - new Date(yb, mb-1, db);
+        });
+        
+        const firstDateStr = sortedDates[0].date;
+        const lastDateStr = sortedDates[sortedDates.length - 1].date;
+        
+        const [d1, m1, y1] = firstDateStr.split('/');
+        const [d2, m2, y2] = lastDateStr.split('/');
+        
+        startDateObj = new Date(y1, m1-1, d1);
+        endDateObj = new Date(y2, m2-1, d2);
+        
+        // Calculer le nombre de jours entre les deux dates (inclusif)
+        const diffTime = Math.abs(endDateObj - startDateObj);
+        totalDaysInPeriod = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+    }
+    
+    // ✅ Utiliser totalDaysInPeriod si calculé, sinon dailySummary.length
+    const displayTotalDays = totalDaysInPeriod > 0 ? totalDaysInPeriod : dailySummary.length;
+    
     // --- Informations de base et forfaits ---
     const clientNumber = parseInt(clientId).toString().padStart(2, '0');
     const allForfaits = extractClientForfaits(clientId);
@@ -1356,8 +1386,8 @@ function generateCommercialView(clientId) {
     const forfaitMax = forfaitLimits.max;
     const toleranceMax = forfaitMax * 1.15;
 
-    // --- Statistiques clés ---
-    const stats = calculateClientStats(dailySummary, forfaitMax);
+    // --- Statistiques clés (CORRIGÉES pour utiliser displayTotalDays) ---
+    const stats = calculateClientStatsForPeriod(dailySummary, forfaitMax, displayTotalDays);
 
     // --- Construction du HTML ---
     return `
@@ -1366,7 +1396,7 @@ function generateCommercialView(clientId) {
             <span style="font-size: 24px;">👤</span>
             <span style="font-size: 18px; font-weight: 600;">Client ${clientNumber}</span>
             <span style="margin-left: auto; background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 20px; font-size: 13px;">
-                ${currentForfait.name} · ${forfaitMax}Wh · ${dailySummary.length} jours
+                ${currentForfait.name} · ${forfaitMax}Wh · ${displayTotalDays} jours
             </span>
         </div>
 
@@ -1383,15 +1413,252 @@ function generateCommercialView(clientId) {
                 </div>
                 <div>
                     <h3 style="margin: 0; font-size: 16px; font-weight: 700; color: #1e293b;">Historique des forfaits et consommation</h3>
-                    <p style="margin: 2px 0 0 0; font-size: 12px; color: #64748b;">1 forfait(s) · Analyse détaillée par période</p>
+                    <p style="margin: 2px 0 0 0; font-size: 12px; color: #64748b;">${allForfaits.length} forfait(s) · Analyse détaillée par période</p>
                 </div>
             </div>
             <div style="padding: 20px;">
-                ${generateForfaitHistoryTable(allForfaits, dailySummary, forfaitMax)}
-                ${generateForfaitProgressBars(allForfaits, dailySummary, forfaitMax)}
+                ${generateForfaitHistoryTableForPeriod(allForfaits, dailySummary, forfaitMax, startDateObj, endDateObj, displayTotalDays)}
+                ${generateForfaitProgressBarsForPeriod(stats, forfaitMax)}
             </div>
         </div>
     `;
+}
+
+// ✅ MODIFIER generateForfaitHistoryTableForPeriod
+function generateForfaitHistoryTableForPeriod(forfaits, dailySummary, currentForfaitMax, startDateObj, endDateObj, totalDaysInPeriod) {
+    if (forfaits.length === 0) return '';
+
+    let tableRows = '';
+    
+    forfaits.forEach((f, index) => {
+        // Filtrer les jours dans la période du forfait
+        let daysInPeriod = dailySummary;
+        if (f.startDate !== '-' && f.endDate !== '-') {
+            const fStartDate = new Date(f.startDate.split('/').reverse().join('-'));
+            const fEndDate = new Date(f.endDate.split('/').reverse().join('-'));
+            daysInPeriod = dailySummary.filter(d => {
+                const dDate = new Date(d.date.split('/').reverse().join('-'));
+                return dDate >= fStartDate && dDate <= fEndDate;
+            });
+        }
+        
+        // Pour le calcul de "Jours totaux", utiliser la période complète du forfait
+        let totalPeriodDays = daysInPeriod.length;
+        if (startDateObj && endDateObj && f.isCurrent) {
+            // Pour le forfait actuel, utiliser la période complète
+            const diffTime = Math.abs(endDateObj - startDateObj);
+            totalPeriodDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+        }
+        
+        const daysWith = daysInPeriod.filter(d => d.energieMax > 0).length;
+        const daysWithout = totalPeriodDays - daysWith;
+        
+        const changement = f.previousForfait ? `${f.previousForfait} → ${f.name}` : 'Premier forfait';
+        const rowClass = f.isCurrent ? 'current-forfait-row' : '';
+
+        // Calcul des énergies max et moyenne pour la période
+        const energiesInPeriod = daysInPeriod.map(d => d.energieMax || 0).filter(v => v > 0);
+        const maxEnergy = energiesInPeriod.length > 0 ? Math.max(...energiesInPeriod) : 0;
+        const maxEnergyDate = energiesInPeriod.length > 0 ? daysInPeriod.find(d => d.energieMax === maxEnergy)?.date || '-' : '-';
+        const avgEnergy = energiesInPeriod.length > 0 ? Math.round(energiesInPeriod.reduce((a, b) => a + b, 0) / energiesInPeriod.length) : 0;
+
+        // Formater les dates d'affichage
+        let startDisplay = f.startDate;
+        let endDisplay = f.endDate;
+        if (f.isCurrent && startDateObj && endDateObj) {
+            startDisplay = startDateObj.toLocaleDateString('fr-FR');
+            endDisplay = endDateObj.toLocaleDateString('fr-FR');
+        }
+
+        tableRows += `
+            <tr class="${rowClass}" style="border-bottom: 1px solid #e2e8f0;">
+                <td style="padding: 12px 15px; white-space: nowrap;">${startDisplay} → ${endDisplay}</td>
+                <td style="padding: 12px 15px; text-align: center;">
+                    <span style="background: ${f.isCurrent ? '#22c55e20' : '#9f7aea20'}; color: ${f.isCurrent ? '#22c55e' : '#9f7aea'}; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600;">
+                        ${f.name}
+                    </span>
+                </td>
+                <td style="padding: 12px 15px; text-align: center; color: #64748b;">${changement}</td>
+                <td style="padding: 12px 15px; text-align: center; background: #f8fafc; font-weight: 600;">${totalPeriodDays}</td>
+                <td style="padding: 12px 15px; text-align: center; background: #f8fafc; color: #22c55e; font-weight: 600;">
+                    ${daysWith} <span style="font-size: 11px; color: #64748b;">(${totalPeriodDays > 0 ? Math.round(daysWith / totalPeriodDays * 100) : 0}%)</span>
+                 </td>
+                <td style="padding: 12px 15px; text-align: center; background: #f8fafc; color: #64748b; font-weight: 600;">
+                    ${daysWithout} <span style="font-size: 11px; color: #64748b;">(${totalPeriodDays > 0 ? Math.round(daysWithout / totalPeriodDays * 100) : 0}%)</span>
+                 </td>
+                <td style="padding: 12px 15px; text-align: center; background: #ede9fe;">
+                    <div style="font-weight: 700; color: #7c3aed;">${maxEnergy.toFixed(1)} Wh</div>
+                    <div style="font-size: 10px; color: #6b21a5;">${maxEnergyDate}</div>
+                 </td>
+                <td style="padding: 12px 15px; text-align: center; background: #ede9fe; font-weight: 600; color: #7c3aed;">
+                    ${avgEnergy} Wh
+                 </td>
+             </tr>
+        `;
+    });
+
+    return `
+        <div style="overflow-x: auto; border-radius: 8px; border: 1px solid #e2e8f0; margin-bottom: 20px;">
+            <table style="width: 100%; border-collapse: collapse; font-size: 13px; min-width: 1200px;">
+                <thead>
+                    <tr style="background: #f8fafc; border-bottom: 2px solid #e2e8f0;">
+                        <th style="padding: 12px 15px; text-align: left; color: #475569; font-weight: 600;">Période</th>
+                        <th style="padding: 12px 15px; text-align: center; color: #475569; font-weight: 600;">Forfait</th>
+                        <th style="padding: 12px 15px; text-align: center; color: #475569; font-weight: 600;">Changement</th>
+                        <th style="padding: 12px 15px; text-align: center; color: #475569; font-weight: 600; background: #f1f5f9;">📅 Jours totaux</th>
+                        <th style="padding: 12px 15px; text-align: center; color: #475569; font-weight: 600; background: #f1f5f9;">✅ Jours avec conso</th>
+                        <th style="padding: 12px 15px; text-align: center; color: #475569; font-weight: 600; background: #f1f5f9;">⭕ Jours sans conso</th>
+                        <th style="padding: 12px 15px; text-align: center; color: #475569; font-weight: 600; background: #ede9fe;">⚡ Énergie max</th>
+                        <th style="padding: 12px 15px; text-align: center; color: #475569; font-weight: 600; background: #ede9fe;">📊 Énergie moy</th>
+                     </tr>
+                </thead>
+                <tbody>
+                    ${tableRows}
+                </tbody>
+             </table>
+        </div>
+    `;
+}
+
+function generateForfaitProgressBarsForPeriod(stats, currentForfaitMax) {
+    const totalDays = stats.totalDays;
+    const currentForfait = { name: 'Kit', max: currentForfaitMax };
+
+    const categories = [
+        {
+            title: 'Normal',
+            subtitle: `≤ ${Math.round(currentForfaitMax * 0.85)} Wh`,
+            value: stats.daysInLimits,
+            percent: stats.percentInLimits,
+            color: '#22c55e'
+        },
+        {
+            title: 'Tolérance',
+            subtitle: `≤ ${Math.round(currentForfaitMax * 1.15)} Wh`,
+            value: stats.daysInTolerance,
+            percent: stats.percentInTolerance,
+            color: '#f59e0b'
+        },
+        {
+            title: 'Hors tolérance',
+            subtitle: `> ${Math.round(currentForfaitMax * 1.15)} Wh`,
+            value: stats.daysOutOfTolerance,
+            percent: stats.percentOutOfTolerance,
+            color: '#ef4444'
+        }
+    ];
+
+    return `
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 5px;">
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 15px;">
+                <span style="font-size: 18px;">📊</span>
+                <span style="font-weight: 600; color: #1e293b;">Répartition de l'énergie consommée (seuils 85% et 115%)</span>
+                <span style="margin-left: 8px; font-size: 11px; color: #64748b;">(sur ${stats.daysWithConsumption} jours avec consommation)</span>
+            </div>
+        </div>
+        <div style="background: white; border-radius: 18px; border: 1px solid #e2e8f0; padding: 20px; box-shadow: 0 10px 25px rgba(15, 23, 42, 0.05); margin-bottom: 20px;">
+            <!-- Barre de progression combinée -->
+            <div style="background: #f1f5f9; border-radius: 30px; height: 40px; overflow: hidden; display: flex; box-shadow: inset 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 10px;">
+                ${(() => {
+                    const validCategories = categories.filter(category => category.percent > 0);
+                    if (validCategories.length === 0) {
+                        return `<div style="width: 100%; height: 100%; background: #cbd5e1; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600; color: white;">Aucune donnée</div>`;
+                    }
+                    return validCategories.map(category => {
+                        return `<div style="width: ${category.percent}%; height: 100%; background: ${category.color}; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600; color: white;">
+                            ${category.percent > 5 ? category.percent + '%' : ''}
+                        </div>`;
+                    }).join('');
+                })()}
+            </div>
+
+            <!-- Légende des catégories -->
+            <div style="display: flex; flex-wrap: wrap; gap: 15px; justify-content: space-between; font-size: 11px; margin-top: 10px;">
+                ${categories.filter(category => category.percent > 0).map(category => `
+                    <div style="display: flex; align-items: center; gap: 5px;">
+                        <div style="width: 12px; height: 12px; background: ${category.color}; border-radius: 3px;"></div>
+                        <span><strong>${category.value} jours</strong> ${category.subtitle} · ${category.percent}%</span>
+                    </div>
+                `).join('')}
+            </div>
+        </div>
+
+        <div style="margin-top: 15px; padding: 15px; background: #f1f5f9; border-radius: 8px; font-size: 12px; display: flex; flex-direction: column; gap: 10px;">
+            <div style="display: flex; align-items: center; gap: 10px; color: #475569;">
+                <span style="font-size: 14px;">📌</span>
+                <span><strong>Légende des seuils de consommation :</strong></span>
+            </div>
+            <div style="display: flex; flex-wrap: wrap; gap: 20px; justify-content: space-around;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <div style="width: 16px; height: 16px; background: #22c55e; border-radius: 4px;"></div>
+                    <span><strong>Normal</strong> (0-85% du forfait)</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <div style="width: 16px; height: 16px; background: #f59e0b; border-radius: 4px;"></div>
+                    <span><strong>Tolérance</strong> (85-115% du forfait)</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <div style="width: 16px; height: 16px; background: #ef4444; border-radius: 4px;"></div>
+                    <span><strong>Hors tolérance</strong> (>115% du forfait ou événement SuspendE)</span>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+// ✅ NOUVELLE FONCTION : calculateClientStatsForPeriod avec paramètre totalDays
+function calculateClientStatsForPeriod(dailySummary, forfaitMax, totalDaysInPeriod) {
+    const daysWithConsumption = dailySummary.filter(d => d.energieMax > 0);
+    const daysWithoutConsumption = totalDaysInPeriod - daysWithConsumption.length;
+
+    // Calculs des énergies
+    const maxEnergy = Math.max(...dailySummary.map(d => d.energieMax || 0));
+    const maxEnergyDate = dailySummary.find(d => d.energieMax === maxEnergy)?.date || '-';
+
+    const avgEnergy = daysWithConsumption.length > 0
+        ? Math.round(dailySummary.reduce((sum, d) => sum + (d.energieMax || 0), 0) / daysWithConsumption.length)
+        : 0;
+
+    // SEUILS: 85% et 115%
+    const seuil85 = forfaitMax * 0.85;
+    const seuil115 = forfaitMax * 1.15;
+
+    const daysInLimits = dailySummary.filter(d => d.energieMax > 0 && d.energieMax <= seuil85).length;
+    const daysInTolerance = dailySummary.filter(d => d.energieMax > seuil85 && d.energieMax <= seuil115).length;
+    const daysOutOfTolerance = dailySummary.filter(d => d.energieMax > seuil115).length;
+    const daysWithEnergyDepleted = daysOutOfTolerance;
+
+    const totalDaysWithData = dailySummary.filter(d => d.energieMax > 0).length;
+
+    // Pourcentages basés sur totalDaysInPeriod
+    const percentInLimits = totalDaysWithData > 0 ? Math.round((daysInLimits / totalDaysWithData) * 100) : 0;
+    const percentInTolerance = totalDaysWithData > 0 ? Math.round((daysInTolerance / totalDaysWithData) * 100) : 0;
+    const percentOutOfTolerance = totalDaysWithData > 0 ? Math.round((daysOutOfTolerance / totalDaysWithData) * 100) : 0;
+    const percentDaysWithConsumption = totalDaysInPeriod > 0 ? Math.round((daysWithConsumption.length / totalDaysInPeriod) * 100) : 0;
+
+    // Dates de début et fin
+    const startDate = dailySummary.length > 0 ? dailySummary[0].date : '-';
+    const endDate = dailySummary.length > 0 ? dailySummary[dailySummary.length - 1].date : '-';
+
+    return {
+        isActive: daysWithConsumption.length > 0,
+        daysWithConsumption: daysWithConsumption.length,
+        daysWithoutConsumption: daysWithoutConsumption,
+        percentDaysWithConsumption,
+        maxEnergy,
+        maxEnergyDate,
+        avgEnergy,
+        daysInLimits,
+        daysInTolerance,
+        daysOutOfTolerance,
+        daysWithEnergyDepleted,
+        percentInLimits,
+        percentInTolerance,
+        percentOutOfTolerance,
+        startDate,
+        endDate,
+        totalDays: totalDaysInPeriod
+    };
 }
 
 // ======================== FONCTION À ADAPTER SELON VOS DONNÉES ========================
@@ -1949,7 +2216,7 @@ function createCreditChart(creditData, clientId) {
                             label: (context) => {
                                 const value = context.parsed.y;
                                 if (value === 0) {
-                                    return '💰 Crédit nul - risque de coupure';
+                                    return '💰 Crédit nul';
                                 }
                                 return `${value} jour(s) de crédit restant`;
                             }
@@ -2285,30 +2552,120 @@ function createCreditCard(clientId) {
     const creditAnalysis = analyzeClientCreditDays(clientId);
     
     // Récupérer les données de crédit complètes pour le graphique
-    const creditData = creditResultsByClient[clientId];
+    let creditData = creditResultsByClient[clientId];
     
-    // ANALYSE MENSUELLE - NOUVEAU
-    const monthlyStats = analyzeMonthlyCredit(creditData, clientId);
+    // Extraire les années disponibles
+    const availableYears = getAvailableYears(creditData);
+    const currentYear = availableYears.length > 0 ? availableYears[availableYears.length - 1] : null;
     
-    // Calculer quelques statistiques pour le résumé
-    const totalDays = creditAnalysis.totalDaysWithoutCredit;
-    const significantStreaks = creditAnalysis.significantStreaks;
-    const longestStreak = creditAnalysis.longestStreak;
-    
-    // Calculer le crédit moyen (hors zéros)
-    let avgCredit = 0;
+    // ========== CALCUL DES STATISTIQUES ==========
+    let totalDays = 0;
     let totalCredit = 0;
     let creditCount = 0;
+    let daysWithoutCredit = 0;
+    let longestStreak = 0;
+    let firstDate = null;
+    let lastDate = null;
+    let monthsCount = 0;
     
-    if (creditData && creditData.results) {
-        creditData.results.forEach(item => {
+    if (creditData && creditData.results && creditData.results.length > 0) {
+        // Trier les résultats par date
+        const sortedResults = [...creditData.results].sort((a, b) => {
+            const dateA = new Date(a.date.split('/').reverse().join('-'));
+            const dateB = new Date(b.date.split('/').reverse().join('-'));
+            return dateA - dateB;
+        });
+        
+        // Première et dernière date
+        if (sortedResults.length > 0) {
+            const firstDateStr = sortedResults[0].date;
+            const lastDateStr = sortedResults[sortedResults.length - 1].date;
+            const [d1, m1, y1] = firstDateStr.split('/');
+            const [d2, m2, y2] = lastDateStr.split('/');
+            firstDate = new Date(y1, m1 - 1, d1);
+            lastDate = new Date(y2, m2 - 1, d2);
+            
+            // Calculer le nombre de mois
+            monthsCount = (lastDate.getFullYear() - firstDate.getFullYear()) * 12 + (lastDate.getMonth() - firstDate.getMonth()) + 1;
+        }
+        
+        // Collecter les jours uniques
+        const uniqueDays = new Set();
+        const zeroDaysSet = new Set();
+        
+        sortedResults.forEach(item => {
+            const dateStr = item.date;
             const val = parseFloat(item.credit || item.valeur || 0);
-            if (val > 0) {
+            uniqueDays.add(dateStr);
+            
+            if (val === 0) {
+                zeroDaysSet.add(dateStr);
+            } else {
                 totalCredit += val;
                 creditCount++;
             }
         });
-        avgCredit = creditCount > 0 ? (totalCredit / creditCount).toFixed(1) : 0;
+        
+        totalDays = uniqueDays.size;
+        daysWithoutCredit = zeroDaysSet.size;
+        
+        // Calculer la plus longue série sans crédit
+        const datesList = Array.from(uniqueDays).sort((a, b) => {
+            const dateA = new Date(a.split('/').reverse().join('-'));
+            const dateB = new Date(b.split('/').reverse().join('-'));
+            return dateA - dateB;
+        });
+        
+        let currentStreak = 0;
+        let previousDateObj = null;
+        
+        datesList.forEach(dateStr => {
+            const currentDateObj = new Date(dateStr.split('/').reverse().join('-'));
+            const isZero = zeroDaysSet.has(dateStr);
+            
+            if (isZero) {
+                if (previousDateObj) {
+                    const diffDays = Math.round((currentDateObj - previousDateObj) / (1000 * 60 * 60 * 24));
+                    if (diffDays === 1) {
+                        currentStreak++;
+                    } else {
+                        currentStreak = 1;
+                    }
+                } else {
+                    currentStreak = 1;
+                }
+                
+                if (currentStreak > longestStreak) {
+                    longestStreak = currentStreak;
+                }
+            } else {
+                currentStreak = 0;
+            }
+            
+            previousDateObj = currentDateObj;
+        });
+    }
+    
+    const avgCredit = creditCount > 0 ? (totalCredit / creditCount).toFixed(1) : 0;
+    
+    // Calculer la disponibilité du crédit (pourcentage de jours avec crédit)
+    const creditAvailability = totalDays > 0 ? ((totalDays - daysWithoutCredit) / totalDays * 100).toFixed(1) : 0;
+    const percentWithoutCredit = totalDays > 0 ? (daysWithoutCredit / totalDays * 100).toFixed(1) : 0;
+    
+    // Formater la période
+    let periodText = '';
+    let periodSubText = '';
+    if (firstDate && lastDate) {
+        if (monthsCount >= 12) {
+            const years = Math.floor(monthsCount / 12);
+            periodText = `${years} an${years > 1 ? 's' : ''}`;
+        } else {
+            periodText = `${monthsCount} mois`;
+        }
+        periodSubText = `${firstDate.toLocaleDateString('fr-FR')} → ${lastDate.toLocaleDateString('fr-FR')}`;
+    } else {
+        periodText = 'Non disponible';
+        periodSubText = '';
     }
     
     // Déterminer le niveau de risque
@@ -2316,22 +2673,26 @@ function createCreditCard(clientId) {
     let riskColor = '#22c55e';
     let riskIcon = '✅';
     
-    if (totalDays > 20 || longestStreak > 7) {
+    if (daysWithoutCredit > 20 || longestStreak > 7) {
         riskLevel = 'élevé';
         riskColor = '#ef4444';
         riskIcon = '🔴';
-    } else if (totalDays > 10 || longestStreak > 3) {
+    } else if (daysWithoutCredit > 10 || longestStreak > 3) {
         riskLevel = 'moyen';
         riskColor = '#f59e0b';
         riskIcon = '⚠️';
     }
+
+    // ID unique pour ce client
+    const chartContainerId = `credit-chart-container-${clientId}`;
+    const monthlyTableId = `monthly-table-container-${clientId}`;
 
     return `
         <!-- CARTE CRÉDIT DU CLIENT AVEC GRAPHIQUE ET TABLEAU MENSUEL -->
         <div style="background: white; border-radius: 16px; border: 2px solid #e2e8f0; margin: 25px 0; overflow: hidden; box-shadow: 0 8px 20px rgba(0,0,0,0.08);">
             
             <!-- En-tête avec le numéro du client -->
-            <div style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; padding: 16px 22px; display: flex; align-items: center; gap: 12px;">
+            <div style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; padding: 16px 22px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
                 <div style="width: 40px; height: 40px; background: rgba(255,255,255,0.2); border-radius: 10px; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(4px);">
                     <span style="font-size: 22px;">💰</span>
                 </div>
@@ -2339,22 +2700,164 @@ function createCreditCard(clientId) {
                     <div style="font-weight: 700; font-size: 18px;">Crédit & Recharge - Client ${clientNumber}</div>
                     <div style="font-size: 12px; opacity: 0.9;">Suivi de l'évolution du crédit</div>
                 </div>
-                <div style="margin-left: auto; background: rgba(255,255,255,0.2); padding: 6px 16px; border-radius: 30px; font-size: 13px; font-weight: 600;">
+                <div style="margin-left: auto; background: rgba(255,255,255,0.2); padding: 6px 16px; border-radius: 30px; font-size: 13px; font-weight: 600;" id="relev-count-${clientId}">
                     📊 ${creditCount} relevés
                 </div>
             </div>
             
+            <!-- FILTRE PAR ANNÉE -->
+            <div style="padding: 15px 20px; background: #f8fafc; border-bottom: 1px solid #e2e8f0;">
+                <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                    <span style="font-size: 14px;">🔍</span>
+                    <label for="year-filter-${clientId}" style="font-weight: 600; font-size: 12px;">Filtrer par année :</label>
+                    <select id="year-filter-${clientId}" style="padding: 5px 10px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 12px; background: white;">
+                        <option value="all">Toutes les années</option>
+                        ${availableYears.map(year => `<option value="${year}" ${year === currentYear ? 'selected' : ''}>${year}</option>`).join('')}
+                    </select>
+                    <button id="apply-year-filter-${clientId}" style="padding: 5px 15px; background: #3b82f6; color: white; border: none; border-radius: 4px; font-size: 12px; font-weight: 600; cursor: pointer; transition: background 0.2s;">
+                        Appliquer
+                    </button>
+                </div>
+            </div>
+            
             <!-- GRAPHIQUE D'ÉVOLUTION DU CRÉDIT -->
-            <div style="padding: 0;">
+            <div id="${chartContainerId}" style="padding: 0;">
                 ${createCreditChart(creditData, clientId)}
             </div>
             
-            <!-- TABLEAU D'ANALYSE MENSUELLE - NOUVEAU -->
-            <div style="padding: 20px; border-top: 1px solid #e2e8f0;">
-                ${createMonthlyCreditTable(monthlyStats)}
+            <!-- TABLEAU D'ANALYSE MENSUELLE -->
+            <div id="${monthlyTableId}" style="padding: 20px; border-top: 1px solid #e2e8f0;">
+                ${createMonthlyCreditTable(analyzeMonthlyCredit(creditData, clientId))}
+            </div>
+            
+            <!-- PIED DE CARTE AVEC STATISTIQUES (Période, Disponibilité, Jours sans crédit) -->
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; padding: 18px 20px; background: #f8fafc; border-top: 1px solid #e2e8f0;">
+                
+                <!-- Période -->
+                <div style="text-align: center; padding: 12px; background: white; border-radius: 12px; box-shadow: 0 2px 6px rgba(0,0,0,0.04); border: 1px solid #e2e8f0;">
+                    <div style="font-size: 22px; margin-bottom: 6px;">📅</div>
+                    <div style="font-size: 10px; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Période</div>
+                    <div style="font-size: 20px; font-weight: 800; color: #1e293b;">${periodText}</div>
+                    <div style="font-size: 10px; color: #64748b; margin-top: 4px;">${periodSubText}</div>
+                </div>
+                
+                <!-- Disponibilité crédit -->
+                <div style="text-align: center; padding: 12px; background: white; border-radius: 12px; box-shadow: 0 2px 6px rgba(0,0,0,0.04); border: 1px solid #e2e8f0;">
+                    <div style="font-size: 22px; margin-bottom: 6px;">💰</div>
+                    <div style="font-size: 10px; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Disponibilité crédit</div>
+                    <div style="font-size: 20px; font-weight: 800; color: ${creditAvailability >= 80 ? '#16a34a' : creditAvailability >= 60 ? '#f59e0b' : '#dc2626'};">${creditAvailability}%</div>
+                    <div style="font-size: 10px; color: #64748b; margin-top: 4px;">${totalDays - daysWithoutCredit} jours avec crédit / ${totalDays} jours</div>
+                </div>
+                
+                <!-- Jours sans crédit -->
+                <div style="text-align: center; padding: 12px; background: white; border-radius: 12px; box-shadow: 0 2px 6px rgba(0,0,0,0.04); border: 1px solid #e2e8f0;">
+                    <div style="font-size: 22px; margin-bottom: 6px;">⚠️</div>
+                    <div style="font-size: 10px; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Jours sans crédit</div>
+                    <div style="font-size: 20px; font-weight: 800; color: ${daysWithoutCredit > 0 ? '#dc2626' : '#16a34a'};">${percentWithoutCredit}%</div>
+                    <div style="font-size: 10px; color: ${daysWithoutCredit > 0 ? '#991b1b' : '#64748b'}; margin-top: 4px;">${daysWithoutCredit} jour${daysWithoutCredit !== 1 ? 's' : ''} sans crédit</div>
+                </div>
             </div>
         </div>
     `;
+}
+
+// ✅ AJOUTER CETTE FONCTION EN DEHORS DE LA CARTE (dans le scope global)
+function initializeCreditYearFilter(clientId) {
+    setTimeout(() => {
+        const filterSelect = document.getElementById(`credit-year-filter-${clientId}`);
+        const applyBtn = document.getElementById(`apply-year-filter-${clientId}`);
+        
+        if (applyBtn && filterSelect && window.creditResultsByClient && window.creditResultsByClient[clientId]) {
+            const originalCreditData = window.creditResultsByClient[clientId];
+            
+            applyBtn.addEventListener('click', function() {
+                const selectedYear = filterSelect.value;
+                
+                // Filtrer les données
+                let filteredResults = [...(originalCreditData.results || [])];
+                
+                if (selectedYear !== 'all') {
+                    filteredResults = filteredResults.filter(item => {
+                        const dateStr = item.date;
+                        if (dateStr) {
+                            const parts = dateStr.split('/');
+                            const year = parts[2];
+                            return year === selectedYear;
+                        }
+                        return false;
+                    });
+                }
+                
+                // Reconstruire l'objet creditData filtré
+                const filteredCreditData = {
+                    results: filteredResults,
+                    dailySummary: typeof window.generateCreditDailySummary === 'function' ? 
+                        window.generateCreditDailySummary(filteredResults) : []
+                };
+                
+                // Recalculer les statistiques mensuelles
+                const monthlyStats = typeof analyzeMonthlyCredit === 'function' ? 
+                    analyzeMonthlyCredit(filteredCreditData, clientId) : [];
+                
+                // Mettre à jour le graphique
+                const chartContainer = document.getElementById(`credit-chart-container-${clientId}`);
+                if (chartContainer) {
+                    const newChartHTML = createCreditChart(filteredCreditData, clientId);
+                    chartContainer.innerHTML = newChartHTML;
+                }
+                
+                // Mettre à jour le tableau mensuel
+                const monthlyContainer = document.getElementById(`monthly-table-container-${clientId}`);
+                if (monthlyContainer) {
+                    monthlyContainer.innerHTML = createMonthlyCreditTable(monthlyStats);
+                }
+                
+                // Mettre à jour le compteur
+                const relevCountSpan = document.getElementById(`relev-count-${clientId}`);
+                if (relevCountSpan) {
+                    relevCountSpan.textContent = `📊 ${filteredResults.length} relevés`;
+                }
+                
+                // Feedback visuel
+                this.style.transform = 'scale(0.95)';
+                setTimeout(() => {
+                    this.style.transform = 'scale(1)';
+                }, 200);
+            });
+        }
+    }, 200);
+}
+
+// ✅ APPELER CETTE FONCTION DANS displayClientData
+function displayClientData(clientId, clientData) {
+    const contentElement = document.getElementById(`sub-content-${clientId}`);
+    if (!contentElement) return;
+
+    const dailySummary = dailySummaryByClient[clientId] || [];
+    const clientNumber = parseInt(clientId).toString().padStart(2, '0');
+
+    contentElement.innerHTML = `
+        <!-- PARTIE COMMERCIALE PRINCIPALE -->
+        ${generateCommercialView(clientId)}
+
+        <!-- TABLEAU DES ÉVÉNEMENTS -->
+        ${displayClientEventsTab(clientId)}
+
+        <!-- CARTE CRÉDIT & RECHARGE DU CLIENT -->
+        ${createCreditCard(clientId)}
+
+        <!-- TABLEAU RÉSUMÉ JOURNALIER (AVEC BOUTON) -->
+        ${dailySummary.length > 0 ? displayDailySummaryTable(clientId, dailySummary) :
+            '<div style="text-align: center; padding: 30px; background: #f8fafc; border-radius: 8px; color: #64748b;">Aucune donnée journalière disponible</div>'
+        }  
+    `;
+
+    // Initialiser les boutons après l'ajout du HTML
+    setTimeout(() => {
+        initializeTableToggles();
+        initializeClientEventsToggles();
+        initializeCreditYearFilter(clientId); // ← AJOUTER CETTE LIGNE
+    }, 100);
 }
 // ======================== EXTRAIRE LES ANNÉES DISPONIBLES ========================
 function getAvailableYears(creditData) {
