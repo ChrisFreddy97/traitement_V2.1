@@ -97,40 +97,24 @@ export async function readFileAsync(file) {
     }
 }
 
-// ===========================================
-// EXTRACTION CENTRALISÉE DE L'ID CLIENT
-// ===========================================
 export function extractClientId(fullId, nanoreseau) {
     if (!fullId) return null;
     
-    // Si c'est déjà un nombre simple (1,2,3...), on le garde
-    if (!isNaN(parseInt(fullId)) && fullId.length <= 3) {
-        return parseInt(fullId, 10);
+    const str = String(fullId);
+    const lastChar = str.slice(-1);
+    
+    // Si c'est un nombre à un chiffre, parfait
+    if (!isNaN(parseInt(lastChar))) {
+        return parseInt(lastChar, 10);
     }
     
-    // Si on a le numéro du nanoréseau, on l'enlève
-    if (nanoreseau && fullId.startsWith(nanoreseau)) {
-        const vraiId = fullId.substring(nanoreseau.length);
-        if (!isNaN(parseInt(vraiId))) {
-            return parseInt(vraiId, 10);
-        }
+    // Fallback: dernier groupe de chiffres
+    const match = str.match(/(\d+)$/);
+    if (match) {
+        return parseInt(match[1], 10);
     }
     
-    // Fallback: essayer de deviner (format NNNCC)
-    if (fullId.length >= 4) {
-        const possibleClient = fullId.substring(3);
-        if (!isNaN(parseInt(possibleClient))) {
-            return parseInt(possibleClient, 10);
-        }
-    }
-    
-    // Si l'ID fait 3 chiffres, c'est probablement un client simple
-    if (fullId.length === 3 && !isNaN(parseInt(fullId))) {
-        return parseInt(fullId, 10);
-    }
-    
-    // Dernier recours : on le retourne tel quel (string)
-    return fullId;
+    return null;
 }
 
 // ===========================================

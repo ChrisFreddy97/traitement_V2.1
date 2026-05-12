@@ -346,21 +346,6 @@ function postProcessClients(clients, commercialData) {
             stats: { normal: 0, tolerance: 0, depasse: 0 }
         };
         
-        // ✅ Filtrer les jours sans crédit à partir de la première recharge
-        if (client.recharges.length > 0) {
-            const firstRechargeDate = client.recharges[0].date;
-            client.firstRechargeDate = firstRechargeDate;
-            client.zeroCreditDates = client.zeroCreditDates.filter(date => date >= firstRechargeDate);
-        } else {
-            client.firstRechargeDate = null;
-        }
-        
-        // Recalculer le pourcentage de crédit nul
-        const totalDays = client.credits.length;
-        client.zeroCreditPercentage = totalDays > 0 
-            ? ((client.zeroCreditDates.length / totalDays) * 100).toFixed(1) 
-            : 0;
-        
         // Analyses
         analyzeTechnicalRefunds(client);
         analyzeConsumptionVsForfait(client);
@@ -423,22 +408,6 @@ function postProcessClients(clients, commercialData) {
             client.id = extractClientId(client.id, null);
         }
     });
-    
-    // ✅ Recalculer les stats globales de crédit nul après filtrage
-    let totalZeroCredits = 0;
-    const allZeroCreditDates = new Set();
-    clients.forEach(client => {
-        totalZeroCredits += client.zeroCreditDates.length;
-        client.zeroCreditDates.forEach(date => allZeroCreditDates.add(date));
-    });
-    commercialData.events.creditNul.total = totalZeroCredits;
-    commercialData.events.creditNul.jours = allZeroCreditDates;
-    
-    // Recalculer le pourcentage global
-    const totalCells = clients.size * Math.max(...Array.from(clients.values()).map(c => c.credits.length));
-    commercialData.events.creditNul.pourcentage = totalCells > 0 
-        ? ((totalZeroCredits / totalCells) * 100).toFixed(1) 
-        : 0;
     
     // Stats globales
     commercialData.consommation.globale = {

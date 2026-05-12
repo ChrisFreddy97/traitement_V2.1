@@ -2,139 +2,239 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=0.9">
-    <title>Analyse - NANORESEAU</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analyse - NANORESEAU (Interface V1)</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link rel="stylesheet" href="./commercialDashboardLite.css">
-    <link rel="stylesheet" href="./technicalDashboardLite.css">
-    <link rel="stylesheet" href="./arduinoLite.css">
     <style>
+        /* ========== STYLES V1 EXACTEMENT ========== */
+        
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
         }
 
+        html, body {
+            height: 100%;
+            overflow: hidden;
+        }
+
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #88aae1 0%, #88aae1 100%);
-            min-height: 100vh;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            display: flex;
+            flex-direction: column;
         }
 
         .container {
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 20px;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            padding: 0;
+            margin: 0;
+            max-width: none;
         }
 
+        /* En-tête fixe V1 */
         .analyze-header {
-            background: linear-gradient(135deg, #0e1a81 0%, #490783 100%);
-            border-radius: 16px;
-            padding: 20px 30px;
-            margin-bottom: 25px;
-            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
-            position: sticky;
-            top: 0;
-            z-index: 100;
+            flex-shrink: 0;
+            position: relative !important;
+            top: 0 !important;
+            z-index: 1000 !important;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+            color: white !important;
+            padding: 15px 30px !important;
+            border-radius: 0 0 12px 12px !important;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1) !important;
+            transition: box-shadow 0.3s ease !important;
+            width: 100%;
+        }
+
+        .analyze-header.scrolled {
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2) !important;
         }
 
         .header-content {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 15px;
+            display: flex !important;
+            justify-content: space-between !important;
+            align-items: center !important;
+            width: 100% !important;
+            gap: 15px !important;
         }
 
-        .header-info h1 {
-            color: white;
-            font-size: 24px;
-            font-weight: 700;
-            margin: 0;
+        .header-info {
+            flex: 1;
         }
 
-        .header-info p {
-            color: rgba(255, 255, 255, 0.8);
-            font-size: 13px;
-            margin-top: 5px;
-        }
-
+        /* Badge V1 */
         .version-badge {
-            background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
-            color: #1e293b;
-            padding: 10px 25px;
-            border-radius: 40px;
-            font-size: 16px;
-            font-weight: 800;
-            box-shadow: 0 4px 15px rgba(245, 158, 11, 0.4);
-            border: 2px solid white;
-            white-space: nowrap;
+            position: relative !important;
+            background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%) !important;
+            color: #1e293b !important;
+            padding: 10px 25px !important;
+            border-radius: 40px !important;
+            font-size: 18px !important;
+            font-weight: 800 !important;
+            letter-spacing: 2px !important;
+            box-shadow: 0 4px 15px rgba(245, 158, 11, 0.4) !important;
+            border: 2px solid white !important;
+            cursor: default !important;
+            transition: transform 0.2s ease, box-shadow 0.2s ease !important;
+            z-index: 1001 !important;
+            animation: pulse 2s infinite !important;
+            white-space: nowrap !important;
+            margin-left: 15px !important;
+            flex-shrink: 0 !important;
         }
 
+        .version-badge:hover {
+            transform: scale(1.05) !important;
+            box-shadow: 0 6px 20px rgba(245, 158, 11, 0.6) !important;
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 4px 15px rgba(245, 158, 11, 0.4); }
+            50% { box-shadow: 0 4px 25px rgba(245, 158, 11, 0.7); }
+            100% { box-shadow: 0 4px 15px rgba(245, 158, 11, 0.4); }
+        }
+
+        /* Bouton retour V1 */
         .btn-secondary {
-            background: rgba(255, 255, 255, 0.15);
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 30px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            font-size: 14px;
+            background: white !important;
+            color: #667eea !important;
+            border: none !important;
+            padding: 10px 20px !important;
+            border-radius: 8px !important;
+            font-weight: 600 !important;
+            cursor: pointer !important;
+            transition: all 0.3s ease !important;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1) !important;
+            font-size: 14px !important;
+            flex-shrink: 0 !important;
         }
 
         .btn-secondary:hover {
-            background: rgba(255, 255, 255, 0.25);
-            transform: translateX(-3px);
+            transform: translateX(-3px) !important;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2) !important;
         }
 
+        /* Zone scrollable V1 */
         .analyze-main {
+            flex: 1 1 auto;
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding: 20px;
             background: transparent;
+            min-height: 0;
         }
 
-        /* Onglets */
-        .tabs {
-            display: flex;
-            gap: 12px;
-            margin-bottom: 25px;
+        /* Scrollbar V1 */
+        .analyze-main::-webkit-scrollbar {
+            width: 10px;
+        }
+
+        .analyze-main::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+
+        .analyze-main::-webkit-scrollbar-thumb {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 10px;
+            border: 2px solid #f1f1f1;
+        }
+
+        .analyze-main::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+        }
+
+        /* Conteneur des onglets V1 */
+        .tabs-container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            margin-bottom: 20px;
+        }
+
+        .tabs-header {
+            background: #f8fafc;
             border-bottom: 2px solid #e2e8f0;
-            padding-bottom: 5px;
+            padding: 0;
         }
 
+        .tabs-list {
+            display: flex;
+            gap: 0;
+            padding: 0;
+            margin: 0;
+            width: 100%;
+        }
+
+        /* ========== STYLES DES ONGLETS - VERSION VIOLET/VERT ========== */
         .tab {
-            padding: 10px 24px;
+            flex: 1;
+            padding: 14px 20px;
             font-weight: 600;
-            font-size: 14px;
-            color: #64748b;
+            font-size: 15px;
+            text-align: center;
             cursor: pointer;
             transition: all 0.3s ease;
-            border-radius: 30px;
+            border: none;
+            background: #f1f5f9;
+            color: #475569;
+            border-bottom: 3px solid transparent;
+            margin-bottom: -2px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
         }
 
         .tab:hover {
-            color: #f59e0b;
-            background: #fef3c7;
+            background: #e2e8f0;
+            color: #1e293b;
         }
 
-        .tab.active {
+        /* Onglet Technique - violet */
+        .tab[data-tab="Technique"].active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
-            background: linear-gradient(135deg, #0e1a81 0%, #490783 100%);
-            box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);
+            border-bottom-color: #764ba2;
         }
 
-        /* Loader */
+        /* Onglet Commercial - vert */
+        .tab[data-tab="Commercial"].active {
+            background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+            color: white;
+            border-bottom-color: #38a169;
+        }
+
+        /* Contenu des onglets V1 */
+        .tabs-content {
+            padding: 25px;
+        }
+
+        /* Dashboard containers */
+        #technicalDashboard, #commercialDashboard {
+            width: 100%;
+        }
+
+        /* Loader V1 */
         .loader-container {
             background: white;
             border-radius: 16px;
-            padding: 40px;
+            padding: 60px;
             text-align: center;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
         }
 
         .spinner {
             width: 50px;
             height: 50px;
             border: 4px solid #e2e8f0;
-            border-top-color: #f59e0b;
+            border-top-color: #667eea;
             border-radius: 50%;
             animation: spin 1s linear infinite;
             margin: 0 auto 15px;
@@ -144,18 +244,19 @@
             to { transform: rotate(360deg); }
         }
 
+        /* Messages d'erreur */
         .error-message {
             background: #fef2f2;
             border-left: 4px solid #ef4444;
-            padding: 15px 20px;
+            padding: 20px;
             border-radius: 12px;
             color: #991b1b;
             margin-bottom: 20px;
         }
 
-        /* Bouton toggle tables */
+        /* Bouton toggle tables V1 */
         .toggle-tables-btn {
-            background: linear-gradient(135deg, #0e1a81 0%, #490783 100%) !important;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
             color: white !important;
             border: none !important;
             padding: 12px 24px !important;
@@ -169,6 +270,7 @@
 
         .toggle-tables-btn:hover {
             transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
         }
 
         #tablesContainer {
@@ -181,30 +283,222 @@
             overflow-x: auto;
         }
 
-        @media (max-width: 768px) {
-            .container { padding: 10px; }
-            .analyze-header { padding: 15px 20px; }
-            .header-content { flex-direction: column; text-align: center; }
-            .tab { padding: 8px 16px; font-size: 12px; }
+        .type-legend {
+            background: white;
+            border-radius: 12px;
+            padding: 15px;
+            margin-top: 20px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
         }
+
+        /* Responsive V1 */
+        @media (max-width: 768px) {
+            .header-content {
+                flex-wrap: wrap;
+                justify-content: center !important;
+                text-align: center;
+            }
+            
+            .version-badge {
+                margin: 10px 0 !important;
+            }
+
+            .analyze-main {
+                padding: 10px;
+            }
+
+            .tab {
+                padding: 10px 12px;
+                font-size: 13px;
+            }
+
+            .tabs-content {
+                padding: 15px;
+            }
+        }
+        /* ========== STYLES ONGLETS CLIENTS - VERSION V1 (SANS FLÈCHES) ========== */
+
+        .global-client-tabs-container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            margin-bottom: 20px;
+            border: 1px solid #e2e8f0;
+        }
+
+        .global-client-tabs-container h3 {
+            margin: 0;
+            padding: 15px 20px 0 20px;
+            font-size: 14px;
+            font-weight: 600;
+            color: #1e293b;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: white;
+        }
+
+        .client-tabs-header {
+            padding: 0 0 0 0;
+            background: #f8fafc;
+            border-bottom: 2px solid #e2e8f0;
+        }
+
+        /* Défilement horizontal NATIF - sans flèches */
+        .client-tabs {
+            display: flex;
+            gap: 0;
+            overflow-x: auto;
+            overflow-y: hidden;
+            scroll-behavior: smooth;
+            padding: 0;
+            margin: 0;
+        }
+
+        /* Cache la scrollbar sur Chrome/Safari (optionnel, garde le défilement) */
+        .client-tabs::-webkit-scrollbar {
+            height: 4px;
+        }
+
+        .client-tabs::-webkit-scrollbar-track {
+            background: #e2e8f0;
+        }
+
+        .client-tabs::-webkit-scrollbar-thumb {
+            background: #94a3b8;
+            border-radius: 4px;
+        }
+
+        /* Style des onglets clients - comme V1 (plats, collés, rectangulaires) */
+        .client-tab {
+            background: #f8fafc;
+            color: #475569;
+            border: none;
+            padding: 12px 24px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border-bottom: 3px solid transparent;
+            margin-bottom: -2px;
+        }
+
+        .client-tab:hover {
+            background: #f1f5f9;
+            color: #1e293b;
+        }
+
+        /* Onglet actif - comme V1 (barre en bas, pas de fond coloré) */
+        .client-tab.active {
+            background: white;
+            color: #3b82f6;
+            border-bottom-color: #3b82f6;
+        }
+
+        /* Cartes */
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+            border: 1px solid #e2e8f0;
+        }
+
+        .section-title {
+            margin: 0 0 15px 0;
+        }
+
+        .section-title h2 {
+            font-size: 16px;
+            font-weight: 700;
+            color: #1e293b;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 0;
+            padding-left: 5px;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .client-tab {
+                padding: 8px 16px;
+                font-size: 12px;
+            }
+            
+            .global-client-tabs-container h3 {
+                padding: 10px 15px 0 15px;
+                font-size: 13px;
+            }
+        }
+
+        /* Conteneur des onglets clients - juste sous les onglets principaux */
+        .client-tabs {
+            display: flex;
+            gap: 0;
+            background: #f8fafc;
+            border-bottom: 2px solid #e2e8f0;
+            margin: -20px -20px 20px -20px;
+            padding: 0;
+            overflow-x: auto;
+        }
+
+        /* Style des onglets clients - comme les onglets principaux */
+        .client-tab {
+            background: #f1f5f9;
+            color: #475569;
+            border: none;
+            padding: 14px 24px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            white-space: nowrap;
+            border-bottom: 3px solid transparent;
+            margin-bottom: -2px;
+        }
+
+        .client-tab:hover {
+            background: #e2e8f0;
+            color: #1e293b;
+        }
+
+        .client-tab.active {
+            background: white;
+            color: #3b82f6;
+            border-bottom-color: #3b82f6;
+        }
+
+        
     </style>
 </head>
 <body>
     <div class="container">
-        <header class="analyze-header">
+        <header class="analyze-header" id="main-header">
             <div class="header-content">
                 <div class="header-info">
-                    <h1 id="page-title">📂 Analyse du Fichier</h1>
-                    <p id="file-info-subtitle" style="margin-top: 5px;"></p>
+                    <h1 id="page-title" style="margin: 0; font-size: 28px; font-weight: 700;">📂 Analyse du Dossier</h1>
+                    <p id="file-info-subtitle" style="margin: 5px 0 0 0; opacity: 0.9; font-size: 14px; color: aliceblue;"></p>
                 </div>
+                
                 <div style="display: flex; align-items: center; gap: 10px;">
-                    <button id="back-btn" class="btn-secondary">← Retour</button>
-                    <div class="version-badge">⚡ ANALYSE V1 ⚡</div>
+                    <button id="back-btn" class="btn-secondary">
+                        ← Retour
+                    </button>
+                    <div class="version-badge">
+                        ⚡ ANALYSE V1 ⚡
+                    </div>
                 </div>
             </div>
         </header>
 
-        <main class="analyze-main">
+        <main class="analyze-main" id="analyze-main">
             <div id="analysis-content">
                 <div class="loader-container">
                     <div class="spinner"></div>
@@ -215,10 +509,24 @@
     </div>
 
     <script type="module">
+        // ========== LOGIQUE V2 CONSERVÉE ==========
         import { analyzeFromContent } from './arduinoMain.js';
         import { renderByTab } from './arduinoRender.js';
 
-        // Récupérer les données du localStorage
+        const mainContainer = document.getElementById('analyze-main');
+        const header = document.getElementById('main-header');
+
+        // Ombre au scroll
+        if (mainContainer) {
+            mainContainer.addEventListener('scroll', function() {
+                if (mainContainer.scrollTop > 10) {
+                    header.classList.add('scrolled');
+                } else {
+                    header.classList.remove('scrolled');
+                }
+            });
+        }
+
         const storedData = localStorage.getItem('currentAnalysisData');
         
         if (!storedData) {
@@ -234,61 +542,69 @@
         } else {
             try {
                 const data = JSON.parse(storedData);
+                
                 document.getElementById('file-info-subtitle').textContent = `${data.fileName} | N°NR: ${data.nr}`;
                 document.getElementById('page-title').innerHTML = `📂 Analyse - ${data.nr}`;
                 
-                // Créer la structure de la page (onglets + dashboards)
+                // Structure HTML IDENTIQUE à celle qui fonctionne
+                // Seul le texte des onglets change (ajout des emojis)
                 document.getElementById('analysis-content').innerHTML = `
-                    <!-- Section INFO -->
-                    <div class="info-section" id="infoSection">
-                        <!-- ONGLETS PRINCIPAUX -->
-                        <div class="tabs">
-                            <div class="tab active" data-tab="Technique">Technique</div>
-                            <div class="tab" data-tab="Commercial">Commercial</div>
+                    <div class="tabs-container">
+                        <div class="tabs-header">
+                            <div class="tabs-list" id="tabs-list">
+                                <div class="tab active" data-tab="Technique">🔧 TECHNIQUE</div>
+                                <div class="tab" data-tab="Commercial">💰 COMMERCIALE</div>
+                            </div>
                         </div>
-                        
-                        <!-- CONTENEURS DES DASHBOARDS -->
-                        <div id="technicalDashboard"></div>
-                        <div id="commercialDashboard"></div>                    
-                        <div class="type-legend" id="typeLegend"></div>
+                        <div class="tabs-content">
+                            <div id="technicalDashboard"></div>
+                            <div id="commercialDashboard"></div>
+                            <div class="type-legend" id="typeLegend"></div>
+                        </div>
                     </div>
-
                     <div id="toggleButtonContainer"></div>
                     <div id="tablesContainer" style="display: none;"></div>
-
                 `;
                 
-                // Ajouter les gestionnaires d'onglets
+                // Gestionnaires d'onglets (inchangés, identiques à la version qui fonctionne)
                 document.querySelectorAll('.tab').forEach(tab => {
                     tab.addEventListener('click', () => {
                         document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
                         tab.classList.add('active');
-                        renderByTab();
+                        
+                        // Appel de la fonction de rendu V2
+                        if (typeof renderByTab === 'function') {
+                            renderByTab();
+                        }
                         
                         // Scroll vers le début des dashboards
-                        document.getElementById('infoSection').scrollIntoView({ 
-                            behavior: 'smooth', 
-                            block: 'start' 
-                        });
+                        const tabsContainer = document.querySelector('.tabs-container');
+                        if (tabsContainer) {
+                            tabsContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        }
                     });
                 });
                 
-                // Appeler la fonction d'analyse
+                // Lancer l'analyse V2
                 await analyzeFromContent(data.content, data.nr);
                 
-                // Nettoyer le localStorage après succès
+                // Nettoyer localStorage
                 localStorage.removeItem('currentAnalysisData');
                 
-                // Afficher le dashboard par défaut
-                renderByTab();
+                // Afficher le dashboard par défaut (Technique)
+                if (typeof renderByTab === 'function') {
+                    renderByTab();
+                }
+                
+                console.log('✅ Interface V1 + Logique V2 OK');
                 
             } catch (error) {
                 console.error('Erreur:', error);
                 document.getElementById('analysis-content').innerHTML = `
                     <div class="error-message">
-                        ❌ Erreur lors de l'analyse du fichier: ${error.message}
+                        ❌ Erreur lors de l'analyse: ${error.message}
                     </div>
-                    <button id="go-back-btn" class="btn-secondary" style="margin-top: 20px;">← Retour à l'upload</button>
+                    <button id="go-back-btn" class="btn-secondary" style="margin-top: 20px;">← Retour</button>
                 `;
                 document.getElementById('go-back-btn')?.addEventListener('click', () => {
                     window.location.href = 'arduino.html';
@@ -296,7 +612,6 @@
             }
         }
         
-        // Bouton retour
         document.getElementById('back-btn')?.addEventListener('click', () => {
             window.location.href = 'arduino.html';
         });

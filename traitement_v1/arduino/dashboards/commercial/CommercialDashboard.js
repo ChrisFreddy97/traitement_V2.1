@@ -426,14 +426,7 @@ export function renderCommercialDashboard() {
     activeClientId = clientsList.length > 0 ? clientsList[0].id : null;
     
     container.innerHTML = `
-        <div class="global-client-tabs-container">
-            <h3>👥 Sélection client</h3>
-            <div class="client-tabs-header">
-                <button class="client-tab-nav prev" id="prevGlobalClient">◀</button>
-                <div class="client-tabs" id="globalClientTabs"></div>
-                <button class="client-tab-nav next" id="nextGlobalClient">▶</button>
-            </div>
-        </div>
+        <div class="client-tabs" id="globalClientTabs"></div>
         
         <div class="section-title"><h2>💰 ANALYSE DE CONSOMMATION</h2></div>
         <div id="consumptionBoard" class="card"></div>
@@ -442,14 +435,14 @@ export function renderCommercialDashboard() {
         
         <div class="section-title"><h2>💳 ANALYSE CRÉDIT ET RECHARGE</h2></div>
         <div id="creditBoard" class="card"></div>
-        
+                
     `;
     
     renderGlobalClientTabs();
     renderAllBoards();
     attachGlobalNavigation();
 }
-
+/*
 function renderGlobalClientTabs() {
     const container = document.getElementById('globalClientTabs');
     if (!container || clientsList.length === 0) return;
@@ -464,6 +457,64 @@ function renderGlobalClientTabs() {
             </button>
         `;
     }).join('');
+}
+*/
+function renderGlobalClientTabs() {
+    const container = document.getElementById('globalClientTabs');
+    if (!container || clientsList.length === 0) return;
+    
+    container.innerHTML = clientsList.map(client => {
+        const isGhost = isGhostClient(client);
+        const noClient = isGhost; // Dans ton cas, client fantôme = pas de client
+        
+        return `
+            <button class="client-tab ${client.id === activeClientId ? 'active' : ''} ${noClient ? 'no-client' : ''}" 
+                    data-client-id="${client.id}" 
+                    ${noClient ? 'disabled' : ''}
+                    title="${noClient ? '🚫 Aucune donnée disponible pour ce client' : 'Voir les détails du client'}">
+                ${noClient ? '🚫 Pas de client' : `👤 Client ${client.id}`}
+            </button>
+        `;
+    }).join('');
+    
+    // Ajouter les styles dynamiquement si besoin
+    addNoClientStyles();
+}
+
+// Fonction pour ajouter les styles CSS (à mettre dans le head ou dans une balise style)
+function addNoClientStyles() {
+    if (document.getElementById('no-client-styles')) return;
+    
+    const style = document.createElement('style');
+    style.id = 'no-client-styles';
+    style.textContent = `
+        /* Style pour les clients normaux (bleu quand actif) */
+        .client-tab.active {
+            background: #3b82f6 !important;
+            color: white !important;
+            border-bottom-color: #3b82f6 !important;
+        }
+        
+        /* Style pour "Pas de client" - désactivé et grisé */
+        .client-tab.no-client {
+            opacity: 0.5;
+            cursor: not-allowed;
+            background: #e2e8f0;
+            color: #94a3b8;
+            pointer-events: none;
+        }
+        
+        .client-tab.no-client:hover {
+            transform: none;
+            background: #e2e8f0;
+        }
+        
+        /* Tooltip pour expliquer pourquoi c'est désactivé */
+        .client-tab.no-client {
+            position: relative;
+        }
+    `;
+    document.head.appendChild(style);
 }
 
 function attachGlobalNavigation() {
@@ -755,155 +806,6 @@ function renderConsumptionBoard() {
     html += `</div>`; // fermeture de la carte principale
     container.innerHTML = html;
 }
-/*
-// ===========================================
-// RENDU CONSOMMATION BOARD
-// ===========================================
-
-function renderConsumptionBoard() {
-    const container = document.getElementById('consumptionBoard');
-    if (!container) return;
-    
-    if (!activeClientId) {
-        container.innerHTML = '<div class="error-message show">❌ Aucun client sélectionné</div>';
-        return;
-    }
-    
-    const client = clientsList.find(c => c.id === activeClientId);
-    if (!client) {
-        container.innerHTML = '<div class="error-message show">❌ Client non trouvé</div>';
-        return;
-    }
-    
-    if (isGhostClient(client)) {
-        container.innerHTML = renderGhostCard('📋 HISTORIQUE FORFAITS & CONSOMMATION', client.id, 'Aucune donnée de consommation ou forfait disponible.');
-        return;
-    }
-    
-    const forfaitHistory = buildForfaitHistory(client);
-    const forfaitStats = computeForfaitStats(client, forfaitHistory);
-    
-    // Calcul du nombre total de jours pour l'affichage
-    const totalDays = forfaitStats.reduce((sum, stat) => sum + stat.totalDays, 0);
-    
-    // EN-TÊTE À LA RENDERINFOCARD (exactement le même style)
-    let html = `
-        <div style="background: white; border-radius: 16px; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08); overflow: hidden; border: 1px solid #e2e8f0; margin-bottom: 20px;">
-            <!-- En-tête style carte (copié de renderInfoCard) -->
-            <div style="background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); color: white; padding: 12px 20px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
-                <div style="display: flex; align-items: center; gap: 10px;">
-                    <span style="font-size: 18px;">📋</span>
-                    <span style="font-weight: 600;">HISTORIQUE FORFAITS & CONSOMMATION</span>
-                </div>
-                <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
-                    <span style="background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 20px; font-size: 11px;">👤 Client ${client.id}</span>
-                    <span style="background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 20px; font-size: 11px;">📊 ${totalDays} jours</span>
-                </div>
-            </div>
-    `;
-    
-    if (forfaitStats.length > 0) {
-        // Contenu principal (tableau + détails)
-        html += `<div style="padding: 20px;">`;
-        
-        // Tableau des forfaits
-        html += `
-            <div class="table-wrapper" style="margin-bottom: 25px;">
-                <table class="table-details">
-                    <thead>
-                        <tr>
-                            <th>Forfait</th>
-                            <th>Changement</th>
-                            <th>Jours totaux</th>
-                            <th>Jours avec conso</th>
-                            <th>Jours sans conso</th>
-                            <th>Énergie max</th>
-                            <th>Énergie moy</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${forfaitStats.map((stat, idx) => {
-                            const badgeClass = stat.isCurrent ? 'badge-excellent' : 'badge-extreme';
-                            return `
-                                <tr>
-                                    <td class="text-center"><span class="badge ${badgeClass}">${stat.forfait}</span></td>
-                                    <td class="text-center" style="white-space: nowrap;">${stat.changeText}</td>
-                                    <td class="text-center" style="font-weight: 600;">${stat.totalDays}</td>
-                                    <td class="text-center" style="font-weight: 600; color: var(--success);">${stat.daysWithConso}</td>
-                                    <td class="text-center" style="font-weight: 600; color: var(--gray-600);">${stat.daysWithoutConso}</td>
-                                    <td class="text-center">${stat.maxEnergy} Wh</td>
-                                    <td class="text-center">${stat.avgEnergy} Wh</td>
-                                </tr>
-                            `;
-                        }).join('')}
-                    </tbody>
-                </table>
-            </div>
-        `;
-        
-        // Détails par forfait
-        forfaitStats.forEach((stat, index) => {
-            const startDate = formatDateToFrench(stat.startDate);
-            const endDate = stat.endDate ? formatDateToFrench(stat.endDate) : 'Présent';
-            const badgeClass = stat.isCurrent ? 'badge-excellent' : 'badge-extreme';
-            const cardBg = index % 2 === 0 ? '#ffffff' : '#fafbfc';
-            const borderColor = stat.isCurrent ? 'var(--success)' : 'var(--primary)';
-            
-            html += `
-                <div class="stat-box" style="margin-bottom: 20px; background: ${cardBg}; border-left: 4px solid ${borderColor};">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px;">
-                        <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
-                            <span class="badge ${badgeClass}">${stat.forfait}</span>
-                            <span class="tag small">📅 ${startDate} → ${endDate}</span>
-                        </div>
-                        <span class="tag">📊 ${stat.daysWithConso} jours avec conso</span>
-                    </div>
-                    
-                    <div class="unified-progress-bar">
-                        ${stat.percentBelow85 > 0 ? `<div class="progress-segment success" style="width: ${stat.percentBelow85}%;"></div>` : ''}
-                        ${stat.percentInTolerance > 0 ? `<div class="progress-segment warning" style="width: ${stat.percentInTolerance}%;"></div>` : ''}
-                        ${stat.percentAbove115 > 0 ? `<div class="progress-segment danger" style="width: ${stat.percentAbove115}%;"></div>` : ''}
-                    </div>
-                    
-                    <div class="progress-legend">
-                        <div class="legend-item">
-                            <span class="legend-dot success"></span>
-                            <span class="legend-label">≤${stat.seuil85.toFixed(0)}Wh :</span>
-                            <span class="legend-value">${stat.daysBelow85}j (${stat.percentBelow85}%)</span>
-                        </div>
-                        <div class="legend-item">
-                            <span class="legend-dot warning"></span>
-                            <span class="legend-label">${stat.seuil85.toFixed(0)}-${stat.seuil115.toFixed(0)}Wh :</span>
-                            <span class="legend-value">${stat.daysInTolerance}j (${stat.percentInTolerance}%)</span>
-                        </div>
-                        <div class="legend-item">
-                            <span class="legend-dot danger"></span>
-                            <span class="legend-label">>${stat.seuil115.toFixed(0)}Wh :</span>
-                            <span class="legend-value">${stat.daysAbove115}j (${stat.percentAbove115}%)</span>
-                        </div>
-                    </div>
-                    
-                    <div class="progress-footer">
-                        <span class="total-days">📅 Total : ${stat.totalDays} jours</span>
-                        <span class="detail-counts">⚡ Moyenne : ${stat.avgEnergy} Wh | Max : ${stat.maxEnergy} Wh</span>
-                    </div>
-                </div>
-            `;
-        });
-        
-        
-        html += `</div>`; // fermeture padding
-    } else {
-        html += '<div class="info-section show" style="margin: 20px;">📭 Aucune donnée de consommation disponible</div>';
-    }
-    
-    html += `</div>`; // fermeture de la carte principale
-    container.innerHTML = html;
-}
-*/
-// ===========================================
-// RENDU EVENTS BOARD
-// ===========================================
 
 // ===========================================
 // RENDU EVENTS BOARD - STYLE IDENTIQUE AU CODE 1
@@ -959,26 +861,11 @@ function renderEventsBoard() {
 function renderEventsClient(client) {
     const events = client.events ?? [];
     const zeroCreditDates = client.zeroCreditDates ?? [];
-    
-    // ✅ CORRECTION: Filtrer TOUTES les données à partir de la première recharge
-    const firstRechargeDate = client.firstRechargeDate;
-    const startDate = firstRechargeDate ? firstRechargeDate.split('T')[0] : null;
-    
-    // Filtrer les événements
-    const filteredEvents = startDate 
-        ? events.filter(e => e.date && e.date.split('T')[0] >= startDate)
-        : events;
-    
-    // Filtrer les jours sans crédit
-    const filteredZeroCreditDates = startDate
-        ? zeroCreditDates.filter(date => date.split('T')[0] >= startDate)
-        : zeroCreditDates;
-    
-    const totalDays = client.consommation?.journaliere?.length ?? client.credits?.length ?? filteredZeroCreditDates.length ?? 1;
+    const totalDays = client.consommation?.journaliere?.length ?? client.credits?.length ?? zeroCreditDates.length ?? 1;
     
     const eventsMap = new Map();
     
-    filteredEvents.forEach(event => {
+    events.forEach(event => {
         if (!event.date) return;
         const dateStr = event.date.split('T')[0];
         const hour = event.date.includes('T') ? event.date.split('T')[1]?.substring(0,5) : '';
@@ -1010,7 +897,13 @@ function renderEventsClient(client) {
         }
     });
     
-    filteredZeroCreditDates.forEach(date => {
+    zeroCreditDates.forEach(date => {
+        const dateStr = date.split('T')[0];
+        if (!eventsMap.has(dateStr)) {
+            eventsMap.set(dateStr, {
+                date: dateStr, dateObj: new Date(date),
+                SuspendE: 0, SuspendE_start: '', SuspendE_end: '', SuspendE_duration: '',
+                SuspendP: 0, SuspendP_start: '', SuspendP_end: '', SuspendP_duration: '',
                 CreditNul: 1
             });
         } else {
@@ -1030,42 +923,6 @@ function renderEventsClient(client) {
     // Format du numéro client avec zéro devant (comme code 1)
     const clientNumberFormatted = client.id.toString().padStart(2, '0');
     
-    // ✅ Calculer le nombre de jours entre la première recharge et le dernier jour du relevé (corrigé)
-    let totalDaysForPercentage = totalDays;
-    if (client.firstRechargeDate) {
-        // Récupérer toutes les dates disponibles (événements + consommation + crédit)
-        const allDates = [];
-        
-        // Ajouter les dates des événements
-        eventsByDay.forEach(d => allDates.push(new Date(d.date)));
-        
-        // Ajouter les dates de consommation si disponibles
-        if (client.consommation?.journaliere?.length > 0) {
-            client.consommation.journaliere.forEach(d => {
-                if (d.date) allDates.push(new Date(d.date.split('T')[0]));
-            });
-        }
-        
-        // Ajouter les dates de crédit si disponibles
-        if (client.credits?.length > 0) {
-            client.credits.forEach(c => {
-                if (c.date) allDates.push(new Date(c.date.split('T')[0]));
-            });
-        }
-        
-        if (allDates.length > 0) {
-            // Trouver la dernière date
-            const lastDate = new Date(Math.max(...allDates.map(d => d.getTime())));
-            const firstDate = new Date(client.firstRechargeDate);
-            
-            if (firstDate && lastDate) {
-                // Calculer le nombre de jours entre firstDate et lastDate (inclus)
-                const timeDiff = lastDate - firstDate;
-                totalDaysForPercentage = Math.floor(timeDiff / (1000 * 60 * 60 * 24)) + 1; // +1 pour inclure les deux jours
-            }
-        }
-    }
-    
     // ✅ CONDITION : si aucun événement
     if (!hasAnyEvent || totalEvents === 0) {
         return `
@@ -1078,16 +935,16 @@ function renderEventsClient(client) {
                     <span style="font-size: 48px; display: block; margin-bottom: 15px;">✅</span>
                     <h3 style="margin: 0 0 10px 0; color: #1e293b;">Aucun événement</h3>
                     <p style="margin: 0; font-size: 14px;">Aucun événement pour ce client</p>
-                    <p style="margin-top: 10px; font-size: 12px; color: #64748b;">Sur ${totalDaysForPercentage} jour(s) analysé(s)</p>
+                    <p style="margin-top: 10px; font-size: 12px; color: #64748b;">Sur ${totalDays} jour(s) de diagnostic</p>
                 </div>
             </div>
         `;
     }
     
     // Calcul des pourcentages
-    const percentCreditNul = ((daysWithCreditNul.size / totalDaysForPercentage) * 100).toFixed(1);
-    const percentSuspendP = ((daysWithSuspendP.size / totalDaysForPercentage) * 100).toFixed(1);
-    const percentSuspendE = ((daysWithSuspendE.size / totalDaysForPercentage) * 100).toFixed(1);
+    const percentCreditNul = ((daysWithCreditNul.size / totalDays) * 100).toFixed(1);
+    const percentSuspendP = ((daysWithSuspendP.size / totalDays) * 100).toFixed(1);
+    const percentSuspendE = ((daysWithSuspendE.size / totalDays) * 100).toFixed(1);
     
     let html = `
         <div style="background: white; border-radius: 16px; box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08); overflow: hidden; border: 2px solid #e2e8f0; margin-bottom: 25px;">
@@ -1273,26 +1130,11 @@ function renderEventsBoard() {
 function renderEventsClient(client) {
     const events = client.events ?? [];
     const zeroCreditDates = client.zeroCreditDates ?? [];
-    
-    // ✅ CORRECTION: Filtrer TOUTES les données à partir de la première recharge
-    const firstRechargeDate = client.firstRechargeDate;
-    const startDate = firstRechargeDate ? firstRechargeDate.split('T')[0] : null;
-    
-    // Filtrer les événements
-    const filteredEvents = startDate 
-        ? events.filter(e => e.date && e.date.split('T')[0] >= startDate)
-        : events;
-    
-    // Filtrer les jours sans crédit
-    const filteredZeroCreditDates = startDate
-        ? zeroCreditDates.filter(date => date.split('T')[0] >= startDate)
-        : zeroCreditDates;
-    
-    const totalDays = client.consommation?.journaliere?.length ?? client.credits?.length ?? filteredZeroCreditDates.length ?? 1;
+    const totalDays = client.consommation?.journaliere?.length ?? client.credits?.length ?? zeroCreditDates.length ?? 1;
     
     const eventsMap = new Map();
     
-    filteredEvents.forEach(event => {
+    events.forEach(event => {
         if (!event.date) return;
         const dateStr = event.date.split('T')[0];
         const hour = event.date.includes('T') ? event.date.split('T')[1]?.substring(0,5) : '';
@@ -1324,7 +1166,7 @@ function renderEventsClient(client) {
         }
     });
     
-    filteredZeroCreditDates.forEach(date => {
+    zeroCreditDates.forEach(date => {
         const dateStr = date.split('T')[0];
         if (!eventsMap.has(dateStr)) {
             eventsMap.set(dateStr, {
@@ -1346,42 +1188,6 @@ function renderEventsClient(client) {
     
     const totalEvents = events.length + zeroCreditDates.length;
     const hasAnyEvent = daysWithCreditNul.size > 0 || daysWithSuspendP.size > 0 || daysWithSuspendE.size > 0;
-    
-    // ✅ Calculer le nombre de jours entre la première recharge et le dernier jour du relevé (corrigé)
-    let totalDaysForPercentage = totalDays;
-    if (client.firstRechargeDate) {
-        // Récupérer toutes les dates disponibles (événements + consommation + crédit)
-        const allDates = [];
-        
-        // Ajouter les dates des événements
-        eventsByDay.forEach(d => allDates.push(new Date(d.date)));
-        
-        // Ajouter les dates de consommation si disponibles
-        if (client.consommation?.journaliere?.length > 0) {
-            client.consommation.journaliere.forEach(d => {
-                if (d.date) allDates.push(new Date(d.date.split('T')[0]));
-            });
-        }
-        
-        // Ajouter les dates de crédit si disponibles
-        if (client.credits?.length > 0) {
-            client.credits.forEach(c => {
-                if (c.date) allDates.push(new Date(c.date.split('T')[0]));
-            });
-        }
-        
-        if (allDates.length > 0) {
-            // Trouver la dernière date
-            const lastDate = new Date(Math.max(...allDates.map(d => d.getTime())));
-            const firstDate = new Date(client.firstRechargeDate);
-            
-            if (firstDate && lastDate) {
-                // Calculer le nombre de jours entre firstDate et lastDate (inclus)
-                const timeDiff = lastDate - firstDate;
-                totalDaysForPercentage = Math.floor(timeDiff / (1000 * 60 * 60 * 24)) + 1; // +1 pour inclure les deux jours
-            }
-        }
-    }
     
     // ✅ CONDITION : si aucun événement (toutes les valeurs à 0)
     if (!hasAnyEvent || totalEvents === 0) {
@@ -1406,9 +1212,9 @@ function renderEventsClient(client) {
     }
     
     // Sinon, afficher le dashboard complet avec l'en-tête style renderInfoCard
-    const percentCreditNul = ((daysWithCreditNul.size / totalDaysForPercentage) * 100).toFixed(1);
-    const percentSuspendP = ((daysWithSuspendP.size / totalDaysForPercentage) * 100).toFixed(1);
-    const percentSuspendE = ((daysWithSuspendE.size / totalDaysForPercentage) * 100).toFixed(1);
+    const percentCreditNul = ((daysWithCreditNul.size / totalDays) * 100).toFixed(1);
+    const percentSuspendP = ((daysWithSuspendP.size / totalDays) * 100).toFixed(1);
+    const percentSuspendE = ((daysWithSuspendE.size / totalDays) * 100).toFixed(1);
     
     let html = `
         <div style="background: white; border-radius: 16px; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08); overflow: hidden; border: 1px solid #e2e8f0; margin-bottom: 20px;">
@@ -1546,20 +1352,7 @@ function renderCreditBoard() {
     const recharges = client.recharges ?? [];
     const zeroCreditDates = client.zeroCreditDates ?? [];
     
-    // ✅ CORRECTION: Filtrer les crédits à partir de la première recharge (date de début d'achat)
-    const firstRechargeDate = client.firstRechargeDate;
-    const startDate = firstRechargeDate ? firstRechargeDate.split('T')[0] : null;
-    
-    const filteredCredits = startDate 
-        ? credits.filter(c => c.date && c.date.split('T')[0] >= startDate)
-        : credits;
-    
-    // ✅ Filtrer aussi les zeroCreditDates
-    const filteredZeroCreditDates = startDate
-        ? zeroCreditDates.filter(date => date.split('T')[0] >= startDate)
-        : zeroCreditDates;
-    
-    const streaksData = processCreditStreaks(filteredCredits, filteredZeroCreditDates);
+    const streaksData = processCreditStreaks(credits, zeroCreditDates);
     const rechargeData = processRechargeData(recharges);
 
 
@@ -1602,9 +1395,8 @@ function renderCreditBoard() {
     </div>`;
     
 
-    // ✅ CORRECTION: Passer les crédits filtrés (à partir de la première recharge) aux analyses
-    html += renderCreditEvolutionChart(filteredCredits, client.id, firstRechargeDate);
-    html += renderMonthlyCreditAnalysis(filteredCredits, filteredZeroCreditDates, firstRechargeDate);
+    html += renderCreditEvolutionChart(credits, client.id);
+    html += renderMonthlyCreditAnalysis(credits, zeroCreditDates);
     const summaryHTML = renderCreditSummaryDashboard(credits, zeroCreditDates);
 
     container.innerHTML = html;
@@ -1838,7 +1630,7 @@ window.showClientDetail = (clientId) => {
 let currentCreditChart = null;
 let currentCreditChartClientId = null;
 
-function renderCreditEvolutionChart(credits, clientId, firstRechargeDate) {
+function renderCreditEvolutionChart(credits, clientId) {
     if (!credits || credits.length === 0) {
         return `
             <div style="background: white; border-radius: ${STYLES.borderRadius.md}; margin-bottom: ${STYLES.spacing.md}; padding: ${STYLES.spacing.xl}; text-align: center; color: ${STYLES.colors.gray}; border: 1px solid ${STYLES.colors.border};">
@@ -1847,18 +1639,12 @@ function renderCreditEvolutionChart(credits, clientId, firstRechargeDate) {
         `;
     }
     
-    // ✅ CORRECTION: Filtrer les données à partir de la première recharge
-    const startDate = firstRechargeDate ? firstRechargeDate.split('T')[0] : null;
-    
     // Traiter les données : regrouper par date
     const creditByDate = new Map();
     credits.forEach(c => {
         if (c.date) {
             const dateStr = c.date.split('T')[0];
-            // ✅ Inclure seulement les données après la première recharge
-            if (!startDate || dateStr >= startDate) {
-                creditByDate.set(dateStr, c.value ?? 0);
-            }
+            creditByDate.set(dateStr, c.value ?? 0);
         }
     });
     
@@ -2140,7 +1926,7 @@ function destroyCreditChart() {
 // ANALYSE MENSUELLE DU CRÉDIT
 // ===========================================
 
-function renderMonthlyCreditAnalysis(credits, zeroCreditDates, firstRechargeDate) {
+function renderMonthlyCreditAnalysis(credits, zeroCreditDates) {
     if (!credits || credits.length === 0) {
         return `
             <div style="background: white; border-radius: ${STYLES.borderRadius.md}; margin-bottom: ${STYLES.spacing.md}; overflow: hidden; border: 1px solid ${STYLES.colors.border};">
@@ -2152,29 +1938,20 @@ function renderMonthlyCreditAnalysis(credits, zeroCreditDates, firstRechargeDate
         `;
     }
     
-    // ✅ CORRECTION: Filtrer à partir de la première recharge
-    const startDate = firstRechargeDate ? firstRechargeDate.split('T')[0] : null;
-    
     // 1. Construire un Map jour par jour avec les valeurs de crédit
     const creditByDate = new Map();
     
     credits.forEach(c => {
         if (c.date) {
             const dateStr = c.date.split('T')[0];
-            // ✅ Inclure seulement les données après la première recharge
-            if (!startDate || dateStr >= startDate) {
-                creditByDate.set(dateStr, c.value ?? 0);
-            }
+            creditByDate.set(dateStr, c.value ?? 0);
         }
     });
     
-    // Ajouter les jours sans crédit (valeur 0) - déjà filtrés dans commercialAnalytics.js
+    // Ajouter les jours sans crédit (valeur 0)
     zeroCreditDates.forEach(date => {
         const dateStr = date.split('T')[0];
-        // ✅ Inclure seulement les jours après la première recharge
-        if (!startDate || dateStr >= startDate) {
-            creditByDate.set(dateStr, 0);
-        }
+        creditByDate.set(dateStr, 0);
     });
     
     // 2. Grouper par mois et analyser
