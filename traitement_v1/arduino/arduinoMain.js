@@ -1266,6 +1266,9 @@ export function applyFilter(newFilter) {
         
         hideLoader();
     }, 50);
+    if (window.resetDashboardCaches) {
+        window.resetDashboardCaches();
+    }
 }
 
 // ===========================================

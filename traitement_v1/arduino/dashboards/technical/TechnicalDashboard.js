@@ -4,6 +4,20 @@ import { VOLTAGE_NORMS, KitDefinitions } from '../../arduinoConstants.js';
 import { getEnergyStats, parseIntensiteForTable, parseTensionForTable, alignData } from '../../analytics/energyAnalytics.js';
 import { getCurrentFilter } from '../../arduinoMain.js';
 
+window.resetDashboardCaches = function() {
+    // Reset graphique horaire
+    allDates = [];
+    allTensionData = [];
+    chartStartIndex = 0;
+    chartEndIndex = 0;
+    needRefreshHourlyChart = true;
+    
+    // Reset cycle énergie
+    currentManager = null;
+    
+    console.log("✅ Caches techniques réinitialisés");
+};
+
 // ===========================================
 // STYLE UNIFIÉ POUR TOUS LES GRAPHIQUES
 // ===========================================
@@ -153,7 +167,7 @@ export function renderFilterPanel() {
     return `
         <div style="background: white; border-radius: 16px; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08); overflow: hidden; border: 1px solid #e2e8f0; margin-bottom: 20px;">
             <!-- En-tête avec toggle -->
-            <div style="background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); color: white; padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; cursor: pointer;" onclick="window.toggleFilterPanelModern()">
+            <div style="background: linear-gradient(135deg, #3498db 0%, #083b5e 100%); color: white; padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; cursor: pointer;" onclick="window.toggleFilterPanelModern()">
                 <div style="display: flex; align-items: center; gap: 10px;">
                     <span style="font-size: 18px;">🎯</span>
                     <span style="font-weight: 600;">Filtrer les données</span>
@@ -167,7 +181,7 @@ export function renderFilterPanel() {
             <!-- Contenu du filtre -->
             <div id="filterContentModern" style="display: block; padding: 20px;">
                 <!-- Résumé du filtre actif -->
-                <div id="filterSummary" style="background: #f8fafc; padding: 10px 15px; border-radius: 10px; margin-bottom: 20px; font-size: 13px; color: #475569; border-left: 4px solid #f59e0b;">
+                <div id="filterSummary" style="background: #f8fafc; padding: 10px 15px; border-radius: 10px; margin-bottom: 20px; font-size: 13px; color: #475569; border-left: 4px solid #3498db;">
                     ${getFilterSummaryText(currentFilter)}
                 </div>
 
@@ -181,14 +195,14 @@ export function renderFilterPanel() {
                             <span style="font-weight: 600; font-size: 13px; color: #1e293b;">Période rapide</span>
                         </div>
                         <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;">
-                            <button class="filter-chip" data-period="7days" onclick="window.applyFilterPeriod('7days')" style="padding: 8px; border: 1px solid #e2e8f0; border-radius: 8px; background: ${currentFilter.period === '7days' ? '#f59e0b' : 'white'}; color: ${currentFilter.period === '7days' ? 'white' : '#1e293b'}; font-size: 11px; cursor: pointer; transition: all 0.2s;">7jours</button>
-                            <button class="filter-chip" data-period="15days" onclick="window.applyFilterPeriod('15days')" style="padding: 8px; border: 1px solid #e2e8f0; border-radius: 8px; background: ${currentFilter.period === '15days' ? '#f59e0b' : 'white'}; color: ${currentFilter.period === '15days' ? 'white' : '#1e293b'}; font-size: 11px; cursor: pointer;">15jours</button>
-                            <button class="filter-chip" data-period="30days" onclick="window.applyFilterPeriod('30days')" style="padding: 8px; border: 1px solid #e2e8f0; border-radius: 8px; background: ${currentFilter.period === '30days' ? '#f59e0b' : 'white'}; color: ${currentFilter.period === '30days' ? 'white' : '#1e293b'}; font-size: 11px; cursor: pointer;">30jours</button>
-                            <button class="filter-chip" data-period="2months" onclick="window.applyFilterPeriod('2months')" style="padding: 8px; border: 1px solid #e2e8f0; border-radius: 8px; background: ${currentFilter.period === '2months' ? '#f59e0b' : 'white'}; color: ${currentFilter.period === '2months' ? 'white' : '#1e293b'}; font-size: 11px; cursor: pointer;">2mois</button>
-                            <button class="filter-chip" data-period="3months" onclick="window.applyFilterPeriod('3months')" style="padding: 8px; border: 1px solid #e2e8f0; border-radius: 8px; background: ${currentFilter.period === '3months' ? '#f59e0b' : 'white'}; color: ${currentFilter.period === '3months' ? 'white' : '#1e293b'}; font-size: 11px; cursor: pointer;">3mois</button>
-                            <button class="filter-chip" data-period="6months" onclick="window.applyFilterPeriod('6months')" style="padding: 8px; border: 1px solid #e2e8f0; border-radius: 8px; background: ${currentFilter.period === '6months' ? '#f59e0b' : 'white'}; color: ${currentFilter.period === '6months' ? 'white' : '#1e293b'}; font-size: 11px; cursor: pointer;">6mois</button>
-                            <button class="filter-chip" data-period="1year" onclick="window.applyFilterPeriod('1year')" style="padding: 8px; border: 1px solid #e2e8f0; border-radius: 8px; background: ${currentFilter.period === '1year' ? '#f59e0b' : 'white'}; color: ${currentFilter.period === '1year' ? 'white' : '#1e293b'}; font-size: 11px; cursor: pointer;">1année</button>
-                            <button class="filter-chip" data-period="all" onclick="window.applyFilterPeriod('all')" style="padding: 8px; border: 1px solid #e2e8f0; border-radius: 8px; background: ${currentFilter.period === 'all' ? '#f59e0b' : 'white'}; color: ${currentFilter.period === 'all' ? 'white' : '#1e293b'}; font-size: 11px; cursor: pointer;">Tout</button>
+                            <button class="filter-chip" data-period="7days" onclick="window.applyFilterPeriod('7days')" style="padding: 8px; border: 1px solid #e2e8f0; border-radius: 8px; background: ${currentFilter.period === '7days' ? '#3498db' : 'white'}; color: ${currentFilter.period === '7days' ? 'white' : '#1e293b'}; font-size: 11px; cursor: pointer; transition: all 0.2s;">7jours</button>
+                            <button class="filter-chip" data-period="15days" onclick="window.applyFilterPeriod('15days')" style="padding: 8px; border: 1px solid #e2e8f0; border-radius: 8px; background: ${currentFilter.period === '15days' ? '#3498db' : 'white'}; color: ${currentFilter.period === '15days' ? 'white' : '#1e293b'}; font-size: 11px; cursor: pointer;">15jours</button>
+                            <button class="filter-chip" data-period="30days" onclick="window.applyFilterPeriod('30days')" style="padding: 8px; border: 1px solid #e2e8f0; border-radius: 8px; background: ${currentFilter.period === '30days' ? '#3498db' : 'white'}; color: ${currentFilter.period === '30days' ? 'white' : '#1e293b'}; font-size: 11px; cursor: pointer;">30jours</button>
+                            <button class="filter-chip" data-period="2months" onclick="window.applyFilterPeriod('2months')" style="padding: 8px; border: 1px solid #e2e8f0; border-radius: 8px; background: ${currentFilter.period === '2months' ? '#3498db' : 'white'}; color: ${currentFilter.period === '2months' ? 'white' : '#1e293b'}; font-size: 11px; cursor: pointer;">2mois</button>
+                            <button class="filter-chip" data-period="3months" onclick="window.applyFilterPeriod('3months')" style="padding: 8px; border: 1px solid #e2e8f0; border-radius: 8px; background: ${currentFilter.period === '3months' ? '#3498db' : 'white'}; color: ${currentFilter.period === '3months' ? 'white' : '#1e293b'}; font-size: 11px; cursor: pointer;">3mois</button>
+                            <button class="filter-chip" data-period="6months" onclick="window.applyFilterPeriod('6months')" style="padding: 8px; border: 1px solid #e2e8f0; border-radius: 8px; background: ${currentFilter.period === '6months' ? '#3498db' : 'white'}; color: ${currentFilter.period === '6months' ? 'white' : '#1e293b'}; font-size: 11px; cursor: pointer;">6mois</button>
+                            <button class="filter-chip" data-period="1year" onclick="window.applyFilterPeriod('1year')" style="padding: 8px; border: 1px solid #e2e8f0; border-radius: 8px; background: ${currentFilter.period === '1year' ? '#3498db' : 'white'}; color: ${currentFilter.period === '1year' ? 'white' : '#1e293b'}; font-size: 11px; cursor: pointer;">1année</button>
+                            <button class="filter-chip" data-period="all" onclick="window.applyFilterPeriod('all')" style="padding: 8px; border: 1px solid #e2e8f0; border-radius: 8px; background: ${currentFilter.period === 'all' ? '#3498db' : 'white'}; color: ${currentFilter.period === 'all' ? 'white' : '#1e293b'}; font-size: 11px; cursor: pointer;">Tout</button>
                         </div>
                     </div>
                     
@@ -207,7 +221,7 @@ export function renderFilterPanel() {
                                 <option value="">Année</option>
                                 ${years.map(y => `<option value="${y}" ${currentFilter.year === y ? 'selected' : ''}>${y}</option>`).join('')}
                             </select>
-                            <button class="filter-btn-primary" onclick="window.applyFilterMonthYear()" style="padding: 8px 16px; background: #f59e0b; border: none; border-radius: 8px; color: white; font-size: 12px; cursor: pointer;">▶ Appliquer</button>
+                            <button class="filter-btn-primary" onclick="window.applyFilterMonthYear()" style="padding: 8px 16px; background: #3498db; border: none; border-radius: 8px; color: white; font-size: 12px; cursor: pointer;">▶ Appliquer</button>
                         </div>
                     </div>
                     
@@ -229,7 +243,7 @@ export function renderFilterPanel() {
                             </select>
                         </div>
                         <div style="display: flex; gap: 10px; margin-top: 12px;">
-                            <button class="filter-btn-primary" onclick="window.applyFilterCustomDates()" style="flex: 1; padding: 8px; background: #f59e0b; border: none; border-radius: 8px; color: white; font-size: 12px; cursor: pointer;">✓ Appliquer</button>
+                            <button class="filter-btn-primary" onclick="window.applyFilterCustomDates()" style="flex: 1; padding: 8px; background: #3498db; border: none; border-radius: 8px; color: white; font-size: 12px; cursor: pointer;">✓ Appliquer</button>
                             <button class="filter-btn-secondary" onclick="window.clearFilter()" style="flex: 1; padding: 8px; background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 8px; color: #475569; font-size: 12px; cursor: pointer;">⟳ Réinitialiser</button>
                         </div>
                     </div>
