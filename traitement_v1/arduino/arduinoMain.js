@@ -1018,6 +1018,8 @@ async function handleFileSelect() {
         
         // 4. Build database avec les tables filtrées
         buildDatabase(tablesToUse);
+
+        getCommercialTables();
         
         // 5. Analyses
         console.log("🚀 Lancement des analyses...");
@@ -1418,4 +1420,121 @@ export async function analyzeFromContent(content, nrValue = null) {
         hideLoader();
         throw err;
     }
+}
+
+// ===========================================
+// FILTRAGE COMMERCIAL (Tables S, R, E uniquement)
+// ===========================================
+
+function findFirstRechargeDate(tables) {
+    const rechargeTable = tables.find(t => t.type === 'R');
+    if (!rechargeTable) return null;
+    
+    let firstDate = null;
+    
+    // Trouver l'index de la colonne Message dans l'en-tête
+    const headers = rechargeTable.header.split(';');
+    const messageIndex = headers.findIndex(h => h.includes('Message'));
+    const timestampIndex = 1; // Toujours à l'index 1 d'après le format
+    
+    if (messageIndex === -1) {
+        console.warn("⚠️ Colonne 'Message' non trouvée dans la table R");
+        return null;
+    }
+    
+    for (const row of rechargeTable.data) {
+        const cells = row.split(';');
+        
+        // Vérifier si c'est une recharge réussie
+        if (cells[messageIndex] === 'Recharge Reussie') {
+            const timestamp = cells[timestampIndex];
+            const date = timestamp?.split(' ')[0];
+            
+            if (date && (!firstDate || date < firstDate)) {
+                firstDate = date;
+            }
+        }
+    }
+    
+    return firstDate;
+}
+
+function filterCommercialTables(tables, startDate) {
+    if (!startDate) return tables;
+    
+    const filteredTables = [];
+    let totalOriginal = 0;
+    let totalFiltered = 0;
+    
+    for (const table of tables) {
+        // Ne filtrer QUE les tables commerciales (S, R, E)
+        if (table.type === 'S' || table.type === 'R' || table.type === 'E') {
+            const originalCount = table.data.length;
+            totalOriginal += originalCount;
+            
+            const filteredData = [];
+            const timestampIndex = 1; // Le timestamp est toujours à l'index 1
+            
+            for (const row of table.data) {
+                const cells = row.split(';');
+                const timestamp = cells[timestampIndex];
+                
+                if (timestamp) {
+                    const rowDate = timestamp.split(' ')[0];
+                    if (rowDate >= startDate) {
+                        filteredData.push(row);
+                    }
+                } else {
+                    // Lignes sans timestamp (rare, mais on garde)
+                    filteredData.push(row);
+                }
+            }
+            
+            totalFiltered += filteredData.length;
+            
+            filteredTables.push({
+                ...table,
+                data: filteredData,
+                originalCount: originalCount,
+                filteredCount: filteredData.length
+            });
+            
+            console.log(`📊 Table ${table.type}: ${originalCount} → ${filteredData.length} lignes (filtré depuis ${startDate})`);
+        } else {
+            // Tables techniques (T, I) inchangées
+            filteredTables.push(table);
+        }
+    }
+    
+    console.log(`✂️ Filtrage commercial total: ${totalOriginal} → ${totalFiltered} lignes (${((totalFiltered/totalOriginal)*100).toFixed(1)}%)`);
+    
+    return filteredTables;
+}
+
+
+// Fonction publique pour obtenir les tables commerciales filtrées
+export function getCommercialTables() {
+    if (!database.rawTables) {
+        console.warn("Pas de données brutes disponibles");
+        return database.tables || [];
+    }
+    
+    // Cache pour ne recalculer qu'une fois
+    if (database.commercialTables) {
+        return database.commercialTables;
+    }
+    
+    const firstRechargeDate = findFirstRechargeDate(database.rawTables);
+    
+    if (firstRechargeDate) {
+        console.log(`🎯 Analyse commerciale: démarrage au ${firstRechargeDate} (première recharge)`);
+        database.commercialTables = filterCommercialTables(database.rawTables, firstRechargeDate);
+        database.commercialStartDate = firstRechargeDate;
+    } else {
+        console.log("⚠️ Aucune recharge trouvée, analyse commerciale sur toutes les données");
+        database.commercialTables = database.rawTables;
+        database.commercialStartDate = null;
+    }
+    
+    return database.commercialTables;
 }

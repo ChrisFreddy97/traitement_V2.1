@@ -26,11 +26,34 @@ export function analyzeCommercialData() {
         consommation: { globale: { max: 0, min: 0, moyenne: 0, joursSans: 0 } },
         recommendations: []
     };
-    
-    const tables = database.tables;
-    const commercialData = database.commercialData;
+
     const nanoreseau = document.getElementById('nanoreseauValue')?.textContent;
+    const commercialData = database.commercialData;
+
+    let tables = database.tables;
     
+    if (database.commercialTables) {
+        tables = database.commercialTables;
+        console.log(`📊 Utilisation des tables commerciales filtrées (depuis ${database.commercialStartDate || 'première recharge'})`);
+    } else {
+        console.log("📊 Utilisation des tables standard pour l'analyse commerciale");
+    }
+    
+    const creditTable = tables.find(t => t.type === 'S');
+    const rechargeTable = tables.find(t => t.type === 'R');
+    const eventTable = tables.find(t => t.type === 'E');
+    
+    // Le reste est STRICTEMENT IDENTIQUE
+    if (creditTable) analyzeCreditData(creditTable, database.commercialData, nanoreseau);
+    if (rechargeTable) analyzeRechargeData(rechargeTable, database.commercialData, nanoreseau);
+    if (eventTable) analyzeCommercialEvents(eventTable, database.commercialData, nanoreseau);
+
+
+    
+/*    
+    const tables = database.tables;
+
+
     if (!tables) {
         console.timeEnd("💰 Analyse commerciale");
         return;
@@ -45,7 +68,7 @@ export function analyzeCommercialData() {
     if (creditTable) analyzeCreditData(creditTable, commercialData, nanoreseau);
     if (rechargeTable) analyzeRechargeData(rechargeTable, commercialData, nanoreseau);
     if (eventTable) analyzeCommercialEvents(eventTable, commercialData, nanoreseau);
-    
+*/   
     // Post-traitement unique
     postProcessClients(commercialData.clients, commercialData);
     
