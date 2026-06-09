@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Analyse - NANORESEAU (Interface V1)</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="style.css" rel="stylesheet">
     <style>
         /* ========== STYLES V1 EXACTEMENT ========== */
         
@@ -254,18 +255,21 @@
             margin-bottom: 20px;
         }
 
-        /* Bouton toggle tables V1 */
+        /* Bouton toggle tables V1 - MODIFIÉ */
         .toggle-tables-btn {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
             color: white !important;
             border: none !important;
             padding: 12px 24px !important;
-            border-radius: 40px !important;
+            border-radius: 8px !important;  /* Changé: de 40px à 8px pour des coins carrés */
             font-weight: 600 !important;
             cursor: pointer !important;
             transition: all 0.3s ease !important;
             font-size: 13px !important;
             margin: 15px 0 !important;
+            width: 100% !important;  /* Ajouté: largeur pleine */
+            display: block !important;  /* Ajouté: pour que width:100% fonctionne correctement */
+            text-align: center !important;  /* Ajouté: centrer le texte */
         }
 
         .toggle-tables-btn:hover {
@@ -290,7 +294,6 @@
             margin-top: 20px;
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
         }
-
         /* Responsive V1 */
         @media (max-width: 768px) {
             .header-content {
@@ -559,11 +562,10 @@
                         <div class="tabs-content">
                             <div id="technicalDashboard"></div>
                             <div id="commercialDashboard"></div>
-                            <div class="type-legend" id="typeLegend"></div>
+                            <div id="toggleButtonContainer"></div>
+                            <div id="tablesContainer" style="display: none;"></div>
                         </div>
                     </div>
-                    <div id="toggleButtonContainer"></div>
-                    <div id="tablesContainer" style="display: none;"></div>
                 `;
                 
                 // Gestionnaires d'onglets (inchangés, identiques à la version qui fonctionne)
