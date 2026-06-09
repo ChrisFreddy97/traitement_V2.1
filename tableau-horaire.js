@@ -3758,7 +3758,7 @@ function getLocalForfaitLimits(forfaitName) {
         "FRIGO": { max: 500, heures: 24 },
         "PRENIUM": { max: 500, heures: 24 },
         "CSB": { max: 1250, heures: 24 },
-        "CSB Congel": { max: 1250, heures: 24 }
+        "CSB Congel": { max: 1250, heures: 24 } 
     };
 
     // Alias pour les noms qui peuvent varier
