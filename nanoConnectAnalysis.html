@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analyse des relevés - NanoR Parser</title>
+    <link rel="stylesheet" href="files.css">
+    <style>
+        .analysis-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .analysis-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 25px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        
+        .analysis-header h1 {
+            margin: 0;
+            font-size: 24px;
+        }
+        
+        .back-btn {
+            background: #6c757d;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: background 0.3s;
+        }
+        
+        .back-btn:hover {
+            background: #5a6268;
+        }
+        
+        /* ==================== CARTE DU HAUT (TECHNIQUE & COMMERCIALE) ==================== */
+        .top-card {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+            overflow: hidden;
+        }
+        
+        .top-tabs {
+            display: flex;
+            gap: 5px;
+            padding: 15px 20px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        
+        .top-tab {
+            padding: 10px 25px;
+            background: #f5f5f5;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 14px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .top-tab:hover {
+            background: #e8e8e8;
+            transform: translateY(-2px);
+        }
+        
+        .top-tab.active {
+            background: linear-gradient(135deg, #2196f3 0%, #1976d2 100%);
+            color: white;
+            box-shadow: 0 2px 8px rgba(33, 150, 243, 0.3);
+        }
+        
+        .top-tab.commerciale.active {
+            background: linear-gradient(135deg, #4caf50 0%, #388e3c 100%);
+        }
+        
+        .top-content {
+            padding: 20px;
+            min-height: 200px;
+        }
+        
+        .empty-content {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+        }
+        
+        /* ==================== CARTE DU BAS (RELEVÉS) ==================== */
+        .bottom-card {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .bottom-content {
+            padding: 20px;
+        }
+        
+        .type-tabs {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #e0e0e0;
+            padding-bottom: 10px;
+        }
+        
+        .type-tab {
+            padding: 10px 20px;
+            background: #f5f5f5;
+            border: none;
+            border-radius: 8px 8px 0 0;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .type-tab:hover {
+            background: #e8e8e8;
+        }
+        
+        .type-tab.active {
+            background: #667eea;
+            color: white;
+        }
+        
+        .type-tab.evnr { background: #f3e5f5; }
+        .type-tab.evnr.active { background: #9c27b0; color: white; }
+        
+        .type-tab.ec { background: #e8f5e9; }
+        .type-tab.ec.active { background: #4caf50; color: white; }
+        
+        .client-subtabs {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            margin-bottom: 15px;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+        
+        .client-tab {
+            padding: 8px 15px;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 13px;
+        }
+        
+        .client-tab:hover {
+            background: #e3f2fd;
+        }
+        
+        .client-tab.active {
+            background: #2196f3;
+            color: white;
+            border-color: #2196f3;
+        }
+        
+        .content-area {
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+        }
+        
+        .content-header {
+            background: #f8f9fa;
+            padding: 15px 20px;
+            border-bottom: 1px solid #e0e0e0;
+            font-weight: bold;
+        }
+        
+        .table-container {
+            overflow-x: auto;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+        }
+        
+        .data-table th,
+        .data-table td {
+            border: 1px solid #ddd;
+            padding: 8px 12px;
+            text-align: left;
+        }
+        
+        .data-table th {
+            background: #f5f5f5;
+            font-weight: bold;
+            position: sticky;
+            top: 0;
+        }
+        
+        .data-table tr:nth-child(even) {
+            background: #fafafa;
+        }
+        
+        .data-table tr:hover {
+            background: #f0f7ff;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 50px;
+            font-size: 18px;
+            color: #666;
+        }
+        
+        .error-message {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        
+        .no-data {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+        }
+    </style>
+</head>
+<body>
+    <div class="analysis-container">
+        <div class="analysis-header">
+            <h1>📊 Analyse des relevés - NR<span id="nr-display"></span></h1>
+            <a href="nanoConnect.html" class="back-btn">← Retour</a>
+        </div>
+        
+        <div id="loading" class="loading">⏳ Chargement...</div>
+        
+        <div id="analysis-content" style="display: none;">
+            <!-- ==================== CARTE DU HAUT : TECHNIQUE & COMMERCIALE ==================== -->
+            <div class="top-card">
+                <div class="top-tabs">
+                    <button class="top-tab technique active" onclick="switchTopTab('technique')">
+                        🔧 TECHNIQUE
+                    </button>
+                    <button class="top-tab commerciale" onclick="switchTopTab('commerciale')">
+                        💰 COMMERCIALE
+                    </button>
+                </div>
+                <div class="top-content">
+                    <!-- Contenu TECHNIQUE vide pour l'instant -->
+                    <div id="technique-content" class="top-tab-content active">
+                        <div class="empty-content" id="technique-empty">
+                            🔧 Aucune information technique disponible
+                        </div>
+                        <div id="daily-energy-container" style="display: none; margin-top:15px;">
+                            <h3>📈 Tableau journalier d'énergie</h3>
+                            <div class="table-container">
+                                <table id="daily-energy-table" class="data-table">
+                                    <thead>
+                                        <tr id="daily-energy-header"></tr>
+                                    </thead>
+                                    <tbody id="daily-energy-body"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <div id="daily-tension-container" style="display: none; margin-top:25px;">
+                            <h3>⚡ Tension journalière</h3>
+                            <div class="table-container">
+                                <table id="daily-tension-table" class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Date</th>
+                                            <th>Min (V)</th>
+                                            <th>Max (V)</th>
+                                            <th>Moyenne (V)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="daily-tension-body"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Contenu COMMERCIALE -->
+                    <div id="commerciale-content" class="top-tab-content" style="display: none;">
+                        <div class="empty-content">
+                            💰 Aucune information commerciale disponible
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- ==================== CARTE DU BAS : RELEVÉS ==================== -->
+            <div class="bottom-card">
+                <div class="bottom-content">
+                    <div class="type-tabs" id="type-tabs"></div>
+                    <div class="client-subtabs" id="client-subtabs"></div>
+                    <div class="content-area">
+                        <div class="content-header" id="content-header"></div>
+                        <div id="content-display"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="error-message" class="error-message" style="display: none;"></div>
+    </div>
+
+    <script src="nanor-parser.js"></script>
+    <script src="nanoConnectAnalysis.js"></script>
+</body>
+</html>

@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analyse V2/V3 - NanoConnect</title>
+    <link rel="stylesheet" href="files.css">
+    <style>
+        /* Styles supplémentaires pour le système étendu */
+        .period-badge {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            display: inline-block;
+            margin-left: 10px;
+        }
+        
+        .auto-detected {
+            background: #e8f5e9;
+            border-left: 4px solid #4caf50;
+            padding: 12px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+        }
+        
+        .auto-detected .label {
+            color: #2e7d32;
+            font-weight: bold;
+        }
+        
+        .forfait-loaded {
+            background: #e3f2fd;
+            border-left: 4px solid #2196f3;
+        }
+        
+        .info-box {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            padding: 15px;
+            background: #f0f7ff;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .info-icon {
+            font-size: 32px;
+        }
+        
+        .info-content {
+            flex: 1;
+        }
+        
+        .info-content strong {
+            color: #1976d2;
+        }
+        
+        .period-info {
+            font-size: 14px;
+            color: #555;
+            margin-top: 5px;
+        }
+        
+        .forfait-source {
+            font-size: 11px;
+            color: #4caf50;
+            margin-top: 5px;
+            font-style: italic;
+        }
+        
+        .badge-auto {
+            background: #4caf50;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 10px;
+            margin-left: 8px;
+        }
+        
+        .client-forfait-card {
+            background: white;
+            padding: 8px 15px;
+            border-radius: 20px;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        
+        .client-forfait-card strong {
+            color: #1976d2;
+        }
+        
+        .files-summary {
+            background: #f5f5f5;
+            padding: 12px;
+            border-radius: 8px;
+            margin-top: 15px;
+        }
+        
+        .files-summary h4 {
+            margin: 0 0 10px 0;
+            color: #555;
+        }
+        
+        .stats-grid {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .stat-item {
+            background: white;
+            padding: 5px 12px;
+            border-radius: 15px;
+            font-size: 13px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header class="management-header">
+            <div class="header-content">
+                <h1>📊 ANALYSE RELÈVES V2/V3 - NANOCONNECT</h1>
+                <button id="back-to-home-btn" class="btn btn-secondary">
+                    ← Retour à l'accueil
+                </button>
+            </div>
+        </header>
+
+        <main class="management-main">
+            <!-- Barre de recherche -->
+            <div class="search-section">
+                <input type="text" id="folder-search" placeholder="🔍 tapez un numéro NR...." class="search-input">
+            </div>
+
+            <!-- Bouton pour l'importation étendue -->
+            <div class="add-folder-section">
+                <button id="import-extended-btn" class="btn btn-primary btn-large">
+                    Ajouter une nouvelle relève
+                </button>
+            </div>
+
+            <!-- Section Liste des Dossiers -->
+            <div id="folders-list-section" class="folders-section">
+                <h2>📁 Liste des dossiers importés</h2>
+                <div class="table-container">
+                    <table class="folders-table">
+                        <thead>
+                            <tr>
+                                <th>Dossier</th>
+                                <th>Période</th>
+                                <th>Fichiers</th>
+                                <th>Date d'import</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="folders-list">
+                        </tbody>
+                    </table>
+                </div>
+                <div id="no-folders-message" class="no-data">
+                    <p>Aucun dossier importé pour le moment</p>
+                    <p>Cliquez sur "Ajouter une nouvelle relève" pour commencer</p>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modal d'importation système étendu -->
+    <div id="extended-modal" class="modal hidden">
+        <div class="modal-content large">
+            <div class="modal-header">
+                <h2>📥 Importation - Système Étendu</h2>
+                <span class="close">&times;</span>
+            </div>
+            <div class="modal-body">
+                <!-- Zone d'information -->
+                <div class="info-box">
+                    <div class="info-icon">📅</div>
+                    <div class="info-content">
+                        <strong>Format attendu:</strong> <code>NR{numéro}_{jjMMyy}_{jjMMyy}</code><br>
+                        <span class="period-info">Le numéro NR, la date de début et la date de fin seront automatiquement extraits du nom du dossier.</span>
+                    </div>
+                </div>
+
+                <!-- Section Sélection de dossier -->
+                <div class="upload-section">
+                    <div class="upload-card">
+                        <button id="select-extended-folder-btn" class="btn btn-primary btn-large">
+                            📁 Sélectionner un dossier
+                        </button>
+                        <div id="selected-folder" class="folder-info"></div>
+                    </div>
+                </div>
+
+                <!-- Section Informations extraites -->
+                <div id="extracted-info" class="auto-detected hidden">
+                    <div class="label">🔍 Informations automatiquement extraites :</div>
+                    <div id="extracted-details"></div>
+                </div>
+
+                <!-- Section Analyse des Fichiers -->
+                <div id="files-section" class="files-section hidden">
+                    <h3>📄 Fichiers détectés</h3>
+                    <div id="files-list" class="files-list"></div>
+                    
+                    <!-- Section Forfaits chargés (remplace la configuration des clients) -->
+                    <div id="forfait-info" class="auto-detected forfait-loaded hidden">
+                        <div class="label">📋 Forfaits chargés automatiquement :</div>
+                        <div id="forfait-details"></div>
+                        <div class="forfait-source" style="margin-top: 10px;">
+                            💡 Les forfaits sont automatiquement assignés depuis le fichier <code>forfait_NR{numéro}.txt</code>
+                        </div>
+                    </div>
+
+                    <!-- Résumé des fichiers -->
+                    <div id="files-summary" class="files-summary hidden">
+                        <h4>📊 Résumé des fichiers importés</h4>
+                        <div id="summary-stats" class="stats-grid"></div>
+                    </div>
+
+                    <div class="validation-section">
+                        <button id="validate-btn" class="btn btn-success btn-large" disabled>
+                            ✅ Valider et créer le dossier
+                        </button>
+                        <div id="validation-hint" class="validation-hint">
+                            Sélectionnez un dossier pour commencer
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="cancel-modal-btn" class="btn btn-secondary">Annuler</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="nanoConnect.js"></script>
+</body>
+</html>
